@@ -1,166 +1,226 @@
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
 import { chmod, readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { setTimeout as delay } from "node:timers/promises";
 import test from "node:test";
-import { callbackIdFor, validateTerminalReceipt } from "../lib/callbacks.mjs";
-import { cli } from "./helpers.mjs";
-import { assertSuccess, createGitFixture, packageRoot, removeFixture, runCli } from "./helpers.mjs";
+import {
+  callbackIdFor,
+  callbackPaths,
+  consumeCallback,
+  deliverCallback,
+  expireCallback,
+  observeCallback,
+  reconcileCallback,
+  validateTerminalReceipt,
+} from "../lib/callbacks.mjs";
+import { bindRecipient, rebindRecipient } from "../lib/recipients.mjs";
+import { createGitFixture, removeFixture } from "./helpers.mjs";
 
-function receipt(executorId = "fixture-executor") {
-  return {
-    source_thread_id: "fixture-coordinator",
-    executor_id: executorId,
+function receipt(overrides = {}) {
+  const base = {
+    schema_version: 2,
+    recipient: {
+      lineage_id: "fixture-lineage",
+      thread_id: "fixture-coordinator",
+      generation: 1,
+    },
+    executor_id: "fixture-executor",
+    run_id: "run-fixture-01",
+    source_revision: "0123456789abcdef",
+    sequence: 1,
+    supersedes_callback_ids: [],
+    expires_at: "2030-08-23T17:15:00-04:00",
     classification: "PASS",
-    branch: `codex/${executorId}`,
+    branch: "codex/fixture-executor",
     commit: "0123456789abcdef",
-    upstream: `origin/codex/${executorId}`,
+    upstream: "origin/codex/fixture-executor",
     cleanliness: "clean",
     result_or_blocker: "Bounded result complete.",
     next_decision: "Integrate once.",
     accounting: { PRODUCT: 1, CROSS_CUTTING_PRODUCT_FIX: 0, ENVIRONMENT: 0, PROOF_HARNESS: 1 },
   };
+  return {
+    ...base,
+    ...overrides,
+    recipient: { ...base.recipient, ...overrides.recipient },
+    accounting: { ...base.accounting, ...overrides.accounting },
+  };
 }
 
-test("callback delivery persists, avoids duplicate normal retries, consumes once, and rejects unsafe receipts", async () => {
-  const root = await createGitFixture("codex-flow-callback-");
-  try {
-    const capture = resolve(root, "calls.ndjson");
-    const fake = resolve(root, "fake-codex.mjs");
-    await writeFile(fake, `#!/usr/bin/env node
+async function bind(root, recipient = receipt().recipient) {
+  return bindRecipient({
+    stateRoot: resolve(root, ".git", "codex-flow"),
+    recipient,
+  });
+}
+
+async function fakeCodex(root) {
+  const capture = resolve(root, "queue.ndjson");
+  const binary = resolve(root, "fake-codex.mjs");
+  await writeFile(binary, `#!/usr/bin/env node
 import { appendFileSync } from "node:fs";
 if (process.argv[2] === "--version") process.exit(0);
 appendFileSync(process.env.FAKE_CAPTURE, JSON.stringify(process.argv.slice(2)) + "\\n");
-if (process.env.FAKE_MODE === "fail") process.exit(19);
+process.exit(process.env.FAKE_MODE === "fail" ? 19 : 0);
 `, "utf8");
-    await chmod(fake, 0o700);
-    const env = { CODEX_FLOW_CODEX_BIN: fake, FAKE_CAPTURE: capture };
-    const receiptPath = resolve(root, "receipt.json");
-    await writeFile(receiptPath, JSON.stringify(receipt()), "utf8");
+  await chmod(binary, 0o700);
+  return { binary, capture };
+}
 
-    const first = runCli(["callback", "deliver", "--file", receiptPath, "--json"], { cwd: root, env });
-    assertSuccess(first, "first callback delivery");
-    const delivered = JSON.parse(first.stdout);
-    assert.equal(delivered.status, "accepted");
-    const calls = (await readFile(capture, "utf8")).trim().split("\n").map(JSON.parse);
-    assert.equal(calls.length, 1);
-    assert.deepEqual(calls[0].slice(0, 3), ["queue", "--thread", "fixture-coordinator"]);
-    assert.match(calls[0][4], new RegExp(delivered.callback_id));
+async function journal(root, payload) {
+  return JSON.parse(await readFile(callbackPaths(resolve(root, ".git", "codex-flow"), payload).record, "utf8"));
+}
 
-    assertSuccess(runCli(["callback", "deliver", "--file", receiptPath], { cwd: root, env }), "idempotent delivery");
-    assert.equal((await readFile(capture, "utf8")).trim().split("\n").length, 1);
-
-    const consume = runCli([
-      "callback", "consume",
-      "--callback-id", delivered.callback_id,
-      "--source-thread-id", "fixture-coordinator",
-      "--executor-id", "fixture-executor",
-      "--json",
-    ], { cwd: root });
-    assertSuccess(consume, "callback consume");
-    assert.equal(JSON.parse(consume.stdout).status, "consumed");
-    assertSuccess(runCli([
-      "callback", "consume",
-      "--callback-id", delivered.callback_id,
-      "--source-thread-id", "fixture-coordinator",
-      "--executor-id", "fixture-executor",
-    ], { cwd: root }), "idempotent consume");
-    assertSuccess(runCli(["callback", "deliver", "--file", receiptPath], { cwd: root, env }), "post-consume retry");
-    assert.equal((await readFile(capture, "utf8")).trim().split("\n").length, 1);
-
-    const unknown = runCli(["callback", "deliver", "--no-queue"], {
-      cwd: root,
-      input: { ...receipt("unsafe-unknown"), raw_log: "forbidden" },
-    });
-    assert.notEqual(unknown.status, 0);
-    assert.match(unknown.stderr, /not allowed/);
-    const secret = runCli(["callback", "deliver", "--no-queue"], {
-      cwd: root,
-      input: { ...receipt("unsafe-secret"), result_or_blocker: "token sk-abcdefghijklmnopqrstuv" },
-    });
-    assert.notEqual(secret.status, 0);
-    assert.match(secret.stderr, /secret-like/);
-  } finally {
-    await removeFixture(root);
-  }
-});
-
-test("callback consumption cannot overtake an in-flight queue delivery", async () => {
-  const root = await createGitFixture("codex-flow-callback-race-");
+test("callback retries retain immutable identity and journal lifecycle through exactly-once consumption", async () => {
+  const root = await createGitFixture("codex-flow-callback-");
+  const originalEnv = { ...process.env };
   try {
-    const capture = resolve(root, "queue-started");
-    const fake = resolve(root, "slow-codex.mjs");
-    await writeFile(fake, `#!/usr/bin/env node
-import { writeFileSync } from "node:fs";
-if (process.argv[2] === "--version") process.exit(0);
-writeFileSync(process.env.FAKE_CAPTURE, "started\\n");
-setTimeout(() => process.exit(0), 600);
-`, "utf8");
-    await chmod(fake, 0o700);
-    const receiptPath = resolve(root, "receipt.json");
-    const payload = receipt("race-executor");
-    await writeFile(receiptPath, JSON.stringify(payload), "utf8");
-    const callbackId = callbackIdFor(validateTerminalReceipt(payload));
+    const stateRoot = resolve(root, ".git", "codex-flow");
+    await bind(root);
+    const { binary, capture } = await fakeCodex(root);
+    process.env.CODEX_FLOW_CODEX_BIN = binary;
+    process.env.FAKE_CAPTURE = capture;
+    delete process.env.FAKE_MODE;
 
-    const child = spawn(process.execPath, [cli, "callback", "deliver", "--file", receiptPath, "--json"], {
-      cwd: root,
-      env: { ...process.env, CODEX_FLOW_CODEX_BIN: fake, FAKE_CAPTURE: capture },
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-    let stdout = "";
-    let stderr = "";
-    child.stdout.on("data", (chunk) => { stdout += chunk; });
-    child.stderr.on("data", (chunk) => { stderr += chunk; });
-    for (let attempt = 0; attempt < 50; attempt += 1) {
-      try {
-        await readFile(capture);
-        break;
-      } catch {
-        await delay(20);
-      }
+    const payload = receipt();
+    const callbackId = callbackIdFor(payload);
+    assert.equal(
+      callbackId,
+      callbackIdFor(receipt({
+        recipient: { thread_id: "rebased-thread", generation: 99 },
+        source_revision: "fedcba9876543210",
+      })),
+    );
+    const first = await deliverCallback({ stateRoot, receipt: payload });
+    assert.equal(first.status, "enqueued");
+    assert.equal(first.callback_id, callbackId);
+    assert.equal((await readFile(capture, "utf8")).trim().split("\n").length, 1);
+    assert.equal((await deliverCallback({ stateRoot, receipt: payload })).status, "already-enqueued");
+    assert.equal((await readFile(capture, "utf8")).trim().split("\n").length, 1);
+    await assert.rejects(
+      deliverCallback({ stateRoot, receipt: receipt({ result_or_blocker: "Changed after persistence." }) }),
+      /immutable callback identity/,
+    );
+
+    assert.equal((await observeCallback({ stateRoot, callbackId })).status, "observed");
+    assert.equal((await consumeCallback({ stateRoot, callbackId, executorId: payload.executor_id })).status, "consumed");
+    assert.equal((await consumeCallback({ stateRoot, callbackId })).status, "already-consumed");
+    const record = await journal(root, payload);
+    assert.equal(record.delivery.state, "consumed");
+    for (const field of ["persisted_at", "enqueue_attempted_at", "enqueued_at", "observed_at", "consumed_at"]) {
+      assert.ok(record.lifecycle[field], `expected lifecycle timestamp ${field}`);
     }
-    await readFile(capture);
-
-    const earlyConsume = runCli([
-      "callback", "consume",
-      "--callback-id", callbackId,
-      "--source-thread-id", "fixture-coordinator",
-      "--executor-id", "race-executor",
-    ], { cwd: root });
-    assert.equal(earlyConsume.status, 75);
-    assert.match(earlyConsume.stderr, /already in progress/);
-
-    const exitCode = await new Promise((resolveExit) => child.on("close", resolveExit));
-    assert.equal(exitCode, 0, stderr || stdout);
-    assert.equal(JSON.parse(stdout).status, "accepted");
-    const consume = runCli([
-      "callback", "consume",
-      "--callback-id", callbackId,
-      "--source-thread-id", "fixture-coordinator",
-      "--executor-id", "race-executor",
-    ], { cwd: root });
-    assertSuccess(consume, "post-delivery consume");
+    assert.equal(record.delivery.enqueue_attempts.length, 1);
+    assert.equal(record.delivery.enqueue_attempts[0].outcome, "enqueued");
   } finally {
+    process.env = originalEnv;
     await removeFixture(root);
   }
 });
 
-test("queue failure exits temporarily while retaining the durable receipt", async () => {
-  const root = await createGitFixture();
+test("ambiguous queue attempts block retries until reconciliation while missing binaries remain safe", async () => {
+  const root = await createGitFixture("codex-flow-callback-ambiguous-");
+  const originalEnv = { ...process.env };
   try {
-    const fake = resolve(root, "fake-codex.mjs");
-    await writeFile(fake, "#!/usr/bin/env node\nif (process.argv[2] === '--version') process.exit(0); process.exit(19);\n", "utf8");
-    await chmod(fake, 0o700);
-    const result = runCli(["callback", "deliver"], {
-      cwd: root,
-      env: { CODEX_FLOW_CODEX_BIN: fake },
-      input: receipt("failed-queue"),
-    });
-    assert.equal(result.status, 75);
-    const common = resolve(root, ".git", "codex-flow", "callbacks", "sources", "fixture-coordinator", "terminal", "failed-queue.json");
-    await readFile(common);
+    const stateRoot = resolve(root, ".git", "codex-flow");
+    await bind(root);
+    const { binary } = await fakeCodex(root);
+    const payload = receipt({ run_id: "run-ambiguous-01" });
+    const callbackId = callbackIdFor(payload);
+    process.env.CODEX_FLOW_CODEX_BIN = binary;
+    process.env.FAKE_CAPTURE = resolve(root, "ambiguous.ndjson");
+    process.env.FAKE_MODE = "fail";
+
+    await assert.rejects(deliverCallback({ stateRoot, receipt: payload }), /outcome is ambiguous/);
+    assert.equal((await journal(root, payload)).delivery.state, "enqueue-attempted");
+    await assert.rejects(deliverCallback({ stateRoot, receipt: payload }), /reconcile before retrying/);
+    assert.equal((await reconcileCallback({ stateRoot, callbackId, outcome: "not-enqueued" })).status, "persisted");
+
+    delete process.env.FAKE_MODE;
+    assert.equal((await deliverCallback({ stateRoot, receipt: payload })).status, "enqueued");
+
+    const missing = receipt({ run_id: "run-missing-binary-01" });
+    process.env.CODEX_FLOW_CODEX_BIN = resolve(root, "missing-codex");
+    await assert.rejects(deliverCallback({ stateRoot, receipt: missing }), /queue unavailable/);
+    assert.equal((await journal(root, missing)).delivery.state, "persisted");
   } finally {
+    process.env = originalEnv;
     await removeFixture(root);
   }
+});
+
+test("stale packets route only through a newer lineage binding, and explicit supersession and expiry are terminal", async () => {
+  const root = await createGitFixture("codex-flow-callback-routing-");
+  const originalEnv = { ...process.env };
+  try {
+    const stateRoot = resolve(root, ".git", "codex-flow");
+    const initial = await bind(root);
+    const rebound = await rebindRecipient({
+      stateRoot,
+      recipient: {
+        lineage_id: "fixture-lineage",
+        thread_id: "new-coordinator-thread",
+        generation: 2,
+      },
+      fenceToken: initial.recipient.fence_token,
+    });
+    assert.equal(rebound.status, "rebound");
+    const { binary, capture } = await fakeCodex(root);
+    process.env.CODEX_FLOW_CODEX_BIN = binary;
+    process.env.FAKE_CAPTURE = capture;
+    delete process.env.FAKE_MODE;
+
+    const stale = receipt({ run_id: "run-rebound-01" });
+    const delivered = await deliverCallback({ stateRoot, receipt: stale });
+    assert.equal(delivered.recipient.thread_id, "new-coordinator-thread");
+    const call = JSON.parse((await readFile(capture, "utf8")).trim());
+    assert.deepEqual(call.slice(0, 3), ["queue", "--thread", "new-coordinator-thread"]);
+    await assert.rejects(
+      deliverCallback({
+        stateRoot,
+        receipt: receipt({
+          run_id: "run-invalid-old-binding-01",
+          recipient: { thread_id: "unbound-thread", generation: 1 },
+        }),
+        noQueue: true,
+      }),
+      /does not match an authoritative lineage binding/,
+    );
+
+    const prior = receipt({ run_id: "run-supersession-01", sequence: 1 });
+    const priorId = callbackIdFor(prior);
+    assert.equal((await deliverCallback({ stateRoot, receipt: prior, noQueue: true })).status, "persisted");
+    const successor = receipt({
+      run_id: "run-supersession-01",
+      sequence: 2,
+      supersedes_callback_ids: [priorId],
+    });
+    assert.equal((await deliverCallback({ stateRoot, receipt: successor, noQueue: true })).status, "persisted");
+    assert.equal((await journal(root, prior)).delivery.state, "superseded");
+    await assert.rejects(observeCallback({ stateRoot, callbackId: priorId }), /superseded.*cannot be observed/);
+    await assert.rejects(consumeCallback({ stateRoot, callbackId: priorId }), /superseded.*cannot be consumed/);
+
+    const expiring = receipt({
+      run_id: "run-expiring-01",
+      expires_at: "2030-08-23T12:00:00.000Z",
+    });
+    const expiringId = callbackIdFor(expiring);
+    assert.equal((await deliverCallback({ stateRoot, receipt: expiring, noQueue: true })).status, "persisted");
+    assert.equal(
+      (await expireCallback({ stateRoot, callbackId: expiringId, now: Date.parse("2030-08-23T12:00:01.000Z") })).status,
+      "expired",
+    );
+    await assert.rejects(observeCallback({ stateRoot, callbackId: expiringId }), /expired.*cannot be observed/);
+    await assert.rejects(consumeCallback({ stateRoot, callbackId: expiringId }), /expired.*cannot be consumed/);
+  } finally {
+    process.env = originalEnv;
+    await removeFixture(root);
+  }
+});
+
+test("receipt validation rejects v1 input, raw transcripts, and user identity-like content", () => {
+  assert.throws(() => validateTerminalReceipt(receipt({ schema_version: 1 })), /schema_version/);
+  assert.throws(() => validateTerminalReceipt(receipt({ result_or_blocker: "stdout: a raw command log" })), /raw log/);
+  assert.throws(() => validateTerminalReceipt(receipt({ next_decision: "Contact jane@example.com" })), /identity-like/);
+  assert.throws(() => validateTerminalReceipt(receipt({ next_decision: "Call 416-555-1212" })), /identity-like/);
+  assert.throws(() => validateTerminalReceipt(receipt({ result_or_blocker: "token sk-abcdefghijklmnopqrstuv" })), /secret-like/);
 });

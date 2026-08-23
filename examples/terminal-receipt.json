@@ -1,6 +1,16 @@
 {
-  "source_thread_id": "coordinator-thread-id",
+  "schema_version": 2,
+  "recipient": {
+    "lineage_id": "coordinator-lineage-v2",
+    "thread_id": "coordinator-thread-id",
+    "generation": 1
+  },
   "executor_id": "bounded-executor-01",
+  "run_id": "run-20260823-01",
+  "source_revision": "0123456789abcdef",
+  "sequence": 1,
+  "supersedes_callback_ids": [],
+  "expires_at": "2030-08-23T17:15:00-04:00",
   "classification": "PASS",
   "branch": "codex/bounded-executor-01",
   "commit": "0123456789abcdef",
