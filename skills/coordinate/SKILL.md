@@ -20,6 +20,12 @@ task packet and pass its requested execution kind, environment, resolved
 `model`, and `reasoning_effort` as actual host creation arguments; merely
 mentioning them in a prompt does not configure the host.
 
+For local and worktree tasks, derive the packet's absolute Git worktree root,
+exact full `HEAD`, and cleanliness directly from that repository. Do not expand
+or transcribe a short revision by hand. `task operation prepare` authenticates
+this baseline before journaling and `attempt` authenticates it again immediately
+before dispatch.
+
 Probe the current session's actual creation tools. Journal each creation with
 `task operation prepare` and `attempt`, then inspect and reconcile the created
 object. If the requested kind is unavailable, render the packet for a capable

@@ -46,7 +46,8 @@ registration remains a separate, explicit user-level operation.
 
 ## Bootstrap a repository
 
-Run from the target repository:
+Create or switch to the intended integration branch first, then run from that
+exact target worktree:
 
 ```bash
 node /path/to/codex-orchestration/bin/codex-flow.mjs init --plan --json
@@ -60,6 +61,11 @@ write set, before/after hashes and line counts, activation roots, compatibility
 conflicts, and a deterministic `plan_id`. Application recomputes the plan and
 refuses stale IDs. Configuration, pinned runtime, and instruction integration
 activate as one transaction and roll back together on failure.
+
+The plan ID binds the repository branch, revision, and cleanliness. Apply it
+from the same branch and unchanged worktree where it was created. Switching to
+a pilot branch after planning deliberately invalidates the plan; branch first,
+then plan and apply.
 
 Managed instruction mode preserves existing `AGENTS.md` content and owns one
 bounded block. A mature repository with an equivalent contract may instead use:
@@ -120,6 +126,14 @@ tool, persist a deterministic operation with `task operation prepare`, then
 start a bounded attempt. After the host call, inspect the actual object and
 reconcile its ID, exact title, kind, and visibility.
 
+For `local` and `worktree` packets, `environment.project_path` is the absolute
+Git worktree root and `baseline.revision` is its exact full `HEAD`. Preparation
+authenticates the packet against that repository before creating an operation
+record. Starting an attempt authenticates it again, including expected clean
+or explicitly dirty state, immediately before the host call. A legacy operation
+without this evidence remains readable but cannot launch until its original
+packet is prepared again.
+
 A timeout is ambiguous, not failure. List/read the host state before retrying,
 then reconcile `observed` or `not-created`. No new launch may start after the
 packet's absolute zoned deadline. The CLI journals the operation but does not
@@ -127,7 +141,7 @@ invoke private in-session model tools; the coordinator performs the one-shot
 host call using the capability available in that session.
 
 See [Host operations](templates/references/host-operations.md) for the adapter
-procedure.
+procedure and bounded host-list fallback.
 
 ## Callback and fork contract
 
@@ -173,5 +187,7 @@ architecture and [ADR 0002](docs/adr/0002-run-identity-and-host-reconciliation.m
 for identity, queue, deadline, and host-reconciliation decisions. Installation
 planning and external instruction ownership are defined by
 [ADR 0003](docs/adr/0003-install-planning-and-instruction-ownership.md).
+Local task baseline authentication is defined by
+[ADR 0004](docs/adr/0004-authenticate-local-task-baselines.md).
 The current covered/partial/host-dependent boundary is listed in
-[v0.3 orchestration coverage](docs/coverage-v0.3.md).
+[v0.3.1 orchestration coverage](docs/coverage-v0.3.1.md).

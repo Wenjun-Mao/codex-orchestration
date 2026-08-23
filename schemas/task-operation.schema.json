@@ -35,8 +35,20 @@
         },
         "reasoning_effort": {
           "enum": [null, "none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"]
+        },
+        "baseline": { "$ref": "#/$defs/baseline" },
+        "environment": { "$ref": "#/$defs/environment" }
+      },
+      "allOf": [
+        {
+          "if": { "required": ["baseline"] },
+          "then": { "required": ["environment"] }
+        },
+        {
+          "if": { "required": ["environment"] },
+          "then": { "required": ["baseline"] }
         }
-      }
+      ]
     },
     "status": {
       "enum": ["prepared", "dispatching", "ambiguous", "observed", "failed", "expired"]
@@ -74,6 +86,29 @@
       "properties": {
         "at": { "$ref": "#/$defs/timestamp" },
         "timezone": { "type": "string", "minLength": 1, "maxLength": 128 }
+      }
+    },
+    "baseline": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["revision", "cleanliness"],
+      "properties": {
+        "revision": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "cleanliness": { "enum": ["clean", "dirty-authorized"] }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "project_path"],
+      "properties": {
+        "type": { "enum": ["local", "worktree", "projectless"] },
+        "project_path": {
+          "oneOf": [
+            { "type": "null" },
+            { "type": "string", "minLength": 1, "maxLength": 1024 }
+          ]
+        }
       }
     },
     "attempt": {

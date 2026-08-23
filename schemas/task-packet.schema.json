@@ -33,6 +33,7 @@
       "properties": {
         "type": { "enum": ["local", "worktree", "projectless"] },
         "project_path": {
+          "description": "Absolute Git worktree root for local/worktree tasks; null for projectless tasks.",
           "oneOf": [
             { "type": "null" },
             { "type": "string", "minLength": 1, "maxLength": 1024 }

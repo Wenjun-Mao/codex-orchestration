@@ -102,6 +102,10 @@ test("task packets reject broad ownership and callback identity drift", async ()
     ...raw,
     ownership: { ...raw.ownership, exclusions: [raw.ownership.write_paths[0]] },
   }), /overlaps an explicit exclusion/);
+  assert.throws(() => validateTaskPacket({
+    ...raw,
+    environment: { type: "local", project_path: "relative/project" },
+  }), /project_path must be absolute/);
 });
 
 test("v2 contracts fail closed on v1 and unknown or ambiguous execution kinds", async () => {
