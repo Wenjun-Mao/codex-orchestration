@@ -28,8 +28,18 @@ function runPinned(root, args, cwd = root) {
 
 function receipt() {
   return {
-    source_thread_id: "linked-coordinator",
+    schema_version: 2,
+    recipient: {
+      lineage_id: "linked-lineage",
+      thread_id: "linked-coordinator",
+      generation: 1,
+    },
     executor_id: "linked-executor",
+    run_id: "linked-run-01",
+    source_revision: "0123456789abcdef",
+    sequence: 1,
+    supersedes_callback_ids: [],
+    expires_at: "2030-08-23T17:15:00-04:00",
     classification: "PASS",
     branch: "codex/linked-executor",
     commit: "0123456789abcdef",
@@ -144,6 +154,9 @@ test("linked Git worktrees share callback and exclusive-resource state", async (
     assert.equal(JSON.parse(status.stdout)[0].owner, "executor-a");
     assert.equal(JSON.parse(status.stdout)[0].token, undefined);
 
+    assertSuccess(runCli([
+      "recipient", "bind", "--lineage-id", "linked-lineage", "--thread-id", "linked-coordinator", "--json",
+    ], { cwd: root }), "main-worktree recipient bind");
     assertSuccess(runCli(["callback", "deliver", "--no-queue"], {
       cwd: root,
       input: receipt(),

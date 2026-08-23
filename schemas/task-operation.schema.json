@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://private.local/codex-flow/task-operation.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "kind", "operation_id", "project_id", "packet_hash",
+    "request", "status", "attempts", "observed", "created_at", "updated_at"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "kind": { "const": "codex-flow-task-create-operation" },
+    "operation_id": { "$ref": "#/$defs/safeId" },
+    "project_id": { "$ref": "#/$defs/safeId" },
+    "packet_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "task_id", "run_id", "role", "execution_kind", "title",
+        "launch_deadline", "model", "reasoning_effort"
+      ],
+      "properties": {
+        "task_id": { "$ref": "#/$defs/safeId" },
+        "run_id": { "$ref": "#/$defs/safeId" },
+        "role": { "enum": ["coordinator", "executor"] },
+        "execution_kind": { "enum": ["task-thread", "subagent"] },
+        "title": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "launch_deadline": { "$ref": "#/$defs/deadline" },
+        "model": {
+          "oneOf": [
+            { "type": "null" },
+            { "type": "string", "minLength": 1, "maxLength": 128 }
+          ]
+        },
+        "reasoning_effort": {
+          "enum": [null, "none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"]
+        }
+      }
+    },
+    "status": {
+      "enum": ["prepared", "dispatching", "ambiguous", "observed", "failed", "expired"]
+    },
+    "attempts": {
+      "type": "array",
+      "maxItems": 32,
+      "items": { "$ref": "#/$defs/attempt" }
+    },
+    "observed": {
+      "oneOf": [
+        { "type": "null" },
+        { "$ref": "#/$defs/observed" }
+      ]
+    },
+    "created_at": { "$ref": "#/$defs/timestamp" },
+    "updated_at": { "$ref": "#/$defs/timestamp" }
+  },
+  "$defs": {
+    "safeId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9_.-]+$"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "maxLength": 64
+    },
+    "deadline": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["at", "timezone"],
+      "properties": {
+        "at": { "$ref": "#/$defs/timestamp" },
+        "timezone": { "type": "string", "minLength": 1, "maxLength": 128 }
+      }
+    },
+    "attempt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["attempt_id", "sequence", "status", "started_at", "ambiguous_after", "finished_at"],
+      "properties": {
+        "attempt_id": { "$ref": "#/$defs/safeId" },
+        "sequence": { "type": "integer", "minimum": 1, "maximum": 32 },
+        "status": { "enum": ["dispatching", "ambiguous", "not-created", "observed", "failed"] },
+        "started_at": { "$ref": "#/$defs/timestamp" },
+        "ambiguous_after": { "$ref": "#/$defs/timestamp" },
+        "finished_at": {
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "#/$defs/timestamp" }
+          ]
+        }
+      }
+    },
+    "observed": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["object_id", "actual_kind", "title", "visible", "observed_at"],
+      "properties": {
+        "object_id": { "$ref": "#/$defs/safeId" },
+        "actual_kind": { "enum": ["task-thread", "subagent"] },
+        "title": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "visible": { "type": "boolean" },
+        "observed_at": { "$ref": "#/$defs/timestamp" }
+      }
+    }
+  }
+}

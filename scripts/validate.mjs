@@ -25,7 +25,7 @@ const plugin = JSON.parse(await readFile(resolve(root, ".codex-plugin/plugin.jso
 if (packageJson.version !== PACKAGE_VERSION || plugin.version !== PACKAGE_VERSION) {
   throw new Error("Package, plugin, and runtime versions must match");
 }
-if (packageJson.private !== true) throw new Error("v0.1 package must remain private");
+if (packageJson.private !== true) throw new Error("Package must remain private");
 for (const field of [
   "dependencies",
   "devDependencies",
@@ -61,7 +61,7 @@ for (const modulePath of modules) {
   }
 }
 
-for (const name of ["project", "task-packet", "parallel-plan", "terminal-receipt"]) {
+for (const name of ["project", "task-packet", "parallel-plan", "task-operation", "terminal-receipt"]) {
   const schema = JSON.parse(await readFile(resolve(root, "schemas", `${name}.schema.json`), "utf8"));
   if (schema.type !== "object" || schema.additionalProperties !== false || !schema.properties) {
     throw new Error(`Schema ${name} must declare a closed object contract`);
@@ -72,6 +72,7 @@ for (const name of ["project", "task-packet", "parallel-plan", "terminal-receipt
 }
 
 validateTaskPacket(JSON.parse(await readFile(resolve(root, "examples/task-packet.json"), "utf8")));
+validateTaskPacket(JSON.parse(await readFile(resolve(root, "examples/task-thread-packet.json"), "utf8")));
 validatePlan(JSON.parse(await readFile(resolve(root, "examples/parallel-plan.json"), "utf8")), {
   projectMaxConcurrency: 2,
 });

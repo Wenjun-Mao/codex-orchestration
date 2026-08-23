@@ -14,7 +14,15 @@ import {
   requireInteger,
   stableStringify,
 } from "../lib/core.mjs";
-import { callbackStatus, consumeCallback, deliverCallback } from "../lib/callbacks.mjs";
+import {
+  callbackStatus,
+  consumeCallback,
+  deliverCallback,
+  expireCallback,
+  expireCallbacks,
+  observeCallback,
+  reconcileCallback,
+} from "../lib/callbacks.mjs";
 import { cleanupAudit } from "../lib/cleanup.mjs";
 import {
   projectConfigPath,
@@ -31,7 +39,20 @@ import {
   withRepositoryManagementLock,
 } from "../lib/managed.mjs";
 import { validatePlan } from "../lib/plan.mjs";
+import {
+  bindRecipient,
+  rebindRecipient,
+  recipientStatus,
+  recipientStatuses,
+  resolveRecipient,
+} from "../lib/recipients.mjs";
 import { applyTaskDefaults, renderTaskPacket, validateTaskPacket } from "../lib/task-packet.mjs";
+import {
+  beginTaskOperationAttempt,
+  prepareTaskOperation,
+  reconcileTaskOperation,
+  taskOperationStatus,
+} from "../lib/task-operations.mjs";
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -49,9 +70,23 @@ Usage:
   codex-flow task start --role coordinator|executor
   codex-flow task packet validate|render <packet.json> [--model MODEL]
                   [--reasoning-effort EFFORT] [--json]
+  codex-flow task operation prepare --file <packet.json> [--json]
+  codex-flow task operation attempt --operation-id ID [--timeout-seconds N] [--json]
+  codex-flow task operation reconcile --operation-id ID --attempt-id ID
+                  --outcome observed|not-created|ambiguous|failed [observation fields] [--json]
+  codex-flow task operation status [--operation-id ID] [--json]
   codex-flow plan validate <plan.json> [--json]
+  codex-flow recipient bind --lineage-id ID --thread-id ID [--fence-token TOKEN] [--json]
+  codex-flow recipient rebind --lineage-id ID --thread-id ID --generation N
+                  --fence-token TOKEN [--next-fence-token TOKEN] [--json]
+  codex-flow recipient status [--lineage-id ID] [--json]
+  codex-flow recipient resolve --lineage-id ID --thread-id ID --generation N [--json]
   codex-flow callback deliver [--file receipt.json] [--no-queue] [--json]
-  codex-flow callback consume --callback-id ID --source-thread-id ID --executor-id ID [--json]
+  codex-flow callback observe --callback-id ID --lineage-id ID --thread-id ID --generation N [--json]
+  codex-flow callback consume --callback-id ID --lineage-id ID --thread-id ID
+                  --generation N --executor-id ID [--json]
+  codex-flow callback reconcile --callback-id ID --outcome enqueued|not-enqueued [--json]
+  codex-flow callback expire [--callback-id ID] [--at TIMESTAMP] [--json]
   codex-flow callback status [--json]
   codex-flow lease acquire --resource ID --owner ID [--ttl-seconds N] [--break-expired] [--json]
   codex-flow lease release --resource ID --owner ID --token TOKEN [--json]
@@ -102,6 +137,14 @@ function repositoryOptions(git) {
     gitRoot: git.root,
     stateRoot: git.stateRoot,
     stateGuardRoot: git.commonDir,
+  };
+}
+
+function recipientFromValues(values) {
+  return {
+    lineage_id: values["lineage-id"],
+    thread_id: values["thread-id"],
+    generation: requireInteger(Number(values.generation), "generation", { min: 1 }),
   };
 }
 
@@ -219,6 +262,8 @@ async function commandDoctor(args) {
       `runtime: ${item.runtime?.package_version ?? "missing"}${item.runtime?.drift?.length ? `, ${item.runtime.drift.length} drift item(s)` : ""}`,
       `task-thread creation: ${item.thread_creation}`,
       `callbacks: ${item.callbacks.pending_count} pending, ${item.callbacks.consumed_count} consumed`,
+      `task operations: ${item.task_operations.total_count} total, ${item.task_operations.ambiguous_count} ambiguous`,
+      `recipient lineages: ${item.recipients.lineage_count}`,
       ...item.warnings.map((warning) => `warning: ${warning}`),
       ...item.errors.map((error) => `error: ${error}`),
     ].join("\n"),
@@ -269,6 +314,89 @@ async function commandTask(args) {
     });
     return;
   }
+  if (subcommand === "operation") {
+    const [action, ...operationArgs] = rest;
+    if (action === "prepare") {
+      const { values } = parse(boolAndJsonOptions({ file: { type: "string" } }), operationArgs);
+      const raw = await readJsonInput(values.file ? resolve(values.file) : null);
+      const result = await prepareTaskOperation({
+        stateRoot: git.stateRoot,
+        projectId: config.project_id,
+        packet: applyTaskDefaults(raw, config),
+      });
+      output(result, {
+        json: values.json,
+        human: (item) => `Task operation ${item.status}: ${item.operation_id}`,
+      });
+      if (result.status === "expired") process.exitCode = 74;
+      return;
+    }
+    if (action === "attempt") {
+      const { values } = parse(boolAndJsonOptions({
+        "operation-id": { type: "string" },
+        "timeout-seconds": { type: "string", default: "60" },
+      }), operationArgs);
+      const result = await beginTaskOperationAttempt({
+        stateRoot: git.stateRoot,
+        operationId: values["operation-id"],
+        timeoutSeconds: Number(values["timeout-seconds"]),
+      });
+      output(result, {
+        json: values.json,
+        human: (item) => [
+          `Task operation ${item.status}: ${item.operation_id ?? item.operation?.operation_id}`,
+          `Attempt: ${item.attempt?.attempt_id ?? "already observed"}`,
+          item.request ? `Create ${item.request.execution_kind} titled: ${item.request.title}` : null,
+          item.request ? `Model/reasoning: ${item.request.model ?? "host default"} / ${item.request.reasoning_effort ?? "host default"}` : null,
+        ].filter(Boolean).join("\n"),
+      });
+      return;
+    }
+    if (action === "reconcile") {
+      const { values } = parse(boolAndJsonOptions({
+        "operation-id": { type: "string" },
+        "attempt-id": { type: "string" },
+        outcome: { type: "string" },
+        "object-id": { type: "string" },
+        "actual-kind": { type: "string" },
+        title: { type: "string" },
+        visible: { type: "boolean", default: false },
+        hidden: { type: "boolean", default: false },
+      }), operationArgs);
+      if (values.visible && values.hidden) throw new CliError("Choose only one of --visible or --hidden");
+      const visibility = values.visible ? true : values.hidden ? false : null;
+      const result = await reconcileTaskOperation({
+        stateRoot: git.stateRoot,
+        operationId: values["operation-id"],
+        attemptId: values["attempt-id"],
+        outcome: values.outcome,
+        objectId: values["object-id"] ?? null,
+        actualKind: values["actual-kind"] ?? null,
+        title: values.title ?? null,
+        visible: visibility,
+      });
+      output(result, {
+        json: values.json,
+        human: (item) => `Task operation ${item.status}: ${item.operation_id}`,
+      });
+      return;
+    }
+    if (action === "status") {
+      const { values } = parse(boolAndJsonOptions({ "operation-id": { type: "string" } }), operationArgs);
+      const result = await taskOperationStatus({
+        stateRoot: git.stateRoot,
+        operationId: values["operation-id"] ?? null,
+      });
+      output(result, {
+        json: values.json,
+        human: (items) => items.length
+          ? items.map((item) => `${item.operation_id}: ${item.effective_status} (${item.request.execution_kind})`).join("\n")
+          : "No task operations.",
+      });
+      return;
+    }
+    throw new CliError("task operation requires prepare, attempt, reconcile, or status");
+  }
   throw new CliError("task requires start or packet");
 }
 
@@ -291,6 +419,93 @@ async function commandPlan(args) {
   });
 }
 
+async function commandRecipient(args) {
+  const [subcommand, ...rest] = args;
+  const git = discoverGit();
+  if (subcommand === "bind") {
+    const { values } = parse(boolAndJsonOptions({
+      "lineage-id": { type: "string" },
+      "thread-id": { type: "string" },
+      "fence-token": { type: "string" },
+    }), rest);
+    const result = await bindRecipient({
+      stateRoot: git.stateRoot,
+      recipient: {
+        lineage_id: values["lineage-id"],
+        thread_id: values["thread-id"],
+        generation: 1,
+      },
+      fenceToken: values["fence-token"],
+    });
+    output(result, {
+      json: values.json,
+      human: (item) => [
+        `Recipient ${item.status}: ${item.recipient.lineage_id} generation ${item.recipient.generation} -> ${item.recipient.thread_id}`,
+        item.recipient.fence_token
+          ? `Rebind fence token (store privately): ${item.recipient.fence_token}`
+          : "Rebind fence token is redacted; retain the token returned by the original bind.",
+      ].join("\n"),
+    });
+    return;
+  }
+  if (subcommand === "rebind") {
+    const { values } = parse(boolAndJsonOptions({
+      "lineage-id": { type: "string" },
+      "thread-id": { type: "string" },
+      generation: { type: "string" },
+      "fence-token": { type: "string" },
+      "next-fence-token": { type: "string" },
+    }), rest);
+    const result = await rebindRecipient({
+      stateRoot: git.stateRoot,
+      recipient: recipientFromValues(values),
+      fenceToken: values["fence-token"],
+      nextFenceToken: values["next-fence-token"],
+    });
+    output(result, {
+      json: values.json,
+      human: (item) => [
+        `Recipient ${item.status}: ${item.recipient.lineage_id} generation ${item.recipient.generation} -> ${item.recipient.thread_id}`,
+        `New rebind fence token (store privately): ${item.recipient.fence_token}`,
+      ].join("\n"),
+    });
+    return;
+  }
+  if (subcommand === "status") {
+    const { values } = parse(boolAndJsonOptions({ "lineage-id": { type: "string" } }), rest);
+    const result = values["lineage-id"]
+      ? await recipientStatus({ stateRoot: git.stateRoot, lineageId: values["lineage-id"] })
+      : await recipientStatuses({ stateRoot: git.stateRoot });
+    output(result, {
+      json: values.json,
+      human: (item) => {
+        const entries = Array.isArray(item) ? item : item ? [item] : [];
+        return entries.length
+          ? entries.map((entry) => `${entry.lineage_id}: generation ${entry.current.generation} -> ${entry.current.thread_id} (${entry.binding_count} binding(s))`).join("\n")
+          : "No recipient bindings.";
+      },
+    });
+    return;
+  }
+  if (subcommand === "resolve") {
+    const { values } = parse(boolAndJsonOptions({
+      "lineage-id": { type: "string" },
+      "thread-id": { type: "string" },
+      generation: { type: "string" },
+    }), rest);
+    const result = await resolveRecipient({
+      stateRoot: git.stateRoot,
+      recipient: recipientFromValues(values),
+    });
+    output(result, {
+      json: values.json,
+      human: (item) => `Recipient resolves to generation ${item.recipient.generation} -> ${item.recipient.thread_id}${item.stale ? " (input was stale)" : ""}`,
+    });
+    return;
+  }
+  throw new CliError("recipient requires bind, rebind, status, or resolve");
+}
+
 async function commandCallback(args) {
   const [subcommand, ...rest] = args;
   const git = discoverGit();
@@ -304,19 +519,66 @@ async function commandCallback(args) {
     output(result, { json: values.json, human: (item) => `Terminal callback ${item.status}: ${item.callback_id}` });
     return;
   }
+  if (subcommand === "observe") {
+    const { values } = parse(boolAndJsonOptions({
+      "callback-id": { type: "string" },
+      "lineage-id": { type: "string" },
+      "thread-id": { type: "string" },
+      generation: { type: "string" },
+    }), rest);
+    const result = await observeCallback({
+      stateRoot: git.stateRoot,
+      callbackId: values["callback-id"],
+      recipient: recipientFromValues(values),
+    });
+    output(result, { json: values.json, human: (item) => `Terminal callback ${item.status}: ${item.callback_id}` });
+    return;
+  }
   if (subcommand === "consume") {
     const { values } = parse(boolAndJsonOptions({
       "callback-id": { type: "string" },
-      "source-thread-id": { type: "string" },
+      "lineage-id": { type: "string" },
+      "thread-id": { type: "string" },
+      generation: { type: "string" },
       "executor-id": { type: "string" },
     }), rest);
     const result = await consumeCallback({
       stateRoot: git.stateRoot,
       callbackId: values["callback-id"],
-      sourceThreadId: values["source-thread-id"],
+      recipient: recipientFromValues(values),
       executorId: values["executor-id"],
     });
     output(result, { json: values.json, human: (item) => `Terminal callback ${item.status}: ${item.callback_id}` });
+    return;
+  }
+  if (subcommand === "reconcile") {
+    const { values } = parse(boolAndJsonOptions({
+      "callback-id": { type: "string" },
+      outcome: { type: "string" },
+    }), rest);
+    const result = await reconcileCallback({
+      stateRoot: git.stateRoot,
+      callbackId: values["callback-id"],
+      outcome: values.outcome,
+    });
+    output(result, { json: values.json, human: (item) => `Terminal callback ${item.status}: ${item.callback_id}` });
+    return;
+  }
+  if (subcommand === "expire") {
+    const { values } = parse(boolAndJsonOptions({
+      "callback-id": { type: "string" },
+      at: { type: "string" },
+    }), rest);
+    const now = values.at ?? Date.now();
+    const result = values["callback-id"]
+      ? await expireCallback({ stateRoot: git.stateRoot, callbackId: values["callback-id"], now })
+      : await expireCallbacks({ stateRoot: git.stateRoot, now });
+    output(result, {
+      json: values.json,
+      human: (item) => Array.isArray(item)
+        ? item.map((entry) => `Terminal callback ${entry.status}: ${entry.callback_id}`).join("\n") || "No terminal callbacks."
+        : `Terminal callback ${item.status}: ${item.callback_id}`,
+    });
     return;
   }
   if (subcommand === "status") {
@@ -325,13 +587,13 @@ async function commandCallback(args) {
     output(result, {
       json: values.json,
       human: (item) => [
-        `${item.pending.length} pending callback(s); ${item.consumed_count} consumed tombstone(s).`,
-        ...item.pending.map((entry) => `${entry.callback_id} ${entry.delivery} ${entry.classification} (${entry.executor_id})`),
+        `${item.pending.length} pending callback(s); ${item.consumed_count} consumed, ${item.superseded_count} superseded, ${item.expired_count} expired journal record(s).`,
+        ...item.pending.map((entry) => `${entry.callback_id} ${entry.effective_delivery} ${entry.classification} (${entry.executor_id})`),
       ].join("\n"),
     });
     return;
   }
-  throw new CliError("callback requires deliver, consume, or status");
+  throw new CliError("callback requires deliver, observe, consume, reconcile, expire, or status");
 }
 
 async function commandLease(args) {
@@ -384,14 +646,15 @@ async function commandLease(args) {
 
 async function commandCleanup(args) {
   const [subcommand, ...rest] = args;
-  if (subcommand !== "audit") throw new CliError("cleanup v0.1 supports audit only");
+  if (subcommand !== "audit") throw new CliError("cleanup supports audit only");
   const { values } = parse(boolAndJsonOptions(), rest);
   const result = await cleanupAudit(gitSnapshot());
   output(result, {
     json: values.json,
     human: (item) => [
       `Cleanup audit only; no mutation performed. State size: ${item.state_size}.`,
-      `Callbacks: ${item.callbacks.pending.length} pending, ${item.consumed_tombstones.length} consumed.`,
+      `Callbacks: ${item.callbacks.pending.length} pending, ${item.callbacks.consumed_count} consumed, ${item.callbacks.superseded_count} superseded, ${item.callbacks.expired_count} expired.`,
+      `Task operations: ${item.task_operations.length}; recipient lineages: ${item.recipients.length}.`,
       `Leases: ${item.leases.filter((lease) => lease.state === "active").length} active, ${item.leases.filter((lease) => lease.state === "expired").length} expired.`,
       ...item.recommendations.map((recommendation) => `review: ${recommendation}`),
     ].join("\n"),
@@ -414,6 +677,7 @@ async function main() {
   if (command === "doctor") return commandDoctor(args);
   if (command === "task") return commandTask(args);
   if (command === "plan") return commandPlan(args);
+  if (command === "recipient") return commandRecipient(args);
   if (command === "callback") return commandCallback(args);
   if (command === "lease") return commandLease(args);
   if (command === "cleanup") return commandCleanup(args);

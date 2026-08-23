@@ -8,28 +8,27 @@ deliberately separate layers:
 - `codex-flow` is an npm-compatible CLI that enforces mechanical contracts
   using only Node.js built-ins.
 
-The package is not a daemon or MCP server. Each repository pins a reviewable
-runtime under `.codex/orchestration/`; mutable callbacks and leases live under
-that repository's Git common directory at `.git/codex-flow/`.
+This is not a daemon, secretary task, or MCP server. Each repository pins a
+reviewable runtime under `.codex/orchestration/`. Mutable recipient bindings,
+task-operation attempts, callback journals, and leases live under that
+repository's Git common directory at `.git/codex-flow/`, so linked worktrees
+share the same coordination state.
 
 ## Requirements
 
 - Git
 - Node.js 20.11 or newer
-- Codex CLI only when persistent thread-queue delivery is requested
+- Codex CLI only when terminal callbacks should use `codex queue`
 
 No third-party npm packages are required. Target repositories do not need to
-be JavaScript projects.
-
-The bundled JSON Schemas provide portable structural validation. The CLI is
-the final authority for cross-field and graph semantics such as callback/task
-identity equality, path overlap, dependency closure, and secret-like receipt
-rejection.
+be JavaScript projects. JSON Schemas provide portable structural validation;
+the CLI remains authoritative for graph, path, identity, expiry, redaction,
+and lifecycle semantics.
 
 ## Private distribution
 
-The canonical checkout can be used directly, or installed as a launcher from
-its local path:
+Use the canonical checkout directly or install a private launcher from its
+local path:
 
 ```bash
 npm install --global /path/to/codex-orchestration
@@ -37,14 +36,13 @@ codex-flow --help
 ```
 
 The global command is only a bootstrap/update entrypoint. `init` copies a
-reviewable version-pinned runtime into the target repository, and routine work
-uses that pinned copy. Removing or updating the global launcher therefore does
-not silently change an initialized repository.
+version-pinned runtime into the target repository; routine work uses that
+pinned copy. Updating the launcher therefore does not silently alter an
+initialized repository.
 
 The npm package also contains a valid Codex plugin manifest and its skills.
-npm installation does not register that plugin with the Codex app. Plugin
-marketplace registration is a separate, explicit user-level operation; v0.1
-does not create or modify a personal marketplace as a bootstrap side effect.
+npm installation does not register the plugin with the Codex app. Marketplace
+registration remains a separate, explicit user-level operation.
 
 ## Bootstrap a repository
 
@@ -57,49 +55,87 @@ node .codex/orchestration/bin/codex-flow.mjs doctor
 
 `init` preserves existing `AGENTS.md` content and owns only one bounded managed
 block. It installs the pinned CLI runtime, role entrypoints, and references.
-Use `init --check` for a read-only compliance check.
+Use `init --check` for a read-only compliance check. Run `init` and `sync` from
+the canonical package; the pinned copy intentionally refuses to update itself.
 
-Run `init` and `sync` with the canonical package path shown above. The pinned
-repository copy intentionally refuses to update itself; all other routine
-commands run from `.codex/orchestration/`.
-
-New repositories default delegated task packets to `gpt-5.6-terra` with
-`xhigh` reasoning. Initial defaults can be supplied to `init`; later changes
-use `config set`. An individual task packet may override either field. Use
-`host-default` to request no explicit override. The rendered packet always
-shows the resolved selection, and a capable coordinator passes those resolved
-values as the host thread-creation model and reasoning arguments.
+New repositories default delegated tasks to `gpt-5.6-terra` with `xhigh`
+reasoning. `config set` changes repository defaults, and each task packet may
+override either value. The resolved values must be passed to the actual host
+creation call; prompt text alone does not configure a task.
 
 ## Core commands
 
 ```text
 codex-flow init [--check] [--force]
 codex-flow sync [--check] [--force]
-codex-flow config show [--json]
-codex-flow config set [--model <model>] [--reasoning-effort <effort>]
-                      [--max-concurrency <n>] [--json]
+codex-flow config show|set ...
 codex-flow doctor [--json]
 codex-flow task start --role coordinator|executor
-codex-flow task packet validate <packet.json>
-codex-flow task packet render <packet.json>
-codex-flow plan validate <plan.json> [--json]
+codex-flow task packet validate|render <packet.json>
+codex-flow task operation prepare --file <packet.json>
+codex-flow task operation attempt --operation-id <id>
+codex-flow task operation reconcile --operation-id <id> --attempt-id <id>
+                  --outcome observed|not-created|ambiguous|failed ...
+codex-flow task operation status [--operation-id <id>]
+codex-flow plan validate <plan.json>
+codex-flow recipient bind|rebind|status|resolve ...
 codex-flow callback deliver --file <receipt.json>
-codex-flow callback consume --callback-id <id> --source-thread-id <id> --executor-id <id>
-codex-flow callback status [--json]
-codex-flow lease acquire --resource <id> --owner <id> [--ttl-seconds <n>]
-codex-flow lease release --resource <id> --owner <id> --token <token>
-codex-flow lease status [--resource <id>] [--json]
+codex-flow callback observe --callback-id <id> --lineage-id <id>
+                  --thread-id <id> --generation <n>
+codex-flow callback consume --callback-id <id> --lineage-id <id>
+                  --thread-id <id> --generation <n> --executor-id <id>
+codex-flow callback reconcile|expire|status ...
+codex-flow lease acquire|release|status ...
 codex-flow cleanup audit [--json]
 ```
 
-Urgent blockers, approval requests, and high-risk drift use the host's direct
-Steer surface. `callback deliver` is only for ordinary terminal completion. It
-persists a bounded receipt before trying `codex queue`; temporary transport
-failure retains the receipt and exits with status 75.
+## Task creation contract
 
-Queue transport is intentionally at least once because the host queue does not
-offer a durable idempotency key. Every message carries a deterministic callback
-ID, and coordinator-side consumption enforces exactly-once integration.
+Every packet explicitly requests either a user-visible `task-thread` or a
+hidden `subagent`; the kinds are not interchangeable. Before calling a host
+tool, persist a deterministic operation with `task operation prepare`, then
+start a bounded attempt. After the host call, inspect the actual object and
+reconcile its ID, exact title, kind, and visibility.
+
+A timeout is ambiguous, not failure. List/read the host state before retrying,
+then reconcile `observed` or `not-created`. No new launch may start after the
+packet's absolute zoned deadline. The CLI journals the operation but does not
+invoke private in-session model tools; the coordinator performs the one-shot
+host call using the capability available in that session.
+
+See [Host operations](templates/references/host-operations.md) for the adapter
+procedure.
+
+## Callback and fork contract
+
+Urgent blockers, approval requests, and high-risk drift use direct Steer.
+Ordinary terminal completion uses `callback deliver`, which persists a strict
+receipt before trying `codex queue`.
+
+Transport is at least once. Integration is exactly once by deterministic
+callback ID and a durable observed/consumed journal. Queue timeouts block retry
+until explicit reconciliation. Corrected receipts use increasing sequence
+numbers and explicit supersession; arrival order is never authority.
+
+Before launching executors, bind the coordinator lineage with `recipient bind`.
+The first successful bind returns a private fence token; idempotent bind replay
+without the token and status redact it. Supply and retain `--fence-token` when
+initial-bind output could be interrupted. After a fork or authoritative thread
+replacement, use that token with `recipient rebind`; stale packets resolve to the current
+generation, while observe/consume requires the current recipient identity. For
+retry-safe rebinding, choose and retain `--next-fence-token`; replaying the same
+old/new token pair and generation is idempotent.
+
+Receipts reject unknown fields, oversized content, secret-like material,
+application/account identifiers, raw logs/transcripts, and user identity data.
+
+## Cleanup boundary
+
+`cleanup audit` is intentionally read-only. It reports callback lifecycle,
+ambiguous task operations, recipient lineages, leases, legacy v0.1 state,
+managed-runtime drift, and disk use. It does not archive threads, remove
+worktrees, delete repositories, or erase evidence. Those actions require a
+separate owner-authorized retention decision.
 
 ## Development
 
@@ -109,5 +145,8 @@ npm run validate
 npm run pack:check
 ```
 
-See [ADR 0001](docs/adr/0001-portable-layered-orchestration.md) for the durable
-architecture and current acceptance boundary.
+See [ADR 0001](docs/adr/0001-portable-layered-orchestration.md) for the layered
+architecture and [ADR 0002](docs/adr/0002-run-identity-and-host-reconciliation.md)
+for v0.2 identity, queue, deadline, and host-reconciliation decisions.
+The current covered/partial/host-dependent boundary is listed in
+[v0.2 orchestration coverage](docs/coverage-v0.2.md).

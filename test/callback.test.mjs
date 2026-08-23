@@ -46,6 +46,14 @@ function receipt(overrides = {}) {
   };
 }
 
+function deliveryRecipient(value) {
+  return {
+    lineage_id: value.lineage_id,
+    thread_id: value.thread_id,
+    generation: value.generation,
+  };
+}
+
 async function bind(root, recipient = receipt().recipient) {
   return bindRecipient({
     stateRoot: resolve(root, ".git", "codex-flow"),
@@ -101,9 +109,19 @@ test("callback retries retain immutable identity and journal lifecycle through e
       /immutable callback identity/,
     );
 
-    assert.equal((await observeCallback({ stateRoot, callbackId })).status, "observed");
-    assert.equal((await consumeCallback({ stateRoot, callbackId, executorId: payload.executor_id })).status, "consumed");
-    assert.equal((await consumeCallback({ stateRoot, callbackId })).status, "already-consumed");
+    assert.equal((await observeCallback({ stateRoot, callbackId, recipient: payload.recipient })).status, "observed");
+    assert.equal((await consumeCallback({
+      stateRoot,
+      callbackId,
+      recipient: payload.recipient,
+      executorId: payload.executor_id,
+    })).status, "consumed");
+    assert.equal((await consumeCallback({
+      stateRoot,
+      callbackId,
+      recipient: payload.recipient,
+      executorId: payload.executor_id,
+    })).status, "already-consumed");
     const record = await journal(root, payload);
     assert.equal(record.delivery.state, "consumed");
     for (const field of ["persisted_at", "enqueue_attempted_at", "enqueued_at", "observed_at", "consumed_at"]) {
@@ -164,6 +182,7 @@ test("stale packets route only through a newer lineage binding, and explicit sup
       fenceToken: initial.recipient.fence_token,
     });
     assert.equal(rebound.status, "rebound");
+    const current = deliveryRecipient(rebound.recipient);
     const { binary, capture } = await fakeCodex(root);
     process.env.CODEX_FLOW_CODEX_BIN = binary;
     process.env.FAKE_CAPTURE = capture;
@@ -174,6 +193,21 @@ test("stale packets route only through a newer lineage binding, and explicit sup
     assert.equal(delivered.recipient.thread_id, "new-coordinator-thread");
     const call = JSON.parse((await readFile(capture, "utf8")).trim());
     assert.deepEqual(call.slice(0, 3), ["queue", "--thread", "new-coordinator-thread"]);
+    await assert.rejects(
+      observeCallback({ stateRoot, callbackId: delivered.callback_id, recipient: stale.recipient }),
+      /binding is stale/,
+    );
+    assert.equal((await observeCallback({
+      stateRoot,
+      callbackId: delivered.callback_id,
+      recipient: current,
+    })).status, "observed");
+    assert.equal((await consumeCallback({
+      stateRoot,
+      callbackId: delivered.callback_id,
+      recipient: current,
+      executorId: stale.executor_id,
+    })).status, "consumed");
     await assert.rejects(
       deliverCallback({
         stateRoot,
@@ -196,8 +230,13 @@ test("stale packets route only through a newer lineage binding, and explicit sup
     });
     assert.equal((await deliverCallback({ stateRoot, receipt: successor, noQueue: true })).status, "persisted");
     assert.equal((await journal(root, prior)).delivery.state, "superseded");
-    await assert.rejects(observeCallback({ stateRoot, callbackId: priorId }), /superseded.*cannot be observed/);
-    await assert.rejects(consumeCallback({ stateRoot, callbackId: priorId }), /superseded.*cannot be consumed/);
+    await assert.rejects(observeCallback({ stateRoot, callbackId: priorId, recipient: current }), /superseded.*cannot be observed/);
+    await assert.rejects(consumeCallback({
+      stateRoot,
+      callbackId: priorId,
+      recipient: current,
+      executorId: prior.executor_id,
+    }), /superseded.*cannot be consumed/);
 
     const expiring = receipt({
       run_id: "run-expiring-01",
@@ -209,8 +248,13 @@ test("stale packets route only through a newer lineage binding, and explicit sup
       (await expireCallback({ stateRoot, callbackId: expiringId, now: Date.parse("2030-08-23T12:00:01.000Z") })).status,
       "expired",
     );
-    await assert.rejects(observeCallback({ stateRoot, callbackId: expiringId }), /expired.*cannot be observed/);
-    await assert.rejects(consumeCallback({ stateRoot, callbackId: expiringId }), /expired.*cannot be consumed/);
+    await assert.rejects(observeCallback({ stateRoot, callbackId: expiringId, recipient: current }), /expired.*cannot be observed/);
+    await assert.rejects(consumeCallback({
+      stateRoot,
+      callbackId: expiringId,
+      recipient: current,
+      executorId: expiring.executor_id,
+    }), /expired.*cannot be consumed/);
   } finally {
     process.env = originalEnv;
     await removeFixture(root);
@@ -223,4 +267,7 @@ test("receipt validation rejects v1 input, raw transcripts, and user identity-li
   assert.throws(() => validateTerminalReceipt(receipt({ next_decision: "Contact jane@example.com" })), /identity-like/);
   assert.throws(() => validateTerminalReceipt(receipt({ next_decision: "Call 416-555-1212" })), /identity-like/);
   assert.throws(() => validateTerminalReceipt(receipt({ result_or_blocker: "token sk-abcdefghijklmnopqrstuv" })), /secret-like/);
+  assert.throws(() => validateTerminalReceipt(receipt({ sequence: 2 })), /explicit supersession/);
+  assert.throws(() => validateTerminalReceipt(receipt({ next_decision: "Client key: not-for-receipts" })), /application or account identifier/);
+  assert.throws(() => validateTerminalReceipt(receipt({ expires_at: "2030-08-23T17:15:00" })), /explicit UTC offset/);
 });

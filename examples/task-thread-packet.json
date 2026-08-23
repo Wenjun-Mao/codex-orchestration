@@ -1,0 +1,53 @@
+{
+  "schema_version": 2,
+  "task_id": "host-adapter-probe-01",
+  "run_id": "host-adapter-probe-v2",
+  "title": "Codex Flow Host Adapter Probe",
+  "objective": "Confirm that one projectless user-visible task thread can be created with the requested model and reasoning effort, observed by exact identity, and archived without filesystem work.",
+  "role": "executor",
+  "execution_kind": "task-thread",
+  "launch_deadline": {
+    "at": "2099-01-01T09:00:00-05:00",
+    "timezone": "America/Toronto"
+  },
+  "baseline": {
+    "revision": "0123456789abcdef",
+    "cleanliness": "clean"
+  },
+  "environment": {
+    "type": "projectless",
+    "project_path": null
+  },
+  "model": "gpt-5.6-terra",
+  "reasoning_effort": "xhigh",
+  "ownership": {
+    "write_paths": ["host-adapter-probe"],
+    "read_paths": [],
+    "exclusions": ["user-files"]
+  },
+  "dependencies": [],
+  "shared_resources": [],
+  "verification": [
+    "Observe the returned thread ID",
+    "Verify exact title and user-visible task-thread kind",
+    "Archive the controlled probe after reading its response"
+  ],
+  "callback": {
+    "recipient": {
+      "lineage_id": "host-adapter-probe-lineage",
+      "thread_id": "host-adapter-probe-coordinator",
+      "generation": 1
+    },
+    "executor_id": "host-adapter-probe-01",
+    "receipt_schema_version": 2
+  },
+  "integration_gate": {
+    "gate_id": "host-adapter-probe-gate",
+    "reproof": ["Read the exact created thread before archiving it"]
+  },
+  "cleanup_owner": "host-adapter-probe-coordinator",
+  "stop_policy": {
+    "urgent": ["blocker", "approval", "high-risk-drift"],
+    "ordinary_completion": "queue"
+  }
+}

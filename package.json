@@ -1,6 +1,6 @@
 {
   "name": "@wjmao/codex-flow",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Dependency-free repository tooling for coordinated Codex task workflows.",
   "private": true,
   "type": "module",
@@ -20,6 +20,7 @@
     "bin/",
     "lib/",
     "schemas/",
+    "examples/",
     "skills/",
     "templates/",
     "docs/",

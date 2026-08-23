@@ -11,12 +11,13 @@ Inspect durable state with:
 node .codex/orchestration/bin/codex-flow.mjs callback status
 ```
 
-For each callback ID, authenticate its branch, revision, cleanliness, owned
+For each callback ID, mark it observed using the current bound recipient
+generation, then authenticate its branch, revision, cleanliness, owned
 diff, verification, and blocker classification. Reject or integrate serially;
 never infer success from UI status or task age. After all accepted branches are
 combined, run the plan's integration gates and proportional product reproof.
 
-Call `callback consume` only after the callback has been integrated or its
+Call `callback consume` with the current recipient identity only after the callback has been integrated or its
 rejection has been durably recorded. Then release owned leases and run
 `cleanup audit`. Read [Communication loop](../../templates/references/communication-loop.md)
 for retry and exactly-once semantics and [Task lifecycle](../../templates/references/task-lifecycle.md)

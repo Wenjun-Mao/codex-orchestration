@@ -1,0 +1,30 @@
+# One-Shot Host Operations
+
+The portable CLI journals intent and reconciliation. It does not invoke private
+in-session Codex tools. The coordinator performs one bounded host call around
+that journal; no daemon, MCP server, or background secretary is required.
+
+For task creation:
+
+1. Validate the task packet and its absolute launch deadline.
+2. Run `task operation prepare`, then `task operation attempt`.
+3. Call the host creation capability exactly once with the requested
+   `execution_kind`, environment, resolved model, and reasoning effort.
+4. If creation succeeds, set the exact requested title when the host creation
+   API does not accept one directly.
+5. List/read the resulting host object and verify its ID, exact title, kind,
+   and visibility. A task thread must be user-visible; a subagent must be
+   hidden.
+6. Reconcile the attempt as `observed` with those facts.
+
+If any host call times out or returns an indeterminate result, reconcile the
+attempt as `ambiguous` and inspect host state before retrying. If the exact
+object exists, reconcile it as observed. If inspection proves it was not
+created, reconcile `not-created`, then start a new attempt only before the
+launch deadline. Never infer failure from a local timeout or create a different
+kind as fallback.
+
+Archive and send operations remain host capabilities. Apply the same
+operation-ID, bounded-wait, inspect-before-retry, and duplicate-safe principles,
+but v0.2's portable journal directly models creation only. Cleanup never
+auto-archives or auto-deletes tasks.
