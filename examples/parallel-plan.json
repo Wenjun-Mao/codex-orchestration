@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "plan_id": "example-plan",
   "baseline_revision": "0123456789abcdef",
   "max_concurrency": 2,
@@ -7,6 +7,12 @@
     {
       "id": "contract",
       "title": "Bind the shared contract",
+      "role": "executor",
+      "execution_kind": "subagent",
+      "launch_deadline": {
+        "at": "2099-01-01T09:00:00-05:00",
+        "timezone": "America/Toronto"
+      },
       "mode": "write",
       "dependencies": [],
       "write_paths": ["src/contracts"],
@@ -16,6 +22,12 @@
     {
       "id": "slice-a",
       "title": "Implement slice A",
+      "role": "executor",
+      "execution_kind": "subagent",
+      "launch_deadline": {
+        "at": "2099-01-01T09:00:00-05:00",
+        "timezone": "America/Toronto"
+      },
       "mode": "write",
       "dependencies": ["contract"],
       "write_paths": ["src/a"],
@@ -25,6 +37,12 @@
     {
       "id": "slice-b",
       "title": "Implement slice B",
+      "role": "executor",
+      "execution_kind": "subagent",
+      "launch_deadline": {
+        "at": "2099-01-01T09:00:00-05:00",
+        "timezone": "America/Toronto"
+      },
       "mode": "write",
       "dependencies": ["contract"],
       "write_paths": ["src/b"],
@@ -34,6 +52,12 @@
     {
       "id": "integration",
       "title": "Integrate and reprove",
+      "role": "executor",
+      "execution_kind": "subagent",
+      "launch_deadline": {
+        "at": "2099-01-01T09:00:00-05:00",
+        "timezone": "America/Toronto"
+      },
       "mode": "write",
       "dependencies": ["slice-a", "slice-b"],
       "write_paths": ["integration-evidence"],

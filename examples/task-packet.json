@@ -1,8 +1,15 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "task_id": "bounded-executor-01",
+  "run_id": "example-run-v2",
   "title": "Implement one bounded slice",
   "objective": "Implement and verify the named source-backed slice without changing unrelated paths.",
+  "role": "executor",
+  "execution_kind": "subagent",
+  "launch_deadline": {
+    "at": "2099-01-01T09:00:00-05:00",
+    "timezone": "America/Toronto"
+  },
   "baseline": {
     "revision": "0123456789abcdef",
     "cleanliness": "clean"
@@ -22,9 +29,19 @@
   "shared_resources": [],
   "verification": ["Run the focused tests", "Run the repository typecheck"],
   "callback": {
-    "coordinator_thread_id": "coordinator-thread-id",
-    "executor_id": "bounded-executor-01"
+    "recipient": {
+      "lineage_id": "example-lineage-v2",
+      "thread_id": "coordinator-thread-id",
+      "generation": 1
+    },
+    "executor_id": "bounded-executor-01",
+    "receipt_schema_version": 2
   },
+  "integration_gate": {
+    "gate_id": "integration-v2",
+    "reproof": ["Run combined tests"]
+  },
+  "cleanup_owner": "coordinator-thread-id",
   "stop_policy": {
     "urgent": ["blocker", "approval", "high-risk-drift"],
     "ordinary_completion": "queue"
