@@ -17,6 +17,8 @@ learned from the first UK Dev repository pilot.
 - Doctor and sync checks reject external instruction drift.
 - Managed repositories can transition to external ownership while removing only
   the package-managed block.
+- Routine sync refuses legacy project configuration until it is migrated by an
+  explicit v0.3 plan and matching apply.
 - Git read-only probes disable optional locking to avoid index refresh writes.
 
 ## Partial

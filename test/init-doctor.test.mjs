@@ -115,6 +115,23 @@ test("sync refuses locally modified managed runtime files", async () => {
   }
 });
 
+test("sync refuses legacy configuration that has not completed plan-bound migration", async () => {
+  const root = await createGitFixture();
+  try {
+    initializeFixture([], { cwd: root });
+    const configPath = resolve(root, ".codex/orchestration/project.json");
+    const config = JSON.parse(await readFile(configPath, "utf8"));
+    delete config.agents_integration;
+    config.schema_version = 1;
+    await writeFile(configPath, `${JSON.stringify(config, null, 2)}\n`, "utf8");
+    const sync = runCli(["sync"], { cwd: root });
+    assert.notEqual(sync.status, 0);
+    assert.match(sync.stderr, /plan-bound migration/);
+  } finally {
+    await removeFixture(root);
+  }
+});
+
 test("init fails closed on malformed AGENTS managed markers", async () => {
   const root = await createGitFixture();
   try {
