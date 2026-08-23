@@ -1,0 +1,17 @@
+{
+  "source_thread_id": "coordinator-thread-id",
+  "executor_id": "bounded-executor-01",
+  "classification": "PASS",
+  "branch": "codex/bounded-executor-01",
+  "commit": "0123456789abcdef",
+  "upstream": "origin/codex/bounded-executor-01",
+  "cleanliness": "clean",
+  "result_or_blocker": "The bounded owned result is complete and verified.",
+  "next_decision": "Review and integrate this branch, then run combined verification.",
+  "accounting": {
+    "PRODUCT": 1,
+    "CROSS_CUTTING_PRODUCT_FIX": 0,
+    "ENVIRONMENT": 0,
+    "PROOF_HARNESS": 1
+  }
+}

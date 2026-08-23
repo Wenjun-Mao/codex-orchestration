@@ -1,0 +1,29 @@
+{
+  "name": "@wjmao/codex-flow",
+  "version": "0.1.0",
+  "description": "Dependency-free repository tooling for coordinated Codex task workflows.",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "codex-flow": "./bin/codex-flow.mjs"
+  },
+  "scripts": {
+    "test": "node --test --test-concurrency=1",
+    "validate": "node scripts/validate.mjs",
+    "pack:check": "npm pack --dry-run"
+  },
+  "engines": {
+    "node": ">=20.11"
+  },
+  "files": [
+    ".codex-plugin/",
+    "bin/",
+    "lib/",
+    "schemas/",
+    "skills/",
+    "templates/",
+    "docs/",
+    "README.md"
+  ],
+  "license": "UNLICENSED"
+}

@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://private.local/codex-flow/terminal-receipt.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "source_thread_id",
+    "executor_id",
+    "classification",
+    "branch",
+    "commit",
+    "upstream",
+    "cleanliness",
+    "result_or_blocker",
+    "next_decision",
+    "accounting"
+  ],
+  "properties": {
+    "source_thread_id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9_.-]+$" },
+    "executor_id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9_.-]+$" },
+    "classification": { "type": "string", "minLength": 1, "maxLength": 96 },
+    "branch": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "commit": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "upstream": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "cleanliness": { "type": "string", "minLength": 1, "maxLength": 32 },
+    "result_or_blocker": { "type": "string", "minLength": 1, "maxLength": 512 },
+    "next_decision": { "type": "string", "minLength": 1, "maxLength": 512 },
+    "accounting": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["PRODUCT", "CROSS_CUTTING_PRODUCT_FIX", "ENVIRONMENT", "PROOF_HARNESS"],
+      "properties": {
+        "PRODUCT": { "type": "number", "minimum": 0 },
+        "CROSS_CUTTING_PRODUCT_FIX": { "type": "number", "minimum": 0 },
+        "ENVIRONMENT": { "type": "number", "minimum": 0 },
+        "PROOF_HARNESS": { "type": "number", "minimum": 0 }
+      }
+    }
+  }
+}

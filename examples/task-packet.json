@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "task_id": "bounded-executor-01",
+  "title": "Implement one bounded slice",
+  "objective": "Implement and verify the named source-backed slice without changing unrelated paths.",
+  "baseline": {
+    "revision": "0123456789abcdef",
+    "cleanliness": "clean"
+  },
+  "environment": {
+    "type": "worktree",
+    "project_path": "/absolute/path/to/project"
+  },
+  "model": "gpt-5.6-terra",
+  "reasoning_effort": "xhigh",
+  "ownership": {
+    "write_paths": ["src/bounded-slice"],
+    "read_paths": ["src/shared-contracts"],
+    "exclusions": ["src/other-slices"]
+  },
+  "dependencies": [],
+  "shared_resources": [],
+  "verification": ["Run the focused tests", "Run the repository typecheck"],
+  "callback": {
+    "coordinator_thread_id": "coordinator-thread-id",
+    "executor_id": "bounded-executor-01"
+  },
+  "stop_policy": {
+    "urgent": ["blocker", "approval", "high-risk-drift"],
+    "ordinary_completion": "queue"
+  }
+}

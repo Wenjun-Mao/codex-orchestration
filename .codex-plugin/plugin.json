@@ -1,0 +1,24 @@
+{
+  "name": "codex-orchestration",
+  "version": "0.1.0",
+  "description": "Coordinate independent Codex tasks with explicit ownership, durable callbacks, and serial integration.",
+  "author": {
+    "name": "Wenjun Mao"
+  },
+  "license": "UNLICENSED",
+  "keywords": ["codex", "orchestration", "delegation", "callbacks"],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Codex Orchestration",
+    "shortDescription": "Coordinate parallel Codex work safely.",
+    "longDescription": "Plan and run coordinator/executor workflows with bounded ownership, queued terminal callbacks, shared-resource leases, and post-integration verification.",
+    "developerName": "Wenjun Mao",
+    "category": "Productivity",
+    "capabilities": ["Planning", "Task coordination", "Workflow validation"],
+    "defaultPrompt": [
+      "Plan this work across independent Codex tasks.",
+      "Validate this executor task packet.",
+      "Integrate queued task results safely."
+    ]
+  }
+}

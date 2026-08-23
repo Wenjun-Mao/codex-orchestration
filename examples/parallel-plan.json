@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "plan_id": "example-plan",
+  "baseline_revision": "0123456789abcdef",
+  "max_concurrency": 2,
+  "tasks": [
+    {
+      "id": "contract",
+      "title": "Bind the shared contract",
+      "mode": "write",
+      "dependencies": [],
+      "write_paths": ["src/contracts"],
+      "shared_resources": [],
+      "serial_gate": true
+    },
+    {
+      "id": "slice-a",
+      "title": "Implement slice A",
+      "mode": "write",
+      "dependencies": ["contract"],
+      "write_paths": ["src/a"],
+      "shared_resources": [],
+      "serial_gate": false
+    },
+    {
+      "id": "slice-b",
+      "title": "Implement slice B",
+      "mode": "write",
+      "dependencies": ["contract"],
+      "write_paths": ["src/b"],
+      "shared_resources": [],
+      "serial_gate": false
+    },
+    {
+      "id": "integration",
+      "title": "Integrate and reprove",
+      "mode": "write",
+      "dependencies": ["slice-a", "slice-b"],
+      "write_paths": ["integration-evidence"],
+      "shared_resources": ["integration-lane"],
+      "serial_gate": true
+    }
+  ]
+}
