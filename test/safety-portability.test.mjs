@@ -15,6 +15,7 @@ import test from "node:test";
 import {
   assertSuccess,
   createGitFixture,
+  initializeFixture,
   removeFixture,
   runCli,
 } from "./helpers.mjs";
@@ -59,7 +60,7 @@ function receipt() {
 test("a pinned runtime cannot self-sync from a nested repository directory", async () => {
   const root = await createGitFixture();
   try {
-    assertSuccess(runCli(["init"], { cwd: root }));
+    initializeFixture([], { cwd: root });
     const nested = resolve(root, "src", "nested");
     await mkdir(nested, { recursive: true });
     for (const command of [["init"], ["sync", "--force"]]) {
@@ -75,7 +76,7 @@ test("a pinned runtime cannot self-sync from a nested repository directory", asy
 test("doctor and cleanup support an unborn repository whose path contains spaces and percent characters", async () => {
   const root = await createGitFixture("codex flow % unborn-", { commit: false });
   try {
-    assertSuccess(runCli(["init"], { cwd: root }), "unborn init");
+    initializeFixture([], { cwd: root });
     const doctor = runCli(["doctor", "--json"], { cwd: root });
     assertSuccess(doctor, "unborn doctor");
     assert.equal(JSON.parse(doctor.stdout).git.revision, "unborn");
@@ -97,7 +98,7 @@ test("managed and Git-common state writes reject symlinked repository paths", {
   try {
     await mkdir(resolve(managedRoot, ".codex"));
     await symlink(managedExternal, resolve(managedRoot, ".codex", "orchestration"), "dir");
-    const managed = runCli(["init"], { cwd: managedRoot });
+    const managed = runCli(["init", "--plan"], { cwd: managedRoot });
     assert.notEqual(managed.status, 0);
     assert.match(managed.stderr, /symbolic link|real directory/);
     assert.deepEqual(await readdir(managedExternal), []);
@@ -122,7 +123,7 @@ test("managed and Git-common state writes reject symlinked repository paths", {
 test("unsafe managed-manifest paths fail before any out-of-root read", async () => {
   const root = await createGitFixture();
   try {
-    assertSuccess(runCli(["init"], { cwd: root }));
+    initializeFixture([], { cwd: root });
     const manifestPath = resolve(root, ".codex", "orchestration", "version.json");
     const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
     manifest.files["../outside"] = "0".repeat(64);

@@ -34,6 +34,15 @@ export function assertSuccess(result, label = "command") {
   }
 }
 
+export function initializeFixture(args = [], { cwd, env = {} } = {}) {
+  const planned = runCli(["init", "--plan", "--json", ...args], { cwd, env });
+  assertSuccess(planned, "initialization plan");
+  const plan = JSON.parse(planned.stdout);
+  const applied = runCli(["init", "--apply-plan", plan.plan_id, "--json", ...args], { cwd, env });
+  assertSuccess(applied, "initialization apply");
+  return { plan, applied, result: JSON.parse(applied.stdout) };
+}
+
 export async function removeFixture(root) {
   await rm(root, { recursive: true, force: true });
 }

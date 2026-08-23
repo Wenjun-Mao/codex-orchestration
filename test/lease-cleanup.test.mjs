@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import test from "node:test";
-import { assertSuccess, createGitFixture, removeFixture, runCli } from "./helpers.mjs";
+import { assertSuccess, createGitFixture, initializeFixture, removeFixture, runCli } from "./helpers.mjs";
 
 test("exclusive leases prevent competing owners and release idempotently", async () => {
   const root = await createGitFixture("codex-flow-lease-");
@@ -81,7 +81,7 @@ test("an expired holder token cannot release a replacement lease with the same o
 test("cleanup is audit-only and reports repository-scoped state", async () => {
   const root = await createGitFixture();
   try {
-    assertSuccess(runCli(["init"], { cwd: root }));
+    initializeFixture([], { cwd: root });
     assertSuccess(runCli([
       "lease", "acquire", "--resource", "creator", "--owner", "executor-a", "--ttl-seconds", "60",
     ], { cwd: root }));

@@ -26,5 +26,5 @@ kind as fallback.
 
 Archive and send operations remain host capabilities. Apply the same
 operation-ID, bounded-wait, inspect-before-retry, and duplicate-safe principles,
-but v0.2's portable journal directly models creation only. Cleanup never
+but the current portable journal directly models creation only. Cleanup never
 auto-archives or auto-deletes tasks.

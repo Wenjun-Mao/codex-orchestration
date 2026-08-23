@@ -49,13 +49,34 @@ registration remains a separate, explicit user-level operation.
 Run from the target repository:
 
 ```bash
-node /path/to/codex-orchestration/bin/codex-flow.mjs init
+node /path/to/codex-orchestration/bin/codex-flow.mjs init --plan --json
+node /path/to/codex-orchestration/bin/codex-flow.mjs init \
+  --apply-plan <plan_id> --json
 node .codex/orchestration/bin/codex-flow.mjs doctor
 ```
 
-`init` preserves existing `AGENTS.md` content and owns only one bounded managed
-block. It installs the pinned CLI runtime, role entrypoints, and references.
-Use `init --check` for a read-only compliance check. Run `init` and `sync` from
+Planning is mandatory and completely read-only. The plan aggregates the exact
+write set, before/after hashes and line counts, activation roots, compatibility
+conflicts, and a deterministic `plan_id`. Application recomputes the plan and
+refuses stale IDs. Configuration, pinned runtime, and instruction integration
+activate as one transaction and roll back together on failure.
+
+Managed instruction mode preserves existing `AGENTS.md` content and owns one
+bounded block. A mature repository with an equivalent contract may instead use:
+
+```bash
+node /path/to/codex-orchestration/bin/codex-flow.mjs init --plan --json \
+  --agents-mode external --external-agents-path AGENTS.md \
+  --attest-external-agents
+```
+
+Repeat those same mode/path/attestation options with `--apply-plan <plan_id>`.
+External mode records the repository-relative instruction path, exact content
+hash, contract version, and explicit human attestation without injecting prompt
+text. `doctor` and `sync --check` fail on drift until the changed instructions
+are reviewed and explicitly re-attested through a new plan.
+
+Use `init --check` for installed-state compliance. Run `init` and `sync` from
 the canonical package; the pinned copy intentionally refuses to update itself.
 
 New repositories default delegated tasks to `gpt-5.6-terra` with `xhigh`
@@ -66,7 +87,9 @@ creation call; prompt text alone does not configure a task.
 ## Core commands
 
 ```text
-codex-flow init [--check] [--force]
+codex-flow init --plan [--json] [initialization options]
+codex-flow init --apply-plan <plan_id> [initialization options]
+codex-flow init --check
 codex-flow sync [--check] [--force]
 codex-flow config show|set ...
 codex-flow doctor [--json]
@@ -147,6 +170,8 @@ npm run pack:check
 
 See [ADR 0001](docs/adr/0001-portable-layered-orchestration.md) for the layered
 architecture and [ADR 0002](docs/adr/0002-run-identity-and-host-reconciliation.md)
-for v0.2 identity, queue, deadline, and host-reconciliation decisions.
+for identity, queue, deadline, and host-reconciliation decisions. Installation
+planning and external instruction ownership are defined by
+[ADR 0003](docs/adr/0003-install-planning-and-instruction-ownership.md).
 The current covered/partial/host-dependent boundary is listed in
-[v0.2 orchestration coverage](docs/coverage-v0.2.md).
+[v0.3 orchestration coverage](docs/coverage-v0.3.md).

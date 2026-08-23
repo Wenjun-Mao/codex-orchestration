@@ -32,9 +32,13 @@ import {
 } from "../lib/config.mjs";
 import { runDoctor } from "../lib/doctor.mjs";
 import { discoverGit, gitSnapshot } from "../lib/git.mjs";
+import {
+  applyInstallationPlan,
+  checkRepositoryInstallation,
+  createInstallationPlan,
+} from "../lib/installation.mjs";
 import { acquireLease, leaseStatus, releaseLease } from "../lib/leases.mjs";
 import {
-  initializeRepository,
   synchronizeRepository,
   withRepositoryManagementLock,
 } from "../lib/managed.mjs";
@@ -59,8 +63,14 @@ const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const HELP = `codex-flow ${PACKAGE_VERSION}
 
 Usage:
-  codex-flow init [--check] [--force] [--project-id ID] [--max-concurrency N]
+  codex-flow init --plan [--json] [initialization options]
+  codex-flow init --apply-plan PLAN_ID [initialization options]
+  codex-flow init --check
+  initialization options:
+                  [--force] [--project-id ID] [--max-concurrency N]
                   [--model MODEL] [--reasoning-effort EFFORT]
+                  [--agents-mode managed|external]
+                  [--external-agents-path PATH] [--attest-external-agents]
   codex-flow sync [--check] [--force]
   codex-flow config show [--json]
   codex-flow config set [--model MODEL|host-default]
@@ -151,14 +161,37 @@ function recipientFromValues(values) {
 async function commandInit(args) {
   requireCanonicalSource();
   const { values } = parse({
+    plan: { type: "boolean", default: false },
+    "apply-plan": { type: "string" },
     check: { type: "boolean", default: false },
     force: { type: "boolean", default: false },
     "project-id": { type: "string" },
     "max-concurrency": { type: "string" },
     model: { type: "string" },
     "reasoning-effort": { type: "string" },
+    "agents-mode": { type: "string" },
+    "external-agents-path": { type: "string" },
+    "attest-external-agents": { type: "boolean", default: false },
+    json: { type: "boolean", default: false },
   }, args);
-  const git = discoverGit();
+  const selectedModes = [values.plan, Boolean(values["apply-plan"]), values.check].filter(Boolean).length;
+  if (selectedModes !== 1) {
+    throw new CliError("init requires exactly one of --plan, --apply-plan PLAN_ID, or --check");
+  }
+  if (values.check && (
+    values.force
+    || values["project-id"] !== undefined
+    || values["max-concurrency"] !== undefined
+    || values.model !== undefined
+    || values["reasoning-effort"] !== undefined
+    || values["agents-mode"] !== undefined
+    || values["external-agents-path"] !== undefined
+    || values["attest-external-agents"]
+  )) throw new CliError("init --check does not accept initialization changes");
+  if (values["agents-mode"] !== undefined) {
+    requireEnum(values["agents-mode"], ["managed", "external"], "agents_mode");
+  }
+  const git = gitSnapshot();
   const max = values["max-concurrency"] === undefined
     ? undefined
     : requireInteger(Number(values["max-concurrency"]), "max_concurrency", { min: 1, max: 32 });
@@ -166,17 +199,53 @@ async function commandInit(args) {
     const effort = values["reasoning-effort"] === "host-default" ? null : values["reasoning-effort"];
     requireEnum(effort, REASONING_EFFORTS, "reasoning_effort");
   }
-  const result = await initializeRepository({
+  const options = {
     ...repositoryOptions(git),
     packageRoot,
-    check: values.check,
+    repository: {
+      branch: git.branch,
+      revision: git.revision,
+      cleanliness: git.cleanliness,
+    },
     force: values.force,
     projectId: values["project-id"],
     maxParallelExecutors: max,
     defaultModel: values.model === "host-default" ? null : values.model,
     defaultReasoningEffort: values["reasoning-effort"] === "host-default" ? null : values["reasoning-effort"],
+    agentsMode: values["agents-mode"],
+    externalAgentsPath: values["external-agents-path"],
+    attestExternalAgents: values["attest-external-agents"],
+  };
+  if (values.plan) {
+    const result = await createInstallationPlan(options);
+    output(result, {
+      json: values.json,
+      human: (item) => [
+        `codex-flow installation plan: ${item.plan_id}`,
+        `project: ${item.project_id}`,
+        `AGENTS: ${item.agents.mode} ${item.agents.path ?? "unresolved"}`,
+        `AGENTS lines: ${item.agents.before_lines ?? "missing"} -> ${item.agents.after_lines ?? "unresolved"}`,
+        `planned changes: ${item.operations.length}`,
+        `compatibility conflicts: ${item.conflicts.length}`,
+        ...item.conflicts.map((entry) => `conflict: ${entry.message}`),
+      ].join("\n"),
+    });
+    if (!result.applicable) process.exitCode = 1;
+    return;
+  }
+  if (values.check) {
+    const result = await checkRepositoryInstallation(options);
+    output(result, {
+      json: values.json,
+      human: (item) => `codex-flow check passed for ${item.project_id} (unchanged)`,
+    });
+    return;
+  }
+  const result = await applyInstallationPlan(options, values["apply-plan"]);
+  output(result, {
+    json: values.json,
+    human: (item) => `codex-flow initialization passed for ${item.project_id}${item.changed ? " (updated)" : " (unchanged)"}`,
   });
-  output(result, { human: (item) => `codex-flow ${values.check ? "check" : "initialization"} passed for ${item.project_id}${item.changed ? " (updated)" : " (unchanged)"}` });
 }
 
 async function commandSync(args) {
@@ -260,6 +329,7 @@ async function commandDoctor(args) {
       `project: ${item.project?.project_id ?? "unconfigured"}`,
       `git: ${item.git.branch} ${item.git.revision.slice(0, 12)} (${item.git.cleanliness})`,
       `runtime: ${item.runtime?.package_version ?? "missing"}${item.runtime?.drift?.length ? `, ${item.runtime.drift.length} drift item(s)` : ""}`,
+      `AGENTS integration: ${item.agents_contract?.mode ?? item.agents_block}`,
       `task-thread creation: ${item.thread_creation}`,
       `callbacks: ${item.callbacks.pending_count} pending, ${item.callbacks.consumed_count} consumed`,
       `task operations: ${item.task_operations.total_count} total, ${item.task_operations.ambiguous_count} ambiguous`,

@@ -1,8 +1,11 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "project_id": "PROJECT_ID",
   "max_parallel_executors": 2,
   "callback_transport": "codex-queue",
   "default_model": "gpt-5.6-terra",
-  "default_reasoning_effort": "xhigh"
+  "default_reasoning_effort": "xhigh",
+  "agents_integration": {
+    "mode": "managed"
+  }
 }

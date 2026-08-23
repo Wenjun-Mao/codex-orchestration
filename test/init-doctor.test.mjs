@@ -3,7 +3,13 @@ import { createHash } from "node:crypto";
 import { lstat, readFile, readdir, writeFile } from "node:fs/promises";
 import { relative, resolve } from "node:path";
 import test from "node:test";
-import { assertSuccess, createGitFixture, removeFixture, runCli } from "./helpers.mjs";
+import {
+  assertSuccess,
+  createGitFixture,
+  initializeFixture,
+  removeFixture,
+  runCli,
+} from "./helpers.mjs";
 
 async function snapshotFiles(root) {
   const snapshot = {};
@@ -32,13 +38,11 @@ test("init preserves a Python repository and installs a pinned runtime idempoten
     await writeFile(resolve(root, "AGENTS.md"), originalAgents, "utf8");
     await writeFile(resolve(root, "pyproject.toml"), "[project]\nname = \"fixture\"\nversion = \"0.0.0\"\n", "utf8");
 
-    const first = runCli([
-      "init",
+    const first = initializeFixture([
       "--model", "gpt-5.5",
       "--reasoning-effort", "high",
       "--max-concurrency", "3",
-    ], { cwd: root });
-    assertSuccess(first, "first init");
+    ], { cwd: root }).applied;
     const agents = await readFile(resolve(root, "AGENTS.md"), "utf8");
     assert.ok(agents.startsWith(originalAgents.trimEnd()));
     assert.equal((agents.match(/codex-flow:start/g) ?? []).length, 1);
@@ -53,9 +57,8 @@ test("init preserves a Python repository and installs a pinned runtime idempoten
     const beforeCheck = await snapshotFiles(root);
     assertSuccess(runCli(["init", "--check"], { cwd: root }), "init check");
     assert.deepEqual(await snapshotFiles(root), beforeCheck);
-    const second = runCli(["init"], { cwd: root });
-    assertSuccess(second, "idempotent init");
-    assert.match(second.stdout, /unchanged/);
+    const second = initializeFixture([], { cwd: root }).applied;
+    assert.equal(JSON.parse(second.stdout).changed, false);
 
     const doctor = runCli(["doctor", "--json"], {
       cwd: root,
@@ -74,7 +77,7 @@ test("init preserves a Python repository and installs a pinned runtime idempoten
 test("sync removes obsolete manifest-owned files and preserves project configuration", async () => {
   const root = await createGitFixture();
   try {
-    assertSuccess(runCli(["init", "--project-id", "obsolete-fixture"], { cwd: root }));
+    initializeFixture(["--project-id", "obsolete-fixture"], { cwd: root });
     const runtimeRoot = resolve(root, ".codex/orchestration");
     const obsoletePath = resolve(runtimeRoot, "lib/obsolete.mjs");
     const obsoleteContents = "export const retired = true;\n";
@@ -99,7 +102,7 @@ test("sync removes obsolete manifest-owned files and preserves project configura
 test("sync refuses locally modified managed runtime files", async () => {
   const root = await createGitFixture();
   try {
-    assertSuccess(runCli(["init"], { cwd: root }));
+    initializeFixture([], { cwd: root });
     const managed = resolve(root, ".codex/orchestration/lib/core.mjs");
     await writeFile(managed, "// local drift\n", "utf8");
     const refused = runCli(["sync"], { cwd: root });
@@ -116,9 +119,9 @@ test("init fails closed on malformed AGENTS managed markers", async () => {
   const root = await createGitFixture();
   try {
     await writeFile(resolve(root, "AGENTS.md"), "<!-- codex-flow:start v0.0.1 -->\n", "utf8");
-    const result = runCli(["init"], { cwd: root });
+    const result = runCli(["init", "--plan"], { cwd: root });
     assert.notEqual(result.status, 0);
-    assert.match(result.stderr, /malformed or duplicate/);
+    assert.match(result.stdout, /malformed or duplicate/);
   } finally {
     await removeFixture(root);
   }
@@ -135,9 +138,9 @@ test("init fails closed when AGENTS managed markers are reversed", async () => {
       "",
     ].join("\n"), "utf8");
     const before = await readFile(resolve(root, "AGENTS.md"), "utf8");
-    const result = runCli(["init"], { cwd: root });
+    const result = runCli(["init", "--plan"], { cwd: root });
     assert.notEqual(result.status, 0);
-    assert.match(result.stderr, /malformed or duplicate/);
+    assert.match(result.stdout, /malformed or duplicate/);
     assert.equal(await readFile(resolve(root, "AGENTS.md"), "utf8"), before);
   } finally {
     await removeFixture(root);
@@ -147,7 +150,7 @@ test("init fails closed when AGENTS managed markers are reversed", async () => {
 test("project defaults can be changed after initialization and resolved per task", async () => {
   const root = await createGitFixture();
   try {
-    assertSuccess(runCli(["init"], { cwd: root }));
+    initializeFixture([], { cwd: root });
     const changed = runCli([
       "config", "set",
       "--model", "gpt-5.6-luna",
@@ -157,12 +160,13 @@ test("project defaults can be changed after initialization and resolved per task
     ], { cwd: root });
     assertSuccess(changed, "config set");
     assert.deepEqual(JSON.parse(changed.stdout), {
-      schema_version: 1,
+      schema_version: 2,
       project_id: root.split("/").at(-1),
       max_parallel_executors: 4,
       callback_transport: "codex-queue",
       default_model: "gpt-5.6-luna",
       default_reasoning_effort: "medium",
+      agents_integration: { mode: "managed" },
     });
 
     const packetPath = resolve(root, "packet.json");

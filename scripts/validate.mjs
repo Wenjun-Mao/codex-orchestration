@@ -61,7 +61,14 @@ for (const modulePath of modules) {
   }
 }
 
-for (const name of ["project", "task-packet", "parallel-plan", "task-operation", "terminal-receipt"]) {
+for (const name of [
+  "project",
+  "install-plan",
+  "task-packet",
+  "parallel-plan",
+  "task-operation",
+  "terminal-receipt",
+]) {
   const schema = JSON.parse(await readFile(resolve(root, "schemas", `${name}.schema.json`), "utf8"));
   if (schema.type !== "object" || schema.additionalProperties !== false || !schema.properties) {
     throw new Error(`Schema ${name} must declare a closed object contract`);
