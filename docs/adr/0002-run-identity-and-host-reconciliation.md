@@ -4,6 +4,10 @@
 - Date: 2026-08-23
 - Scope: portable orchestration contracts and Codex host-operation safety
 
+The callback transport portion of this decision is superseded by ADR 0005;
+run identity, recipient fencing, and host-operation reconciliation remain in
+force.
+
 ## Context
 
 The first live parallel field run confirmed that ordinary terminal completion

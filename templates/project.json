@@ -1,8 +1,9 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "project_id": "PROJECT_ID",
   "max_parallel_executors": 2,
-  "callback_transport": "codex-queue",
+  "ordinary_completion_authority": "journal-monitor",
+  "callback_transport": "none",
   "default_model": "gpt-5.6-terra",
   "default_reasoning_effort": "xhigh",
   "agents_integration": {

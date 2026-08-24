@@ -1,4 +1,4 @@
-<!-- codex-flow:start v0.3.1 -->
+<!-- codex-flow:start v0.3.2 -->
 ## Codex Orchestration
 
 For work that creates, coordinates, or integrates other Codex tasks, invoke
@@ -7,6 +7,6 @@ For work that creates, coordinates, or integrates other Codex tasks, invoke
 before delegated planning. Executors must start from a validated task packet.
 Create only the packet's explicit task kind and journal ambiguous host calls.
 Use Steer only for true blockers, approvals, or high-risk drift; route ordinary
-terminal completion through `codex-flow callback deliver`. After a coordinator
-fork, rebind its recipient lineage before integration.
+terminal completion through the journal with `codex-flow callback deliver`.
+After a coordinator fork, rebind its recipient lineage before integration.
 <!-- codex-flow:end -->

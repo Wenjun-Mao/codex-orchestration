@@ -18,7 +18,7 @@ share the same coordination state.
 
 - Git
 - Node.js 20.11 or newer
-- Codex CLI only when terminal callbacks should use `codex queue`
+- Codex host tools only for task creation and other explicitly requested host actions
 
 No third-party npm packages are required. Target repositories do not need to
 be JavaScript projects. JSON Schemas provide portable structural validation;
@@ -110,7 +110,7 @@ codex-flow plan validate <plan.json>
 codex-flow recipient bind|rebind|status|resolve ...
 codex-flow callback deliver --file <receipt.json>
 codex-flow callback observe --callback-id <id> --lineage-id <id>
-                  --thread-id <id> --generation <n>
+                  --thread-id <id> --generation <n> --source journal-monitor
 codex-flow callback consume --callback-id <id> --lineage-id <id>
                   --thread-id <id> --generation <n> --executor-id <id>
 codex-flow callback reconcile|expire|status ...
@@ -147,12 +147,38 @@ procedure and bounded host-list fallback.
 
 Urgent blockers, approval requests, and high-risk drift use direct Steer.
 Ordinary terminal completion uses `callback deliver`, which persists a strict
-receipt before trying `codex queue`.
+receipt in the repository journal. The default and only installed project
+authority is `journal-monitor`: it creates no Codex thread-queue entry. The
+coordinator or its quiet monitor reads `callback status`, then observes with
+`--source journal-monitor` and consumes only after integration.
 
-Transport is at least once. Integration is exactly once by deterministic
-callback ID and a durable observed/consumed journal. Queue timeouts block retry
-until explicit reconciliation. Corrected receipts use increasing sequence
-numbers and explicit supersession; arrival order is never authority.
+Integration is exactly once by deterministic callback ID and a durable
+observed/consumed journal. Corrected receipts use increasing sequence numbers
+and explicit supersession; arrival order is never authority. Task packets and
+project configuration must name the same ordinary-completion authority, so a
+monitor cannot silently integrate work that was also queued.
+
+The library contains an optional capability-probed retractable-queue contract
+for adapter field tests. It requires stable add/list/delete identities, sends
+only a callback pointer, and performs host calls outside the journal lock. No
+such experimental host adapter is enabled by default or required for package
+operation, and v0.3.2 does not claim Desktop queue retraction from a real host
+field test.
+
+Upgrading a v0.3.1 repository requires an explicit read-only plan and accepted
+authority migration:
+
+```bash
+codex-flow init --plan --callback-authority journal-monitor --json
+codex-flow init --apply-plan <plan_id> \
+  --callback-authority journal-monitor --json
+```
+
+Legacy callback journals remain readable. Because old `codex queue` accepted
+no retractable submission identity, `doctor` reports any legacy notification
+that may still surface. A stale legacy queue turn resolves the trusted receipt
+from the journal and is deduplicated by callback ID; it must not be integrated
+again.
 
 Before launching executors, bind the coordinator lineage with `recipient bind`.
 The first successful bind returns a private fence token; idempotent bind replay
@@ -189,5 +215,7 @@ planning and external instruction ownership are defined by
 [ADR 0003](docs/adr/0003-install-planning-and-instruction-ownership.md).
 Local task baseline authentication is defined by
 [ADR 0004](docs/adr/0004-authenticate-local-task-baselines.md).
+Ordinary-completion authority and queue-notification lifecycle are defined by
+[ADR 0005](docs/adr/0005-callback-authority-and-notification-lifecycle.md).
 The current covered/partial/host-dependent boundary is listed in
-[v0.3.1 orchestration coverage](docs/coverage-v0.3.1.md).
+[v0.3.2 orchestration coverage](docs/coverage-v0.3.2.md).

@@ -36,8 +36,9 @@ registry, `node_modules`, or a JavaScript application.
 Parallel work is serial by default. A validated plan must establish baseline,
 dependencies, disjoint write ownership, exclusive shared resources, and serial
 integration gates before executors begin. Ordinary terminal completion is
-persisted and queued; urgent blockers and approvals use Steer. Executors never
-manage siblings, monitors, integration, or archive state.
+persisted for the sole declared journal monitor; urgent blockers and approvals
+use Steer. Executors never manage siblings, monitors, integration, or archive
+state.
 
 `codex-flow` cannot introspect the model's private tool registry. `doctor`
 therefore reports thread creation as requiring a runtime probe rather than
@@ -55,9 +56,9 @@ inherited silently from the host.
 
 - Existing language-specific `AGENTS.md` guidance remains intact.
 - Detailed playbooks load only for the active role.
-- Callback integration is exactly once by deterministic callback ID, while
-  transport may be retried at least once.
-- Queue and lease state are operational state, never an evidence archive.
+- Callback integration is exactly once by deterministic callback ID; ADR 0005
+  defines the separate notification lifecycle.
+- Callback and lease state are operational state, never an evidence archive.
 - Cleanup is audit-only in v0.1; deletion requires a later explicit contract.
 - No claim is made for FIFO, archived destinations, role retention through
   compaction/fork, or every Codex host until controlled field tests prove them.

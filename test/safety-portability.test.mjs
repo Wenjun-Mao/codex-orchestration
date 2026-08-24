@@ -144,6 +144,9 @@ test("linked Git worktrees share callback and exclusive-resource state", async (
   const linked = resolve(tmpdir(), `${basename(root)}-linked`);
   await rm(linked, { recursive: true, force: true });
   try {
+    initializeFixture([], { cwd: root });
+    execFileSync("git", ["add", "AGENTS.md", ".codex/orchestration"], { cwd: root });
+    execFileSync("git", ["commit", "--quiet", "-m", "initialize fixture"], { cwd: root });
     execFileSync("git", ["worktree", "add", "--quiet", "-b", "linked-fixture", linked], { cwd: root });
     const acquired = runCli([
       "lease", "acquire", "--resource", "creator", "--owner", "executor-a", "--ttl-seconds", "60", "--json",

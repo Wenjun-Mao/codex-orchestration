@@ -115,18 +115,43 @@ test("sync refuses locally modified managed runtime files", async () => {
   }
 });
 
-test("sync refuses legacy configuration that has not completed plan-bound migration", async () => {
+test("legacy queue configuration requires an explicit plan-bound journal-monitor migration", async () => {
   const root = await createGitFixture();
   try {
     initializeFixture([], { cwd: root });
     const configPath = resolve(root, ".codex/orchestration/project.json");
     const config = JSON.parse(await readFile(configPath, "utf8"));
-    delete config.agents_integration;
-    config.schema_version = 1;
-    await writeFile(configPath, `${JSON.stringify(config, null, 2)}\n`, "utf8");
+    const legacy = {
+      schema_version: 2,
+      project_id: config.project_id,
+      max_parallel_executors: config.max_parallel_executors,
+      callback_transport: "codex-queue",
+      default_model: config.default_model,
+      default_reasoning_effort: config.default_reasoning_effort,
+      agents_integration: config.agents_integration,
+    };
+    await writeFile(configPath, `${JSON.stringify(legacy, null, 2)}\n`, "utf8");
     const sync = runCli(["sync"], { cwd: root });
     assert.notEqual(sync.status, 0);
     assert.match(sync.stderr, /plan-bound migration/);
+
+    const implicit = runCli(["init", "--plan", "--json"], { cwd: root });
+    assert.equal(implicit.status, 1);
+    assert.match(JSON.parse(implicit.stdout).conflicts[0].message, /choose --callback-authority journal-monitor/);
+    assert.deepEqual(JSON.parse(await readFile(configPath, "utf8")), legacy, "read-only planning must preserve legacy config");
+
+    const planned = runCli(["init", "--plan", "--callback-authority", "journal-monitor", "--json"], { cwd: root });
+    assertSuccess(planned, "legacy callback-authority migration plan");
+    const plan = JSON.parse(planned.stdout);
+    const applied = runCli([
+      "init", "--apply-plan", plan.plan_id,
+      "--callback-authority", "journal-monitor", "--json",
+    ], { cwd: root });
+    assertSuccess(applied, "legacy callback-authority migration apply");
+    const migrated = JSON.parse(await readFile(configPath, "utf8"));
+    assert.equal(migrated.schema_version, 3);
+    assert.equal(migrated.ordinary_completion_authority, "journal-monitor");
+    assert.equal(migrated.callback_transport, "none");
   } finally {
     await removeFixture(root);
   }
@@ -177,10 +202,11 @@ test("project defaults can be changed after initialization and resolved per task
     ], { cwd: root });
     assertSuccess(changed, "config set");
     assert.deepEqual(JSON.parse(changed.stdout), {
-      schema_version: 2,
+      schema_version: 3,
       project_id: root.split("/").at(-1),
       max_parallel_executors: 4,
-      callback_transport: "codex-queue",
+      ordinary_completion_authority: "journal-monitor",
+      callback_transport: "none",
       default_model: "gpt-5.6-luna",
       default_reasoning_effort: "medium",
       agents_integration: { mode: "managed" },

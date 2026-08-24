@@ -1,6 +1,6 @@
 ---
 name: integrate
-description: Integrate queued Codex executor results exactly once, review branch ownership and provenance, merge serially, run combined verification, consume callbacks, and release resources. Use after one or more executors return.
+description: Integrate journaled Codex executor results exactly once, review branch ownership and provenance, merge serially, run combined verification, consume callbacks, and release resources. Use after one or more executors return.
 ---
 
 # Integrate Executor Results
@@ -11,8 +11,9 @@ Inspect durable state with:
 node .codex/orchestration/bin/codex-flow.mjs callback status
 ```
 
-For each callback ID, mark it observed using the current bound recipient
-generation, then authenticate its branch, revision, cleanliness, owned
+For each callback ID, mark it observed with `--source journal-monitor` using
+the current bound recipient generation, then authenticate its branch,
+revision, cleanliness, owned
 diff, verification, and blocker classification. Reject or integrate serially;
 never infer success from UI status or task age. After all accepted branches are
 combined, run the plan's integration gates and proportional product reproof.

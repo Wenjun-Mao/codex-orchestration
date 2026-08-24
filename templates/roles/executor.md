@@ -12,8 +12,9 @@ or high-risk scope/cost drift. Do not broaden write ownership to keep a run
 green.
 
 When the bounded result is terminal, leave the branch clean or state the exact
-reason it is not, create one strict terminal receipt, and deliver it through
-`codex-flow callback deliver`. The receipt is a signal, not an archive: never
+reason it is not, create one strict terminal receipt, and persist it through
+`codex-flow callback deliver`. Do not separately queue ordinary completion.
+The receipt is a signal, not an archive: never
 include secrets, raw logs, transcripts, user data, or application/account
 identifiers. Retries keep the same callback identity; corrections use explicit
 sequence supersession.

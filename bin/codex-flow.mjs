@@ -26,6 +26,7 @@ import {
 import { cleanupAudit } from "../lib/cleanup.mjs";
 import {
   projectConfigPath,
+  ORDINARY_COMPLETION_AUTHORITIES,
   REASONING_EFFORTS,
   validateProjectConfig,
   writeProjectConfig,
@@ -69,6 +70,7 @@ Usage:
   initialization options:
                   [--force] [--project-id ID] [--max-concurrency N]
                   [--model MODEL] [--reasoning-effort EFFORT]
+                  [--callback-authority journal-monitor]
                   [--agents-mode managed|external]
                   [--external-agents-path PATH] [--attest-external-agents]
   codex-flow sync [--check] [--force]
@@ -92,10 +94,12 @@ Usage:
   codex-flow recipient status [--lineage-id ID] [--json]
   codex-flow recipient resolve --lineage-id ID --thread-id ID --generation N [--json]
   codex-flow callback deliver [--file receipt.json] [--no-queue] [--json]
-  codex-flow callback observe --callback-id ID --lineage-id ID --thread-id ID --generation N [--json]
+  codex-flow callback observe --callback-id ID --lineage-id ID --thread-id ID --generation N
+                  --source journal-monitor|monitor-recovery|queue-turn [--json]
   codex-flow callback consume --callback-id ID --lineage-id ID --thread-id ID
                   --generation N --executor-id ID [--json]
-  codex-flow callback reconcile --callback-id ID --outcome enqueued|not-enqueued [--json]
+  codex-flow callback reconcile --callback-id ID
+                  --outcome queued|not-queued|deleted|started [--submission-id ID] [--json]
   codex-flow callback expire [--callback-id ID] [--at TIMESTAMP] [--json]
   codex-flow callback status [--json]
   codex-flow lease acquire --resource ID --owner ID [--ttl-seconds N] [--break-expired] [--json]
@@ -170,6 +174,7 @@ async function commandInit(args) {
     model: { type: "string" },
     "reasoning-effort": { type: "string" },
     "agents-mode": { type: "string" },
+    "callback-authority": { type: "string" },
     "external-agents-path": { type: "string" },
     "attest-external-agents": { type: "boolean", default: false },
     json: { type: "boolean", default: false },
@@ -184,12 +189,16 @@ async function commandInit(args) {
     || values["max-concurrency"] !== undefined
     || values.model !== undefined
     || values["reasoning-effort"] !== undefined
+    || values["callback-authority"] !== undefined
     || values["agents-mode"] !== undefined
     || values["external-agents-path"] !== undefined
     || values["attest-external-agents"]
   )) throw new CliError("init --check does not accept initialization changes");
   if (values["agents-mode"] !== undefined) {
     requireEnum(values["agents-mode"], ["managed", "external"], "agents_mode");
+  }
+  if (values["callback-authority"] !== undefined) {
+    requireEnum(values["callback-authority"], ORDINARY_COMPLETION_AUTHORITIES, "callback_authority");
   }
   const git = gitSnapshot();
   const max = values["max-concurrency"] === undefined
@@ -212,6 +221,7 @@ async function commandInit(args) {
     maxParallelExecutors: max,
     defaultModel: values.model === "host-default" ? null : values.model,
     defaultReasoningEffort: values["reasoning-effort"] === "host-default" ? null : values["reasoning-effort"],
+    ordinaryCompletionAuthority: values["callback-authority"],
     agentsMode: values["agents-mode"],
     externalAgentsPath: values["external-agents-path"],
     attestExternalAgents: values["attest-external-agents"],
@@ -584,8 +594,14 @@ async function commandCallback(args) {
       file: { type: "string" },
       "no-queue": { type: "boolean", default: false },
     }), rest);
+    const config = await loadConfig(git.root);
     const receipt = await readJsonInput(values.file ? resolve(values.file) : null);
-    const result = await deliverCallback({ stateRoot: git.stateRoot, receipt, noQueue: values["no-queue"] });
+    const result = await deliverCallback({
+      stateRoot: git.stateRoot,
+      receipt,
+      authority: config.ordinary_completion_authority,
+      noQueue: values["no-queue"],
+    });
     output(result, { json: values.json, human: (item) => `Terminal callback ${item.status}: ${item.callback_id}` });
     return;
   }
@@ -595,11 +611,13 @@ async function commandCallback(args) {
       "lineage-id": { type: "string" },
       "thread-id": { type: "string" },
       generation: { type: "string" },
+      source: { type: "string" },
     }), rest);
     const result = await observeCallback({
       stateRoot: git.stateRoot,
       callbackId: values["callback-id"],
       recipient: recipientFromValues(values),
+      source: values.source,
     });
     output(result, { json: values.json, human: (item) => `Terminal callback ${item.status}: ${item.callback_id}` });
     return;
@@ -625,11 +643,13 @@ async function commandCallback(args) {
     const { values } = parse(boolAndJsonOptions({
       "callback-id": { type: "string" },
       outcome: { type: "string" },
+      "submission-id": { type: "string" },
     }), rest);
     const result = await reconcileCallback({
       stateRoot: git.stateRoot,
       callbackId: values["callback-id"],
       outcome: values.outcome,
+      submissionId: values["submission-id"] ?? null,
     });
     output(result, { json: values.json, human: (item) => `Terminal callback ${item.status}: ${item.callback_id}` });
     return;
@@ -658,7 +678,13 @@ async function commandCallback(args) {
       json: values.json,
       human: (item) => [
         `${item.pending.length} pending callback(s); ${item.consumed_count} consumed, ${item.superseded_count} superseded, ${item.expired_count} expired journal record(s).`,
-        ...item.pending.map((entry) => `${entry.callback_id} ${entry.effective_delivery} ${entry.classification} (${entry.executor_id})`),
+        ...item.pending.map((entry) => `${entry.callback_id} ${entry.effective_integration} ${entry.notification} ${entry.classification} (${entry.executor_id})`),
+        ...(item.notification_risk_count > 0
+          ? [`${item.notification_risk_count} callback notification(s) may still be live.`]
+          : []),
+        ...(item.legacy_notification_risk_count > 0
+          ? [`${item.legacy_notification_risk_count} legacy callback notification(s) may still surface as stale queue turns.`]
+          : []),
       ].join("\n"),
     });
     return;

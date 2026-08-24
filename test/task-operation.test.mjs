@@ -41,7 +41,7 @@ function packet(overrides = {}) {
     },
     stop_policy: {
       urgent: ["blocker", "approval", "high-risk-drift"],
-      ordinary_completion: "queue",
+      ordinary_completion: "journal-monitor",
     },
     integration_gate: { gate_id: "integration-r01", reproof: ["Run combined tests."] },
     cleanup_owner: "coordinator-lineage",

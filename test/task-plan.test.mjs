@@ -75,6 +75,7 @@ test("task packets resolve Terra xhigh defaults and preserve per-task overrides"
   const resolved = applyTaskDefaults(raw, {
     default_model: "gpt-5.6-terra",
     default_reasoning_effort: "xhigh",
+    ordinary_completion_authority: "journal-monitor",
   });
   assert.equal(resolved.model, "gpt-5.6-terra");
   assert.equal(resolved.reasoning_effort, "xhigh");
@@ -106,6 +107,10 @@ test("task packets reject broad ownership and callback identity drift", async ()
     ...raw,
     environment: { type: "local", project_path: "relative/project" },
   }), /project_path must be absolute/);
+  assert.throws(() => validateTaskPacket({
+    ...raw,
+    stop_policy: { ...raw.stop_policy, ordinary_completion: "queue" },
+  }), /ordinary_completion/);
 });
 
 test("v2 contracts fail closed on v1 and unknown or ambiguous execution kinds", async () => {

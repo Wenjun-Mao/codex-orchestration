@@ -1,6 +1,6 @@
 {
   "name": "codex-orchestration",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Coordinate independent Codex tasks with explicit ownership, durable callbacks, and serial integration.",
   "author": {
     "name": "Wenjun Mao"
@@ -18,7 +18,7 @@
     "defaultPrompt": [
       "Plan this work across independent Codex tasks.",
       "Validate this executor task packet.",
-      "Integrate queued task results safely."
+      "Integrate journaled task results safely."
     ]
   }
 }

@@ -4,21 +4,24 @@ Use two delivery classes:
 
 - **Urgent:** a true blocker, approval request, or high-risk scope/cost drift
   interrupts the coordinator through the host's Steer surface.
-- **Ordinary terminal completion:** persist and queue one bounded callback with
-  `codex-flow callback deliver`.
+- **Ordinary terminal completion:** persist one bounded callback with
+  `codex-flow callback deliver`; the declared journal monitor is the sole
+  integration authority.
 
-Queued delivery is at least once. Coordinator integration is exactly once by
-the deterministic callback ID. Persisted lifecycle is `persisted`,
-`enqueue-attempted`, `enqueued`, `observed`, then `consumed`; explicit
-`superseded` and `expired` are terminal alternatives. The coordinator calls
-`callback consume` only after the result has been integrated or deliberately
-rejected and recorded.
+Coordinator integration is exactly once by the deterministic callback ID.
+Persisted integration lifecycle is `persisted`, `observed`, then `consumed`;
+explicit `superseded` and `expired` are terminal alternatives. Notification
+lifecycle is independent. The default `journal-monitor` authority disables
+host queue notification entirely. The coordinator calls `callback observe`
+with `--source journal-monitor`, then calls `callback consume` only after the
+result has been integrated or deliberately rejected and recorded.
 
-If queue transport is unavailable, exit status 75 means the receipt remains
-durable. A queue timeout is ambiguous and must be reconciled before retrying.
-A monitor or coordinator may inspect `callback status`; it suppresses duplicate
+A monitor or coordinator inspects `callback status`; it suppresses duplicate
 IDs and remains silent on unchanged state. It must not invent a result from
-task age, UI state, or arrival order.
+task age, UI state, or arrival order. Never combine monitor integration with a
+separate ordinary-completion queue. Legacy records with potentially live queue
+notifications remain fail-closed until the actual queue turn arrives or a
+retractable identity is proven.
 
 Bind one coordinator lineage before launch. After a fork or authoritative
 replacement, fence and rebind that lineage to the new thread generation.

@@ -1,8 +1,6 @@
 import assert from "node:assert/strict";
-import { chmod, writeFile } from "node:fs/promises";
-import { resolve } from "node:path";
 import test from "node:test";
-import { assertSuccess, createGitFixture, removeFixture, runCli } from "./helpers.mjs";
+import { assertSuccess, createGitFixture, initializeFixture, removeFixture, runCli } from "./helpers.mjs";
 
 function receipt() {
   return {
@@ -37,13 +35,7 @@ function receipt() {
 test("CLI binds a redacted recipient and enforces observe before consume", async () => {
   const root = await createGitFixture("codex-flow-cli-lifecycle-");
   try {
-    const fakeCodex = resolve(root, "fake-codex.mjs");
-    await writeFile(fakeCodex, `#!/usr/bin/env node
-if (process.argv[2] === "--version") process.exit(0);
-if (process.argv[2] === "queue") process.exit(0);
-process.exit(2);
-`, "utf8");
-    await chmod(fakeCodex, 0o700);
+    initializeFixture([], { cwd: root });
 
     const binding = runCli([
       "recipient", "bind", "--lineage-id", "cli-lineage", "--thread-id", "cli-coordinator", "--json",
@@ -61,7 +53,6 @@ process.exit(2);
 
     const delivered = runCli(["callback", "deliver", "--json"], {
       cwd: root,
-      env: { CODEX_FLOW_CODEX_BIN: fakeCodex },
       input: receipt(),
     });
     assertSuccess(delivered, "callback deliver");
@@ -78,6 +69,7 @@ process.exit(2);
     assertSuccess(runCli([
       "callback", "observe", "--callback-id", callbackId,
       "--lineage-id", "cli-lineage", "--thread-id", "cli-coordinator", "--generation", "1",
+      "--source", "journal-monitor",
     ], { cwd: root }), "callback observe");
     assertSuccess(runCli([
       "callback", "consume", "--callback-id", callbackId,

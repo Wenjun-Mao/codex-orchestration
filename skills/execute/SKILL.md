@@ -21,7 +21,8 @@ reverse.
 
 Use direct Steer for a true blocker, approval request, ownership collision, or
 high-risk scope/cost drift. On terminal completion, leave a reviewable branch
-state and send one bounded schema-v2 receipt with `codex-flow callback deliver`.
+state and persist one bounded schema-v2 receipt with `codex-flow callback deliver`.
+Do not separately queue ordinary completion.
 Retries retain the same run, sequence, and callback ID. A correction advances
 the sequence and explicitly supersedes the earlier unconsumed callback.
 

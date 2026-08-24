@@ -7,16 +7,18 @@
     "schema_version",
     "project_id",
     "max_parallel_executors",
+    "ordinary_completion_authority",
     "callback_transport",
     "default_model",
     "default_reasoning_effort",
     "agents_integration"
   ],
   "properties": {
-    "schema_version": { "const": 2 },
+    "schema_version": { "const": 3 },
     "project_id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9_.-]+$" },
     "max_parallel_executors": { "type": "integer", "minimum": 1, "maximum": 32 },
-    "callback_transport": { "const": "codex-queue" },
+    "ordinary_completion_authority": { "const": "journal-monitor" },
+    "callback_transport": { "const": "none" },
     "default_model": {
       "oneOf": [
         { "type": "null" },

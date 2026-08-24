@@ -21,8 +21,10 @@ When creating each thread, pass the packet's resolved model and reasoning
 effort to the host creation tool. Prompt text alone does not select either.
 
 During execution, Steer only true blockers, approvals, and high-risk drift.
-Leave ordinary completion to the durable callback queue. Observe and integrate
-each callback ID once under the current recipient generation, reauthenticate
-the branch and scope, merge serially, reprove the combined state, consume the
-callback, and audit stale operational state. After a fork, rebind the lineage
-before accepting new callbacks.
+Leave ordinary completion to the durable callback journal. The quiet journal
+monitor is the sole ordinary-completion authority; do not also queue completion
+messages. Observe each callback with `--source journal-monitor`, integrate its
+ID once under the current recipient generation, reauthenticate the branch and
+scope, merge serially, reprove the combined state, consume the callback, and
+audit stale operational state. After a fork, rebind the lineage before
+accepting new callbacks.
