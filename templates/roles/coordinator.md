@@ -32,7 +32,11 @@ For task threads, reread the exact requested title. If the host substitutes the
 delegation envelope, make one bounded title update and reread before recording
 the operation as observed. Do not use a subagent nickname as packet-title proof.
 
-During execution, Steer only true blockers, approvals, and high-risk drift.
+During execution, accept direct Steer only for true blockers, approvals, and
+high-risk drift. Before acting, observe its `urgent_id` and
+`delivery_attempt_id`; act only on `disposition: process`, suppress every
+duplicate, and consume the logical signal after handling it. Identity-less
+urgent messages are nonauthoritative.
 Leave ordinary completion to the durable callback journal. The quiet journal
 monitor is the sole ordinary-completion authority; do not also queue completion
 messages. Observe each callback through the journal monitor, integrate its

@@ -10,8 +10,8 @@
    For a host-created worktree, create with the no-action bootstrap, observe and
    bind its exact path, then release the full task packet.
 4. **Execute:** remain inside packet ownership and verify proportionally.
-5. **Signal:** Steer urgent conditions; persist one ordinary terminal callback
-   for the declared journal monitor.
+5. **Signal:** persist and identify urgent conditions before direct Steer;
+   persist one ordinary terminal callback for the declared journal monitor.
 6. **Integrate:** observe under the current recipient generation, authenticate,
    review, merge serially, reprove combined behavior, and record the exact Git
    integration disposition.

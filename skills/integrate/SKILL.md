@@ -11,6 +11,10 @@ Inspect durable state with:
 node .codex/orchestration/bin/codex-flow.mjs callback status
 ```
 
+Also inspect `urgent status`. A pending urgent signal is coordinator work, not
+an executor completion: observe it before acting, suppress any duplicate
+disposition, and consume it only after the requested decision is handled.
+
 For each callback ID, mark it observed using the current bound recipient
 generation, then authenticate its branch,
 revision, cleanliness, owned

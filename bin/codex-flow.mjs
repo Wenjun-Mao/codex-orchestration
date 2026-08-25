@@ -73,6 +73,16 @@ import {
   reconcileTaskOperation,
   taskOperationStatus,
 } from "../lib/task-operations.mjs";
+import {
+  consumeUrgentSignal,
+  expireUrgentSignal,
+  expireUrgentSignals,
+  observeUrgentSignal,
+  persistUrgentSignal,
+  prepareUrgentAttempt,
+  reconcileUrgentAttempt,
+  urgentSignalStatus,
+} from "../lib/urgent-signals.mjs";
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -119,6 +129,18 @@ Usage:
                   --generation N --executor-id ID [--json]
   codex-flow callback expire [--callback-id ID] [--at TIMESTAMP] [--json]
   codex-flow callback status [--json]
+  codex-flow urgent persist [--file signal.json] [--json]
+  codex-flow urgent attempt prepare --urgent-id ID --attempt-sequence N
+                  [--retry-reason host-ambiguous|recipient-rebound|operator-approved-retry]
+                  [--json]
+  codex-flow urgent attempt reconcile --urgent-id ID --delivery-attempt-id ID
+                  --outcome accepted|failed|ambiguous [--json]
+  codex-flow urgent observe --urgent-id ID --delivery-attempt-id ID
+                  --lineage-id ID --thread-id ID --generation N [--json]
+  codex-flow urgent consume --urgent-id ID --lineage-id ID --thread-id ID
+                  --generation N --executor-id ID [--json]
+  codex-flow urgent expire [--urgent-id ID] [--at TIMESTAMP] [--json]
+  codex-flow urgent status [--json]
   codex-flow git bind --operation-id ID [--json]
   codex-flow git integrate --operation-id ID --main-branch BRANCH
                   [--superseded-by REF] [--json]
@@ -361,6 +383,7 @@ async function commandDoctor(args) {
       `AGENTS integration: ${item.agents_contract?.mode ?? item.agents_block}`,
       `task-thread creation: ${item.thread_creation}`,
       `callbacks: ${item.callbacks.pending_count} pending, ${item.callbacks.consumed_count} consumed`,
+      `urgent signals: ${item.urgent_signals.pending_count} pending, ${item.urgent_signals.consumed_count} consumed, ${item.urgent_signals.host_replay_count} host replay(s)`,
       `task operations: ${item.task_operations.total_count} total, ${item.task_operations.ambiguous_count} ambiguous, ${item.task_operations.host_session_blocked_count} session-blocked, ${item.task_operations.partial_evidence_count} partial-evidence`,
       `recipient lineages: ${item.recipients.lineage_count}`,
       ...item.warnings.map((warning) => `warning: ${warning}`),
@@ -748,6 +771,137 @@ async function commandCallback(args) {
   throw new CliError("callback requires deliver, observe, consume, expire, or status");
 }
 
+async function commandUrgent(args) {
+  const [subcommand, ...rest] = args;
+  const git = discoverGit();
+  if (subcommand === "persist") {
+    const { values } = parse(boolAndJsonOptions({ file: { type: "string" } }), rest);
+    await loadConfig(git.root);
+    const signal = await readJsonInput(values.file ? resolve(values.file) : null);
+    const result = await persistUrgentSignal({ stateRoot: git.stateRoot, signal });
+    output(result, {
+      json: values.json,
+      human: (item) => `Urgent signal ${item.status}: ${item.urgent_id}`,
+    });
+    return;
+  }
+  if (subcommand === "attempt") {
+    const [action, ...actionArgs] = rest;
+    if (action === "prepare") {
+      const { values } = parse(boolAndJsonOptions({
+        "urgent-id": { type: "string" },
+        "attempt-sequence": { type: "string" },
+        "retry-reason": { type: "string" },
+      }), actionArgs);
+      const result = await prepareUrgentAttempt({
+        stateRoot: git.stateRoot,
+        urgentId: values["urgent-id"],
+        attemptSequence: Number(values["attempt-sequence"]),
+        retryReason: values["retry-reason"] ?? null,
+      });
+      output(result, {
+        json: values.json,
+        human: (item) => [
+          `Urgent delivery attempt ${item.status}: ${item.delivery_attempt_id}`,
+          `Dispatch permitted: ${item.dispatch_permitted ? "yes" : "no"}`,
+          stableStringify(item.direct_envelope, 2),
+        ].join("\n"),
+      });
+      return;
+    }
+    if (action === "reconcile") {
+      const { values } = parse(boolAndJsonOptions({
+        "urgent-id": { type: "string" },
+        "delivery-attempt-id": { type: "string" },
+        outcome: { type: "string" },
+      }), actionArgs);
+      const result = await reconcileUrgentAttempt({
+        stateRoot: git.stateRoot,
+        urgentId: values["urgent-id"],
+        deliveryAttemptId: values["delivery-attempt-id"],
+        outcome: values.outcome,
+      });
+      output(result, {
+        json: values.json,
+        human: (item) => `Urgent delivery attempt ${item.status}: ${item.delivery_attempt_id}`,
+      });
+      return;
+    }
+    throw new CliError("urgent attempt requires prepare or reconcile");
+  }
+  if (subcommand === "observe") {
+    const { values } = parse(boolAndJsonOptions({
+      "urgent-id": { type: "string" },
+      "delivery-attempt-id": { type: "string" },
+      "lineage-id": { type: "string" },
+      "thread-id": { type: "string" },
+      generation: { type: "string" },
+    }), rest);
+    const result = await observeUrgentSignal({
+      stateRoot: git.stateRoot,
+      urgentId: values["urgent-id"],
+      deliveryAttemptId: values["delivery-attempt-id"],
+      recipient: recipientFromValues(values),
+    });
+    output(result, {
+      json: values.json,
+      human: (item) => `Urgent signal ${item.status}: ${item.urgent_id} (${item.disposition})`,
+    });
+    return;
+  }
+  if (subcommand === "consume") {
+    const { values } = parse(boolAndJsonOptions({
+      "urgent-id": { type: "string" },
+      "lineage-id": { type: "string" },
+      "thread-id": { type: "string" },
+      generation: { type: "string" },
+      "executor-id": { type: "string" },
+    }), rest);
+    const result = await consumeUrgentSignal({
+      stateRoot: git.stateRoot,
+      urgentId: values["urgent-id"],
+      recipient: recipientFromValues(values),
+      executorId: values["executor-id"],
+    });
+    output(result, {
+      json: values.json,
+      human: (item) => `Urgent signal ${item.status}: ${item.urgent_id}`,
+    });
+    return;
+  }
+  if (subcommand === "expire") {
+    const { values } = parse(boolAndJsonOptions({
+      "urgent-id": { type: "string" },
+      at: { type: "string" },
+    }), rest);
+    const now = values.at ?? Date.now();
+    const result = values["urgent-id"]
+      ? await expireUrgentSignal({ stateRoot: git.stateRoot, urgentId: values["urgent-id"], now })
+      : await expireUrgentSignals({ stateRoot: git.stateRoot, now });
+    output(result, {
+      json: values.json,
+      human: (item) => Array.isArray(item)
+        ? item.map((entry) => `Urgent signal ${entry.status}: ${entry.urgent_id}`).join("\n") || "No urgent signals."
+        : `Urgent signal ${item.status}: ${item.urgent_id}`,
+    });
+    return;
+  }
+  if (subcommand === "status") {
+    const { values } = parse(boolAndJsonOptions(), rest);
+    const result = await urgentSignalStatus(git.stateRoot);
+    output(result, {
+      json: values.json,
+      human: (item) => [
+        `${item.pending.length} pending urgent signal(s); ${item.consumed_count} consumed, ${item.superseded_count} superseded, ${item.expired_count} expired.`,
+        `Observed duplicates: ${item.host_replay_count} host replay(s), ${item.sender_attempt_duplicate_count} additional sender attempt(s).`,
+        ...item.pending.map((entry) => `${entry.urgent_id} ${entry.effective_state} ${entry.classification} (${entry.executor_id})`),
+      ].join("\n"),
+    });
+    return;
+  }
+  throw new CliError("urgent requires persist, attempt, observe, consume, expire, or status");
+}
+
 async function commandLease(args) {
   const [subcommand, ...rest] = args;
   const git = discoverGit();
@@ -918,6 +1072,7 @@ async function main() {
   if (command === "plan") return commandPlan(args);
   if (command === "recipient") return commandRecipient(args);
   if (command === "callback") return commandCallback(args);
+  if (command === "urgent") return commandUrgent(args);
   if (command === "git") return commandGit(args);
   if (command === "lease") return commandLease(args);
   if (command === "cleanup") return commandCleanup(args);

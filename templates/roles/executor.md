@@ -6,10 +6,12 @@ repository; preserve their changes and never manage siblings or coordinator
 lifecycle.
 
 Before acting, validate the packet, confirm the requested execution kind, and
-reauthenticate its baseline. Stop and
-Steer the coordinator for a true blocker, approval need, ownership collision,
-or high-risk scope/cost drift. Do not broaden write ownership to keep a run
-green.
+reauthenticate its baseline. Stop for a true blocker, approval need, ownership
+collision, or high-risk scope/cost drift. Persist it with
+`codex-flow urgent persist`, prepare one delivery attempt, Steer exactly once
+only when dispatch is permitted, and reconcile the attempt. Never send
+identity-less urgent content or reuse one attempt for another host call. Do not
+broaden write ownership to keep a run green.
 
 A host-worktree bootstrap is not an executor packet. Perform no repository work
 until the coordinator sends the released full packet after Git binding.

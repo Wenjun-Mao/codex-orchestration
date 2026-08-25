@@ -10,7 +10,7 @@ deliberately separate layers:
 
 This is not a daemon, secretary task, or MCP server. Each repository pins a
 reviewable runtime under `.codex/orchestration/`. Mutable recipient bindings,
-task-operation attempts, callback journals, and leases live under that
+task-operation attempts, urgent-signal and callback journals, and leases live under that
 repository's Git common directory at `.git/codex-flow/v0.4/`, so linked worktrees
 share the same coordination state.
 
@@ -132,6 +132,12 @@ codex-flow callback observe --callback-id <id> --lineage-id <id>
 codex-flow callback consume --callback-id <id> --lineage-id <id>
                   --thread-id <id> --generation <n> --executor-id <id>
 codex-flow callback expire|status ...
+codex-flow urgent persist --file <urgent-signal.json>
+codex-flow urgent attempt prepare --urgent-id <id> --attempt-sequence <n>
+                  [--retry-reason <reason>]
+codex-flow urgent attempt reconcile --urgent-id <id>
+                  --delivery-attempt-id <id> --outcome <outcome>
+codex-flow urgent observe|consume|expire|status ...
 codex-flow git bind --operation-id <id>
 codex-flow git integrate --operation-id <id> --main-branch <branch>
                   [--superseded-by <ref>]
@@ -197,7 +203,22 @@ procedure and bounded host-list fallback.
 
 ## Callback and fork contract
 
-Urgent blockers, approval requests, and high-risk drift use direct Steer.
+Urgent blockers, approval requests, and high-risk drift use `journal-direct`.
+The sender first persists a strict urgent signal, prepares one numbered
+delivery attempt, and calls direct Steer exactly once with the returned bounded
+envelope. It then reconciles that attempt as `accepted`, `failed`, or
+`ambiguous`. A second host call requires a new numbered attempt and an explicit
+retry reason. Raw identity-less Steer is invalid for new work.
+
+The coordinator calls `urgent observe` with the signal and attempt IDs before
+acting. The first observed attempt returns `disposition: process`; every later
+envelope for that logical signal returns `disposition: suppress`. Repeated
+observation of one attempt is classified as a host replay. A different attempt
+ID for the same signal is classified as an additional sender attempt. The
+coordinator calls `urgent consume` after handling the signal. Corrected urgent
+content advances the logical sequence and explicitly names its predecessor.
+Host-added envelope fields never participate in identity.
+
 Ordinary terminal completion uses `callback deliver`, which persists a strict
 receipt in the repository journal. The default and only installed project
 authority is `journal-monitor`: it creates no Codex thread-queue entry. The
@@ -225,7 +246,7 @@ generation, while observe/consume requires the current recipient identity. For
 retry-safe rebinding, choose and retain `--next-fence-token`; replaying the same
 old/new token pair and generation is idempotent.
 
-Receipts reject unknown fields, oversized content, secret-like material,
+Urgent signals and terminal receipts reject unknown fields, oversized content, secret-like material,
 application/account identifiers, raw logs/transcripts, and user identity data.
 
 ## Cleanup boundary
@@ -280,5 +301,7 @@ defines the v0.3.3 host-session and title-normalization contract.
 [Git lifecycle and breaking-state policy](docs/adr/0007-git-lifecycle-and-breaking-state.md)
 defines the v0.4 ownership and cleanup contract.
 [Host-provisioned worktree launch](docs/adr/0008-host-provisioned-worktree-launch.md)
-defines the two-phase Desktop worktree contract. The current covered boundary
-is listed in [v0.4 orchestration coverage](docs/coverage-v0.4.md).
+defines the two-phase Desktop worktree contract.
+[Journaled urgent direct delivery](docs/adr/0009-journaled-urgent-direct-delivery.md)
+defines urgent-signal and delivery-attempt identity. The current covered
+boundary is listed in [v0.4.1 orchestration coverage](docs/coverage-v0.4.1.md).

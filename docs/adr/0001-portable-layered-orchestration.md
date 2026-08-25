@@ -37,8 +37,8 @@ Parallel work is serial by default. A validated plan must establish baseline,
 dependencies, disjoint write ownership, exclusive shared resources, and serial
 integration gates before executors begin. Ordinary terminal completion is
 persisted for the sole declared journal monitor; urgent blockers and approvals
-use Steer. Executors never manage siblings, monitors, integration, or archive
-state.
+are journaled and identified before direct Steer. Executors never manage
+siblings, monitors, integration, or archive state.
 
 `codex-flow` cannot introspect the model's private tool registry. `doctor`
 therefore reports thread creation as requiring a runtime probe rather than

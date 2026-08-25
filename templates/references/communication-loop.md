@@ -3,7 +3,8 @@
 Use two delivery classes:
 
 - **Urgent:** a true blocker, approval request, or high-risk scope/cost drift
-  interrupts the coordinator through the host's Steer surface.
+  is persisted with `urgent persist`, assigned one numbered delivery attempt,
+  and sent through the host's Steer surface using only the returned envelope.
 - **Ordinary terminal completion:** persist one bounded callback with
   `codex-flow callback deliver`; the declared journal monitor is the sole
   integration authority.
@@ -27,3 +28,12 @@ Delivery resolves stale packets to the current generation; observation and
 consumption require the current generation. Supply a retained
 `next-fence-token` when rebind output could be interrupted, so the exact rebind
 can be replayed idempotently.
+
+Urgent delivery is idempotent by logical `urgent_id`, independently of host
+envelope shape. Before each host call, run `urgent attempt prepare`; call the
+host exactly once only when `dispatch_permitted` is true, then run
+`urgent attempt reconcile`. The recipient must run `urgent observe` before
+acting and `urgent consume` afterward. One attempt observed twice is a host
+replay; distinct attempts for one urgent signal are sender retries. Both are
+suppressed after the first observation. Corrections advance the signal
+sequence. Never send raw urgent content without the persisted IDs.

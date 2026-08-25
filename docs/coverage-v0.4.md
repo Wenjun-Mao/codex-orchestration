@@ -30,6 +30,9 @@
 - Protected local branches and protected upstream refs are never cleanup candidates.
 - Existing host preflight, title normalization, baseline authentication,
   instruction attestation, leases, and external-AGENTS behavior.
+- One held-out Desktop host-worktree executor through bootstrap, detached
+  branch claim, packet release, callback consume, integration, and exact
+  worktree/local/remote cleanup.
 
 ## Not claimed
 
@@ -38,16 +41,14 @@
   ignored authority, or user files.
 - No migration or automatic deletion of v0.3 operational state.
 - No daemon, MCP server, GitHub API client, or experimental host queue adapter.
-- No accepted held-out end-to-end host-worktree lifecycle yet. Two UK Dev pilots
-  proved installation and both fail-closed launch gates, then exposed the
-  host-assigned path and detached-branch contracts that ADR 0008 replaces.
+- No independent post-creation observation of the selected model/reasoning;
+  those remain host-accepted facts when list/read omits them.
 
-## Held-out gate
+## Held-out result
 
-Before making v0.4 the default in the consultant repository, restart the UK Dev
-pilot from fresh v0.4 state. Exercise one real Terra/xhigh `host-worktree`
-executor through bootstrap, observed-path binding and declared branch claim,
-packet release, callback
-consume, serial integration, Git integration record, read-only audit, and exact
-cleanup plan/apply. Preserve existing v0.3 state as inert evidence; do not
-attempt a mixed-version migration.
+The 2026-08-25 UK Dev pilot accepted package revision `62dfb21` through one real
+Terra/xhigh `host-worktree` executor: bootstrap-only creation, observed-path
+binding, declared branch claim, packet release, callback consume, serial
+integration, Git integration record, read-only audit, and exact cleanup
+plan/apply all passed. The completed executor worktree and its exact local and
+remote branches were removed; retained older state remained inert evidence.

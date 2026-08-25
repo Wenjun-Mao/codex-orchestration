@@ -22,8 +22,10 @@ Confirm that the coordinator launched the requested task kind; do not continue
 inside a hidden subagent when the packet requires a visible task thread, or the
 reverse.
 
-Use direct Steer for a true blocker, approval request, ownership collision, or
-high-risk scope/cost drift. On terminal completion, leave a reviewable branch
+For a true blocker, approval request, ownership collision, or high-risk drift,
+persist an urgent signal, prepare one numbered attempt, and direct Steer only
+with the returned identified envelope. Reconcile the host attempt afterward;
+never resend the same attempt. On terminal completion, leave a reviewable branch
 state and persist one bounded schema-v2 receipt with `codex-flow callback deliver`.
 Do not separately queue ordinary completion.
 Retries retain the same run, sequence, and callback ID. A correction advances

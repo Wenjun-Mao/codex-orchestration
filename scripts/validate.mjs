@@ -7,6 +7,7 @@ import { PACKAGE_VERSION } from "../lib/core.mjs";
 import { validatePlan } from "../lib/plan.mjs";
 import { validateTaskPacket } from "../lib/task-packet.mjs";
 import { validateTerminalReceipt } from "../lib/callbacks.mjs";
+import { validateUrgentSignal } from "../lib/urgent-signals.mjs";
 import {
   validateHostCapabilityEvidence,
   validateHostObservationEvidence,
@@ -75,6 +76,7 @@ for (const name of [
   "host-capability-evidence",
   "host-observation-evidence",
   "terminal-receipt",
+  "urgent-signal",
   "git-branch-claim",
   "git-ownership",
   "git-integration",
@@ -106,6 +108,7 @@ validatePlan(JSON.parse(await readFile(resolve(root, "examples/parallel-plan.jso
   projectMaxConcurrency: 2,
 });
 validateTerminalReceipt(JSON.parse(await readFile(resolve(root, "examples/terminal-receipt.json"), "utf8")));
+validateUrgentSignal(JSON.parse(await readFile(resolve(root, "examples/urgent-signal.json"), "utf8")));
 validateHostCapabilityEvidence(JSON.parse(
   await readFile(resolve(root, "examples/host-capability-evidence.json"), "utf8"),
 ));

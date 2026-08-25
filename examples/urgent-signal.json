@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "recipient": {
+    "lineage_id": "sample-coordinator-lineage",
+    "thread_id": "sample-coordinator-thread",
+    "generation": 1
+  },
+  "executor_id": "sample-executor",
+  "run_id": "sample-run-01",
+  "sequence": 1,
+  "supersedes_urgent_ids": [],
+  "expires_at": "2030-08-23T17:15:00-04:00",
+  "classification": "blocker",
+  "summary": "The authenticated source contract is unavailable.",
+  "requested_action": "Confirm the source authority before implementation resumes."
+}
