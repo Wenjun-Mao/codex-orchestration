@@ -7,8 +7,11 @@ import test from "node:test";
 import {
   beginTaskOperationAttempt,
   prepareTaskOperation,
+  recordTaskOperationHostPreflight,
   reconcileTaskOperation,
   taskOperationStatus,
+  validateHostCapabilityEvidence,
+  validateHostObservationEvidence,
 } from "../lib/task-operations.mjs";
 import { createGitFixture, removeFixture } from "./helpers.mjs";
 
@@ -62,6 +65,104 @@ function repositoryPacket(root, overrides = {}) {
   });
 }
 
+function hostCapability({
+  hostSessionId = "desktop-session-a",
+  executionKind = "task-thread",
+  model = { state: "supported", basis: "open-selector" },
+  reasoningEffort = { state: "supported", basis: "open-selector" },
+  query = "rejected",
+  fallback = "bounded-unfiltered",
+  checkedAt = "2026-08-23T12:00:00Z",
+} = {}) {
+  return {
+    schema_version: 1,
+    adapter_id: "codex-desktop-host",
+    host_session_id: hostSessionId,
+    checked_at: checkedAt,
+    execution_kind: executionKind,
+    support: {
+      execution_kind: { state: "supported", basis: "host-contract" },
+      model,
+      reasoning_effort: reasoningEffort,
+    },
+    thread_discovery: { query, fallback },
+  };
+}
+
+function taskThreadEvidence({
+  title = "Bounded executor 01",
+  titleNormalization = "none",
+  modelSource = "host-accepted",
+  reasoningSource = "host-accepted",
+} = {}) {
+  return {
+    schema_version: 1,
+    title: { source: "host-observed", value: title, normalization: titleNormalization },
+    visibility: { source: "host-observed", value: true },
+    model: { source: modelSource, value: "gpt-5.6-terra" },
+    reasoning_effort: { source: reasoningSource, value: "xhigh" },
+    host_label: { source: "unavailable", value: null },
+  };
+}
+
+function subagentEvidence() {
+  return {
+    schema_version: 1,
+    title: { source: "unavailable", value: null, normalization: "not-applicable" },
+    visibility: { source: "host-contract", value: false },
+    model: { source: "role-contract", value: "gpt-5.6-terra" },
+    reasoning_effort: { source: "role-contract", value: "xhigh" },
+    host_label: { source: "host-observed", value: "focused-runner" },
+  };
+}
+
+test("host evidence validators reject contradictory provenance and values", () => {
+  assert.throws(
+    () => validateHostCapabilityEvidence(hostCapability({
+      model: { state: "unsupported", basis: "open-selector" },
+    })),
+    /positive closed-contract evidence/,
+  );
+  assert.throws(
+    () => validateHostCapabilityEvidence(hostCapability({
+      executionKind: "subagent",
+      query: "supported",
+      fallback: "none",
+    })),
+    /must mark thread discovery not-applicable/,
+  );
+  assert.throws(
+    () => validateHostObservationEvidence({
+      ...taskThreadEvidence(),
+      title: { source: "unavailable", value: "claimed title", normalization: "not-applicable" },
+    }),
+    /Unavailable title evidence/,
+  );
+  assert.throws(
+    () => validateHostObservationEvidence({
+      ...taskThreadEvidence(),
+      model: { source: "unavailable", value: "gpt-5.6-terra" },
+    }),
+    /unavailable evidence must have a null value/,
+  );
+  assert.throws(
+    () => validateHostObservationEvidence({
+      ...taskThreadEvidence(),
+      host_label: { source: "host-observed", value: null },
+    }),
+    /Host label source and value are inconsistent/,
+  );
+});
+
+async function recordCompatiblePreflight(stateRoot, operationId, overrides = {}) {
+  return recordTaskOperationHostPreflight({
+    stateRoot,
+    operationId,
+    evidence: hostCapability(overrides),
+    now: Date.parse(overrides.checkedAt ?? "2026-08-23T12:00:00Z"),
+  });
+}
+
 test("task operation requires explicit kind and reconciles an observed task thread", async () => {
   const root = await createGitFixture();
   const stateRoot = resolve(root, ".git", "codex-flow");
@@ -80,6 +181,8 @@ test("task operation requires explicit kind and reconciles an observed task thre
       now: Date.parse("2026-08-23T12:00:01Z"),
     });
     assert.equal(repeated.operation_id, prepared.operation_id);
+
+    await recordCompatiblePreflight(stateRoot, prepared.operation_id);
 
     const dispatch = await beginTaskOperationAttempt({
       stateRoot,
@@ -104,8 +207,7 @@ test("task operation requires explicit kind and reconciles an observed task thre
         outcome: "observed",
         objectId: "agent-01",
         actualKind: "subagent",
-        title: "Bounded executor 01",
-        visible: false,
+        evidence: subagentEvidence(),
       }),
       /Requested task-thread but observed subagent/,
     );
@@ -116,12 +218,33 @@ test("task operation requires explicit kind and reconciles an observed task thre
       outcome: "observed",
       objectId: "thread-01",
       actualKind: "task-thread",
-      title: "Bounded executor 01",
-      visible: true,
+      evidence: taskThreadEvidence(),
       now: Date.parse("2026-08-23T12:01:20Z"),
     });
     assert.equal(observed.status, "observed");
     assert.equal(observed.observed.object_id, "thread-01");
+    assert.deepEqual(observed.observation_evidence, {
+      quality: "partial",
+      gaps: ["model-host-accepted", "reasoning-effort-host-accepted"],
+    });
+    assert.equal((await reconcileTaskOperation({
+      stateRoot,
+      operationId: prepared.operation_id,
+      attemptId: dispatch.attempt.attempt_id,
+      outcome: "observed",
+    })).status, "observed");
+    await assert.rejects(
+      reconcileTaskOperation({
+        stateRoot,
+        operationId: prepared.operation_id,
+        attemptId: dispatch.attempt.attempt_id,
+        outcome: "observed",
+        objectId: "thread-conflict",
+        actualKind: "task-thread",
+        evidence: taskThreadEvidence(),
+      }),
+      /replay conflicts/,
+    );
   } finally {
     await removeFixture(root);
   }
@@ -140,6 +263,8 @@ test("local task operation authenticates its exact full Git baseline", async () 
     });
     assert.deepEqual(prepared.request.baseline, current.baseline);
     assert.deepEqual(prepared.request.environment, current.environment);
+
+    await recordCompatiblePreflight(stateRoot, prepared.operation_id);
 
     const dispatch = await beginTaskOperationAttempt({
       stateRoot,
@@ -231,6 +356,7 @@ test("pre-dispatch authentication rejects revision and cleanliness drift", async
       projectId: "revision-project",
       packet: repositoryPacket(revisionRoot, { run_id: "run-revision-drift-01" }),
     });
+    await recordCompatiblePreflight(revisionState, revisionOperation.operation_id);
     await writeFile(resolve(revisionRoot, ".gitkeep"), "next revision\n", "utf8");
     execFileSync("git", ["add", ".gitkeep"], { cwd: revisionRoot });
     execFileSync("git", ["commit", "--quiet", "-m", "next"], { cwd: revisionRoot });
@@ -249,6 +375,7 @@ test("pre-dispatch authentication rejects revision and cleanliness drift", async
       projectId: "cleanliness-project",
       packet: repositoryPacket(cleanlinessRoot, { run_id: "run-cleanliness-drift-01" }),
     });
+    await recordCompatiblePreflight(cleanlinessState, cleanlinessOperation.operation_id);
     await writeFile(resolve(cleanlinessRoot, ".gitkeep"), "dirty\n", "utf8");
     await assert.rejects(
       beginTaskOperationAttempt({ stateRoot: cleanlinessState, operationId: cleanlinessOperation.operation_id }),
@@ -260,7 +387,7 @@ test("pre-dispatch authentication rejects revision and cleanliness drift", async
   }
 });
 
-test("legacy operation records remain readable but require authenticated re-prepare", async () => {
+test("pre-baseline operation requests remain readable but require authenticated re-prepare", async () => {
   const root = await createGitFixture();
   const stateRoot = resolve(root, ".git", "codex-flow");
   try {
@@ -288,6 +415,7 @@ test("legacy operation records remain readable but require authenticated re-prep
       packet: current,
     });
     assert.deepEqual(upgraded.request.environment, current.environment);
+    await recordCompatiblePreflight(stateRoot, prepared.operation_id);
     assert.equal((await beginTaskOperationAttempt({
       stateRoot,
       operationId: prepared.operation_id,
@@ -307,6 +435,7 @@ test("ambiguous task creation blocks retry until inspect-before-retry reconcilia
       packet: packet({ run_id: "run-ambiguous-01" }),
       now: Date.parse("2026-08-23T12:00:00Z"),
     });
+    await recordCompatiblePreflight(stateRoot, prepared.operation_id);
     const first = await beginTaskOperationAttempt({
       stateRoot,
       operationId: prepared.operation_id,
@@ -343,6 +472,320 @@ test("ambiguous task creation blocks retry until inspect-before-retry reconcilia
       now: Date.parse("2026-08-23T12:01:09Z"),
     });
     assert.equal(retry.attempt.sequence, 2);
+  } finally {
+    await removeFixture(root);
+  }
+});
+
+test("host capability preflight is mandatory and selector incompatibility creates zero attempts", async () => {
+  const root = await createGitFixture();
+  const stateRoot = resolve(root, ".git", "codex-flow");
+  try {
+    const prepared = await prepareTaskOperation({
+      stateRoot,
+      projectId: "fixture-project",
+      packet: packet({ run_id: "run-host-preflight-01" }),
+    });
+    await assert.rejects(
+      beginTaskOperationAttempt({ stateRoot, operationId: prepared.operation_id }),
+      /requires host capability preflight/,
+    );
+    await assert.rejects(
+      recordTaskOperationHostPreflight({
+        stateRoot,
+        operationId: prepared.operation_id,
+        evidence: hostCapability({ query: "unavailable", fallback: "none" }),
+      }),
+      /requires a bounded reread path/,
+    );
+
+    const incompatible = await recordTaskOperationHostPreflight({
+      stateRoot,
+      operationId: prepared.operation_id,
+      evidence: hostCapability({
+        model: { state: "unsupported", basis: "closed-selector" },
+      }),
+    });
+    assert.equal(incompatible.status, "host-incompatible");
+    assert.equal(incompatible.incompatibility.reason_code, "model-unsupported");
+    assert.equal(incompatible.attempts.length, 0);
+    await assert.rejects(
+      beginTaskOperationAttempt({ stateRoot, operationId: prepared.operation_id }),
+      /Host selector is incompatible: model-unsupported/,
+    );
+
+    const compatible = await recordCompatiblePreflight(stateRoot, prepared.operation_id, {
+      hostSessionId: "desktop-session-b",
+      checkedAt: "2026-08-23T12:00:31Z",
+    });
+    assert.equal(compatible.status, "prepared");
+    assert.equal(compatible.host_preflights.at(-1).support.model.basis, "open-selector");
+    await assert.rejects(
+      recordCompatiblePreflight(stateRoot, prepared.operation_id, {
+        hostSessionId: "desktop-session-b",
+        checkedAt: "2026-08-23T12:00:32Z",
+      }),
+      /already rejected in this host session/,
+    );
+    assert.equal((await beginTaskOperationAttempt({
+      stateRoot,
+      operationId: prepared.operation_id,
+    })).status, "dispatching");
+  } finally {
+    await removeFixture(root);
+  }
+});
+
+test("transient serializer failure blocks only its host session", async () => {
+  const root = await createGitFixture();
+  const stateRoot = resolve(root, ".git", "codex-flow");
+  try {
+    const prepared = await prepareTaskOperation({
+      stateRoot,
+      projectId: "fixture-project",
+      packet: packet({ run_id: "run-host-session-recovery-01" }),
+    });
+    await recordCompatiblePreflight(stateRoot, prepared.operation_id);
+    const first = await beginTaskOperationAttempt({ stateRoot, operationId: prepared.operation_id });
+    const blocked = await reconcileTaskOperation({
+      stateRoot,
+      operationId: prepared.operation_id,
+      attemptId: first.attempt.attempt_id,
+      outcome: "host-session-blocked",
+      reasonCode: "argument-serialization",
+    });
+    assert.equal(blocked.status, "host-session-blocked");
+    assert.equal(blocked.incompatibility.host_session_id, "desktop-session-a");
+    const recordPath = resolve(stateRoot, "task-operations", "records", `${prepared.operation_id}.json`);
+    const validBytes = await readFile(recordPath, "utf8");
+    const malformed = JSON.parse(validBytes);
+    malformed.incompatibility.attempt_id = "task-attempt-v1-mismatched";
+    await writeFile(recordPath, `${JSON.stringify(malformed, null, 2)}\n`, "utf8");
+    await assert.rejects(
+      taskOperationStatus({ stateRoot, operationId: prepared.operation_id }),
+      /does not match its blocked attempt/,
+    );
+    await writeFile(recordPath, validBytes, "utf8");
+    await assert.rejects(
+      beginTaskOperationAttempt({ stateRoot, operationId: prepared.operation_id }),
+      /new host session/,
+    );
+    await assert.rejects(
+      recordCompatiblePreflight(stateRoot, prepared.operation_id, {
+        checkedAt: "2026-08-23T12:00:31Z",
+      }),
+      /blocked host session cannot be retried/,
+    );
+
+    const reopened = await recordCompatiblePreflight(stateRoot, prepared.operation_id, {
+      hostSessionId: "desktop-session-after-reboot",
+      checkedAt: "2026-08-23T12:02:00Z",
+    });
+    assert.equal(reopened.status, "prepared");
+    assert.equal(reopened.incompatibility, null);
+    const retry = await beginTaskOperationAttempt({ stateRoot, operationId: prepared.operation_id });
+    assert.equal(retry.attempt.sequence, 2);
+    assert.equal(retry.attempt.host_preflight_id, reopened.active_host_preflight_id);
+    assert.equal(reopened.host_preflights.length, 2);
+  } finally {
+    await removeFixture(root);
+  }
+});
+
+test("task-thread reconciliation requires exact reread title and records bounded normalization", async () => {
+  const root = await createGitFixture();
+  const stateRoot = resolve(root, ".git", "codex-flow");
+  try {
+    const prepared = await prepareTaskOperation({
+      stateRoot,
+      projectId: "fixture-project",
+      packet: packet({ run_id: "run-title-normalization-01" }),
+    });
+    await recordCompatiblePreflight(stateRoot, prepared.operation_id);
+    const dispatch = await beginTaskOperationAttempt({ stateRoot, operationId: prepared.operation_id });
+    await assert.rejects(
+      reconcileTaskOperation({
+        stateRoot,
+        operationId: prepared.operation_id,
+        attemptId: dispatch.attempt.attempt_id,
+        outcome: "observed",
+        objectId: "thread-title-01",
+        actualKind: "task-thread",
+        evidence: taskThreadEvidence({ title: "Delegation envelope" }),
+      }),
+      /title must be independently verified/,
+    );
+    const observed = await reconcileTaskOperation({
+      stateRoot,
+      operationId: prepared.operation_id,
+      attemptId: dispatch.attempt.attempt_id,
+      outcome: "observed",
+      objectId: "thread-title-01",
+      actualKind: "task-thread",
+      evidence: taskThreadEvidence({ titleNormalization: "bounded-host-write" }),
+    });
+    assert.equal(observed.observed.evidence.title.normalization, "bounded-host-write");
+  } finally {
+    await removeFixture(root);
+  }
+});
+
+test("subagent reconciliation keeps unavailable title distinct from its host nickname", async () => {
+  const root = await createGitFixture();
+  const stateRoot = resolve(root, ".git", "codex-flow");
+  try {
+    const prepared = await prepareTaskOperation({
+      stateRoot,
+      projectId: "fixture-project",
+      packet: packet({
+        run_id: "run-subagent-evidence-01",
+        execution_kind: "subagent",
+      }),
+    });
+    await recordCompatiblePreflight(stateRoot, prepared.operation_id, {
+      executionKind: "subagent",
+      model: { state: "supported", basis: "fixed-role" },
+      reasoningEffort: { state: "supported", basis: "fixed-role" },
+      query: "not-applicable",
+      fallback: "none",
+    });
+    const dispatch = await beginTaskOperationAttempt({ stateRoot, operationId: prepared.operation_id });
+    const observed = await reconcileTaskOperation({
+      stateRoot,
+      operationId: prepared.operation_id,
+      attemptId: dispatch.attempt.attempt_id,
+      outcome: "observed",
+      objectId: "agent-sub-01",
+      actualKind: "subagent",
+      evidence: subagentEvidence(),
+    });
+    assert.equal(observed.observed.evidence.title.value, null);
+    assert.equal(observed.observed.evidence.host_label.value, "focused-runner");
+    assert.deepEqual(observed.observation_evidence, {
+      quality: "partial",
+      gaps: [
+        "title-unavailable",
+        "visibility-host-contract",
+        "model-role-contract",
+        "reasoning-effort-role-contract",
+      ],
+    });
+  } finally {
+    await removeFixture(root);
+  }
+});
+
+test("legacy v1 operation reads without mutation and upgrades only on safe preflight write", async () => {
+  const root = await createGitFixture();
+  const stateRoot = resolve(root, ".git", "codex-flow");
+  try {
+    const prepared = await prepareTaskOperation({
+      stateRoot,
+      projectId: "fixture-project",
+      packet: packet({ run_id: "run-v1-migration-01" }),
+    });
+    await recordCompatiblePreflight(stateRoot, prepared.operation_id);
+    const legacyDispatch = await beginTaskOperationAttempt({
+      stateRoot,
+      operationId: prepared.operation_id,
+    });
+    await reconcileTaskOperation({
+      stateRoot,
+      operationId: prepared.operation_id,
+      attemptId: legacyDispatch.attempt.attempt_id,
+      outcome: "not-created",
+    });
+    const recordPath = resolve(stateRoot, "task-operations", "records", `${prepared.operation_id}.json`);
+    const legacy = JSON.parse(await readFile(recordPath, "utf8"));
+    legacy.schema_version = 1;
+    delete legacy.host_preflights;
+    delete legacy.active_host_preflight_id;
+    delete legacy.incompatibility;
+    delete legacy.legacy_source_schema_version;
+    delete legacy.legacy_attempt_count;
+    for (const attempt of legacy.attempts) {
+      delete attempt.host_preflight_id;
+      delete attempt.failure_code;
+    }
+    const legacyBytes = `${JSON.stringify(legacy, null, 2)}\n`;
+    await writeFile(recordPath, legacyBytes, "utf8");
+
+    const readOnly = (await taskOperationStatus({ stateRoot, operationId: prepared.operation_id }))[0];
+    assert.equal(readOnly.schema_version, 2);
+    assert.equal(readOnly.legacy_source_schema_version, 1);
+    assert.equal(readOnly.legacy_attempt_count, 1);
+    assert.equal(await readFile(recordPath, "utf8"), legacyBytes);
+
+    const upgraded = await recordCompatiblePreflight(stateRoot, prepared.operation_id);
+    assert.equal(upgraded.schema_version, 2);
+    assert.equal(upgraded.legacy_source_schema_version, 1);
+    const persisted = JSON.parse(await readFile(recordPath, "utf8"));
+    assert.equal(persisted.schema_version, 2);
+    assert.equal(persisted.legacy_source_schema_version, 1);
+    assert.equal(persisted.legacy_attempt_count, 1);
+    assert.equal(persisted.attempts[0].host_preflight_id, null);
+    const newAttempt = await beginTaskOperationAttempt({
+      stateRoot,
+      operationId: prepared.operation_id,
+    });
+    assert.equal(newAttempt.attempt.sequence, 2);
+    assert.notEqual(newAttempt.attempt.host_preflight_id, null);
+  } finally {
+    await removeFixture(root);
+  }
+});
+
+test("legacy observed records preserve the v0.3.2 object-ID limit", async () => {
+  const root = await createGitFixture();
+  const stateRoot = resolve(root, ".git", "codex-flow");
+  try {
+    const prepared = await prepareTaskOperation({
+      stateRoot,
+      projectId: "fixture-project",
+      packet: packet({ run_id: "run-v1-long-object-id-01" }),
+    });
+    await recordCompatiblePreflight(stateRoot, prepared.operation_id);
+    const dispatch = await beginTaskOperationAttempt({ stateRoot, operationId: prepared.operation_id });
+    const objectId = `thread-${"a".repeat(190)}`;
+    const observed = await reconcileTaskOperation({
+      stateRoot,
+      operationId: prepared.operation_id,
+      attemptId: dispatch.attempt.attempt_id,
+      outcome: "observed",
+      objectId,
+      actualKind: "task-thread",
+      evidence: taskThreadEvidence(),
+    });
+    const recordPath = resolve(stateRoot, "task-operations", "records", `${prepared.operation_id}.json`);
+    const legacy = JSON.parse(await readFile(recordPath, "utf8"));
+    legacy.schema_version = 1;
+    delete legacy.host_preflights;
+    delete legacy.active_host_preflight_id;
+    delete legacy.incompatibility;
+    delete legacy.legacy_source_schema_version;
+    delete legacy.legacy_attempt_count;
+    legacy.attempts = legacy.attempts.map((attempt) => ({
+      attempt_id: attempt.attempt_id,
+      sequence: attempt.sequence,
+      status: attempt.status,
+      started_at: attempt.started_at,
+      ambiguous_after: attempt.ambiguous_after,
+      finished_at: attempt.finished_at,
+    }));
+    legacy.observed = {
+      object_id: observed.observed.object_id,
+      actual_kind: observed.observed.actual_kind,
+      title: "Bounded executor 01",
+      visible: true,
+      observed_at: observed.observed.observed_at,
+    };
+    const legacyBytes = `${JSON.stringify(legacy, null, 2)}\n`;
+    await writeFile(recordPath, legacyBytes, "utf8");
+
+    const migrated = (await taskOperationStatus({ stateRoot, operationId: prepared.operation_id }))[0];
+    assert.equal(migrated.observed.object_id, objectId);
+    assert.equal(migrated.legacy_attempt_count, 1);
+    assert.equal(await readFile(recordPath, "utf8"), legacyBytes);
   } finally {
     await removeFixture(root);
   }
@@ -401,6 +844,9 @@ test("an in-flight host call remains reconcilable after the launch deadline", as
         launch_deadline: { at: "2026-08-23T12:01:02Z", timezone: "America/Toronto" },
       }),
       now: Date.parse("2026-08-23T12:01:00Z"),
+    });
+    await recordCompatiblePreflight(stateRoot, prepared.operation_id, {
+      checkedAt: "2026-08-23T12:01:00Z",
     });
     await beginTaskOperationAttempt({
       stateRoot,

@@ -9,24 +9,29 @@ For task creation:
 1. Validate the task packet and its absolute launch deadline. For a local or
    worktree task, derive the absolute Git worktree root, exact full `HEAD`, and
    current cleanliness from Git rather than transcribing them manually.
-2. Run `task operation prepare`, then `task operation attempt`. Both fail
-   closed on baseline mismatch; the attempt rechecks immediately before the
-   host call.
-3. Call the host creation capability exactly once with the requested
+2. Record a stable, nonsecret host-session marker and capability evidence for
+   the requested kind, model, and reasoning. Also record whether filtered
+   discovery works or which bounded fallback is available.
+3. Run `task operation prepare`, `task operation preflight`, then
+   `task operation attempt`. Preparation and attempt fail closed on baseline
+   mismatch; unsupported or unverified required selectors stop before dispatch.
+4. Call the host creation capability exactly once with the requested
    `execution_kind`, environment, resolved model, and reasoning effort.
-4. If creation succeeds, set the exact requested title when the host creation
-   API does not accept one directly.
-5. List/read the resulting host object and verify its ID, exact title, kind,
-   and visibility. A task thread must be user-visible; a subagent must be
-   hidden.
-6. Reconcile the attempt as `observed` with those facts.
+5. List/read the resulting host object. A task thread must be user-visible and
+   its title must be independently reread. If the host used the delegation
+   envelope, perform one bounded title update, reread the exact requested title,
+   and record `bounded-host-write`. A subagent may have no title field; keep its
+   host nickname separate.
+6. Reconcile the attempt as `observed` with field-level provenance for title,
+   visibility, model, reasoning, and host label.
 
 When a host advertises filtered thread listing but rejects the filter at
 runtime, make one bounded recent-list call without that filter and match only
-the expected operation by exact returned ID, title, kind, and visibility. Do
-not search an unbounded history or infer identity from title alone. If the host
-does not expose model or reasoning in list/read results, report those fields as
-requested and accepted by creation, not independently observed. Likewise, an
+the expected operation by exact returned ID, title, kind, and visibility. Record
+the rejected query and selected fallback in preflight evidence. Do not search
+an unbounded history or infer identity from title alone. If the host does not
+expose model or reasoning in list/read results, report those fields as
+host-accepted or role-derived, not independently observed. Likewise, an
 archive setter response proves the bounded archive operation, but does not
 prove archived-list visibility when no such host capability exists.
 
@@ -36,6 +41,13 @@ object exists, reconcile it as observed. If inspection proves it was not
 created, reconcile `not-created`, then start a new attempt only before the
 launch deadline. Never infer failure from a local timeout or create a different
 kind as fallback.
+
+If dispatch fails before creation with a serializer, adapter, backend,
+schema-runtime, or host-control error, reconcile `host-session-blocked` with a
+specific reason code. Do not retry in that host session. After a reboot or
+host-generation change, record a new compatible preflight; only then may a new
+attempt start. Permanent selector incompatibility and transient session failure
+are different states.
 
 Archive and send operations remain host capabilities. Apply the same
 operation-ID, bounded-wait, inspect-before-retry, and duplicate-safe principles,

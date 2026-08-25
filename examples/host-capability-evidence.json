@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "adapter_id": "codex-desktop-host",
+  "host_session_id": "desktop-session-20260824-a",
+  "checked_at": "2026-08-24T12:00:00-04:00",
+  "execution_kind": "task-thread",
+  "support": {
+    "execution_kind": { "state": "supported", "basis": "host-contract" },
+    "model": { "state": "supported", "basis": "open-selector" },
+    "reasoning_effort": { "state": "supported", "basis": "open-selector" }
+  },
+  "thread_discovery": {
+    "query": "rejected",
+    "fallback": "bounded-unfiltered"
+  }
+}

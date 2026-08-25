@@ -12,13 +12,18 @@ Before delegation:
 2. Create and validate a task DAG with disjoint write ownership.
 3. Name every exclusive shared resource and serial gate.
 4. Bind the current coordinator recipient lineage and generation.
-5. Probe whether this session can create the packet's exact task kind. If not,
-   render it for a capable coordinator or human; never silently substitute.
-6. Persist, attempt, inspect, and reconcile each task creation before launch
-   deadline. Preparation and attempt must both authenticate the local baseline.
+5. Record strict capability evidence for a stable host-session marker. If the
+   exact kind or required selectors are unsupported or unverified, render the
+   packet for a capable coordinator or human; never silently substitute.
+6. Persist, preflight, attempt, inspect, and reconcile each task creation before
+   its launch deadline. Preparation and attempt both authenticate the local
+   baseline. A session-blocking host failure requires a new session preflight.
 
 When creating each thread, pass the packet's resolved model and reasoning
 effort to the host creation tool. Prompt text alone does not select either.
+For task threads, reread the exact requested title. If the host substitutes the
+delegation envelope, make one bounded title update and reread before recording
+the operation as observed. Do not use a subagent nickname as packet-title proof.
 
 During execution, Steer only true blockers, approvals, and high-risk drift.
 Leave ordinary completion to the durable callback journal. The quiet journal

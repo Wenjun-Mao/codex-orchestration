@@ -7,6 +7,10 @@ import { PACKAGE_VERSION } from "../lib/core.mjs";
 import { validatePlan } from "../lib/plan.mjs";
 import { validateTaskPacket } from "../lib/task-packet.mjs";
 import { validateTerminalReceipt } from "../lib/callbacks.mjs";
+import {
+  validateHostCapabilityEvidence,
+  validateHostObservationEvidence,
+} from "../lib/task-operations.mjs";
 
 const root = resolve(import.meta.dirname, "..");
 
@@ -67,6 +71,8 @@ for (const name of [
   "task-packet",
   "parallel-plan",
   "task-operation",
+  "host-capability-evidence",
+  "host-observation-evidence",
   "terminal-receipt",
 ]) {
   const schema = JSON.parse(await readFile(resolve(root, "schemas", `${name}.schema.json`), "utf8"));
@@ -84,6 +90,12 @@ validatePlan(JSON.parse(await readFile(resolve(root, "examples/parallel-plan.jso
   projectMaxConcurrency: 2,
 });
 validateTerminalReceipt(JSON.parse(await readFile(resolve(root, "examples/terminal-receipt.json"), "utf8")));
+validateHostCapabilityEvidence(JSON.parse(
+  await readFile(resolve(root, "examples/host-capability-evidence.json"), "utf8"),
+));
+validateHostObservationEvidence(JSON.parse(
+  await readFile(resolve(root, "examples/host-observation-evidence.json"), "utf8"),
+));
 
 for (const skillName of ["index", "coordinate", "execute", "integrate", "cleanup"]) {
   const skill = await readFile(resolve(root, "skills", skillName, "SKILL.md"), "utf8");

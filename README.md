@@ -102,9 +102,11 @@ codex-flow doctor [--json]
 codex-flow task start --role coordinator|executor
 codex-flow task packet validate|render <packet.json>
 codex-flow task operation prepare --file <packet.json>
+codex-flow task operation preflight --operation-id <id>
+                  --file <host-capability-evidence.json>
 codex-flow task operation attempt --operation-id <id>
 codex-flow task operation reconcile --operation-id <id> --attempt-id <id>
-                  --outcome observed|not-created|ambiguous|failed ...
+                  --outcome observed|not-created|ambiguous|failed|host-session-blocked ...
 codex-flow task operation status [--operation-id <id>]
 codex-flow plan validate <plan.json>
 codex-flow recipient bind|rebind|status|resolve ...
@@ -122,9 +124,10 @@ codex-flow cleanup audit [--json]
 
 Every packet explicitly requests either a user-visible `task-thread` or a
 hidden `subagent`; the kinds are not interchangeable. Before calling a host
-tool, persist a deterministic operation with `task operation prepare`, then
+tool, persist a deterministic operation with `task operation prepare`, record
+strict capability evidence for the current host session with `preflight`, then
 start a bounded attempt. After the host call, inspect the actual object and
-reconcile its ID, exact title, kind, and visibility.
+reconcile its ID, kind, and field-level evidence provenance.
 
 For `local` and `worktree` packets, `environment.project_path` is the absolute
 Git worktree root and `baseline.revision` is its exact full `HEAD`. Preparation
@@ -139,6 +142,19 @@ then reconcile `observed` or `not-created`. No new launch may start after the
 packet's absolute zoned deadline. The CLI journals the operation but does not
 invoke private in-session model tools; the coordinator performs the one-shot
 host call using the capability available in that session.
+
+Unsupported or unverified required selectors stop before an attempt exists. A
+dispatch-time serializer, adapter, backend, schema-runtime, or host-control
+failure is `host-session-blocked`; retry requires compatible evidence from a
+different host session. Preflight history remains immutable so every attempt is
+bound to the exact session evidence that authorized it.
+
+Task-thread title must be independently reread and exactly match the request.
+When the host substitutes the delegation envelope, perform one bounded title
+write, reread the exact title, and record `bounded-host-write`. A subagent may
+have no title field; keep its host nickname separate and report title evidence
+as unavailable. Requested, accepted, role-derived, and independently observed
+model/reasoning facts are never conflated.
 
 See [Host operations](templates/references/host-operations.md) for the adapter
 procedure and bounded host-list fallback.
@@ -217,5 +233,7 @@ Local task baseline authentication is defined by
 [ADR 0004](docs/adr/0004-authenticate-local-task-baselines.md).
 Ordinary-completion authority and queue-notification lifecycle are defined by
 [ADR 0005](docs/adr/0005-callback-authority-and-notification-lifecycle.md).
+[Host capability and observation evidence](docs/adr/0006-host-capability-and-observation-evidence.md)
+defines the v0.3.3 host-session and title-normalization contract.
 The current covered/partial/host-dependent boundary is listed in
-[v0.3.2 orchestration coverage](docs/coverage-v0.3.2.md).
+[v0.3.3 orchestration coverage](docs/coverage-v0.3.3.md).

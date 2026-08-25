@@ -26,12 +26,19 @@ or transcribe a short revision by hand. `task operation prepare` authenticates
 this baseline before journaling and `attempt` authenticates it again immediately
 before dispatch.
 
-Probe the current session's actual creation tools. Journal each creation with
-`task operation prepare` and `attempt`, then inspect and reconcile the created
-object. If the requested kind is unavailable, render the packet for a capable
+Probe the current session's actual creation tools and bind the result to a
+stable host-session marker. Journal each creation with `task operation prepare`,
+`preflight`, and `attempt`, then inspect and reconcile field-level evidence. If
+the requested kind or selector is unavailable, render the packet for a capable
 session or human. Do not silently substitute a subagent for a task thread or a
-task thread for a subagent. Use the smallest concurrency that shortens the
-critical path and never launch after the packet deadline.
+task thread for a subagent. A serializer or host-control failure blocks retry in
+that session; record a new session preflight after restart. Use the smallest
+concurrency that shortens the critical path and never launch after the packet
+deadline.
+
+Task-thread title must be independently reread. If the host used the delegation
+envelope, make one bounded title update, reread the exact requested title, and
+record that normalization. A subagent nickname is a host label, not title proof.
 
 Read the detailed references only as needed:
 

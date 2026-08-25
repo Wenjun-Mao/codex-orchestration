@@ -5,53 +5,33 @@
   "additionalProperties": false,
   "required": [
     "schema_version", "kind", "operation_id", "project_id", "packet_hash",
-    "request", "status", "attempts", "observed", "created_at", "updated_at"
+    "request", "host_preflights", "active_host_preflight_id", "status", "attempts", "observed",
+    "incompatibility", "created_at", "updated_at", "legacy_source_schema_version",
+    "legacy_attempt_count"
   ],
   "properties": {
-    "schema_version": { "const": 1 },
+    "schema_version": { "const": 2 },
     "kind": { "const": "codex-flow-task-create-operation" },
-    "operation_id": { "$ref": "#/$defs/safeId" },
+    "operation_id": { "$ref": "#/$defs/journalId" },
     "project_id": { "$ref": "#/$defs/safeId" },
     "packet_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
-    "request": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "task_id", "run_id", "role", "execution_kind", "title",
-        "launch_deadline", "model", "reasoning_effort"
-      ],
-      "properties": {
-        "task_id": { "$ref": "#/$defs/safeId" },
-        "run_id": { "$ref": "#/$defs/safeId" },
-        "role": { "enum": ["coordinator", "executor"] },
-        "execution_kind": { "enum": ["task-thread", "subagent"] },
-        "title": { "type": "string", "minLength": 1, "maxLength": 160 },
-        "launch_deadline": { "$ref": "#/$defs/deadline" },
-        "model": {
-          "oneOf": [
-            { "type": "null" },
-            { "type": "string", "minLength": 1, "maxLength": 128 }
-          ]
-        },
-        "reasoning_effort": {
-          "enum": [null, "none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"]
-        },
-        "baseline": { "$ref": "#/$defs/baseline" },
-        "environment": { "$ref": "#/$defs/environment" }
-      },
-      "allOf": [
-        {
-          "if": { "required": ["baseline"] },
-          "then": { "required": ["environment"] }
-        },
-        {
-          "if": { "required": ["environment"] },
-          "then": { "required": ["baseline"] }
-        }
+    "request": { "$ref": "#/$defs/request" },
+    "host_preflights": {
+      "type": "array",
+      "maxItems": 64,
+      "items": { "$ref": "#/$defs/hostPreflight" }
+    },
+    "active_host_preflight_id": {
+      "oneOf": [
+        { "type": "null" },
+        { "$ref": "#/$defs/journalId" }
       ]
     },
     "status": {
-      "enum": ["prepared", "dispatching", "ambiguous", "observed", "failed", "expired"]
+      "enum": [
+        "prepared", "dispatching", "ambiguous", "observed", "failed", "expired",
+        "host-incompatible", "host-session-blocked"
+      ]
     },
     "attempts": {
       "type": "array",
@@ -64,14 +44,43 @@
         { "$ref": "#/$defs/observed" }
       ]
     },
+    "incompatibility": {
+      "oneOf": [
+        { "type": "null" },
+        { "$ref": "#/$defs/incompatibility" }
+      ]
+    },
     "created_at": { "$ref": "#/$defs/timestamp" },
-    "updated_at": { "$ref": "#/$defs/timestamp" }
+    "updated_at": { "$ref": "#/$defs/timestamp" },
+    "legacy_source_schema_version": {
+      "oneOf": [
+        { "type": "null" },
+        { "const": 1 }
+      ]
+    },
+    "legacy_attempt_count": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 32
+    }
   },
   "$defs": {
     "safeId": {
       "type": "string",
       "minLength": 1,
       "maxLength": 128,
+      "pattern": "^[A-Za-z0-9_.-]+$"
+    },
+    "objectId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9_.-]+$"
+    },
+    "journalId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 96,
       "pattern": "^[A-Za-z0-9_.-]+$"
     },
     "timestamp": {
@@ -111,14 +120,167 @@
         }
       }
     },
+    "request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "task_id", "run_id", "role", "execution_kind", "title",
+        "launch_deadline", "model", "reasoning_effort"
+      ],
+      "properties": {
+        "task_id": { "$ref": "#/$defs/safeId" },
+        "run_id": { "$ref": "#/$defs/safeId" },
+        "role": { "enum": ["coordinator", "executor"] },
+        "execution_kind": { "enum": ["task-thread", "subagent"] },
+        "title": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "launch_deadline": { "$ref": "#/$defs/deadline" },
+        "model": {
+          "oneOf": [
+            { "type": "null" },
+            { "type": "string", "minLength": 1, "maxLength": 128 }
+          ]
+        },
+        "reasoning_effort": {
+          "enum": [null, "none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"]
+        },
+        "baseline": { "$ref": "#/$defs/baseline" },
+        "environment": { "$ref": "#/$defs/environment" }
+      },
+      "allOf": [
+        {
+          "if": { "required": ["baseline"] },
+          "then": { "required": ["environment"] }
+        },
+        {
+          "if": { "required": ["environment"] },
+          "then": { "required": ["baseline"] }
+        }
+      ]
+    },
+    "supportEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "basis"],
+      "properties": {
+        "state": { "enum": ["supported", "unsupported", "unknown", "not-required"] },
+        "basis": {
+          "enum": [
+            "tool-schema", "open-selector", "closed-selector", "fixed-role",
+            "host-contract", "not-required", "unavailable"
+          ]
+        }
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "state": { "const": "supported" },
+            "basis": {
+              "enum": ["tool-schema", "open-selector", "closed-selector", "fixed-role", "host-contract"]
+            }
+          }
+        },
+        {
+          "properties": {
+            "state": { "const": "unsupported" },
+            "basis": { "enum": ["tool-schema", "closed-selector", "fixed-role", "host-contract"] }
+          }
+        },
+        {
+          "properties": {
+            "state": { "const": "unknown" },
+            "basis": { "const": "unavailable" }
+          }
+        },
+        {
+          "properties": {
+            "state": { "const": "not-required" },
+            "basis": { "const": "not-required" }
+          }
+        }
+      ]
+    },
+    "hostPreflight": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "preflight_id", "schema_version", "adapter_id", "host_session_id", "checked_at",
+        "execution_kind", "support", "thread_discovery"
+      ],
+      "properties": {
+        "preflight_id": { "$ref": "#/$defs/journalId" },
+        "schema_version": { "const": 1 },
+        "adapter_id": { "$ref": "#/$defs/safeId" },
+        "host_session_id": { "$ref": "#/$defs/safeId" },
+        "checked_at": { "$ref": "#/$defs/timestamp" },
+        "execution_kind": { "enum": ["task-thread", "subagent"] },
+        "support": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["execution_kind", "model", "reasoning_effort"],
+          "properties": {
+            "execution_kind": { "$ref": "#/$defs/supportEvidence" },
+            "model": { "$ref": "#/$defs/supportEvidence" },
+            "reasoning_effort": { "$ref": "#/$defs/supportEvidence" }
+          }
+        },
+        "thread_discovery": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["query", "fallback"],
+          "properties": {
+            "query": { "enum": ["supported", "rejected", "unavailable", "not-applicable"] },
+            "fallback": { "enum": ["bounded-unfiltered", "exact-read", "none"] }
+          }
+        }
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "execution_kind": { "const": "task-thread" },
+            "thread_discovery": {
+              "oneOf": [
+                {
+                  "properties": {
+                    "query": { "const": "supported" },
+                    "fallback": { "const": "none" }
+                  }
+                },
+                {
+                  "properties": {
+                    "query": { "enum": ["rejected", "unavailable"] },
+                    "fallback": { "enum": ["bounded-unfiltered", "exact-read"] }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "properties": {
+            "execution_kind": { "const": "subagent" },
+            "thread_discovery": {
+              "properties": {
+                "query": { "const": "not-applicable" },
+                "fallback": { "const": "none" }
+              }
+            }
+          }
+        }
+      ]
+    },
     "attempt": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["attempt_id", "sequence", "status", "started_at", "ambiguous_after", "finished_at"],
+      "required": [
+        "attempt_id", "sequence", "status", "started_at", "ambiguous_after", "finished_at",
+        "host_preflight_id", "failure_code"
+      ],
       "properties": {
-        "attempt_id": { "$ref": "#/$defs/safeId" },
+        "attempt_id": { "$ref": "#/$defs/journalId" },
         "sequence": { "type": "integer", "minimum": 1, "maximum": 32 },
-        "status": { "enum": ["dispatching", "ambiguous", "not-created", "observed", "failed"] },
+        "status": {
+          "enum": ["dispatching", "ambiguous", "not-created", "observed", "failed", "host-session-blocked"]
+        },
         "started_at": { "$ref": "#/$defs/timestamp" },
         "ambiguous_after": { "$ref": "#/$defs/timestamp" },
         "finished_at": {
@@ -126,20 +288,243 @@
             { "type": "null" },
             { "$ref": "#/$defs/timestamp" }
           ]
+        },
+        "host_preflight_id": {
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "#/$defs/journalId" }
+          ]
+        },
+        "failure_code": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "enum": [
+                "argument-serialization", "adapter-unavailable", "backend-unavailable",
+                "schema-runtime-drift", "host-control-failure"
+              ]
+            }
+          ]
         }
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "status": { "const": "host-session-blocked" },
+            "failure_code": {
+              "enum": [
+                "argument-serialization", "adapter-unavailable", "backend-unavailable",
+                "schema-runtime-drift", "host-control-failure"
+              ]
+            }
+          }
+        },
+        {
+          "properties": {
+            "status": { "enum": ["dispatching", "ambiguous", "not-created", "observed", "failed"] },
+            "failure_code": { "type": "null" }
+          }
+        }
+      ]
+    },
+    "titleEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "value", "normalization"],
+      "properties": {
+        "source": { "enum": ["host-observed", "unavailable", "legacy-claimed"] },
+        "value": {
+          "oneOf": [
+            { "type": "null" },
+            { "type": "string", "minLength": 1, "maxLength": 160 }
+          ]
+        },
+        "normalization": { "enum": ["none", "bounded-host-write", "not-applicable", "legacy-unknown"] }
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "source": { "const": "host-observed" },
+            "value": { "type": "string", "minLength": 1, "maxLength": 160 },
+            "normalization": { "enum": ["none", "bounded-host-write"] }
+          }
+        },
+        {
+          "properties": {
+            "source": { "const": "unavailable" },
+            "value": { "type": "null" },
+            "normalization": { "const": "not-applicable" }
+          }
+        },
+        {
+          "properties": {
+            "source": { "const": "legacy-claimed" },
+            "value": { "type": "string", "minLength": 1, "maxLength": 160 },
+            "normalization": { "const": "legacy-unknown" }
+          }
+        }
+      ]
+    },
+    "visibilityEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "value"],
+      "properties": {
+        "source": { "enum": ["host-observed", "host-contract", "legacy-claimed"] },
+        "value": { "type": "boolean" }
+      }
+    },
+    "selectorEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "value"],
+      "properties": {
+        "source": { "enum": ["host-observed", "host-accepted", "role-contract", "unavailable"] },
+        "value": {
+          "oneOf": [
+            { "type": "null" },
+            { "type": "string", "minLength": 1, "maxLength": 128 }
+          ]
+        }
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "source": { "enum": ["host-observed", "host-accepted", "role-contract"] },
+            "value": { "type": "string", "minLength": 1, "maxLength": 128 }
+          }
+        },
+        {
+          "properties": {
+            "source": { "const": "unavailable" },
+            "value": { "type": "null" }
+          }
+        }
+      ]
+    },
+    "reasoningEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "value"],
+      "properties": {
+        "source": { "enum": ["host-observed", "host-accepted", "role-contract", "unavailable"] },
+        "value": {
+          "enum": [null, "none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"]
+        }
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "source": { "enum": ["host-observed", "host-accepted", "role-contract"] },
+            "value": { "enum": ["none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"] }
+          }
+        },
+        {
+          "properties": {
+            "source": { "const": "unavailable" },
+            "value": { "type": "null" }
+          }
+        }
+      ]
+    },
+    "hostLabelEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "value"],
+      "properties": {
+        "source": { "enum": ["host-observed", "unavailable"] },
+        "value": {
+          "oneOf": [
+            { "type": "null" },
+            { "type": "string", "minLength": 1, "maxLength": 160 }
+          ]
+        }
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "source": { "const": "host-observed" },
+            "value": { "type": "string", "minLength": 1, "maxLength": 160 }
+          }
+        },
+        {
+          "properties": {
+            "source": { "const": "unavailable" },
+            "value": { "type": "null" }
+          }
+        }
+      ]
+    },
+    "observationEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "title", "visibility", "model", "reasoning_effort", "host_label"],
+      "properties": {
+        "schema_version": { "const": 1 },
+        "title": { "$ref": "#/$defs/titleEvidence" },
+        "visibility": { "$ref": "#/$defs/visibilityEvidence" },
+        "model": { "$ref": "#/$defs/selectorEvidence" },
+        "reasoning_effort": { "$ref": "#/$defs/reasoningEvidence" },
+        "host_label": { "$ref": "#/$defs/hostLabelEvidence" }
       }
     },
     "observed": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["object_id", "actual_kind", "title", "visible", "observed_at"],
+      "required": ["object_id", "actual_kind", "evidence", "observed_at"],
       "properties": {
-        "object_id": { "$ref": "#/$defs/safeId" },
+        "object_id": { "$ref": "#/$defs/objectId" },
         "actual_kind": { "enum": ["task-thread", "subagent"] },
-        "title": { "type": "string", "minLength": 1, "maxLength": 160 },
-        "visible": { "type": "boolean" },
+        "evidence": { "$ref": "#/$defs/observationEvidence" },
         "observed_at": { "$ref": "#/$defs/timestamp" }
       }
+    },
+    "incompatibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type", "stage", "reason_code", "preflight_id", "host_session_id",
+        "attempt_id", "recorded_at"
+      ],
+      "properties": {
+        "type": { "enum": ["selector-incompatible", "host-session-failure"] },
+        "stage": { "enum": ["preflight", "dispatch"] },
+        "reason_code": { "$ref": "#/$defs/safeId" },
+        "preflight_id": { "$ref": "#/$defs/journalId" },
+        "host_session_id": { "$ref": "#/$defs/safeId" },
+        "attempt_id": {
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "#/$defs/journalId" }
+          ]
+        },
+        "recorded_at": { "$ref": "#/$defs/timestamp" }
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "type": { "const": "selector-incompatible" },
+            "stage": { "const": "preflight" },
+            "reason_code": {
+              "pattern": "^(?:execution-kind|model|reasoning-effort)-(?:unsupported|unverified)$"
+            },
+            "attempt_id": { "type": "null" }
+          }
+        },
+        {
+          "properties": {
+            "type": { "const": "host-session-failure" },
+            "stage": { "const": "dispatch" },
+            "reason_code": {
+              "enum": [
+                "argument-serialization", "adapter-unavailable", "backend-unavailable",
+                "schema-runtime-drift", "host-control-failure"
+              ]
+            },
+            "attempt_id": { "$ref": "#/$defs/journalId" }
+          }
+        }
+      ]
     }
   }
 }

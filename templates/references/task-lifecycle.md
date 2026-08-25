@@ -2,9 +2,11 @@
 
 1. **Admit:** bind objective, authority, baseline, and exclusions.
 2. **Map:** validate dependencies, write ownership, resources, and gates.
-3. **Launch:** persist a creation operation, create the exact requested task
-   kind before its deadline, pass resolved `model` and `reasoning_effort` as
-   actual host arguments, then inspect and reconcile ID/title/kind/visibility.
+3. **Launch:** persist a creation operation, record capability evidence for the
+   current host session, create the exact requested task kind before its
+   deadline, pass resolved `model` and `reasoning_effort` as actual host
+   arguments, then inspect and reconcile field-level evidence. Normalize a
+   substituted task-thread title only through a bounded write and exact reread.
 4. **Execute:** remain inside packet ownership and verify proportionally.
 5. **Signal:** Steer urgent conditions; persist one ordinary terminal callback
    for the declared journal monitor.

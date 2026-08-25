@@ -55,6 +55,7 @@ import { applyTaskDefaults, renderTaskPacket, validateTaskPacket } from "../lib/
 import {
   beginTaskOperationAttempt,
   prepareTaskOperation,
+  recordTaskOperationHostPreflight,
   reconcileTaskOperation,
   taskOperationStatus,
 } from "../lib/task-operations.mjs";
@@ -83,9 +84,12 @@ Usage:
   codex-flow task packet validate|render <packet.json> [--model MODEL]
                   [--reasoning-effort EFFORT] [--json]
   codex-flow task operation prepare --file <packet.json> [--json]
+  codex-flow task operation preflight --operation-id ID --file <host-capabilities.json> [--json]
   codex-flow task operation attempt --operation-id ID [--timeout-seconds N] [--json]
   codex-flow task operation reconcile --operation-id ID --attempt-id ID
-                  --outcome observed|not-created|ambiguous|failed [observation fields] [--json]
+                  --outcome observed|not-created|ambiguous|failed|host-session-blocked
+                  [--object-id ID --actual-kind KIND --evidence <observation.json>]
+                  [--reason-code CODE] [--json]
   codex-flow task operation status [--operation-id ID] [--json]
   codex-flow plan validate <plan.json> [--json]
   codex-flow recipient bind --lineage-id ID --thread-id ID [--fence-token TOKEN] [--json]
@@ -342,7 +346,7 @@ async function commandDoctor(args) {
       `AGENTS integration: ${item.agents_contract?.mode ?? item.agents_block}`,
       `task-thread creation: ${item.thread_creation}`,
       `callbacks: ${item.callbacks.pending_count} pending, ${item.callbacks.consumed_count} consumed`,
-      `task operations: ${item.task_operations.total_count} total, ${item.task_operations.ambiguous_count} ambiguous`,
+      `task operations: ${item.task_operations.total_count} total, ${item.task_operations.ambiguous_count} ambiguous, ${item.task_operations.host_session_blocked_count} session-blocked, ${item.task_operations.partial_evidence_count} partial-evidence`,
       `recipient lineages: ${item.recipients.lineage_count}`,
       ...item.warnings.map((warning) => `warning: ${warning}`),
       ...item.errors.map((error) => `error: ${error}`),
@@ -367,7 +371,7 @@ async function commandTask(args) {
       `Default task model: ${config.default_model ?? "host default"}`,
       `Default reasoning effort: ${config.default_reasoning_effort ?? "host default"}`,
       `Maximum parallel executors: ${config.max_parallel_executors}`,
-      "Task-thread creation capability: probe the current host; this CLI cannot infer it.",
+      "Task creation capability: record a current host-session preflight; this CLI cannot infer it.",
       "",
       role.trim(),
       "",
@@ -432,6 +436,33 @@ async function commandTask(args) {
       });
       return;
     }
+    if (action === "preflight") {
+      const { values } = parse(boolAndJsonOptions({
+        "operation-id": { type: "string" },
+        file: { type: "string" },
+      }), operationArgs);
+      const evidence = await readJsonInput(values.file ? resolve(values.file) : null);
+      const result = await recordTaskOperationHostPreflight({
+        stateRoot: git.stateRoot,
+        operationId: values["operation-id"],
+        evidence,
+      });
+      output(result, {
+        json: values.json,
+        human: (item) => {
+          const active = item.host_preflights.find(
+            (entry) => entry.preflight_id === item.active_host_preflight_id,
+          );
+          return [
+            `Task operation ${item.status}: ${item.operation_id}`,
+            `Host preflight: ${item.active_host_preflight_id}`,
+            `Host session: ${active?.host_session_id ?? "none"}`,
+          ].join("\n");
+        },
+      });
+      if (result.status === "host-incompatible") process.exitCode = 74;
+      return;
+    }
     if (action === "reconcile") {
       const { values } = parse(boolAndJsonOptions({
         "operation-id": { type: "string" },
@@ -439,12 +470,10 @@ async function commandTask(args) {
         outcome: { type: "string" },
         "object-id": { type: "string" },
         "actual-kind": { type: "string" },
-        title: { type: "string" },
-        visible: { type: "boolean", default: false },
-        hidden: { type: "boolean", default: false },
+        evidence: { type: "string" },
+        "reason-code": { type: "string" },
       }), operationArgs);
-      if (values.visible && values.hidden) throw new CliError("Choose only one of --visible or --hidden");
-      const visibility = values.visible ? true : values.hidden ? false : null;
+      const evidence = values.evidence ? await readJson(resolve(values.evidence)) : null;
       const result = await reconcileTaskOperation({
         stateRoot: git.stateRoot,
         operationId: values["operation-id"],
@@ -452,8 +481,8 @@ async function commandTask(args) {
         outcome: values.outcome,
         objectId: values["object-id"] ?? null,
         actualKind: values["actual-kind"] ?? null,
-        title: values.title ?? null,
-        visible: visibility,
+        evidence,
+        reasonCode: values["reason-code"] ?? null,
       });
       output(result, {
         json: values.json,
@@ -475,7 +504,7 @@ async function commandTask(args) {
       });
       return;
     }
-    throw new CliError("task operation requires prepare, attempt, reconcile, or status");
+    throw new CliError("task operation requires prepare, preflight, attempt, reconcile, or status");
   }
   throw new CliError("task requires start or packet");
 }
