@@ -38,15 +38,16 @@
   ignored authority, or user files.
 - No migration or automatic deletion of v0.3 operational state.
 - No daemon, MCP server, GitHub API client, or experimental host queue adapter.
-- No accepted held-out end-to-end host-worktree lifecycle yet. The first UK Dev
-  pilot proved installation and fail-closed local gates, then exposed the
-  pre-dispatch-path contract that ADR 0008 replaces.
+- No accepted held-out end-to-end host-worktree lifecycle yet. Two UK Dev pilots
+  proved installation and both fail-closed launch gates, then exposed the
+  host-assigned path and detached-branch contracts that ADR 0008 replaces.
 
 ## Held-out gate
 
 Before making v0.4 the default in the consultant repository, restart the UK Dev
 pilot from fresh v0.4 state. Exercise one real Terra/xhigh `host-worktree`
-executor through bootstrap, observed-path binding, packet release, callback
+executor through bootstrap, observed-path binding and declared branch claim,
+packet release, callback
 consume, serial integration, Git integration record, read-only audit, and exact
 cleanup plan/apply. Preserve existing v0.3 state as inert evidence; do not
 attempt a mixed-version migration.

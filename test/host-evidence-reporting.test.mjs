@@ -13,7 +13,7 @@ import { createGitFixture, initializeFixture, removeFixture } from "./helpers.mj
 
 function packet(revision, runId) {
   return {
-    schema_version: 3,
+    schema_version: 4,
     task_id: `executor-${runId}`,
     run_id: runId,
     role: "executor",
@@ -153,6 +153,7 @@ test("doctor and cleanup disclose incompatible, session-blocked, and partial ope
           type: "host-worktree",
           repository_path: root,
           starting_branch: "main",
+          executor_branch: "codex/host-evidence",
         },
       },
     });

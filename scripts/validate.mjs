@@ -65,6 +65,7 @@ for (const modulePath of modules) {
   }
 }
 
+const schemas = new Map();
 for (const name of [
   "project",
   "install-plan",
@@ -74,16 +75,28 @@ for (const name of [
   "host-capability-evidence",
   "host-observation-evidence",
   "terminal-receipt",
+  "git-branch-claim",
   "git-ownership",
   "git-integration",
   "git-cleanup-plan",
 ]) {
   const schema = JSON.parse(await readFile(resolve(root, "schemas", `${name}.schema.json`), "utf8"));
+  schemas.set(name, schema);
   if (schema.type !== "object" || schema.additionalProperties !== false || !schema.properties) {
     throw new Error(`Schema ${name} must declare a closed object contract`);
   }
   for (const field of schema.required ?? []) {
     if (!(field in schema.properties)) throw new Error(`Schema ${name} requires undeclared property ${field}`);
+  }
+}
+
+for (const name of ["task-packet", "task-operation"]) {
+  const environment = schemas.get(name).$defs.environment.oneOf.find(
+    (entry) => entry.properties?.type?.const === "host-worktree",
+  );
+  if (JSON.stringify(environment?.["x-codex-flow-distinct-properties"])
+    !== JSON.stringify(["starting_branch", "executor_branch"])) {
+    throw new Error(`Schema ${name} must declare the host-worktree branch-distinctness constraint`);
   }
 }
 

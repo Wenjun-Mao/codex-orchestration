@@ -156,8 +156,9 @@ reconcile its ID, kind, and field-level evidence provenance.
 `local` packets name an existing exact Git worktree in
 `environment.project_path`; preparation and attempt authenticate its full
 `HEAD` and declared cleanliness. `host-worktree` packets instead name the
-saved repository and an exact local `starting_branch`. Preparation and attempt
-authenticate that branch tip without requiring the saved checkout itself to be
+saved repository, an exact local `starting_branch`, and an unclaimed
+`executor_branch`. Preparation and attempt authenticate the source tip and
+branch-name availability without requiring the saved checkout itself to be
 clean or on that branch.
 
 Desktop-created worktrees use a two-phase launch. After `attempt`, render the
@@ -165,8 +166,12 @@ bootstrap-only prompt and make one host call. The bootstrap contains no task
 objective and forbids repository work. Reread the created task's actual worktree
 path, reconcile it as host-observed, run `git bind`, then render `release` and
 send that full packet to the same task. Binding proves the path is a pristine,
-distinct, named-branch worktree in the same Git repository at the exact starting
-revision. Never guess the path or bind the saved checkout as the executor.
+distinct worktree in the same Git repository at the exact starting revision.
+If Desktop supplied it detached, binding first persists an immutable claim
+receipt, claims the packet-declared executor branch, and rereads every invariant
+before recording ownership. An interrupted bind resumes only from that exact
+receipt. Never guess the path, accept an unreceipted named branch, or bind the
+saved checkout.
 
 A timeout is ambiguous, not failure. List/read the host state before retrying,
 then reconcile `observed` or `not-created`. No new launch may start after the

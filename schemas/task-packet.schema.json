@@ -9,7 +9,7 @@
     "shared_resources", "verification", "callback", "integration_gate", "cleanup_owner", "stop_policy"
   ],
   "properties": {
-    "schema_version": { "const": 3 },
+    "schema_version": { "const": 4 },
     "task_id": { "$ref": "#/$defs/safeId" },
     "run_id": { "$ref": "#/$defs/safeId" },
     "title": { "type": "string", "minLength": 1, "maxLength": 160 },
@@ -136,11 +136,13 @@
         {
           "type": "object",
           "additionalProperties": false,
-          "required": ["type", "repository_path", "starting_branch"],
+          "x-codex-flow-distinct-properties": ["starting_branch", "executor_branch"],
+          "required": ["type", "repository_path", "starting_branch", "executor_branch"],
           "properties": {
             "type": { "const": "host-worktree" },
             "repository_path": { "type": "string", "minLength": 1, "maxLength": 1024 },
-            "starting_branch": { "type": "string", "minLength": 1, "maxLength": 256 }
+            "starting_branch": { "type": "string", "minLength": 1, "maxLength": 256 },
+            "executor_branch": { "type": "string", "minLength": 1, "maxLength": 256 }
           }
         },
         {

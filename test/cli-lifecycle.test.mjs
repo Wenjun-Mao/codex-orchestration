@@ -38,7 +38,7 @@ function receipt() {
 
 function operationPacket(root) {
   return {
-    schema_version: 3,
+    schema_version: 4,
     task_id: "cli-task-operation",
     run_id: "cli-task-operation-run-01",
     role: "executor",
@@ -85,6 +85,7 @@ function hostWorktreeOperationPacket(root) {
       type: "host-worktree",
       repository_path: root,
       starting_branch: "main",
+      executor_branch: "codex/cli-host-worktree",
     },
     callback: {
       ...operationPacket(root).callback,
@@ -273,7 +274,7 @@ test("CLI gates a host-created worktree between bootstrap and Git-bound release"
     assert.match(bootstrap.stdout, /bootstrap turn only/);
     assert.doesNotMatch(bootstrap.stdout, /Exercise host preflight/);
 
-    execFileSync("git", ["worktree", "add", "--quiet", "-b", "codex/cli-host-worktree", worktree, "main"], {
+    execFileSync("git", ["worktree", "add", "--quiet", "--detach", worktree, "main"], {
       cwd: root,
     });
     const evidencePath = resolve(root, "host-worktree-observation.json");
@@ -300,6 +301,10 @@ test("CLI gates a host-created worktree between bootstrap and Git-bound release"
     assertSuccess(runCli([
       "git", "bind", "--operation-id", prepared.operation_id,
     ], { cwd: root }), "host-worktree Git bind");
+    assert.equal(execFileSync("git", ["branch", "--show-current"], {
+      cwd: worktree,
+      encoding: "utf8",
+    }).trim(), "codex/cli-host-worktree");
     const released = runCli([
       "task", "operation", "release", "--operation-id", prepared.operation_id,
     ], { cwd: root, input: request });

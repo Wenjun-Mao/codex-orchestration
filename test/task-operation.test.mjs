@@ -18,7 +18,7 @@ import { createGitFixture, removeFixture } from "./helpers.mjs";
 
 function packet(overrides = {}) {
   return {
-    schema_version: 3,
+    schema_version: 4,
     task_id: "bounded-executor-01",
     run_id: "run-20260823-01",
     role: "executor",
@@ -74,6 +74,7 @@ function hostWorktreePacket(root, overrides = {}) {
       type: "host-worktree",
       repository_path: root,
       starting_branch: "main",
+      executor_branch: "codex/host-worktree-executor",
     },
     ...overrides,
   });
@@ -491,6 +492,52 @@ test("host-worktree preflight and starting-ref drift fail before a host call", a
   }
 });
 
+test("host-worktree executor branch collisions fail before operation creation", async () => {
+  const root = await createGitFixture("codex-flow-host-branch-collision-");
+  const stateRoot = resolve(root, ".git", "codex-flow", "v0.4");
+  try {
+    execFileSync("git", ["branch", "codex/existing-local", "main"], { cwd: root });
+    await assert.rejects(
+      prepareTaskOperation({
+        stateRoot,
+        projectId: "host-branch-collision",
+        packet: hostWorktreePacket(root, {
+          run_id: "run-host-local-collision-01",
+          environment: {
+            type: "host-worktree",
+            repository_path: root,
+            starting_branch: "main",
+            executor_branch: "codex/existing-local",
+          },
+        }),
+      }),
+      /already exists locally or in fetched remote-tracking state/,
+    );
+    execFileSync("git", [
+      "update-ref", "refs/remotes/origin/codex/existing-tracked", "refs/heads/main",
+    ], { cwd: root });
+    await assert.rejects(
+      prepareTaskOperation({
+        stateRoot,
+        projectId: "host-branch-collision",
+        packet: hostWorktreePacket(root, {
+          run_id: "run-host-tracked-collision-01",
+          environment: {
+            type: "host-worktree",
+            repository_path: root,
+            starting_branch: "main",
+            executor_branch: "codex/existing-tracked",
+          },
+        }),
+      }),
+      /already exists locally or in fetched remote-tracking state/,
+    );
+    assert.deepEqual(await taskOperationStatus({ stateRoot }), []);
+  } finally {
+    await removeFixture(root);
+  }
+});
+
 test("pre-dispatch authentication rejects revision and cleanliness drift", async () => {
   const revisionRoot = await createGitFixture("codex-flow-revision-drift-");
   const cleanlinessRoot = await createGitFixture("codex-flow-cleanliness-drift-");
@@ -817,7 +864,7 @@ test("v0.4 rejects older task-operation records instead of migrating them", asyn
     });
     const recordPath = resolve(stateRoot, "task-operations", "records", `${prepared.operation_id}.json`);
     const old = JSON.parse(await readFile(recordPath, "utf8"));
-    old.schema_version = 3;
+    old.schema_version = 4;
     await writeFile(recordPath, `${JSON.stringify(old, null, 2)}\n`, "utf8");
     await assert.rejects(
       taskOperationStatus({ stateRoot, operationId: prepared.operation_id }),

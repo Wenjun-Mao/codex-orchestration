@@ -61,7 +61,7 @@ async function dispose(value) {
 
 function packet(worktree, revision, suffix) {
   return {
-    schema_version: 3,
+    schema_version: 4,
     task_id: `git-executor-${suffix}`,
     run_id: `run-git-${suffix}`,
     role: "executor",
@@ -98,6 +98,7 @@ function hostWorktreePacket(value, suffix) {
       type: "host-worktree",
       repository_path: value.root,
       starting_branch: "main",
+      executor_branch: `codex/host-${suffix}`,
     },
   };
 }
@@ -230,6 +231,7 @@ async function mergeAndRecord(value, operationId) {
 test("host-created worktree binds only from observed path and gates task release", async () => {
   const value = await fixture();
   try {
+    git(value.worktree, ["switch", "--detach", "main"]);
     const observed = await observedHostWorktree(value, "two-phase");
     await assert.rejects(
       authorizeGitBoundTaskRelease({
@@ -244,7 +246,9 @@ test("host-created worktree binds only from observed path and gates task release
       operationId: observed.operationId,
     });
     assert.equal(ownership.worktree_path, value.worktree);
+    assert.equal(ownership.branch, "codex/host-two-phase");
     assert.equal(ownership.initial_revision, observed.request.baseline.revision);
+    assert.equal(git(value.worktree, ["branch", "--show-current"]), "codex/host-two-phase");
     const released = await authorizeGitBoundTaskRelease({
       git: observed.controller,
       operationId: observed.operationId,
@@ -284,6 +288,7 @@ test("host-created worktree rejects source checkout and pre-bind dirt", async ()
       /distinct from its source repository path/,
     );
 
+    git(dirtyTarget.worktree, ["switch", "--detach", "main"]);
     const dirtyObserved = await observedHostWorktree(dirtyTarget, "dirty-path");
     await writeFile(resolve(dirtyTarget.worktree, "before-bind.txt"), "dirty\n", "utf8");
     await assert.rejects(
@@ -307,6 +312,95 @@ test("host-created worktree rejects source checkout and pre-bind dirt", async ()
     await dispose(sourcePath);
     await dispose(dirtyTarget);
     await dispose(unrelatedTarget);
+  }
+});
+
+test("host-created worktree rejects unexpected or newly unavailable executor branches", async () => {
+  const unexpected = await fixture();
+  const raced = await fixture();
+  try {
+    const unexpectedObserved = await observedHostWorktree(unexpected, "unexpected");
+    await assert.rejects(
+      bindGitOwnership({
+        git: unexpectedObserved.controller,
+        operationId: unexpectedObserved.operationId,
+      }),
+      /unexpected named branch/,
+    );
+    git(unexpected.worktree, ["switch", "--detach", "main"]);
+    git(unexpected.worktree, [
+      "switch", "--no-track", "-c", unexpectedObserved.request.environment.executor_branch, "main",
+    ]);
+    await assert.rejects(
+      bindGitOwnership({
+        git: unexpectedObserved.controller,
+        operationId: unexpectedObserved.operationId,
+      }),
+      /unexpected named branch/,
+    );
+
+    git(raced.worktree, ["switch", "--detach", "main"]);
+    const racedObserved = await observedHostWorktree(raced, "raced");
+    git(raced.root, ["branch", racedObserved.request.environment.executor_branch, "main"]);
+    await assert.rejects(
+      bindGitOwnership({ git: racedObserved.controller, operationId: racedObserved.operationId }),
+      /became unavailable/,
+    );
+    assert.equal(git(raced.worktree, ["branch", "--show-current"]), "");
+  } finally {
+    await dispose(unexpected);
+    await dispose(raced);
+  }
+});
+
+test("host-created worktree resumes only from its persisted branch-claim receipt", async () => {
+  const value = await fixture();
+  try {
+    git(value.worktree, ["switch", "--detach", "main"]);
+    const observed = await observedHostWorktree(value, "claim-recovery");
+    await assert.rejects(
+      bindGitOwnership({
+        git: observed.controller,
+        operationId: observed.operationId,
+        hooks: {
+          afterBranchClaim() {
+            throw new Error("simulated post-claim interruption");
+          },
+        },
+      }),
+      /simulated post-claim interruption/,
+    );
+    assert.equal(git(value.worktree, ["branch", "--show-current"]), "codex/host-claim-recovery");
+    git(value.worktree, ["switch", "--detach", "main"]);
+    assert.equal(git(value.worktree, ["branch", "--show-current"]), "");
+    await assert.rejects(
+      authorizeGitBoundTaskRelease({
+        git: observed.controller,
+        operationId: observed.operationId,
+        packet: observed.request,
+      }),
+      /requires bound Git ownership/,
+    );
+    const interruptedAudit = await gitLifecycleAudit({
+      git: observed.controller,
+      config: value.config,
+      inspectRemotes: false,
+    });
+    assert.equal(interruptedAudit.incomplete_claim_count, 1);
+    assert.equal(interruptedAudit.blocked, true);
+    const ownership = await bindGitOwnership({
+      git: observed.controller,
+      operationId: observed.operationId,
+    });
+    assert.equal(ownership.branch, "codex/host-claim-recovery");
+    const recoveredAudit = await gitLifecycleAudit({
+      git: observed.controller,
+      config: value.config,
+      inspectRemotes: false,
+    });
+    assert.equal(recoveredAudit.incomplete_claim_count, 0);
+  } finally {
+    await dispose(value);
   }
 });
 

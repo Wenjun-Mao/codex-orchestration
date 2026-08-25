@@ -1,5 +1,5 @@
 {
-  "schema_version": 3,
+  "schema_version": 4,
   "task_id": "bounded-executor-01",
   "run_id": "example-run-v2",
   "title": "Implement one bounded slice",

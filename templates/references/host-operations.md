@@ -9,7 +9,7 @@ For task creation:
 1. Validate the task packet and its absolute launch deadline. For `local`,
    derive the exact worktree root, full `HEAD`, and cleanliness. For
    `host-worktree`, derive the saved repository root, local starting branch,
-   and exact branch tip from Git.
+   exact branch tip, and a distinct unclaimed executor branch from Git.
 2. Record a stable, nonsecret host-session marker and capability evidence for
    the requested kind, model, and reasoning. Also record whether filtered
    discovery works or which bounded fallback is available.
@@ -28,9 +28,13 @@ For task creation:
    visibility, model, reasoning, host label, and execution path. A
    `host-worktree` path must come from host observation.
 7. For `host-worktree`, run `git bind`, then `task operation release` and send
-   the resulting full packet to the same task. Do not release if the worktree
-   is not pristine, distinct from the saved checkout, on a named non-source
-   branch, in the same repository, and at the exact starting revision.
+   the resulting full packet to the same task. A pristine detached worktree may
+   be claimed only as the packet-declared executor branch after an immutable
+   claim receipt is persisted; an unreceipted named branch is rejected. An
+   interrupted bind may resume only from that exact receipt. Do not release
+   unless the final path is distinct from
+   the saved checkout, in the same repository, and at the exact starting
+   revision.
 
 When a host advertises filtered thread listing but rejects the filter at
 runtime, make one bounded recent-list call without that filter and match only

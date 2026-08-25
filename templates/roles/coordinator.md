@@ -8,7 +8,8 @@ Before delegation:
 
 1. Bind the source baseline and product authority. For `local`, derive the
    exact worktree root, full `HEAD`, and cleanliness. For `host-worktree`,
-   derive the saved repository, local starting branch, and exact branch tip.
+   derive the saved repository, local starting branch and exact branch tip, and
+   a distinct unclaimed executor branch.
 2. Create and validate a task DAG with disjoint write ownership.
 3. Name every exclusive shared resource and serial gate.
 4. Bind the current coordinator recipient lineage and generation.
@@ -19,8 +20,11 @@ Before delegation:
    its launch deadline. Preparation and attempt both authenticate the local
    baseline. A session-blocking host failure requires a new session preflight.
 7. A host-created worktree receives only the no-action bootstrap until its
-   host-observed path is reconciled and Git-bound. Then release the full packet
-   to that same task. Bind every project-backed executor before implementation.
+   host-observed path is reconciled and Git-bound. Binding may claim the
+   packet-declared branch from an exact pristine detached baseline after
+   persisting its claim receipt; it rejects every unreceipted named branch.
+   Then release the full packet to that same
+   task. Bind every project-backed executor before implementation.
 
 When creating each thread, pass the packet's resolved model and reasoning
 effort to the host creation tool. Prompt text alone does not select either.

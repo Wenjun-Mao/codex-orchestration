@@ -127,6 +127,7 @@ test("host-worktree packets expose only a bootstrap prompt before Git binding", 
       type: "host-worktree",
       repository_path: "/absolute/path/to/saved/project",
       starting_branch: "codex/pilot-source",
+      executor_branch: "codex/pilot-executor",
     },
   });
   assert.throws(() => renderTaskPacket(hostWorktree), /Git-bound task-operation release/);
@@ -137,12 +138,35 @@ test("host-worktree packets expose only a bootstrap prompt before Git binding", 
     () => validateTaskPacket({ ...hostWorktree, execution_kind: "subagent" }),
     /requires a user-visible task-thread/,
   );
+  assert.throws(
+    () => validateTaskPacket({
+      ...hostWorktree,
+      environment: {
+        ...hostWorktree.environment,
+        executor_branch: hostWorktree.environment.starting_branch,
+      },
+    }),
+    /must differ from starting_branch/,
+  );
+  for (const name of ["task-packet", "task-operation"]) {
+    const schema = JSON.parse(await readFile(
+      resolve(packageRoot, "schemas", `${name}.schema.json`),
+      "utf8",
+    ));
+    const environment = schema.$defs.environment.oneOf.find(
+      (entry) => entry.properties?.type?.const === "host-worktree",
+    );
+    assert.deepEqual(
+      environment["x-codex-flow-distinct-properties"],
+      ["starting_branch", "executor_branch"],
+    );
+  }
 });
 
-test("v3 task packets and v2 plans fail closed on older versions and ambiguous kinds", async () => {
+test("v4 task packets and v2 plans fail closed on older versions and ambiguous kinds", async () => {
   const packet = JSON.parse(await readFile(resolve(packageRoot, "examples/task-packet.json"), "utf8"));
   const plan = JSON.parse(await readFile(resolve(packageRoot, "examples/parallel-plan.json"), "utf8"));
-  assert.throws(() => validateTaskPacket({ ...packet, schema_version: 2 }), /Unsupported task packet schema_version/);
+  assert.throws(() => validateTaskPacket({ ...packet, schema_version: 3 }), /Unsupported task packet schema_version/);
   assert.throws(() => validatePlan({ ...plan, schema_version: 1 }), /Unsupported plan schema_version/);
   assert.throws(() => validateTaskPacket({ ...packet, role: "coordinator-or-executor" }), /role must be one of/);
   assert.throws(() => validateTaskPacket({ ...packet, execution_kind: "task-thread-or-subagent" }), /execution_kind must be one of/);
