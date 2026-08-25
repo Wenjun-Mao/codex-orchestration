@@ -2,7 +2,8 @@
 
 ## Status
 
-Accepted for v0.4.1 pending held-out host replay.
+Accepted for v0.4.1. The normal direct-delivery path is held-out proven; a
+natural host replay remains pending field evidence.
 
 ## Context
 
@@ -66,5 +67,5 @@ identity. Identity-less urgent messages are nonauthoritative for new work.
 Tests cover sender idempotence, host replay, distinct sender attempts,
 correction sequence, recipient rebinding, expiry, bounded payloads, unsafe
 content rejection, CLI lifecycle, doctor reporting, and audit-only cleanup. A
-held-out cross-task direct delivery must still prove the normal host path; a
-host replay is claimed only if the host actually reproduces one.
+held-out cross-task direct delivery proved the normal host path. Host replay is
+claimed only if the host actually reproduces one.

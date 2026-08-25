@@ -22,6 +22,9 @@ without changing ordinary terminal completion.
 - Doctor and cleanup-audit visibility for pending signals and suppressed
   duplicate evidence.
 - Dependency-free operation in the existing v0.4 repository state namespace.
+- One held-out visible Terra/xhigh host-worktree executor through urgent
+  persist, attempt preparation, one direct host call, observe, consume,
+  ordinary callback integration, doctor, and exact Git cleanup.
 
 ## Not claimed
 
@@ -33,10 +36,12 @@ without changing ordinary terminal completion.
 - No acceptance of identity-less direct Steer for new work.
 - No held-out reproduction of the original host replay yet.
 
-## Held-out gate
+## Held-out result
 
-Install the exact v0.4.1 checkpoint in a disposable repository task lifecycle.
-Send one identified urgent signal between visible Terra/xhigh tasks, observe and
-consume it once, and verify doctor/cleanup state. If the host replays the same
-attempt, verify that the second envelope is classified and suppressed. Do not
-manufacture a replay and report it as host evidence.
+The 2026-08-25 UK Dev pilot accepted exact package revision `520a3e8` through a
+visible Terra/xhigh host-worktree task. One urgent attempt made one sender host
+call, returned `process` on observation, consumed once, and returned
+`already-consumed` on repeat. Ordinary completion remained exactly-once;
+doctor, integration reproof, audit, and exact worktree/local/remote cleanup
+passed. No natural host replay occurred, so same-attempt replay suppression
+remains regression-proven rather than held-out host evidence.
