@@ -119,8 +119,10 @@ codex-flow task operation prepare --file <packet.json>
 codex-flow task operation preflight --operation-id <id>
                   --file <host-capability-evidence.json>
 codex-flow task operation attempt --operation-id <id>
+codex-flow task operation bootstrap --operation-id <id> --file <packet.json>
 codex-flow task operation reconcile --operation-id <id> --attempt-id <id>
                   --outcome observed|not-created|ambiguous|failed|host-session-blocked ...
+codex-flow task operation release --operation-id <id> --file <packet.json>
 codex-flow task operation status [--operation-id <id>]
 codex-flow plan validate <plan.json>
 codex-flow recipient bind|rebind|status|resolve ...
@@ -151,11 +153,20 @@ strict capability evidence for the current host session with `preflight`, then
 start a bounded attempt. After the host call, inspect the actual object and
 reconcile its ID, kind, and field-level evidence provenance.
 
-For `local` and `worktree` packets, `environment.project_path` is the absolute
-Git worktree root and `baseline.revision` is its exact full `HEAD`. Preparation
-authenticates the packet against that repository before creating an operation
-record. Starting an attempt authenticates it again, including expected clean
-or explicitly dirty state, immediately before the host call.
+`local` packets name an existing exact Git worktree in
+`environment.project_path`; preparation and attempt authenticate its full
+`HEAD` and declared cleanliness. `host-worktree` packets instead name the
+saved repository and an exact local `starting_branch`. Preparation and attempt
+authenticate that branch tip without requiring the saved checkout itself to be
+clean or on that branch.
+
+Desktop-created worktrees use a two-phase launch. After `attempt`, render the
+bootstrap-only prompt and make one host call. The bootstrap contains no task
+objective and forbids repository work. Reread the created task's actual worktree
+path, reconcile it as host-observed, run `git bind`, then render `release` and
+send that full packet to the same task. Binding proves the path is a pristine,
+distinct, named-branch worktree in the same Git repository at the exact starting
+revision. Never guess the path or bind the saved checkout as the executor.
 
 A timeout is ambiguous, not failure. List/read the host state before retrying,
 then reconcile `observed` or `not-created`. No new launch may start after the
@@ -214,7 +225,7 @@ application/account identifiers, raw logs/transcripts, and user identity data.
 
 ## Cleanup boundary
 
-Bind every local or worktree executor to its observed task operation with
+Bind every local or host-created worktree executor to its observed task operation with
 `git bind` before the branch changes. After serial integration and reproof, run
 `git integrate` from a clean integrating branch. The record classifies the
 exact executor tip as an ancestor, patch-equivalent, explicitly superseded, or
@@ -262,5 +273,7 @@ records the superseded v0.3 queue-lifecycle decision.
 [Host capability and observation evidence](docs/adr/0006-host-capability-and-observation-evidence.md)
 defines the v0.3.3 host-session and title-normalization contract.
 [Git lifecycle and breaking-state policy](docs/adr/0007-git-lifecycle-and-breaking-state.md)
-defines the v0.4 ownership and cleanup contract. The current covered boundary
+defines the v0.4 ownership and cleanup contract.
+[Host-provisioned worktree launch](docs/adr/0008-host-provisioned-worktree-launch.md)
+defines the two-phase Desktop worktree contract. The current covered boundary
 is listed in [v0.4 orchestration coverage](docs/coverage-v0.4.md).

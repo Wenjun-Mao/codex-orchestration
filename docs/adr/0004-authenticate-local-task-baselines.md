@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted.
+Accepted for `local`; superseded for host-created worktrees by ADR 0008.
 
 ## Context
 

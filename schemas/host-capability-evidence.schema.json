@@ -5,20 +5,23 @@
   "additionalProperties": false,
   "required": [
     "schema_version", "adapter_id", "host_session_id", "checked_at",
-    "execution_kind", "support", "thread_discovery"
+    "execution_kind", "environment_type", "support", "thread_discovery"
   ],
   "properties": {
-    "schema_version": { "const": 1 },
+    "schema_version": { "const": 2 },
     "adapter_id": { "$ref": "#/$defs/safeId" },
     "host_session_id": { "$ref": "#/$defs/safeId" },
     "checked_at": { "type": "string", "format": "date-time", "maxLength": 64 },
     "execution_kind": { "enum": ["task-thread", "subagent"] },
+    "environment_type": { "enum": ["local", "host-worktree", "projectless"] },
     "support": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["execution_kind", "model", "reasoning_effort"],
+      "required": ["execution_kind", "environment", "execution_path", "model", "reasoning_effort"],
       "properties": {
         "execution_kind": { "$ref": "#/$defs/supportEvidence" },
+        "environment": { "$ref": "#/$defs/supportEvidence" },
+        "execution_path": { "$ref": "#/$defs/supportEvidence" },
         "model": { "$ref": "#/$defs/supportEvidence" },
         "reasoning_effort": { "$ref": "#/$defs/supportEvidence" }
       }

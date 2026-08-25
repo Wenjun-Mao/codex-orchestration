@@ -8,6 +8,7 @@ import { defaultProjectConfig } from "../lib/config.mjs";
 import { gitSnapshot } from "../lib/git.mjs";
 import {
   applyGitCleanupPlan,
+  authorizeGitBoundTaskRelease,
   bindGitOwnership,
   createGitCleanupPlan,
   gitLifecycleAudit,
@@ -60,7 +61,7 @@ async function dispose(value) {
 
 function packet(worktree, revision, suffix) {
   return {
-    schema_version: 2,
+    schema_version: 3,
     task_id: `git-executor-${suffix}`,
     run_id: `run-git-${suffix}`,
     role: "executor",
@@ -90,15 +91,31 @@ function packet(worktree, revision, suffix) {
   };
 }
 
-function capability(suffix) {
+function hostWorktreePacket(value, suffix) {
   return {
-    schema_version: 1,
+    ...packet(value.root, git(value.root, ["rev-parse", "refs/heads/main"]), suffix),
+    environment: {
+      type: "host-worktree",
+      repository_path: value.root,
+      starting_branch: "main",
+    },
+  };
+}
+
+function capability(suffix, environmentType = "local") {
+  return {
+    schema_version: 2,
     adapter_id: "codex-desktop-host",
     host_session_id: `host-session-${suffix}`,
     checked_at: "2026-08-24T12:00:00Z",
     execution_kind: "task-thread",
+    environment_type: environmentType,
     support: {
       execution_kind: { state: "supported", basis: "host-contract" },
+      environment: { state: "supported", basis: "tool-schema" },
+      execution_path: environmentType === "host-worktree"
+        ? { state: "supported", basis: "host-contract" }
+        : { state: "not-required", basis: "not-required" },
       model: { state: "supported", basis: "open-selector" },
       reasoning_effort: { state: "supported", basis: "open-selector" },
     },
@@ -106,14 +123,17 @@ function capability(suffix) {
   };
 }
 
-function observation(title) {
+function observation(title, executionPath = null) {
   return {
-    schema_version: 1,
+    schema_version: 2,
     title: { source: "host-observed", value: title, normalization: "none" },
     visibility: { source: "host-observed", value: true },
     model: { source: "host-observed", value: "gpt-5.6-terra" },
     reasoning_effort: { source: "host-observed", value: "xhigh" },
     host_label: { source: "unavailable", value: null },
+    execution_path: executionPath === null
+      ? { source: "not-required", value: null }
+      : { source: "host-observed", value: executionPath },
   };
 }
 
@@ -160,6 +180,35 @@ async function observedOperation(
   return prepared.operation_id;
 }
 
+async function observedHostWorktree(value, suffix = "host", executionPath = value.worktree) {
+  const controller = gitSnapshot(value.root);
+  const request = hostWorktreePacket(value, suffix);
+  const prepared = await prepareTaskOperation({
+    stateRoot: controller.stateRoot,
+    projectId: "fixture-project",
+    packet: request,
+  });
+  await recordTaskOperationHostPreflight({
+    stateRoot: controller.stateRoot,
+    operationId: prepared.operation_id,
+    evidence: capability(suffix, "host-worktree"),
+  });
+  const attempt = await beginTaskOperationAttempt({
+    stateRoot: controller.stateRoot,
+    operationId: prepared.operation_id,
+  });
+  await reconcileTaskOperation({
+    stateRoot: controller.stateRoot,
+    operationId: prepared.operation_id,
+    attemptId: attempt.attempt.attempt_id,
+    outcome: "observed",
+    objectId: `thread-${suffix}`,
+    actualKind: "task-thread",
+    evidence: observation(request.title, executionPath),
+  });
+  return { controller, request, operationId: prepared.operation_id };
+}
+
 async function commitExecutor(value, suffix = "a") {
   await writeFile(resolve(value.worktree, `change-${suffix}.txt`), `${suffix}\n`, "utf8");
   git(value.worktree, ["add", `change-${suffix}.txt`]);
@@ -178,12 +227,95 @@ async function mergeAndRecord(value, operationId) {
   });
 }
 
+test("host-created worktree binds only from observed path and gates task release", async () => {
+  const value = await fixture();
+  try {
+    const observed = await observedHostWorktree(value, "two-phase");
+    await assert.rejects(
+      authorizeGitBoundTaskRelease({
+        git: observed.controller,
+        operationId: observed.operationId,
+        packet: observed.request,
+      }),
+      /requires bound Git ownership/,
+    );
+    const ownership = await bindGitOwnership({
+      git: observed.controller,
+      operationId: observed.operationId,
+    });
+    assert.equal(ownership.worktree_path, value.worktree);
+    assert.equal(ownership.initial_revision, observed.request.baseline.revision);
+    const released = await authorizeGitBoundTaskRelease({
+      git: observed.controller,
+      operationId: observed.operationId,
+      packet: observed.request,
+    });
+    assert.equal(released.object_id, "thread-two-phase");
+    await assert.rejects(
+      authorizeGitBoundTaskRelease({
+        git: observed.controller,
+        operationId: observed.operationId,
+        packet: { ...observed.request, objective: "A replayed packet with different authority." },
+      }),
+      /does not match the prepared operation/,
+    );
+    await writeFile(resolve(value.worktree, "premature.txt"), "premature\n", "utf8");
+    await assert.rejects(
+      authorizeGitBoundTaskRelease({
+        git: observed.controller,
+        operationId: observed.operationId,
+        packet: observed.request,
+      }),
+      /drifted after Git ownership binding/,
+    );
+  } finally {
+    await dispose(value);
+  }
+});
+
+test("host-created worktree rejects source checkout and pre-bind dirt", async () => {
+  const sourcePath = await fixture();
+  const dirtyTarget = await fixture();
+  const unrelatedTarget = await fixture();
+  try {
+    const sourceObserved = await observedHostWorktree(sourcePath, "source-path", sourcePath.root);
+    await assert.rejects(
+      bindGitOwnership({ git: sourceObserved.controller, operationId: sourceObserved.operationId }),
+      /distinct from its source repository path/,
+    );
+
+    const dirtyObserved = await observedHostWorktree(dirtyTarget, "dirty-path");
+    await writeFile(resolve(dirtyTarget.worktree, "before-bind.txt"), "dirty\n", "utf8");
+    await assert.rejects(
+      bindGitOwnership({ git: dirtyObserved.controller, operationId: dirtyObserved.operationId }),
+      /changed before Git ownership binding/,
+    );
+
+    const unrelatedObserved = await observedHostWorktree(
+      sourcePath,
+      "unrelated-path",
+      unrelatedTarget.worktree,
+    );
+    await assert.rejects(
+      bindGitOwnership({
+        git: unrelatedObserved.controller,
+        operationId: unrelatedObserved.operationId,
+      }),
+      /different Git repository/,
+    );
+  } finally {
+    await dispose(sourcePath);
+    await dispose(dirtyTarget);
+    await dispose(unrelatedTarget);
+  }
+});
+
 test("cleanup plan removes only a proven merged worktree and exact local/remote refs", async () => {
   const value = await fixture();
   try {
-    const operationId = await observedOperation(value, "cleanup", "worktree");
+    const operationId = await observedOperation(value, "cleanup");
     await assert.rejects(
-      observedOperation(value, "duplicate-owner", "worktree"),
+      observedOperation(value, "duplicate-owner"),
       /already owned by another task operation/,
     );
     await commitExecutor(value, "cleanup");
@@ -394,7 +526,7 @@ test("ownership canonicalizes packet paths and rejects a first bind after branch
 test("cleanup preserves ignored and config-hidden untracked worktree files", async () => {
   const value = await fixture();
   try {
-    const operationId = await observedOperation(value, "hidden-files", "worktree");
+    const operationId = await observedOperation(value, "hidden-files");
     await commitExecutor(value, "hidden-files");
     await mergeAndRecord(value, operationId);
 

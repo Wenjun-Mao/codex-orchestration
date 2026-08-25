@@ -12,6 +12,9 @@ node .codex/orchestration/bin/codex-flow.mjs task start --role executor
 node .codex/orchestration/bin/codex-flow.mjs task packet validate <packet.json>
 ```
 
+If the first turn says it is a host-worktree bootstrap, do no repository work
+and wait for the coordinator's released full packet.
+
 Reauthenticate the packet baseline and remain inside its write paths. Preserve
 parallel user and sibling changes. Do not acquire undeclared resources, manage
 other tasks, weaken verification, or expand scope to keep a run green.

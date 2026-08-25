@@ -1,5 +1,5 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "task_id": "bounded-executor-01",
   "run_id": "example-run-v2",
   "title": "Implement one bounded slice",
@@ -15,7 +15,7 @@
     "cleanliness": "clean"
   },
   "environment": {
-    "type": "worktree",
+    "type": "local",
     "project_path": "/absolute/path/to/project"
   },
   "model": "gpt-5.6-terra",

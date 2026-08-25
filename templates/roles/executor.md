@@ -11,6 +11,9 @@ Steer the coordinator for a true blocker, approval need, ownership collision,
 or high-risk scope/cost drift. Do not broaden write ownership to keep a run
 green.
 
+A host-worktree bootstrap is not an executor packet. Perform no repository work
+until the coordinator sends the released full packet after Git binding.
+
 When the bounded result is terminal, leave the branch clean or state the exact
 reason it is not, create one strict terminal receipt, and persist it through
 `codex-flow callback deliver`. Do not separately queue ordinary completion.

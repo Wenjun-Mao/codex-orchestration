@@ -9,7 +9,7 @@
     "shared_resources", "verification", "callback", "integration_gate", "cleanup_owner", "stop_policy"
   ],
   "properties": {
-    "schema_version": { "const": 2 },
+    "schema_version": { "const": 3 },
     "task_id": { "$ref": "#/$defs/safeId" },
     "run_id": { "$ref": "#/$defs/safeId" },
     "title": { "type": "string", "minLength": 1, "maxLength": 160 },
@@ -26,27 +26,7 @@
         "cleanliness": { "enum": ["clean", "dirty-authorized"] }
       }
     },
-    "environment": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["type", "project_path"],
-      "properties": {
-        "type": { "enum": ["local", "worktree", "projectless"] },
-        "project_path": {
-          "description": "Absolute Git worktree root for local/worktree tasks; null for projectless tasks.",
-          "oneOf": [
-            { "type": "null" },
-            { "type": "string", "minLength": 1, "maxLength": 1024 }
-          ]
-        }
-      },
-      "allOf": [
-        {
-          "if": { "properties": { "type": { "enum": ["local", "worktree"] } } },
-          "then": { "properties": { "project_path": { "type": "string", "minLength": 1 } } }
-        }
-      ]
-    },
+    "environment": { "$ref": "#/$defs/environment" },
     "model": {
       "oneOf": [
         { "type": "null" },
@@ -126,7 +106,51 @@
       }
     }
   },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "environment": { "properties": { "type": { "const": "host-worktree" } } }
+        }
+      },
+      "then": {
+        "properties": {
+          "execution_kind": { "const": "task-thread" },
+          "baseline": { "properties": { "cleanliness": { "const": "clean" } } }
+        }
+      }
+    }
+  ],
   "$defs": {
+    "environment": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "project_path"],
+          "properties": {
+            "type": { "const": "local" },
+            "project_path": { "type": "string", "minLength": 1, "maxLength": 1024 }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "repository_path", "starting_branch"],
+          "properties": {
+            "type": { "const": "host-worktree" },
+            "repository_path": { "type": "string", "minLength": 1, "maxLength": 1024 },
+            "starting_branch": { "type": "string", "minLength": 1, "maxLength": 256 }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type"],
+          "properties": { "type": { "const": "projectless" } }
+        }
+      ]
+    },
     "safeId": {
       "type": "string",
       "minLength": 1,

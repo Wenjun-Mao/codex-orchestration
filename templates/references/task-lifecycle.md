@@ -7,6 +7,8 @@
    deadline, pass resolved `model` and `reasoning_effort` as actual host
    arguments, then inspect and reconcile field-level evidence. Normalize a
    substituted task-thread title only through a bounded write and exact reread.
+   For a host-created worktree, create with the no-action bootstrap, observe and
+   bind its exact path, then release the full task packet.
 4. **Execute:** remain inside packet ownership and verify proportionally.
 5. **Signal:** Steer urgent conditions; persist one ordinary terminal callback
    for the declared journal monitor.

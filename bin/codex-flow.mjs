@@ -33,6 +33,7 @@ import { runDoctor } from "../lib/doctor.mjs";
 import { discoverGit, gitSnapshot } from "../lib/git.mjs";
 import {
   applyGitCleanupPlan,
+  authorizeGitBoundTaskRelease,
   bindGitOwnership,
   createGitCleanupPlan,
   gitLifecycleAudit,
@@ -57,8 +58,15 @@ import {
   recipientStatuses,
   resolveRecipient,
 } from "../lib/recipients.mjs";
-import { applyTaskDefaults, renderTaskPacket, validateTaskPacket } from "../lib/task-packet.mjs";
 import {
+  applyTaskDefaults,
+  renderHostWorktreeBootstrap,
+  renderReleasedTaskPacket,
+  renderTaskPacket,
+  validateTaskPacket,
+} from "../lib/task-packet.mjs";
+import {
+  authorizeHostWorktreeBootstrap,
   beginTaskOperationAttempt,
   prepareTaskOperation,
   recordTaskOperationHostPreflight,
@@ -91,10 +99,12 @@ Usage:
   codex-flow task operation prepare --file <packet.json> [--json]
   codex-flow task operation preflight --operation-id ID --file <host-capabilities.json> [--json]
   codex-flow task operation attempt --operation-id ID [--timeout-seconds N] [--json]
+  codex-flow task operation bootstrap --operation-id ID --file <packet.json> [--json]
   codex-flow task operation reconcile --operation-id ID --attempt-id ID
                   --outcome observed|not-created|ambiguous|failed|host-session-blocked
                   [--object-id ID --actual-kind KIND --evidence <observation.json>]
                   [--reason-code CODE] [--json]
+  codex-flow task operation release --operation-id ID --file <packet.json> [--json]
   codex-flow task operation status [--operation-id ID] [--json]
   codex-flow plan validate <plan.json> [--json]
   codex-flow recipient bind --lineage-id ID --thread-id ID [--fence-token TOKEN] [--json]
@@ -444,6 +454,26 @@ async function commandTask(args) {
       });
       return;
     }
+    if (action === "bootstrap") {
+      const { values } = parse(boolAndJsonOptions({
+        "operation-id": { type: "string" },
+        file: { type: "string" },
+      }), operationArgs);
+      const raw = await readJsonInput(values.file ? resolve(values.file) : null);
+      const authorized = await authorizeHostWorktreeBootstrap({
+        stateRoot: git.stateRoot,
+        operationId: values["operation-id"],
+        packet: applyTaskDefaults(raw, config),
+      });
+      const prompt = renderHostWorktreeBootstrap(authorized.packet, authorized.operation_id);
+      if (values.json) output({
+        operation_id: authorized.operation_id,
+        attempt_id: authorized.attempt_id,
+        prompt,
+      }, { json: true });
+      else console.log(prompt);
+      return;
+    }
     if (action === "preflight") {
       const { values } = parse(boolAndJsonOptions({
         "operation-id": { type: "string" },
@@ -498,6 +528,23 @@ async function commandTask(args) {
       });
       return;
     }
+    if (action === "release") {
+      const { values } = parse(boolAndJsonOptions({
+        "operation-id": { type: "string" },
+        file: { type: "string" },
+      }), operationArgs);
+      const raw = await readJsonInput(values.file ? resolve(values.file) : null);
+      const packet = applyTaskDefaults(raw, config);
+      const authorization = await authorizeGitBoundTaskRelease({
+        git,
+        operationId: values["operation-id"],
+        packet,
+      });
+      const prompt = renderReleasedTaskPacket(packet);
+      if (values.json) output({ ...authorization, prompt }, { json: true });
+      else console.log(prompt);
+      return;
+    }
     if (action === "status") {
       const { values } = parse(boolAndJsonOptions({ "operation-id": { type: "string" } }), operationArgs);
       const result = await taskOperationStatus({
@@ -512,7 +559,7 @@ async function commandTask(args) {
       });
       return;
     }
-    throw new CliError("task operation requires prepare, preflight, attempt, reconcile, or status");
+    throw new CliError("task operation requires prepare, preflight, attempt, bootstrap, reconcile, release, or status");
   }
   throw new CliError("task requires start or packet");
 }

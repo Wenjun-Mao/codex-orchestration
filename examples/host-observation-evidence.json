@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "title": {
     "source": "host-observed",
     "value": "Bounded executor 01",
@@ -8,5 +8,6 @@
   "visibility": { "source": "host-observed", "value": true },
   "model": { "source": "host-accepted", "value": "gpt-5.6-terra" },
   "reasoning_effort": { "source": "host-accepted", "value": "xhigh" },
-  "host_label": { "source": "unavailable", "value": null }
+  "host_label": { "source": "unavailable", "value": null },
+  "execution_path": { "source": "not-required", "value": null }
 }

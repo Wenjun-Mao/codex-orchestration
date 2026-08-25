@@ -9,6 +9,11 @@
   evidence untouched and unread.
 - Local executor ownership bound to an observed operation and exact canonical
   worktree in the same Git common directory.
+- Host-created worktree launch split into source-branch authentication,
+  bootstrap-only creation, host-observed path reconciliation, pristine Git
+  binding, and full-packet release.
+- Rejection of guessed, replayed, source-checkout, unrelated-repository,
+  detached, dirty, or revision-drifted host worktrees before task release.
 - Integration classification as ancestor, patch-equivalent, superseded, or
   unmerged.
 - Read-only classification of active/protected, dirty, unmerged, merged,
@@ -33,13 +38,15 @@
   ignored authority, or user files.
 - No migration or automatic deletion of v0.3 operational state.
 - No daemon, MCP server, GitHub API client, or experimental host queue adapter.
-- No held-out installation field test in UK Dev or another repository yet.
+- No accepted held-out end-to-end host-worktree lifecycle yet. The first UK Dev
+  pilot proved installation and fail-closed local gates, then exposed the
+  pre-dispatch-path contract that ADR 0008 replaces.
 
 ## Held-out gate
 
-Before making v0.4 the default in the consultant repository, use a dedicated
-branch, explicitly retire the old pinned runtime there, and install v0.4 into
-its fresh state namespace. Exercise one real Terra/xhigh local executor through
-ownership bind, callback consume, serial integration, Git integration record,
-read-only audit, and an exact cleanup plan/apply. Preserve existing v0.3 state
-as inert evidence; do not attempt a mixed-version migration.
+Before making v0.4 the default in the consultant repository, restart the UK Dev
+pilot from fresh v0.4 state. Exercise one real Terra/xhigh `host-worktree`
+executor through bootstrap, observed-path binding, packet release, callback
+consume, serial integration, Git integration record, read-only audit, and exact
+cleanup plan/apply. Preserve existing v0.3 state as inert evidence; do not
+attempt a mixed-version migration.

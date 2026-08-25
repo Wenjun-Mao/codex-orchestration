@@ -1,5 +1,5 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "task_id": "host-adapter-probe-01",
   "run_id": "host-adapter-probe-v2",
   "title": "Codex Flow Host Adapter Probe",
@@ -14,10 +14,7 @@
     "revision": "0123456789abcdef",
     "cleanliness": "clean"
   },
-  "environment": {
-    "type": "projectless",
-    "project_path": null
-  },
+  "environment": { "type": "projectless" },
   "model": "gpt-5.6-terra",
   "reasoning_effort": "xhigh",
   "ownership": {

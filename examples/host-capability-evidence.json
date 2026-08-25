@@ -1,11 +1,14 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "adapter_id": "codex-desktop-host",
   "host_session_id": "desktop-session-20260824-a",
   "checked_at": "2026-08-24T12:00:00-04:00",
   "execution_kind": "task-thread",
+  "environment_type": "projectless",
   "support": {
     "execution_kind": { "state": "supported", "basis": "host-contract" },
+    "environment": { "state": "supported", "basis": "tool-schema" },
+    "execution_path": { "state": "not-required", "basis": "not-required" },
     "model": { "state": "supported", "basis": "open-selector" },
     "reasoning_effort": { "state": "supported", "basis": "open-selector" }
   },

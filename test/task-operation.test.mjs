@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import test from "node:test";
 import {
+  authorizeHostWorktreeBootstrap,
   beginTaskOperationAttempt,
   prepareTaskOperation,
   recordTaskOperationHostPreflight,
@@ -17,7 +18,7 @@ import { createGitFixture, removeFixture } from "./helpers.mjs";
 
 function packet(overrides = {}) {
   return {
-    schema_version: 2,
+    schema_version: 3,
     task_id: "bounded-executor-01",
     run_id: "run-20260823-01",
     role: "executor",
@@ -25,7 +26,7 @@ function packet(overrides = {}) {
     title: "Bounded executor 01",
     objective: "Exercise one bounded task operation.",
     baseline: { revision: "0123456789abcdef", cleanliness: "clean" },
-    environment: { type: "projectless", project_path: null },
+    environment: { type: "projectless" },
     model: "gpt-5.6-terra",
     reasoning_effort: "xhigh",
     launch_deadline: { at: "2030-08-23T17:15:00-04:00", timezone: "America/Toronto" },
@@ -65,6 +66,19 @@ function repositoryPacket(root, overrides = {}) {
   });
 }
 
+function hostWorktreePacket(root, overrides = {}) {
+  return packet({
+    run_id: "run-host-worktree-01",
+    baseline: { revision: gitRevision(root), cleanliness: "clean" },
+    environment: {
+      type: "host-worktree",
+      repository_path: root,
+      starting_branch: "main",
+    },
+    ...overrides,
+  });
+}
+
 function hostCapability({
   hostSessionId = "desktop-session-a",
   executionKind = "task-thread",
@@ -73,15 +87,21 @@ function hostCapability({
   query = "rejected",
   fallback = "bounded-unfiltered",
   checkedAt = "2026-08-23T12:00:00Z",
+  environmentType = "projectless",
+  environment = { state: "supported", basis: "tool-schema" },
+  executionPath = { state: "not-required", basis: "not-required" },
 } = {}) {
   return {
-    schema_version: 1,
+    schema_version: 2,
     adapter_id: "codex-desktop-host",
     host_session_id: hostSessionId,
     checked_at: checkedAt,
     execution_kind: executionKind,
+    environment_type: environmentType,
     support: {
       execution_kind: { state: "supported", basis: "host-contract" },
+      environment,
+      execution_path: executionPath,
       model,
       reasoning_effort: reasoningEffort,
     },
@@ -94,25 +114,30 @@ function taskThreadEvidence({
   titleNormalization = "none",
   modelSource = "host-accepted",
   reasoningSource = "host-accepted",
+  executionPath = null,
 } = {}) {
   return {
-    schema_version: 1,
+    schema_version: 2,
     title: { source: "host-observed", value: title, normalization: titleNormalization },
     visibility: { source: "host-observed", value: true },
     model: { source: modelSource, value: "gpt-5.6-terra" },
     reasoning_effort: { source: reasoningSource, value: "xhigh" },
     host_label: { source: "unavailable", value: null },
+    execution_path: executionPath === null
+      ? { source: "not-required", value: null }
+      : { source: "host-observed", value: executionPath },
   };
 }
 
 function subagentEvidence() {
   return {
-    schema_version: 1,
+    schema_version: 2,
     title: { source: "unavailable", value: null, normalization: "not-applicable" },
     visibility: { source: "host-contract", value: false },
     model: { source: "role-contract", value: "gpt-5.6-terra" },
     reasoning_effort: { source: "role-contract", value: "xhigh" },
     host_label: { source: "host-observed", value: "focused-runner" },
+    execution_path: { source: "not-required", value: null },
   };
 }
 
@@ -155,10 +180,18 @@ test("host evidence validators reject contradictory provenance and values", () =
 });
 
 async function recordCompatiblePreflight(stateRoot, operationId, overrides = {}) {
+  const operation = (await taskOperationStatus({ stateRoot, operationId }))[0];
+  const environmentType = operation.request.environment.type;
   return recordTaskOperationHostPreflight({
     stateRoot,
     operationId,
-    evidence: hostCapability(overrides),
+    evidence: hostCapability({
+      ...overrides,
+      environmentType,
+      executionPath: environmentType === "host-worktree"
+        ? { state: "supported", basis: "host-contract" }
+        : { state: "not-required", basis: "not-required" },
+    }),
     now: Date.parse(overrides.checkedAt ?? "2026-08-23T12:00:00Z"),
   });
 }
@@ -331,7 +364,7 @@ test("prepare accepts a linked worktree sharing the operation journal", async ()
       projectId: "linked-project",
       packet: repositoryPacket(linkedRoot, {
         run_id: "run-linked-worktree-01",
-        environment: { type: "worktree", project_path: linkedRoot },
+        environment: { type: "local", project_path: linkedRoot },
       }),
     });
     assert.equal(prepared.request.environment.project_path, linkedRoot);
@@ -343,6 +376,118 @@ test("prepare accepts a linked worktree sharing the operation journal", async ()
     }
     await removeFixture(root);
     await rm(linkedParent, { recursive: true, force: true });
+  }
+});
+
+test("host-worktree authenticates a source branch before creation and requires an observed path", async () => {
+  const root = await createGitFixture("codex-flow-host-worktree-");
+  const stateRoot = resolve(root, ".git", "codex-flow", "v0.4");
+  try {
+    await writeFile(resolve(root, "user-owned-untracked.txt"), "preserve\n", "utf8");
+    const request = hostWorktreePacket(root);
+    const prepared = await prepareTaskOperation({
+      stateRoot,
+      projectId: "host-worktree-project",
+      packet: request,
+    });
+    await assert.rejects(
+      authorizeHostWorktreeBootstrap({
+        stateRoot,
+        operationId: prepared.operation_id,
+        packet: request,
+      }),
+      /requires an active dispatch attempt/,
+    );
+    await recordCompatiblePreflight(stateRoot, prepared.operation_id);
+    const attempt = await beginTaskOperationAttempt({
+      stateRoot,
+      operationId: prepared.operation_id,
+    });
+    await assert.rejects(
+      authorizeHostWorktreeBootstrap({
+        stateRoot,
+        operationId: prepared.operation_id,
+        packet: { ...request, objective: "A different objective must not reuse this dispatch." },
+      }),
+      /does not match the prepared operation/,
+    );
+    const bootstrap = await authorizeHostWorktreeBootstrap({
+      stateRoot,
+      operationId: prepared.operation_id,
+      packet: request,
+    });
+    assert.equal(bootstrap.attempt_id, attempt.attempt.attempt_id);
+    await assert.rejects(
+      reconcileTaskOperation({
+        stateRoot,
+        operationId: prepared.operation_id,
+        attemptId: attempt.attempt.attempt_id,
+        outcome: "observed",
+        objectId: "host-worktree-thread",
+        actualKind: "task-thread",
+        evidence: taskThreadEvidence(),
+      }),
+      /requires a host-observed execution path/,
+    );
+    const observed = await reconcileTaskOperation({
+      stateRoot,
+      operationId: prepared.operation_id,
+      attemptId: attempt.attempt.attempt_id,
+      outcome: "observed",
+      objectId: "host-worktree-thread",
+      actualKind: "task-thread",
+      evidence: taskThreadEvidence({ executionPath: "/tmp/codex-host-worktree" }),
+    });
+    assert.equal(observed.observed.evidence.execution_path.value, "/tmp/codex-host-worktree");
+  } finally {
+    await removeFixture(root);
+  }
+});
+
+test("host-worktree preflight and starting-ref drift fail before a host call", async () => {
+  const root = await createGitFixture("codex-flow-host-worktree-drift-");
+  const stateRoot = resolve(root, ".git", "codex-flow", "v0.4");
+  try {
+    const request = hostWorktreePacket(root, { run_id: "run-host-worktree-drift-01" });
+    const unsupported = await prepareTaskOperation({
+      stateRoot,
+      projectId: "host-worktree-project",
+      packet: request,
+    });
+    const blocked = await recordTaskOperationHostPreflight({
+      stateRoot,
+      operationId: unsupported.operation_id,
+      evidence: hostCapability({
+        environmentType: "host-worktree",
+        executionPath: { state: "unknown", basis: "unavailable" },
+      }),
+    });
+    assert.equal(blocked.status, "host-incompatible");
+    await assert.rejects(
+      beginTaskOperationAttempt({ stateRoot, operationId: unsupported.operation_id }),
+      /execution-path-unverified/,
+    );
+    assert.equal(blocked.attempts.length, 0);
+
+    const drifting = await prepareTaskOperation({
+      stateRoot,
+      projectId: "host-worktree-project",
+      packet: hostWorktreePacket(root, { run_id: "run-host-worktree-drift-02" }),
+    });
+    await recordCompatiblePreflight(stateRoot, drifting.operation_id);
+    await writeFile(resolve(root, "advance.txt"), "advance\n", "utf8");
+    execFileSync("git", ["add", "advance.txt"], { cwd: root });
+    execFileSync("git", ["commit", "--quiet", "-m", "advance source"], { cwd: root });
+    await assert.rejects(
+      beginTaskOperationAttempt({ stateRoot, operationId: drifting.operation_id }),
+      /starting branch/,
+    );
+    assert.equal((await taskOperationStatus({
+      stateRoot,
+      operationId: drifting.operation_id,
+    }))[0].attempts.length, 0);
+  } finally {
+    await removeFixture(root);
   }
 });
 
@@ -672,7 +817,7 @@ test("v0.4 rejects older task-operation records instead of migrating them", asyn
     });
     const recordPath = resolve(stateRoot, "task-operations", "records", `${prepared.operation_id}.json`);
     const old = JSON.parse(await readFile(recordPath, "utf8"));
-    old.schema_version = 2;
+    old.schema_version = 3;
     await writeFile(recordPath, `${JSON.stringify(old, null, 2)}\n`, "utf8");
     await assert.rejects(
       taskOperationStatus({ stateRoot, operationId: prepared.operation_id }),

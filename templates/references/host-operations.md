@@ -6,24 +6,31 @@ that journal; no daemon, MCP server, or background secretary is required.
 
 For task creation:
 
-1. Validate the task packet and its absolute launch deadline. For a local or
-   worktree task, derive the absolute Git worktree root, exact full `HEAD`, and
-   current cleanliness from Git rather than transcribing them manually.
+1. Validate the task packet and its absolute launch deadline. For `local`,
+   derive the exact worktree root, full `HEAD`, and cleanliness. For
+   `host-worktree`, derive the saved repository root, local starting branch,
+   and exact branch tip from Git.
 2. Record a stable, nonsecret host-session marker and capability evidence for
    the requested kind, model, and reasoning. Also record whether filtered
    discovery works or which bounded fallback is available.
 3. Run `task operation prepare`, `task operation preflight`, then
    `task operation attempt`. Preparation and attempt fail closed on baseline
    mismatch; unsupported or unverified required selectors stop before dispatch.
-4. Call the host creation capability exactly once with the requested
-   `execution_kind`, environment, resolved model, and reasoning effort.
+4. For `local` or `projectless`, call the host once with the released packet.
+   For `host-worktree`, render `task operation bootstrap` and use only that
+   no-action prompt in the one creation call.
 5. List/read the resulting host object. A task thread must be user-visible and
    its title must be independently reread. If the host used the delegation
    envelope, perform one bounded title update, reread the exact requested title,
    and record `bounded-host-write`. A subagent may have no title field; keep its
    host nickname separate.
 6. Reconcile the attempt as `observed` with field-level provenance for title,
-   visibility, model, reasoning, and host label.
+   visibility, model, reasoning, host label, and execution path. A
+   `host-worktree` path must come from host observation.
+7. For `host-worktree`, run `git bind`, then `task operation release` and send
+   the resulting full packet to the same task. Do not release if the worktree
+   is not pristine, distinct from the saved checkout, on a named non-source
+   branch, in the same repository, and at the exact starting revision.
 
 When a host advertises filtered thread listing but rejects the filter at
 runtime, make one bounded recent-list call without that filter and match only

@@ -17,7 +17,7 @@ completion models in one runtime.
 
 v0.4 has one ordinary-completion authority: the repository journal monitor. It
 does not enqueue host turns and contains no queue adapter. Project configuration
-is schema 4, task-operation records are schema 3, and callback records are
+is schema 4, task packets are schema 3, task-operation records are schema 4, and callback records are
 schema 4. Older operational state is rejected rather than migrated. A user may
 preserve old files as evidence, but a v0.4 runtime starts in the independent
 `.git/codex-flow/v0.4/` namespace and never reads or deletes older records.

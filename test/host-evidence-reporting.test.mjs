@@ -13,7 +13,7 @@ import { createGitFixture, initializeFixture, removeFixture } from "./helpers.mj
 
 function packet(revision, runId) {
   return {
-    schema_version: 2,
+    schema_version: 3,
     task_id: `executor-${runId}`,
     run_id: runId,
     role: "executor",
@@ -21,7 +21,7 @@ function packet(revision, runId) {
     title: `Executor ${runId}`,
     objective: "Exercise host evidence reporting.",
     baseline: { revision, cleanliness: "clean" },
-    environment: { type: "projectless", project_path: null },
+    environment: { type: "projectless" },
     model: "gpt-5.6-terra",
     reasoning_effort: "xhigh",
     launch_deadline: { at: "2030-08-24T17:00:00-04:00", timezone: "America/Toronto" },
@@ -43,15 +43,20 @@ function packet(revision, runId) {
   };
 }
 
-function capability(hostSessionId, modelState = "supported") {
+function capability(hostSessionId, modelState = "supported", environmentType = "projectless") {
   return {
-    schema_version: 1,
+    schema_version: 2,
     adapter_id: "codex-desktop-host",
     host_session_id: hostSessionId,
     checked_at: "2026-08-24T12:00:00Z",
     execution_kind: "task-thread",
+    environment_type: environmentType,
     support: {
       execution_kind: { state: "supported", basis: "host-contract" },
+      environment: { state: "supported", basis: "tool-schema" },
+      execution_path: environmentType === "host-worktree"
+        ? { state: "supported", basis: "host-contract" }
+        : { state: "not-required", basis: "not-required" },
       model: {
         state: modelState,
         basis: modelState === "supported" ? "open-selector" : "closed-selector",
@@ -62,14 +67,17 @@ function capability(hostSessionId, modelState = "supported") {
   };
 }
 
-function partialEvidence(title) {
+function partialEvidence(title, executionPath = null) {
   return {
-    schema_version: 1,
+    schema_version: 2,
     title: { source: "host-observed", value: title, normalization: "none" },
     visibility: { source: "host-observed", value: true },
     model: { source: "host-accepted", value: "gpt-5.6-terra" },
     reasoning_effort: { source: "host-accepted", value: "xhigh" },
     host_label: { source: "unavailable", value: null },
+    execution_path: executionPath === null
+      ? { source: "not-required", value: null }
+      : { source: "host-observed", value: executionPath },
   };
 }
 
@@ -136,20 +144,55 @@ test("doctor and cleanup disclose incompatible, session-blocked, and partial ope
       evidence: partialEvidence(partial.request.title),
     });
 
+    const unbound = await prepareTaskOperation({
+      stateRoot: git.stateRoot,
+      projectId: "fixture",
+      packet: {
+        ...packet(git.revision, "unbound"),
+        environment: {
+          type: "host-worktree",
+          repository_path: root,
+          starting_branch: "main",
+        },
+      },
+    });
+    await recordTaskOperationHostPreflight({
+      stateRoot: git.stateRoot,
+      operationId: unbound.operation_id,
+      evidence: capability("session-unbound", "supported", "host-worktree"),
+    });
+    const unboundAttempt = await beginTaskOperationAttempt({
+      stateRoot: git.stateRoot,
+      operationId: unbound.operation_id,
+    });
+    await reconcileTaskOperation({
+      stateRoot: git.stateRoot,
+      operationId: unbound.operation_id,
+      attemptId: unboundAttempt.attempt.attempt_id,
+      outcome: "observed",
+      objectId: "thread-unbound",
+      actualKind: "task-thread",
+      evidence: partialEvidence(unbound.request.title, "/tmp/unbound-host-worktree"),
+    });
+
     const doctor = await runDoctor(gitSnapshot(root));
     assert.equal(doctor.ok, true);
     assert.equal(doctor.task_operations.host_incompatible_count, 1);
     assert.equal(doctor.task_operations.host_session_blocked_count, 1);
-    assert.equal(doctor.task_operations.partial_evidence_count, 1);
+    assert.equal(doctor.task_operations.partial_evidence_count, 2);
     assert.match(doctor.warnings.join("\n"), /incompatible with their recorded host selector/);
     assert.match(doctor.warnings.join("\n"), /blocked for their recorded host session/);
     assert.match(doctor.warnings.join("\n"), /partial host evidence/);
+    assert.match(doctor.warnings.join("\n"), /host worktree.*lack Git ownership binding/);
 
     const cleanup = await cleanupAudit(gitSnapshot(root));
     assert.equal(cleanup.mutation_performed, false);
     assert.match(cleanup.recommendations.join("\n"), /compatible selector evidence/);
     assert.match(cleanup.recommendations.join("\n"), /new host-session preflight/);
     assert.match(cleanup.recommendations.join("\n"), /partial host evidence/);
+    assert.equal(cleanup.unbound_host_worktrees.length, 1);
+    assert.equal(cleanup.unbound_host_worktrees[0].object_id, "thread-unbound");
+    assert.match(cleanup.recommendations.join("\n"), /require Git ownership binding/);
   } finally {
     await removeFixture(root);
   }

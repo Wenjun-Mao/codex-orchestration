@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { writeFile } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import test from "node:test";
 import { assertSuccess, createGitFixture, initializeFixture, removeFixture, runCli } from "./helpers.mjs";
@@ -37,7 +38,7 @@ function receipt() {
 
 function operationPacket(root) {
   return {
-    schema_version: 2,
+    schema_version: 3,
     task_id: "cli-task-operation",
     run_id: "cli-task-operation-run-01",
     role: "executor",
@@ -70,15 +71,42 @@ function operationPacket(root) {
   };
 }
 
-function hostCapability() {
+function hostWorktreeOperationPacket(root) {
   return {
-    schema_version: 1,
+    ...operationPacket(root),
+    task_id: "cli-host-worktree",
+    run_id: "cli-host-worktree-run-01",
+    title: "CLI host worktree probe",
+    baseline: {
+      revision: execFileSync("git", ["rev-parse", "refs/heads/main"], { cwd: root, encoding: "utf8" }).trim(),
+      cleanliness: "clean",
+    },
+    environment: {
+      type: "host-worktree",
+      repository_path: root,
+      starting_branch: "main",
+    },
+    callback: {
+      ...operationPacket(root).callback,
+      executor_id: "cli-host-worktree",
+    },
+  };
+}
+
+function hostCapability(environmentType = "local") {
+  return {
+    schema_version: 2,
     adapter_id: "cli-test-host",
     host_session_id: "cli-test-session",
     checked_at: "2026-08-23T12:00:00Z",
     execution_kind: "task-thread",
+    environment_type: environmentType,
     support: {
       execution_kind: { state: "supported", basis: "host-contract" },
+      environment: { state: "supported", basis: "tool-schema" },
+      execution_path: environmentType === "host-worktree"
+        ? { state: "supported", basis: "host-contract" }
+        : { state: "not-required", basis: "not-required" },
       model: { state: "supported", basis: "open-selector" },
       reasoning_effort: { state: "supported", basis: "open-selector" },
     },
@@ -86,18 +114,21 @@ function hostCapability() {
   };
 }
 
-function hostObservation() {
+function hostObservation(executionPath = null, title = "CLI task operation probe") {
   return {
-    schema_version: 1,
+    schema_version: 2,
     title: {
       source: "host-observed",
-      value: "CLI task operation probe",
+      value: title,
       normalization: "bounded-host-write",
     },
     visibility: { source: "host-observed", value: true },
     model: { source: "host-accepted", value: "gpt-5.6-terra" },
     reasoning_effort: { source: "host-accepted", value: "xhigh" },
     host_label: { source: "unavailable", value: null },
+    execution_path: executionPath === null
+      ? { source: "not-required", value: null }
+      : { source: "host-observed", value: executionPath },
   };
 }
 
@@ -211,5 +242,75 @@ test("CLI requires preflight and records provenance-rich host reconciliation", a
     assert.equal(JSON.parse(gitStatus.stdout).items.length, 1);
   } finally {
     await removeFixture(root);
+  }
+});
+
+test("CLI gates a host-created worktree between bootstrap and Git-bound release", async () => {
+  const root = await createGitFixture("codex-flow-cli-host-worktree-");
+  const worktreeParent = await mkdtemp(resolve(tmpdir(), "codex-flow-cli-host-parent-"));
+  const worktree = resolve(worktreeParent, "executor");
+  try {
+    initializeFixture([], { cwd: root });
+    const request = hostWorktreeOperationPacket(root);
+    const preparedResult = runCli(["task", "operation", "prepare", "--json"], {
+      cwd: root,
+      input: request,
+    });
+    assertSuccess(preparedResult, "host-worktree prepare");
+    const prepared = JSON.parse(preparedResult.stdout);
+    assertSuccess(runCli([
+      "task", "operation", "preflight", "--operation-id", prepared.operation_id, "--json",
+    ], { cwd: root, input: hostCapability("host-worktree") }), "host-worktree preflight");
+    const attemptResult = runCli([
+      "task", "operation", "attempt", "--operation-id", prepared.operation_id, "--json",
+    ], { cwd: root });
+    assertSuccess(attemptResult, "host-worktree attempt");
+    const attempt = JSON.parse(attemptResult.stdout);
+    const bootstrap = runCli([
+      "task", "operation", "bootstrap", "--operation-id", prepared.operation_id,
+    ], { cwd: root, input: request });
+    assertSuccess(bootstrap, "host-worktree bootstrap");
+    assert.match(bootstrap.stdout, /bootstrap turn only/);
+    assert.doesNotMatch(bootstrap.stdout, /Exercise host preflight/);
+
+    execFileSync("git", ["worktree", "add", "--quiet", "-b", "codex/cli-host-worktree", worktree, "main"], {
+      cwd: root,
+    });
+    const evidencePath = resolve(root, "host-worktree-observation.json");
+    await writeFile(evidencePath, `${JSON.stringify(
+      hostObservation(worktree, request.title),
+      null,
+      2,
+    )}\n`, "utf8");
+    assertSuccess(runCli([
+      "task", "operation", "reconcile",
+      "--operation-id", prepared.operation_id,
+      "--attempt-id", attempt.attempt.attempt_id,
+      "--outcome", "observed",
+      "--object-id", "thread-cli-host-worktree",
+      "--actual-kind", "task-thread",
+      "--evidence", evidencePath,
+    ], { cwd: root }), "host-worktree reconcile");
+
+    const premature = runCli([
+      "task", "operation", "release", "--operation-id", prepared.operation_id,
+    ], { cwd: root, input: request });
+    assert.notEqual(premature.status, 0);
+    assert.match(premature.stderr, /requires bound Git ownership/);
+    assertSuccess(runCli([
+      "git", "bind", "--operation-id", prepared.operation_id,
+    ], { cwd: root }), "host-worktree Git bind");
+    const released = runCli([
+      "task", "operation", "release", "--operation-id", prepared.operation_id,
+    ], { cwd: root, input: request });
+    assertSuccess(released, "host-worktree release");
+    assert.match(released.stdout, /Exercise host preflight and evidence reconciliation/);
+    assert.match(released.stdout, /host-worktree.*codex\/pilot|host-worktree.*main/);
+  } finally {
+    try {
+      execFileSync("git", ["worktree", "remove", "--force", worktree], { cwd: root });
+    } catch {}
+    await removeFixture(root);
+    await rm(worktreeParent, { recursive: true, force: true });
   }
 });

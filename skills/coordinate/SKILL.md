@@ -20,11 +20,11 @@ task packet and pass its requested execution kind, environment, resolved
 `model`, and `reasoning_effort` as actual host creation arguments; merely
 mentioning them in a prompt does not configure the host.
 
-For local and worktree tasks, derive the packet's absolute Git worktree root,
-exact full `HEAD`, and cleanliness directly from that repository. Do not expand
-or transcribe a short revision by hand. `task operation prepare` authenticates
-this baseline before journaling and `attempt` authenticates it again immediately
-before dispatch.
+For `local`, derive the packet's exact Git worktree root, full `HEAD`, and
+cleanliness. For `host-worktree`, derive the saved repository root, exact local
+starting branch, and full branch tip. Do not expand or transcribe a short
+revision. `prepare` authenticates before journaling and `attempt` repeats the
+check immediately before dispatch.
 
 Probe the current session's actual creation tools and bind the result to a
 stable host-session marker. Journal each creation with `task operation prepare`,
@@ -36,8 +36,11 @@ that session; record a new session preflight after restart. Use the smallest
 concurrency that shortens the critical path and never launch after the packet
 deadline.
 
-For a project-backed executor, bind the observed operation to its exact
-canonical worktree with `codex-flow git bind` before implementation begins.
+For a host-created worktree, create the task with only the generated bootstrap
+prompt. Observe its actual path, reconcile, run `codex-flow git bind`, then
+generate and send `task operation release`. Never guess a host path or send the
+objective before binding. For any project-backed executor, bind the observed
+operation to its exact canonical worktree before implementation begins.
 Task creation fails closed at the configured cleanup threshold; reconcile
 completed Git ownership before launching another wave.
 

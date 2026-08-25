@@ -9,6 +9,7 @@ Create only the packet's explicit task kind and journal ambiguous host calls.
 Use Steer only for true blockers, approvals, or high-risk drift; route ordinary
 terminal completion through the journal with `codex-flow callback deliver`.
 After a coordinator fork, rebind its recipient lineage before integration.
-Bind each executor worktree to its observed operation, record integration, and
+For host-created worktrees, bootstrap without the objective, bind the observed
+path, then release the full packet. Record integration, and
 use only a reviewed `cleanup plan` / `cleanup apply` pair for Git deletion.
 <!-- codex-flow:end -->
