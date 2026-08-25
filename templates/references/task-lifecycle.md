@@ -10,11 +10,12 @@
 4. **Execute:** remain inside packet ownership and verify proportionally.
 5. **Signal:** Steer urgent conditions; persist one ordinary terminal callback
    for the declared journal monitor.
-6. **Integrate:** observe with `--source journal-monitor` under the current
-   recipient generation, authenticate, review, merge serially, and reprove
-   combined behavior.
-7. **Close:** consume the callback exactly once, release resources, archive appropriate task
-   threads when the host permits it, and audit stale state.
+6. **Integrate:** observe under the current recipient generation, authenticate,
+   review, merge serially, reprove combined behavior, and record the exact Git
+   integration disposition.
+7. **Close:** consume the callback exactly once, release resources, archive
+   appropriate task threads when the host permits it, audit Git state, and use
+   an explicit cleanup plan/apply pair for eligible task branches/worktrees.
 
 Thread creation, archiving, deletion, and host-specific role binding are
 capabilities, not assumptions. Record what the current session actually

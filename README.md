@@ -11,7 +11,7 @@ deliberately separate layers:
 This is not a daemon, secretary task, or MCP server. Each repository pins a
 reviewable runtime under `.codex/orchestration/`. Mutable recipient bindings,
 task-operation attempts, callback journals, and leases live under that
-repository's Git common directory at `.git/codex-flow/`, so linked worktrees
+repository's Git common directory at `.git/codex-flow/v0.4/`, so linked worktrees
 share the same coordination state.
 
 ## Requirements
@@ -24,6 +24,20 @@ No third-party npm packages are required. Target repositories do not need to
 be JavaScript projects. JSON Schemas provide portable structural validation;
 the CLI remains authoritative for graph, path, identity, expiry, redaction,
 and lifecycle semantics.
+
+## Pre-release compatibility policy
+
+This private tool is intentionally allowed to break. Until the user explicitly
+declares a stable compatibility boundary, a better contract replaces the old
+one outright: no compatibility readers, migration branches, deprecated aliases,
+or dual execution paths. Repositories preserve any evidence they still need,
+retire old operational state explicitly, and initialize the current version.
+
+Replacing a pre-v0.4 pinned runtime is a fresh installation on a dedicated
+branch: retain the old `.git/codex-flow/` evidence, explicitly remove the old
+tracked `.codex/orchestration/` runtime and configuration from that branch,
+then plan and apply v0.4. New operational records live only in
+`.git/codex-flow/v0.4/`; v0.4 neither reads nor deletes the retained namespace.
 
 ## Private distribution
 
@@ -112,12 +126,20 @@ codex-flow plan validate <plan.json>
 codex-flow recipient bind|rebind|status|resolve ...
 codex-flow callback deliver --file <receipt.json>
 codex-flow callback observe --callback-id <id> --lineage-id <id>
-                  --thread-id <id> --generation <n> --source journal-monitor
+                  --thread-id <id> --generation <n>
 codex-flow callback consume --callback-id <id> --lineage-id <id>
                   --thread-id <id> --generation <n> --executor-id <id>
-codex-flow callback reconcile|expire|status ...
+codex-flow callback expire|status ...
+codex-flow git bind --operation-id <id>
+codex-flow git integrate --operation-id <id> --main-branch <branch>
+                  [--superseded-by <ref>]
+codex-flow git status
 codex-flow lease acquire|release|status ...
 codex-flow cleanup audit [--json]
+codex-flow cleanup plan --operation-id <id>... --main-branch <branch>
+                  [--include-remote]
+codex-flow cleanup apply --plan-id <id> --operation-id <id>...
+                  --main-branch <branch> [--include-remote]
 ```
 
 ## Task creation contract
@@ -133,9 +155,7 @@ For `local` and `worktree` packets, `environment.project_path` is the absolute
 Git worktree root and `baseline.revision` is its exact full `HEAD`. Preparation
 authenticates the packet against that repository before creating an operation
 record. Starting an attempt authenticates it again, including expected clean
-or explicitly dirty state, immediately before the host call. A legacy operation
-without this evidence remains readable but cannot launch until its original
-packet is prepared again.
+or explicitly dirty state, immediately before the host call.
 
 A timeout is ambiguous, not failure. List/read the host state before retrying,
 then reconcile `observed` or `not-created`. No new launch may start after the
@@ -166,7 +186,7 @@ Ordinary terminal completion uses `callback deliver`, which persists a strict
 receipt in the repository journal. The default and only installed project
 authority is `journal-monitor`: it creates no Codex thread-queue entry. The
 coordinator or its quiet monitor reads `callback status`, then observes with
-`--source journal-monitor` and consumes only after integration.
+the current recipient identity and consumes only after integration.
 
 Integration is exactly once by deterministic callback ID and a durable
 observed/consumed journal. Corrected receipts use increasing sequence numbers
@@ -174,27 +194,11 @@ and explicit supersession; arrival order is never authority. Task packets and
 project configuration must name the same ordinary-completion authority, so a
 monitor cannot silently integrate work that was also queued.
 
-The library contains an optional capability-probed retractable-queue contract
-for adapter field tests. It requires stable add/list/delete identities, sends
-only a callback pointer, and performs host calls outside the journal lock. No
-such experimental host adapter is enabled by default or required for package
-operation, and v0.3.2 does not claim Desktop queue retraction from a real host
-field test.
-
-Upgrading a v0.3.1 repository requires an explicit read-only plan and accepted
-authority migration:
-
-```bash
-codex-flow init --plan --callback-authority journal-monitor --json
-codex-flow init --apply-plan <plan_id> \
-  --callback-authority journal-monitor --json
-```
-
-Legacy callback journals remain readable. Because old `codex queue` accepted
-no retractable submission identity, `doctor` reports any legacy notification
-that may still surface. A stale legacy queue turn resolves the trusted receipt
-from the journal and is deduplicated by callback ID; it must not be integrated
-again.
+v0.4 intentionally removes the experimental queue adapter and every legacy
+callback reader. An ordinary completion has one authority and one durable path.
+This is a breaking checkpoint: v0.3 configuration, task-operation records, and
+callback journals are not migrated. The package fails closed rather than carry
+compatibility code.
 
 Before launching executors, bind the coordinator lineage with `recipient bind`.
 The first successful bind returns a private fence token; idempotent bind replay
@@ -210,11 +214,33 @@ application/account identifiers, raw logs/transcripts, and user identity data.
 
 ## Cleanup boundary
 
-`cleanup audit` is intentionally read-only. It reports callback lifecycle,
-ambiguous task operations, recipient lineages, leases, legacy v0.1 state,
-managed-runtime drift, and disk use. It does not archive threads, remove
-worktrees, delete repositories, or erase evidence. Those actions require a
-separate owner-authorized retention decision.
+Bind every local or worktree executor to its observed task operation with
+`git bind` before the branch changes. After serial integration and reproof, run
+`git integrate` from a clean integrating branch. The record classifies the
+exact executor tip as an ancestor, patch-equivalent, explicitly superseded, or
+unmerged. Ownership also pins the intended task upstream and a hash of its push
+destination when the controller repository has an upstream.
+
+`cleanup audit` is read-only. It joins those records with task operations,
+leases, linked worktrees, local refs, and exact remote refs. Dirty, active,
+protected, drifted, ambiguous, or uniquely unmerged state is never eligible.
+Branch names alone are never deletion authority.
+
+Deletion requires an explicit deterministic `cleanup plan`, followed by an
+`apply` with the same plan ID and arguments. Apply rechecks the clean/pushed
+main revision, pinned remote identity, every exact tip, active leases, and a
+worktree scan that includes ignored and normally hidden untracked files. It
+then removes only the planned clean linked worktree, local ref, and remote ref,
+in that preservation-first order. An interruption invalidates the old plan;
+audit again and make a fresh plan for what remains. Executors never run cleanup.
+Remote cleanup requires exactly one fetch URL and one identical push URL;
+split or fan-out remotes fail closed.
+This is a process-role rule rather than a security claim: a local CLI cannot
+authenticate which Codex role invoked it.
+Configured warning and block thresholds count integrated Git records that still
+need local reconciliation, including unsafe ones, so another task wave cannot
+grow an unattended worktree/branch backlog. Task preparation and `doctor` stay
+network-free; explicit audit and cleanup commands inspect exact remote tips.
 
 ## Development
 
@@ -231,9 +257,10 @@ planning and external instruction ownership are defined by
 [ADR 0003](docs/adr/0003-install-planning-and-instruction-ownership.md).
 Local task baseline authentication is defined by
 [ADR 0004](docs/adr/0004-authenticate-local-task-baselines.md).
-Ordinary-completion authority and queue-notification lifecycle are defined by
-[ADR 0005](docs/adr/0005-callback-authority-and-notification-lifecycle.md).
+[ADR 0005](docs/adr/0005-callback-authority-and-notification-lifecycle.md)
+records the superseded v0.3 queue-lifecycle decision.
 [Host capability and observation evidence](docs/adr/0006-host-capability-and-observation-evidence.md)
 defines the v0.3.3 host-session and title-normalization contract.
-The current covered/partial/host-dependent boundary is listed in
-[v0.3.3 orchestration coverage](docs/coverage-v0.3.3.md).
+[Git lifecycle and breaking-state policy](docs/adr/0007-git-lifecycle-and-breaking-state.md)
+defines the v0.4 ownership and cleanup contract. The current covered boundary
+is listed in [v0.4 orchestration coverage](docs/coverage-v0.4.md).

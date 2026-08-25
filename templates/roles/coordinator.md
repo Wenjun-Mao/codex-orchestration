@@ -18,6 +18,8 @@ Before delegation:
 6. Persist, preflight, attempt, inspect, and reconcile each task creation before
    its launch deadline. Preparation and attempt both authenticate the local
    baseline. A session-blocking host failure requires a new session preflight.
+7. Bind each observed project-backed executor operation to its exact worktree
+   before implementation changes that branch.
 
 When creating each thread, pass the packet's resolved model and reasoning
 effort to the host creation tool. Prompt text alone does not select either.
@@ -28,8 +30,9 @@ the operation as observed. Do not use a subagent nickname as packet-title proof.
 During execution, Steer only true blockers, approvals, and high-risk drift.
 Leave ordinary completion to the durable callback journal. The quiet journal
 monitor is the sole ordinary-completion authority; do not also queue completion
-messages. Observe each callback with `--source journal-monitor`, integrate its
+messages. Observe each callback through the journal monitor, integrate its
 ID once under the current recipient generation, reauthenticate the branch and
-scope, merge serially, reprove the combined state, consume the callback, and
-audit stale operational state. After a fork, rebind the lineage before
+scope, merge serially, reprove the combined state, record Git integration,
+consume the callback, and audit stale operational state. Cleanup requires a
+reviewed coordinator-owned plan/apply pair. After a fork, rebind the lineage before
 accepting new callbacks.

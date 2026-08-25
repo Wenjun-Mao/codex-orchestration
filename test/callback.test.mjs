@@ -1,12 +1,10 @@
 import assert from "node:assert/strict";
-import { existsSync } from "node:fs";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { readFile, writeFile } from "node:fs/promises";
+import { resolve } from "node:path";
 import test from "node:test";
 import {
   callbackIdFor,
   callbackPaths,
-  callbackPointerMessage,
   callbackStatus,
   consumeCallback,
   deliverCallback,
@@ -14,8 +12,6 @@ import {
   observeCallback,
   validateTerminalReceipt,
 } from "../lib/callbacks.mjs";
-import { runDoctor } from "../lib/doctor.mjs";
-import { gitSnapshot } from "../lib/git.mjs";
 import { bindRecipient, rebindRecipient } from "../lib/recipients.mjs";
 import { createGitFixture, removeFixture } from "./helpers.mjs";
 
@@ -59,46 +55,24 @@ function deliveryRecipient(value) {
 }
 
 async function bind(root, recipient = receipt().recipient) {
-  return bindRecipient({ stateRoot: resolve(root, ".git", "codex-flow"), recipient });
+  return bindRecipient({ stateRoot: resolve(root, ".git", "codex-flow", "v0.4"), recipient });
 }
 
 async function journal(root, payload) {
-  return JSON.parse(await readFile(callbackPaths(resolve(root, ".git", "codex-flow"), payload).record, "utf8"));
+    const stateRoot = resolve(root, ".git", "codex-flow", "v0.4");
+  return JSON.parse(await readFile(callbackPaths(stateRoot, payload).record, "utf8"));
 }
 
-function queueAdapter({ paths, add = [], list = [], delete: deletes = [] }) {
-  const calls = [];
-  const next = (values, fallback) => values.length > 0 ? values.shift() : fallback;
-  const assertUnlocked = () => assert.equal(existsSync(paths.lock), false, "host adapter called while callback lock existed");
-  return {
-    calls,
-    async probe() {
-      assertUnlocked();
-      calls.push({ action: "probe" });
-      return { stable_identity: true, add: true, list: true, delete: true };
-    },
-    async add(request) {
-      assertUnlocked();
-      calls.push({ action: "add", request });
-      return next(add, { outcome: "queued", submission_id: "submission-default", reason: null });
-    },
-    async list(request) {
-      assertUnlocked();
-      calls.push({ action: "list", request });
-      return next(list, { outcome: "found", submission_id: "submission-default", reason: null });
-    },
-    async delete(request) {
-      assertUnlocked();
-      calls.push({ action: "delete", request });
-      return next(deletes, { outcome: "deleted", reason: null });
-    },
-  };
+function deferred() {
+  let resolvePromise;
+  const promise = new Promise((resolve) => { resolvePromise = resolve; });
+  return { promise, resolve: resolvePromise };
 }
 
-test("journal-monitor persists without host notification and integrates exactly once", async () => {
+test("journal-monitor persists and integrates exactly once", async () => {
   const root = await createGitFixture("codex-flow-callback-monitor-");
   try {
-    const stateRoot = resolve(root, ".git", "codex-flow");
+    const stateRoot = resolve(root, ".git", "codex-flow", "v0.4");
     await bind(root);
     const payload = receipt();
     const callbackId = callbackIdFor(payload);
@@ -113,16 +87,14 @@ test("journal-monitor persists without host notification and integrates exactly 
       deliverCallback({ stateRoot, receipt: receipt({ result_or_blocker: "Changed after persistence." }) }),
       /immutable callback identity/,
     );
-    await assert.rejects(
-      observeCallback({ stateRoot, callbackId, recipient: payload.recipient, source: "queue-turn" }),
-      /conflicts with journal-monitor/,
-    );
-    assert.equal((await observeCallback({
+    await assert.rejects(consumeCallback({
       stateRoot,
       callbackId,
       recipient: payload.recipient,
-      source: "journal-monitor",
-    })).status, "observed");
+      executorId: payload.executor_id,
+    }), /observed before/);
+    assert.equal((await observeCallback({ stateRoot, callbackId, recipient: payload.recipient })).status, "observed");
+    assert.equal((await observeCallback({ stateRoot, callbackId, recipient: payload.recipient })).status, "already-observed");
     assert.equal((await consumeCallback({
       stateRoot,
       callbackId,
@@ -135,308 +107,152 @@ test("journal-monitor persists without host notification and integrates exactly 
       recipient: payload.recipient,
       executorId: payload.executor_id,
     })).status, "already-consumed");
-
     const record = await journal(root, payload);
-    assert.equal(record.schema_version, 3);
-    assert.equal(record.integration.state, "consumed");
-    assert.equal(record.integration.observation_source, "journal-monitor");
-    assert.deepEqual(record.notification, {
-      authority: "journal-monitor",
-      transport: "none",
-      state: "disabled",
-      recipient: payload.recipient,
-      queue_submission_id: null,
-      client_user_message_id: null,
-      potentially_live: false,
-      attempts: [],
+    assert.equal(record.schema_version, 4);
+    assert.equal(record.state, "consumed");
+    assert.equal("notification" in record, false);
+    assert.deepEqual(await callbackStatus(stateRoot), {
+      pending: [],
+      consumed_count: 1,
+      superseded_count: 0,
+      expired_count: 0,
     });
   } finally {
     await removeFixture(root);
   }
 });
 
-test("retractable queue uses a pointer payload and retracts before monitor consumption", async () => {
-  const root = await createGitFixture("codex-flow-callback-retract-");
-  try {
-    const stateRoot = resolve(root, ".git", "codex-flow");
-    await bind(root);
-    const payload = receipt({ run_id: "run-retract-01" });
-    const paths = callbackPaths(stateRoot, payload);
-    const adapter = queueAdapter({ paths });
-    const delivered = await deliverCallback({
-      stateRoot,
-      receipt: payload,
-      authority: "retractable-thread-queue",
-      queueAdapter: adapter,
-    });
-    assert.equal(delivered.status, "queued");
-    const add = adapter.calls.find((call) => call.action === "add").request;
-    assert.equal(add.message, callbackPointerMessage(paths.callbackId, payload.recipient));
-    assert.doesNotMatch(add.message, /Bounded result complete|result_or_blocker|accounting/);
-    assert.ok(Buffer.byteLength(add.message, "utf8") < 1024);
-
-    assert.equal((await observeCallback({
-      stateRoot,
-      callbackId: paths.callbackId,
-      recipient: payload.recipient,
-      source: "monitor-recovery",
-      queueAdapter: adapter,
-    })).status, "observed");
-    assert.equal(adapter.calls.filter((call) => call.action === "delete").length, 1);
-    assert.equal((await consumeCallback({
-      stateRoot,
-      callbackId: paths.callbackId,
-      recipient: payload.recipient,
-      executorId: payload.executor_id,
-    })).status, "consumed");
-    const record = await journal(root, payload);
-    assert.equal(record.notification.state, "retracted");
-    assert.equal(record.notification.potentially_live, false);
-  } finally {
-    await removeFixture(root);
-  }
-});
-
-test("supersession and expiry retract queued notifications before becoming terminal", async () => {
+test("higher sequence supersedes only the immediate unobserved callback", async () => {
   const root = await createGitFixture("codex-flow-callback-terminal-");
   try {
-    const stateRoot = resolve(root, ".git", "codex-flow");
+    const stateRoot = resolve(root, ".git", "codex-flow", "v0.4");
     await bind(root);
-    const prior = receipt({ run_id: "run-supersede-01" });
-    const priorPaths = callbackPaths(stateRoot, prior);
-    const adapter = queueAdapter({ paths: priorPaths });
-    await deliverCallback({ stateRoot, receipt: prior, authority: "retractable-thread-queue", queueAdapter: adapter });
-    const successor = receipt({
-      run_id: "run-supersede-01",
+    const first = receipt({ run_id: "run-terminal-01" });
+    await deliverCallback({ stateRoot, receipt: first });
+    const second = receipt({
+      run_id: first.run_id,
       sequence: 2,
-      supersedes_callback_ids: [priorPaths.callbackId],
+      supersedes_callback_ids: [callbackIdFor(first)],
+      result_or_blocker: "Replacement result complete.",
     });
-    await deliverCallback({ stateRoot, receipt: successor, authority: "retractable-thread-queue", queueAdapter: adapter });
-    assert.equal((await journal(root, prior)).integration.state, "superseded");
-    assert.equal((await journal(root, prior)).notification.state, "retracted");
+    await deliverCallback({ stateRoot, receipt: second });
+    assert.equal((await journal(root, first)).state, "superseded");
+    await assert.rejects(
+      observeCallback({ stateRoot, callbackId: callbackIdFor(first), recipient: first.recipient }),
+      /superseded/,
+    );
 
-    const expiring = receipt({ run_id: "run-expire-01", expires_at: "2030-08-23T12:00:00.000Z" });
-    const expiringPaths = callbackPaths(stateRoot, expiring);
-    const expiringAdapter = queueAdapter({ paths: expiringPaths });
-    await deliverCallback({ stateRoot, receipt: expiring, authority: "retractable-thread-queue", queueAdapter: expiringAdapter });
+    const third = receipt({
+      run_id: first.run_id,
+      sequence: 3,
+      supersedes_callback_ids: [callbackIdFor(first)],
+      result_or_blocker: "Invalid nonadjacent replacement.",
+    });
+    await assert.rejects(
+      deliverCallback({ stateRoot, receipt: third }),
+      /immediately preceding/,
+    );
+    await assert.rejects(readFile(callbackPaths(stateRoot, third).record, "utf8"), { code: "ENOENT" });
+
+    const expiring = receipt({ run_id: "run-expiring-01", expires_at: "2029-01-01T00:00:00Z" });
+    await deliverCallback({ stateRoot, receipt: expiring, now: Date.parse("2028-01-01T00:00:00Z") });
     assert.equal((await expireCallback({
       stateRoot,
-      callbackId: expiringPaths.callbackId,
-      now: Date.parse("2030-08-23T12:00:01.000Z"),
-      queueAdapter: expiringAdapter,
+      callbackId: callbackIdFor(expiring),
+      now: Date.parse("2030-01-01T00:00:00Z"),
     })).status, "expired");
-    const expired = await journal(root, expiring);
-    assert.equal(expired.integration.state, "expired");
-    assert.equal(expired.notification.state, "retracted");
+    assert.equal((await callbackStatus(stateRoot)).expired_count, 1);
   } finally {
     await removeFixture(root);
   }
 });
 
-test("queue-start and ambiguous retraction races block monitor terminalization", async () => {
-  const root = await createGitFixture("codex-flow-callback-race-");
+test("observed callbacks remain the sole consumable result and cannot be replaced or expired", async () => {
+  const root = await createGitFixture("codex-flow-callback-observed-");
   try {
-    const stateRoot = resolve(root, ".git", "codex-flow");
+    const stateRoot = resolve(root, ".git", "codex-flow", "v0.4");
     await bind(root);
-    const startedPayload = receipt({ run_id: "run-started-race" });
-    const startedPaths = callbackPaths(stateRoot, startedPayload);
-    const startedAdapter = queueAdapter({
-      paths: startedPaths,
-      delete: [{ outcome: "started", reason: "already-started" }],
+    const first = receipt({
+      run_id: "run-observed-01",
+      expires_at: "2029-01-01T00:00:00Z",
     });
-    await deliverCallback({
+    await deliverCallback({ stateRoot, receipt: first, now: Date.parse("2028-01-01T00:00:00Z") });
+    await observeCallback({
       stateRoot,
-      receipt: startedPayload,
-      authority: "retractable-thread-queue",
-      queueAdapter: startedAdapter,
+      callbackId: callbackIdFor(first),
+      recipient: first.recipient,
+      now: Date.parse("2028-01-02T00:00:00Z"),
     });
-    await assert.rejects(observeCallback({
-      stateRoot,
-      callbackId: startedPaths.callbackId,
-      recipient: startedPayload.recipient,
-      source: "monitor-recovery",
-      queueAdapter: startedAdapter,
-    }), /started before retraction/);
-    assert.equal((await journal(root, startedPayload)).integration.state, "persisted");
-    assert.equal((await observeCallback({
-      stateRoot,
-      callbackId: startedPaths.callbackId,
-      recipient: startedPayload.recipient,
-      source: "queue-turn",
-    })).status, "observed");
-
-    const ambiguousPayload = receipt({ run_id: "run-ambiguous-delete" });
-    const ambiguousPaths = callbackPaths(stateRoot, ambiguousPayload);
-    const ambiguousAdapter = queueAdapter({
-      paths: ambiguousPaths,
-      delete: [{ outcome: "ambiguous", reason: "timeout" }],
+    const second = receipt({
+      run_id: first.run_id,
+      sequence: 2,
+      supersedes_callback_ids: [callbackIdFor(first)],
+      result_or_blocker: "Late replacement must fail.",
     });
-    await deliverCallback({
+    await assert.rejects(
+      deliverCallback({ stateRoot, receipt: second, now: Date.parse("2028-01-03T00:00:00Z") }),
+      /observed or consumed/,
+    );
+    await assert.rejects(readFile(callbackPaths(stateRoot, second).record, "utf8"), { code: "ENOENT" });
+    assert.equal((await expireCallback({
       stateRoot,
-      receipt: ambiguousPayload,
-      authority: "retractable-thread-queue",
-      queueAdapter: ambiguousAdapter,
-    });
-    await assert.rejects(observeCallback({
+      callbackId: callbackIdFor(first),
+      now: Date.parse("2030-01-01T00:00:00Z"),
+    })).status, "already-observed");
+    assert.equal((await consumeCallback({
       stateRoot,
-      callbackId: ambiguousPaths.callbackId,
-      recipient: ambiguousPayload.recipient,
-      source: "monitor-recovery",
-      queueAdapter: ambiguousAdapter,
-    }), /ambiguous or unavailable/);
-    const ambiguous = await journal(root, ambiguousPayload);
-    assert.equal(ambiguous.integration.state, "persisted");
-    assert.equal(ambiguous.notification.state, "ambiguous");
-    assert.equal(ambiguous.notification.potentially_live, true);
+      callbackId: callbackIdFor(first),
+      recipient: first.recipient,
+      executorId: first.executor_id,
+      now: Date.parse("2030-01-01T00:00:01Z"),
+    })).status, "consumed");
   } finally {
     await removeFixture(root);
   }
 });
 
-test("ambiguous queue add is inspected before a duplicate-safe retry", async () => {
-  const root = await createGitFixture("codex-flow-callback-inspect-");
+test("supersession interruption cannot leave two consumable callbacks", async () => {
+  const root = await createGitFixture("codex-flow-callback-supersession-crash-");
   try {
-    const stateRoot = resolve(root, ".git", "codex-flow");
+    const stateRoot = resolve(root, ".git", "codex-flow", "v0.4");
     await bind(root);
-    const payload = receipt({ run_id: "run-ambiguous-add" });
-    const paths = callbackPaths(stateRoot, payload);
-    const adapter = queueAdapter({
-      paths,
-      add: [{ outcome: "ambiguous", submission_id: null, reason: "timeout" }],
-      list: [{ outcome: "found", submission_id: "recovered-submission", reason: null }],
+    const first = receipt({ run_id: "run-crash-01" });
+    await deliverCallback({ stateRoot, receipt: first });
+    const second = receipt({
+      run_id: first.run_id,
+      sequence: 2,
+      supersedes_callback_ids: [callbackIdFor(first)],
+      result_or_blocker: "Crash-safe replacement.",
     });
-    await assert.rejects(deliverCallback({
-      stateRoot,
-      receipt: payload,
-      authority: "retractable-thread-queue",
-      queueAdapter: adapter,
-    }), /inspect before retrying/);
-    assert.equal((await deliverCallback({
-      stateRoot,
-      receipt: payload,
-      authority: "retractable-thread-queue",
-      queueAdapter: adapter,
-    })).status, "queued");
-    assert.equal(adapter.calls.filter((call) => call.action === "add").length, 1);
-    assert.equal(adapter.calls.filter((call) => call.action === "list").length, 1);
-  } finally {
-    await removeFixture(root);
-  }
-});
+    await assert.rejects(
+      deliverCallback({
+        stateRoot,
+        receipt: second,
+        hooks: { afterSupersede: () => { throw new Error("simulated interruption"); } },
+      }),
+      /simulated interruption/,
+    );
+    assert.equal((await journal(root, first)).state, "superseded");
+    await assert.rejects(readFile(callbackPaths(stateRoot, second).record, "utf8"), { code: "ENOENT" });
+    await assert.rejects(
+      observeCallback({ stateRoot, callbackId: callbackIdFor(first), recipient: first.recipient }),
+      /superseded/,
+    );
 
-test("missing queue CRUD capability fails closed without falling back to mixed authority", async () => {
-  const root = await createGitFixture("codex-flow-callback-capability-");
-  try {
-    const stateRoot = resolve(root, ".git", "codex-flow");
-    await bind(root);
-    const payload = receipt({ run_id: "run-capability-missing" });
-    const paths = callbackPaths(stateRoot, payload);
-    let addCalls = 0;
-    const incompleteAdapter = {
-      async probe() {
-        return { stable_identity: true, add: true, list: true, delete: false };
-      },
-      async add() {
-        addCalls += 1;
-        return { outcome: "queued", submission_id: "must-not-run", reason: null };
-      },
-      async list() {
-        return { outcome: "absent", submission_id: null, reason: null };
-      },
-      async delete() {
-        return { outcome: "deleted", reason: null };
-      },
-    };
-    await assert.rejects(deliverCallback({
-      stateRoot,
-      receipt: payload,
-      authority: "retractable-thread-queue",
-      queueAdapter: incompleteAdapter,
-    }), /queue unavailable/);
-    assert.equal(addCalls, 0);
-    const record = await journal(root, payload);
-    assert.equal(record.integration.state, "persisted");
-    assert.equal(record.notification.state, "unavailable");
-    await assert.rejects(deliverCallback({ stateRoot, receipt: payload }), /differs from its immutable persisted authority/);
-    assert.equal(paths.callbackId, record.callback_id);
-  } finally {
-    await removeFixture(root);
-  }
-});
-
-test("legacy v0.3.1 records migrate read-only and disclose uncancellable notification risk", async () => {
-  const root = await createGitFixture("codex-flow-callback-legacy-");
-  try {
-    const stateRoot = resolve(root, ".git", "codex-flow");
-    await bind(root);
-    const payload = receipt({ run_id: "run-legacy-01" });
-    const paths = callbackPaths(stateRoot, payload);
-    const now = "2026-08-24T12:00:00.000Z";
-    const legacy = {
-      schema_version: 2,
-      kind: "terminal-callback-record",
-      callback_id: paths.callbackId,
-      receipt: payload,
-      delivery: {
-        state: "enqueued",
-        recipient: payload.recipient,
-        observed_by_recipient: null,
-        consumed_by_recipient: null,
-        transport: "codex-thread-queue",
-        enqueue_attempts: [{
-          attempted_at: now,
-          recipient: payload.recipient,
-          outcome: "enqueued",
-          reason: null,
-        }],
-        superseded_by_callback_id: null,
-      },
-      lifecycle: {
-        persisted_at: now,
-        enqueue_attempted_at: now,
-        enqueued_at: now,
-        observed_at: null,
-        consumed_at: null,
-        superseded_at: null,
-        expired_at: null,
-      },
-    };
-    await mkdir(dirname(paths.record), { recursive: true });
-    await writeFile(paths.record, `${JSON.stringify(legacy, null, 2)}\n`, { mode: 0o600 });
+    assert.equal((await deliverCallback({ stateRoot, receipt: second })).status, "persisted");
+    assert.equal((await journal(root, second)).state, "persisted");
     const status = await callbackStatus(stateRoot);
-    assert.equal(status.notification_risk_count, 1);
-    assert.equal(status.legacy_notification_risk_count, 1);
-    const doctor = await runDoctor(gitSnapshot(root));
-    assert.equal(doctor.callbacks.legacy_notification_risk_count, 1);
-    assert.match(doctor.warnings.join("\n"), /lack a retractable legacy identity/);
-    assert.equal(JSON.parse(await readFile(paths.record, "utf8")).schema_version, 2, "status must not mutate legacy evidence");
-    await assert.rejects(observeCallback({
-      stateRoot,
-      callbackId: paths.callbackId,
-      recipient: payload.recipient,
-      source: "monitor-recovery",
-    }), /no retractable identity/);
-    assert.equal((await observeCallback({
-      stateRoot,
-      callbackId: paths.callbackId,
-      recipient: payload.recipient,
-      source: "queue-turn",
-    })).status, "observed");
-    const migrated = await journal(root, payload);
-    assert.equal(migrated.schema_version, 3);
-    assert.equal(migrated.legacy_source_schema_version, 2);
-    assert.equal(migrated.notification.state, "started");
-    assert.equal((await callbackStatus(stateRoot)).notification_risk_count, 0);
-    assert.equal((await callbackStatus(stateRoot)).legacy_notification_risk_count, 0);
+    assert.deepEqual(status.pending.map((entry) => entry.callback_id), [callbackIdFor(second)]);
+    assert.equal(status.superseded_count, 1);
   } finally {
     await removeFixture(root);
   }
 });
 
-test("stale packets route only through a newer lineage binding", async () => {
+test("stale packets resolve through the current recipient binding", async () => {
   const root = await createGitFixture("codex-flow-callback-routing-");
   try {
-    const stateRoot = resolve(root, ".git", "codex-flow");
+    const stateRoot = resolve(root, ".git", "codex-flow", "v0.4");
     const initial = await bind(root);
     const rebound = await rebindRecipient({
       stateRoot,
@@ -447,30 +263,150 @@ test("stale packets route only through a newer lineage binding", async () => {
     const stale = receipt({ run_id: "run-rebound-01" });
     const delivered = await deliverCallback({ stateRoot, receipt: stale });
     assert.equal(delivered.recipient.thread_id, "new-coordinator-thread");
-    await assert.rejects(observeCallback({
-      stateRoot,
-      callbackId: delivered.callback_id,
-      recipient: stale.recipient,
-      source: "journal-monitor",
-    }), /binding is stale/);
+    await assert.rejects(
+      observeCallback({ stateRoot, callbackId: delivered.callback_id, recipient: stale.recipient }),
+      /binding is stale/,
+    );
     assert.equal((await observeCallback({
       stateRoot,
       callbackId: delivered.callback_id,
       recipient: current,
-      source: "journal-monitor",
     })).status, "observed");
   } finally {
     await removeFixture(root);
   }
 });
 
-test("receipt validation rejects v1 input, raw transcripts, and user identity-like content", () => {
+test("observe holds the recipient generation stable against concurrent rebind", async () => {
+  const root = await createGitFixture("codex-flow-callback-observe-rebind-");
+  try {
+    const stateRoot = resolve(root, ".git", "codex-flow", "v0.4");
+    const initial = await bind(root);
+    const payload = receipt({ run_id: "run-observe-rebind-01" });
+    await deliverCallback({ stateRoot, receipt: payload });
+    const locked = deferred();
+    const release = deferred();
+    const observing = observeCallback({
+      stateRoot,
+      callbackId: callbackIdFor(payload),
+      recipient: payload.recipient,
+      hooks: {
+        async afterRecipientLock() {
+          locked.resolve();
+          await release.promise;
+        },
+      },
+    });
+    await locked.promise;
+    await assert.rejects(rebindRecipient({
+      stateRoot,
+      recipient: { lineage_id: "fixture-lineage", thread_id: "coordinator-next", generation: 2 },
+      fenceToken: initial.recipient.fence_token,
+      nextFenceToken: "fixture-fence-next",
+    }), /already in progress/);
+    release.resolve();
+    assert.equal((await observing).status, "observed");
+    await rebindRecipient({
+      stateRoot,
+      recipient: { lineage_id: "fixture-lineage", thread_id: "coordinator-next", generation: 2 },
+      fenceToken: initial.recipient.fence_token,
+      nextFenceToken: "fixture-fence-next",
+    });
+    assert.equal((await journal(root, payload)).observed_by_recipient.generation, 1);
+    await assert.rejects(
+      consumeCallback({
+        stateRoot,
+        callbackId: callbackIdFor(payload),
+        recipient: payload.recipient,
+        executorId: payload.executor_id,
+      }),
+      /binding is stale/,
+    );
+  } finally {
+    await removeFixture(root);
+  }
+});
+
+test("consume holds the recipient generation stable against concurrent rebind", async () => {
+  const root = await createGitFixture("codex-flow-callback-consume-rebind-");
+  try {
+    const stateRoot = resolve(root, ".git", "codex-flow", "v0.4");
+    const initial = await bind(root);
+    const payload = receipt({ run_id: "run-consume-rebind-01" });
+    await deliverCallback({ stateRoot, receipt: payload });
+    await observeCallback({ stateRoot, callbackId: callbackIdFor(payload), recipient: payload.recipient });
+    const locked = deferred();
+    const release = deferred();
+    const consuming = consumeCallback({
+      stateRoot,
+      callbackId: callbackIdFor(payload),
+      recipient: payload.recipient,
+      executorId: payload.executor_id,
+      hooks: {
+        async afterRecipientLock() {
+          locked.resolve();
+          await release.promise;
+        },
+      },
+    });
+    await locked.promise;
+    await assert.rejects(rebindRecipient({
+      stateRoot,
+      recipient: { lineage_id: "fixture-lineage", thread_id: "coordinator-next", generation: 2 },
+      fenceToken: initial.recipient.fence_token,
+      nextFenceToken: "fixture-fence-next",
+    }), /already in progress/);
+    release.resolve();
+    assert.equal((await consuming).status, "consumed");
+    await rebindRecipient({
+      stateRoot,
+      recipient: { lineage_id: "fixture-lineage", thread_id: "coordinator-next", generation: 2 },
+      fenceToken: initial.recipient.fence_token,
+      nextFenceToken: "fixture-fence-next",
+    });
+    assert.equal((await journal(root, payload)).consumed_by_recipient.generation, 1);
+    assert.equal((await consumeCallback({
+      stateRoot,
+      callbackId: callbackIdFor(payload),
+      recipient: { lineage_id: "fixture-lineage", thread_id: "coordinator-next", generation: 2 },
+      executorId: payload.executor_id,
+    })).status, "already-consumed");
+  } finally {
+    await removeFixture(root);
+  }
+});
+
+test("v0.4 rejects older callback journal records instead of migrating them", async () => {
+  const root = await createGitFixture("codex-flow-callback-breaking-");
+  try {
+    const stateRoot = resolve(root, ".git", "codex-flow", "v0.4");
+    await bind(root);
+    const payload = receipt({ run_id: "run-old-record-01" });
+    await deliverCallback({ stateRoot, receipt: payload });
+    const path = callbackPaths(stateRoot, payload).record;
+    const record = JSON.parse(await readFile(path, "utf8"));
+    record.schema_version = 3;
+    await writeFile(path, `${JSON.stringify(record, null, 2)}\n`, "utf8");
+    await assert.rejects(callbackStatus(stateRoot), /does not migrate older callback journals/);
+  } finally {
+    await removeFixture(root);
+  }
+});
+
+test("receipt validation rejects unsafe or ambiguous input", () => {
   assert.throws(() => validateTerminalReceipt(receipt({ schema_version: 1 })), /schema_version/);
   assert.throws(() => validateTerminalReceipt(receipt({ result_or_blocker: "stdout: a raw command log" })), /raw log/);
   assert.throws(() => validateTerminalReceipt(receipt({ next_decision: "Contact jane@example.com" })), /identity-like/);
   assert.throws(() => validateTerminalReceipt(receipt({ next_decision: "Call 416-555-1212" })), /identity-like/);
   assert.throws(() => validateTerminalReceipt(receipt({ result_or_blocker: "token sk-abcdefghijklmnopqrstuv" })), /secret-like/);
-  assert.throws(() => validateTerminalReceipt(receipt({ sequence: 2 })), /explicit supersession/);
+  assert.throws(() => validateTerminalReceipt(receipt({ sequence: 2 })), /exactly one predecessor/);
+  assert.throws(() => validateTerminalReceipt(receipt({
+    sequence: 3,
+    supersedes_callback_ids: [
+      "terminal-v2-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "terminal-v2-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    ],
+  })), /at most 1/);
   assert.throws(() => validateTerminalReceipt(receipt({ next_decision: "Client key: not-for-receipts" })), /application or account identifier/);
   assert.throws(() => validateTerminalReceipt(receipt({ expires_at: "2030-08-23T17:15:00" })), /explicit UTC offset/);
 });

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { lstat, readFile, readdir, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { relative, resolve } from "node:path";
 import test from "node:test";
 import {
@@ -10,6 +10,7 @@ import {
   removeFixture,
   runCli,
 } from "./helpers.mjs";
+import { discoverGit } from "../lib/git.mjs";
 
 async function snapshotFiles(root) {
   const snapshot = {};
@@ -115,43 +116,49 @@ test("sync refuses locally modified managed runtime files", async () => {
   }
 });
 
-test("legacy queue configuration requires an explicit plan-bound journal-monitor migration", async () => {
+test("v0.4 rejects older project configuration instead of migrating it", async () => {
   const root = await createGitFixture();
   try {
     initializeFixture([], { cwd: root });
     const configPath = resolve(root, ".codex/orchestration/project.json");
     const config = JSON.parse(await readFile(configPath, "utf8"));
-    const legacy = {
-      schema_version: 2,
-      project_id: config.project_id,
-      max_parallel_executors: config.max_parallel_executors,
-      callback_transport: "codex-queue",
-      default_model: config.default_model,
-      default_reasoning_effort: config.default_reasoning_effort,
-      agents_integration: config.agents_integration,
-    };
-    await writeFile(configPath, `${JSON.stringify(legacy, null, 2)}\n`, "utf8");
+    const old = { ...config, schema_version: 3 };
+    delete old.git_lifecycle;
+    const oldBytes = `${JSON.stringify(old, null, 2)}\n`;
+    await writeFile(configPath, oldBytes, "utf8");
     const sync = runCli(["sync"], { cwd: root });
     assert.notEqual(sync.status, 0);
-    assert.match(sync.stderr, /plan-bound migration/);
+    assert.match(sync.stderr, /fresh schema 4 initialization/);
+    const plan = runCli(["init", "--plan", "--json"], { cwd: root });
+    assert.notEqual(plan.status, 0);
+    assert.match(plan.stderr, /fresh schema 4 initialization/);
+    assert.equal(await readFile(configPath, "utf8"), oldBytes);
+  } finally {
+    await removeFixture(root);
+  }
+});
 
-    const implicit = runCli(["init", "--plan", "--json"], { cwd: root });
-    assert.equal(implicit.status, 1);
-    assert.match(JSON.parse(implicit.stdout).conflicts[0].message, /choose --callback-authority journal-monitor/);
-    assert.deepEqual(JSON.parse(await readFile(configPath, "utf8")), legacy, "read-only planning must preserve legacy config");
+test("v0.4 uses a fresh state namespace and ignores retained pre-v0.4 evidence", async () => {
+  const root = await createGitFixture("codex-flow-state-v04-");
+  try {
+    const legacyRecord = resolve(
+      root,
+      ".git",
+      "codex-flow",
+      "task-operations",
+      "records",
+      "incompatible-v03.json",
+    );
+    await mkdir(resolve(legacyRecord, ".."), { recursive: true });
+    await writeFile(legacyRecord, "{\"schema_version\":2}\n", "utf8");
 
-    const planned = runCli(["init", "--plan", "--callback-authority", "journal-monitor", "--json"], { cwd: root });
-    assertSuccess(planned, "legacy callback-authority migration plan");
-    const plan = JSON.parse(planned.stdout);
-    const applied = runCli([
-      "init", "--apply-plan", plan.plan_id,
-      "--callback-authority", "journal-monitor", "--json",
-    ], { cwd: root });
-    assertSuccess(applied, "legacy callback-authority migration apply");
-    const migrated = JSON.parse(await readFile(configPath, "utf8"));
-    assert.equal(migrated.schema_version, 3);
-    assert.equal(migrated.ordinary_completion_authority, "journal-monitor");
-    assert.equal(migrated.callback_transport, "none");
+    initializeFixture([], { cwd: root });
+    const context = discoverGit(root);
+    assert.equal(context.stateRoot, resolve(context.commonDir, "codex-flow", "v0.4"));
+    assert.equal(await readFile(legacyRecord, "utf8"), "{\"schema_version\":2}\n");
+    const doctor = runCli(["doctor", "--json"], { cwd: root });
+    assertSuccess(doctor, "v0.4 namespaced doctor");
+    assert.equal(JSON.parse(doctor.stdout).ok, true);
   } finally {
     await removeFixture(root);
   }
@@ -202,14 +209,17 @@ test("project defaults can be changed after initialization and resolved per task
     ], { cwd: root });
     assertSuccess(changed, "config set");
     assert.deepEqual(JSON.parse(changed.stdout), {
-      schema_version: 3,
+      schema_version: 4,
       project_id: root.split("/").at(-1),
       max_parallel_executors: 4,
-      ordinary_completion_authority: "journal-monitor",
-      callback_transport: "none",
       default_model: "gpt-5.6-luna",
       default_reasoning_effort: "medium",
       agents_integration: { mode: "managed" },
+      git_lifecycle: {
+        protected_branches: ["main", "master"],
+        warn_at: 5,
+        block_at: 10,
+      },
     });
 
     const packetPath = resolve(root, "packet.json");

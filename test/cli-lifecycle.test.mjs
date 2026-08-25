@@ -138,7 +138,6 @@ test("CLI binds a redacted recipient and enforces observe before consume", async
     assertSuccess(runCli([
       "callback", "observe", "--callback-id", callbackId,
       "--lineage-id", "cli-lineage", "--thread-id", "cli-coordinator", "--generation", "1",
-      "--source", "journal-monitor",
     ], { cwd: root }), "callback observe");
     assertSuccess(runCli([
       "callback", "consume", "--callback-id", callbackId,
@@ -200,6 +199,16 @@ test("CLI requires preflight and records provenance-rich host reconciliation", a
     const observed = JSON.parse(observedResult.stdout);
     assert.equal(observed.observed.evidence.title.normalization, "bounded-host-write");
     assert.equal(observed.observation_evidence.quality, "partial");
+
+    const boundResult = runCli([
+      "git", "bind", "--operation-id", prepared.operation_id, "--json",
+    ], { cwd: root });
+    assertSuccess(boundResult, "git ownership bind");
+    assert.equal(JSON.parse(boundResult.stdout).executor_id, "cli-task-operation");
+
+    const gitStatus = runCli(["git", "status", "--json"], { cwd: root });
+    assertSuccess(gitStatus, "git lifecycle status");
+    assert.equal(JSON.parse(gitStatus.stdout).items.length, 1);
   } finally {
     await removeFixture(root);
   }

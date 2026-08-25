@@ -21,18 +21,24 @@ import {
   expireCallback,
   expireCallbacks,
   observeCallback,
-  reconcileCallback,
 } from "../lib/callbacks.mjs";
 import { cleanupAudit } from "../lib/cleanup.mjs";
 import {
   projectConfigPath,
-  ORDINARY_COMPLETION_AUTHORITIES,
   REASONING_EFFORTS,
   validateProjectConfig,
   writeProjectConfig,
 } from "../lib/config.mjs";
 import { runDoctor } from "../lib/doctor.mjs";
 import { discoverGit, gitSnapshot } from "../lib/git.mjs";
+import {
+  applyGitCleanupPlan,
+  bindGitOwnership,
+  createGitCleanupPlan,
+  gitLifecycleAudit,
+  gitLifecycleReadiness,
+  recordGitIntegration,
+} from "../lib/git-lifecycle.mjs";
 import {
   applyInstallationPlan,
   checkRepositoryInstallation,
@@ -71,7 +77,6 @@ Usage:
   initialization options:
                   [--force] [--project-id ID] [--max-concurrency N]
                   [--model MODEL] [--reasoning-effort EFFORT]
-                  [--callback-authority journal-monitor]
                   [--agents-mode managed|external]
                   [--external-agents-path PATH] [--attest-external-agents]
   codex-flow sync [--check] [--force]
@@ -97,19 +102,25 @@ Usage:
                   --fence-token TOKEN [--next-fence-token TOKEN] [--json]
   codex-flow recipient status [--lineage-id ID] [--json]
   codex-flow recipient resolve --lineage-id ID --thread-id ID --generation N [--json]
-  codex-flow callback deliver [--file receipt.json] [--no-queue] [--json]
+  codex-flow callback deliver [--file receipt.json] [--json]
   codex-flow callback observe --callback-id ID --lineage-id ID --thread-id ID --generation N
-                  --source journal-monitor|monitor-recovery|queue-turn [--json]
+                  [--json]
   codex-flow callback consume --callback-id ID --lineage-id ID --thread-id ID
                   --generation N --executor-id ID [--json]
-  codex-flow callback reconcile --callback-id ID
-                  --outcome queued|not-queued|deleted|started [--submission-id ID] [--json]
   codex-flow callback expire [--callback-id ID] [--at TIMESTAMP] [--json]
   codex-flow callback status [--json]
+  codex-flow git bind --operation-id ID [--json]
+  codex-flow git integrate --operation-id ID --main-branch BRANCH
+                  [--superseded-by REF] [--json]
+  codex-flow git status [--json]
   codex-flow lease acquire --resource ID --owner ID [--ttl-seconds N] [--break-expired] [--json]
   codex-flow lease release --resource ID --owner ID --token TOKEN [--json]
   codex-flow lease status [--resource ID] [--json]
   codex-flow cleanup audit [--json]
+  codex-flow cleanup plan --operation-id ID... --main-branch BRANCH
+                  [--include-remote] [--json]
+  codex-flow cleanup apply --plan-id ID --operation-id ID... --main-branch BRANCH
+                  [--include-remote] [--json]
 `;
 
 function parse(options, args = process.argv.slice(2), allowPositionals = true) {
@@ -178,7 +189,6 @@ async function commandInit(args) {
     model: { type: "string" },
     "reasoning-effort": { type: "string" },
     "agents-mode": { type: "string" },
-    "callback-authority": { type: "string" },
     "external-agents-path": { type: "string" },
     "attest-external-agents": { type: "boolean", default: false },
     json: { type: "boolean", default: false },
@@ -193,16 +203,12 @@ async function commandInit(args) {
     || values["max-concurrency"] !== undefined
     || values.model !== undefined
     || values["reasoning-effort"] !== undefined
-    || values["callback-authority"] !== undefined
     || values["agents-mode"] !== undefined
     || values["external-agents-path"] !== undefined
     || values["attest-external-agents"]
   )) throw new CliError("init --check does not accept initialization changes");
   if (values["agents-mode"] !== undefined) {
     requireEnum(values["agents-mode"], ["managed", "external"], "agents_mode");
-  }
-  if (values["callback-authority"] !== undefined) {
-    requireEnum(values["callback-authority"], ORDINARY_COMPLETION_AUTHORITIES, "callback_authority");
   }
   const git = gitSnapshot();
   const max = values["max-concurrency"] === undefined
@@ -225,7 +231,6 @@ async function commandInit(args) {
     maxParallelExecutors: max,
     defaultModel: values.model === "host-default" ? null : values.model,
     defaultReasoningEffort: values["reasoning-effort"] === "host-default" ? null : values["reasoning-effort"],
-    ordinaryCompletionAuthority: values["callback-authority"],
     agentsMode: values["agents-mode"],
     externalAgentsPath: values["external-agents-path"],
     attestExternalAgents: values["attest-external-agents"],
@@ -402,6 +407,9 @@ async function commandTask(args) {
     const [action, ...operationArgs] = rest;
     if (action === "prepare") {
       const { values } = parse(boolAndJsonOptions({ file: { type: "string" } }), operationArgs);
+      const readiness = await gitLifecycleReadiness({ git, config });
+      if (readiness.blocked) throw new CliError(`${readiness.message}; reconcile cleanup before launching another task wave`, 74);
+      if (readiness.warning) console.error(`codex-flow: warning: ${readiness.message}`);
       const raw = await readJsonInput(values.file ? resolve(values.file) : null);
       const result = await prepareTaskOperation({
         stateRoot: git.stateRoot,
@@ -619,17 +627,12 @@ async function commandCallback(args) {
   const [subcommand, ...rest] = args;
   const git = discoverGit();
   if (subcommand === "deliver") {
-    const { values } = parse(boolAndJsonOptions({
-      file: { type: "string" },
-      "no-queue": { type: "boolean", default: false },
-    }), rest);
-    const config = await loadConfig(git.root);
+    const { values } = parse(boolAndJsonOptions({ file: { type: "string" } }), rest);
+    await loadConfig(git.root);
     const receipt = await readJsonInput(values.file ? resolve(values.file) : null);
     const result = await deliverCallback({
       stateRoot: git.stateRoot,
       receipt,
-      authority: config.ordinary_completion_authority,
-      noQueue: values["no-queue"],
     });
     output(result, { json: values.json, human: (item) => `Terminal callback ${item.status}: ${item.callback_id}` });
     return;
@@ -640,13 +643,11 @@ async function commandCallback(args) {
       "lineage-id": { type: "string" },
       "thread-id": { type: "string" },
       generation: { type: "string" },
-      source: { type: "string" },
     }), rest);
     const result = await observeCallback({
       stateRoot: git.stateRoot,
       callbackId: values["callback-id"],
       recipient: recipientFromValues(values),
-      source: values.source,
     });
     output(result, { json: values.json, human: (item) => `Terminal callback ${item.status}: ${item.callback_id}` });
     return;
@@ -664,21 +665,6 @@ async function commandCallback(args) {
       callbackId: values["callback-id"],
       recipient: recipientFromValues(values),
       executorId: values["executor-id"],
-    });
-    output(result, { json: values.json, human: (item) => `Terminal callback ${item.status}: ${item.callback_id}` });
-    return;
-  }
-  if (subcommand === "reconcile") {
-    const { values } = parse(boolAndJsonOptions({
-      "callback-id": { type: "string" },
-      outcome: { type: "string" },
-      "submission-id": { type: "string" },
-    }), rest);
-    const result = await reconcileCallback({
-      stateRoot: git.stateRoot,
-      callbackId: values["callback-id"],
-      outcome: values.outcome,
-      submissionId: values["submission-id"] ?? null,
     });
     output(result, { json: values.json, human: (item) => `Terminal callback ${item.status}: ${item.callback_id}` });
     return;
@@ -707,18 +693,12 @@ async function commandCallback(args) {
       json: values.json,
       human: (item) => [
         `${item.pending.length} pending callback(s); ${item.consumed_count} consumed, ${item.superseded_count} superseded, ${item.expired_count} expired journal record(s).`,
-        ...item.pending.map((entry) => `${entry.callback_id} ${entry.effective_integration} ${entry.notification} ${entry.classification} (${entry.executor_id})`),
-        ...(item.notification_risk_count > 0
-          ? [`${item.notification_risk_count} callback notification(s) may still be live.`]
-          : []),
-        ...(item.legacy_notification_risk_count > 0
-          ? [`${item.legacy_notification_risk_count} legacy callback notification(s) may still surface as stale queue turns.`]
-          : []),
+        ...item.pending.map((entry) => `${entry.callback_id} ${entry.effective_integration} ${entry.classification} (${entry.executor_id})`),
       ].join("\n"),
     });
     return;
   }
-  throw new CliError("callback requires deliver, observe, consume, reconcile, expire, or status");
+  throw new CliError("callback requires deliver, observe, consume, expire, or status");
 }
 
 async function commandLease(args) {
@@ -769,21 +749,108 @@ async function commandLease(args) {
   throw new CliError("lease requires acquire, release, or status");
 }
 
+async function commandGit(args) {
+  const [subcommand, ...rest] = args;
+  const git = discoverGit();
+  const config = await loadConfig(git.root);
+  if (subcommand === "bind") {
+    const { values } = parse(boolAndJsonOptions({
+      "operation-id": { type: "string" },
+    }), rest);
+    const result = await bindGitOwnership({
+      git,
+      operationId: values["operation-id"],
+    });
+    output(result, { json: values.json, human: (item) => `Git ownership bound: ${item.branch} -> ${item.operation_id}` });
+    return;
+  }
+  if (subcommand === "integrate") {
+    const { values } = parse(boolAndJsonOptions({
+      "operation-id": { type: "string" },
+      "main-branch": { type: "string" },
+      "superseded-by": { type: "string" },
+    }), rest);
+    const result = await recordGitIntegration({
+      git,
+      operationId: values["operation-id"],
+      mainBranch: values["main-branch"],
+      supersededBy: values["superseded-by"] ?? null,
+    });
+    output(result, { json: values.json, human: (item) => `Git integration ${item.disposition}: ${item.operation_id}` });
+    return;
+  }
+  if (subcommand === "status") {
+    const { values } = parse(boolAndJsonOptions(), rest);
+    const result = await gitLifecycleAudit({ git, config });
+    output(result, {
+      json: values.json,
+      human: (item) => [
+        `${item.items.length} owned Git task(s); ${item.eligible_count} cleanup-eligible; ${item.backlog_count} require reconciliation.`,
+        ...item.items.map((entry) => `${entry.operation_id} ${entry.classification} ${entry.branch}`),
+      ].join("\n"),
+    });
+    return;
+  }
+  throw new CliError("git requires bind, integrate, or status");
+}
+
 async function commandCleanup(args) {
   const [subcommand, ...rest] = args;
-  if (subcommand !== "audit") throw new CliError("cleanup supports audit only");
-  const { values } = parse(boolAndJsonOptions(), rest);
-  const result = await cleanupAudit(gitSnapshot());
-  output(result, {
-    json: values.json,
-    human: (item) => [
-      `Cleanup audit only; no mutation performed. State size: ${item.state_size}.`,
-      `Callbacks: ${item.callbacks.pending.length} pending, ${item.callbacks.consumed_count} consumed, ${item.callbacks.superseded_count} superseded, ${item.callbacks.expired_count} expired.`,
-      `Task operations: ${item.task_operations.length}; recipient lineages: ${item.recipients.length}.`,
-      `Leases: ${item.leases.filter((lease) => lease.state === "active").length} active, ${item.leases.filter((lease) => lease.state === "expired").length} expired.`,
-      ...item.recommendations.map((recommendation) => `review: ${recommendation}`),
-    ].join("\n"),
-  });
+  const git = discoverGit();
+  const config = await loadConfig(git.root);
+  if (subcommand === "audit") {
+    const { values } = parse(boolAndJsonOptions(), rest);
+    const result = await cleanupAudit(git);
+    output(result, {
+      json: values.json,
+      human: (item) => [
+        `Cleanup audit only; no mutation performed. State size: ${item.state_size}.`,
+        `Callbacks: ${item.callbacks.pending.length} pending, ${item.callbacks.consumed_count} consumed, ${item.callbacks.superseded_count} superseded, ${item.callbacks.expired_count} expired.`,
+        `Task operations: ${item.task_operations.length}; recipient lineages: ${item.recipients.length}.`,
+        `Git tasks: ${item.git_lifecycle.items.length}; ${item.git_lifecycle.eligible_count} cleanup-eligible; ${item.git_lifecycle.backlog_count} require reconciliation.`,
+        `Leases: ${item.leases.filter((lease) => lease.state === "active").length} active, ${item.leases.filter((lease) => lease.state === "expired").length} expired.`,
+        ...item.recommendations.map((recommendation) => `review: ${recommendation}`),
+      ].join("\n"),
+    });
+    return;
+  }
+  if (["plan", "apply"].includes(subcommand)) {
+    const { values } = parse(boolAndJsonOptions({
+      "operation-id": { type: "string", multiple: true },
+      "main-branch": { type: "string" },
+      "include-remote": { type: "boolean", default: false },
+      "plan-id": { type: "string" },
+    }), rest);
+    const common = {
+      git,
+      config,
+      operationIds: values["operation-id"] ?? [],
+      mainBranch: values["main-branch"],
+      includeRemote: values["include-remote"],
+    };
+    const result = subcommand === "plan"
+      ? await createGitCleanupPlan(common)
+      : await applyGitCleanupPlan({ ...common, expectedPlanId: values["plan-id"] });
+    output(result, {
+      json: values.json,
+      human: (item) => subcommand === "plan"
+        ? [
+          `Git cleanup plan ${item.plan_id}: ${item.candidates.length} task(s)`,
+          ...item.candidates.flatMap((candidate) => [
+            `${candidate.operation_id} ${candidate.disposition}`,
+            ...(candidate.remove_worktree ? [`  remove worktree: ${candidate.worktree_path}`] : []),
+            ...(candidate.delete_local ? [`  delete local branch: ${candidate.branch}`] : []),
+            ...(candidate.remote ? [`  delete remote branch: ${candidate.remote.remote}/${candidate.remote.ref}`] : []),
+          ]),
+        ].join("\n")
+        : [
+          `Git cleanup ${item.status}: ${item.plan.plan_id}`,
+          ...item.completed_actions.map((action) => `  completed: ${action}`),
+        ].join("\n"),
+    });
+    return;
+  }
+  throw new CliError("cleanup requires audit, plan, or apply");
 }
 
 async function main() {
@@ -804,6 +871,7 @@ async function main() {
   if (command === "plan") return commandPlan(args);
   if (command === "recipient") return commandRecipient(args);
   if (command === "callback") return commandCallback(args);
+  if (command === "git") return commandGit(args);
   if (command === "lease") return commandLease(args);
   if (command === "cleanup") return commandCleanup(args);
   throw new CliError(`Unknown command: ${command}\n\n${HELP}`);

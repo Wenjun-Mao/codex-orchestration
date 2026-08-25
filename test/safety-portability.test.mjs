@@ -161,7 +161,7 @@ test("linked Git worktrees share callback and exclusive-resource state", async (
     assertSuccess(runCli([
       "recipient", "bind", "--lineage-id", "linked-lineage", "--thread-id", "linked-coordinator", "--json",
     ], { cwd: root }), "main-worktree recipient bind");
-    assertSuccess(runCli(["callback", "deliver", "--no-queue"], {
+    assertSuccess(runCli(["callback", "deliver"], {
       cwd: root,
       input: receipt(),
     }), "main-worktree callback persist");

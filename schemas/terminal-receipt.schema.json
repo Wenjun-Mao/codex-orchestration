@@ -39,7 +39,7 @@
     "sequence": { "type": "integer", "minimum": 1 },
     "supersedes_callback_ids": {
       "type": "array",
-      "maxItems": 64,
+      "maxItems": 1,
       "uniqueItems": true,
       "items": {
         "type": "string",

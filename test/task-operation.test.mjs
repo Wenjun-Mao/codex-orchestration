@@ -165,7 +165,7 @@ async function recordCompatiblePreflight(stateRoot, operationId, overrides = {})
 
 test("task operation requires explicit kind and reconciles an observed task thread", async () => {
   const root = await createGitFixture();
-  const stateRoot = resolve(root, ".git", "codex-flow");
+  const stateRoot = resolve(root, ".git", "codex-flow", "v0.4");
   try {
     const prepared = await prepareTaskOperation({
       stateRoot,
@@ -252,7 +252,7 @@ test("task operation requires explicit kind and reconciles an observed task thre
 
 test("local task operation authenticates its exact full Git baseline", async () => {
   const root = await createGitFixture();
-  const stateRoot = resolve(root, ".git", "codex-flow");
+  const stateRoot = resolve(root, ".git", "codex-flow", "v0.4");
   try {
     const current = repositoryPacket(root);
     const prepared = await prepareTaskOperation({
@@ -279,7 +279,7 @@ test("local task operation authenticates its exact full Git baseline", async () 
 
 test("prepare rejects an abbreviated or incorrect local baseline before journaling", async () => {
   const root = await createGitFixture();
-  const stateRoot = resolve(root, ".git", "codex-flow");
+  const stateRoot = resolve(root, ".git", "codex-flow", "v0.4");
   try {
     const revision = gitRevision(root);
     await assert.rejects(
@@ -302,7 +302,7 @@ test("prepare rejects an abbreviated or incorrect local baseline before journali
 test("prepare rejects a packet from an unrelated Git common directory", async () => {
   const journalRoot = await createGitFixture("codex-flow-journal-repository-");
   const packetRoot = await createGitFixture("codex-flow-packet-repository-");
-  const stateRoot = resolve(journalRoot, ".git", "codex-flow");
+  const stateRoot = resolve(journalRoot, ".git", "codex-flow", "v0.4");
   try {
     await assert.rejects(
       prepareTaskOperation({
@@ -323,7 +323,7 @@ test("prepare accepts a linked worktree sharing the operation journal", async ()
   const root = await createGitFixture("codex-flow-linked-repository-");
   const linkedParent = await mkdtemp(resolve(tmpdir(), "codex-flow-linked-parent-"));
   const linkedRoot = resolve(linkedParent, "worktree");
-  const stateRoot = resolve(root, ".git", "codex-flow");
+  const stateRoot = resolve(root, ".git", "codex-flow", "v0.4");
   try {
     execFileSync("git", ["worktree", "add", "--quiet", "-b", "fixture-linked", linkedRoot], { cwd: root });
     const prepared = await prepareTaskOperation({
@@ -350,7 +350,7 @@ test("pre-dispatch authentication rejects revision and cleanliness drift", async
   const revisionRoot = await createGitFixture("codex-flow-revision-drift-");
   const cleanlinessRoot = await createGitFixture("codex-flow-cleanliness-drift-");
   try {
-    const revisionState = resolve(revisionRoot, ".git", "codex-flow");
+    const revisionState = resolve(revisionRoot, ".git", "codex-flow", "v0.4");
     const revisionOperation = await prepareTaskOperation({
       stateRoot: revisionState,
       projectId: "revision-project",
@@ -369,7 +369,7 @@ test("pre-dispatch authentication rejects revision and cleanliness drift", async
       operationId: revisionOperation.operation_id,
     }))[0].attempts.length, 0);
 
-    const cleanlinessState = resolve(cleanlinessRoot, ".git", "codex-flow");
+    const cleanlinessState = resolve(cleanlinessRoot, ".git", "codex-flow", "v0.4");
     const cleanlinessOperation = await prepareTaskOperation({
       stateRoot: cleanlinessState,
       projectId: "cleanliness-project",
@@ -387,39 +387,25 @@ test("pre-dispatch authentication rejects revision and cleanliness drift", async
   }
 });
 
-test("pre-baseline operation requests remain readable but require authenticated re-prepare", async () => {
+test("current task operations reject missing baseline authority", async () => {
   const root = await createGitFixture();
-  const stateRoot = resolve(root, ".git", "codex-flow");
+  const stateRoot = resolve(root, ".git", "codex-flow", "v0.4");
   try {
-    const current = packet({ run_id: "run-legacy-operation-01" });
+    const current = packet({ run_id: "run-missing-baseline-01" });
     const prepared = await prepareTaskOperation({
       stateRoot,
       projectId: "fixture-project",
       packet: current,
     });
     const recordPath = resolve(stateRoot, "task-operations", "records", `${prepared.operation_id}.json`);
-    const legacy = JSON.parse(await readFile(recordPath, "utf8"));
-    delete legacy.request.baseline;
-    delete legacy.request.environment;
-    await writeFile(recordPath, `${JSON.stringify(legacy, null, 2)}\n`, "utf8");
-
-    assert.equal((await taskOperationStatus({ stateRoot, operationId: prepared.operation_id }))[0].status, "prepared");
+    const invalid = JSON.parse(await readFile(recordPath, "utf8"));
+    delete invalid.request.baseline;
+    delete invalid.request.environment;
+    await writeFile(recordPath, `${JSON.stringify(invalid, null, 2)}\n`, "utf8");
     await assert.rejects(
-      beginTaskOperationAttempt({ stateRoot, operationId: prepared.operation_id }),
-      /predates baseline authentication/,
+      taskOperationStatus({ stateRoot, operationId: prepared.operation_id }),
+      /requires field: baseline/,
     );
-
-    const upgraded = await prepareTaskOperation({
-      stateRoot,
-      projectId: "fixture-project",
-      packet: current,
-    });
-    assert.deepEqual(upgraded.request.environment, current.environment);
-    await recordCompatiblePreflight(stateRoot, prepared.operation_id);
-    assert.equal((await beginTaskOperationAttempt({
-      stateRoot,
-      operationId: prepared.operation_id,
-    })).status, "dispatching");
   } finally {
     await removeFixture(root);
   }
@@ -427,7 +413,7 @@ test("pre-baseline operation requests remain readable but require authenticated 
 
 test("ambiguous task creation blocks retry until inspect-before-retry reconciliation", async () => {
   const root = await createGitFixture();
-  const stateRoot = resolve(root, ".git", "codex-flow");
+  const stateRoot = resolve(root, ".git", "codex-flow", "v0.4");
   try {
     const prepared = await prepareTaskOperation({
       stateRoot,
@@ -479,7 +465,7 @@ test("ambiguous task creation blocks retry until inspect-before-retry reconcilia
 
 test("host capability preflight is mandatory and selector incompatibility creates zero attempts", async () => {
   const root = await createGitFixture();
-  const stateRoot = resolve(root, ".git", "codex-flow");
+  const stateRoot = resolve(root, ".git", "codex-flow", "v0.4");
   try {
     const prepared = await prepareTaskOperation({
       stateRoot,
@@ -538,7 +524,7 @@ test("host capability preflight is mandatory and selector incompatibility create
 
 test("transient serializer failure blocks only its host session", async () => {
   const root = await createGitFixture();
-  const stateRoot = resolve(root, ".git", "codex-flow");
+  const stateRoot = resolve(root, ".git", "codex-flow", "v0.4");
   try {
     const prepared = await prepareTaskOperation({
       stateRoot,
@@ -594,7 +580,7 @@ test("transient serializer failure blocks only its host session", async () => {
 
 test("task-thread reconciliation requires exact reread title and records bounded normalization", async () => {
   const root = await createGitFixture();
-  const stateRoot = resolve(root, ".git", "codex-flow");
+  const stateRoot = resolve(root, ".git", "codex-flow", "v0.4");
   try {
     const prepared = await prepareTaskOperation({
       stateRoot,
@@ -632,7 +618,7 @@ test("task-thread reconciliation requires exact reread title and records bounded
 
 test("subagent reconciliation keeps unavailable title distinct from its host nickname", async () => {
   const root = await createGitFixture();
-  const stateRoot = resolve(root, ".git", "codex-flow");
+  const stateRoot = resolve(root, ".git", "codex-flow", "v0.4");
   try {
     const prepared = await prepareTaskOperation({
       stateRoot,
@@ -675,117 +661,23 @@ test("subagent reconciliation keeps unavailable title distinct from its host nic
   }
 });
 
-test("legacy v1 operation reads without mutation and upgrades only on safe preflight write", async () => {
+test("v0.4 rejects older task-operation records instead of migrating them", async () => {
   const root = await createGitFixture();
-  const stateRoot = resolve(root, ".git", "codex-flow");
+  const stateRoot = resolve(root, ".git", "codex-flow", "v0.4");
   try {
     const prepared = await prepareTaskOperation({
       stateRoot,
       projectId: "fixture-project",
-      packet: packet({ run_id: "run-v1-migration-01" }),
-    });
-    await recordCompatiblePreflight(stateRoot, prepared.operation_id);
-    const legacyDispatch = await beginTaskOperationAttempt({
-      stateRoot,
-      operationId: prepared.operation_id,
-    });
-    await reconcileTaskOperation({
-      stateRoot,
-      operationId: prepared.operation_id,
-      attemptId: legacyDispatch.attempt.attempt_id,
-      outcome: "not-created",
+      packet: packet({ run_id: "run-breaking-record-01" }),
     });
     const recordPath = resolve(stateRoot, "task-operations", "records", `${prepared.operation_id}.json`);
-    const legacy = JSON.parse(await readFile(recordPath, "utf8"));
-    legacy.schema_version = 1;
-    delete legacy.host_preflights;
-    delete legacy.active_host_preflight_id;
-    delete legacy.incompatibility;
-    delete legacy.legacy_source_schema_version;
-    delete legacy.legacy_attempt_count;
-    for (const attempt of legacy.attempts) {
-      delete attempt.host_preflight_id;
-      delete attempt.failure_code;
-    }
-    const legacyBytes = `${JSON.stringify(legacy, null, 2)}\n`;
-    await writeFile(recordPath, legacyBytes, "utf8");
-
-    const readOnly = (await taskOperationStatus({ stateRoot, operationId: prepared.operation_id }))[0];
-    assert.equal(readOnly.schema_version, 2);
-    assert.equal(readOnly.legacy_source_schema_version, 1);
-    assert.equal(readOnly.legacy_attempt_count, 1);
-    assert.equal(await readFile(recordPath, "utf8"), legacyBytes);
-
-    const upgraded = await recordCompatiblePreflight(stateRoot, prepared.operation_id);
-    assert.equal(upgraded.schema_version, 2);
-    assert.equal(upgraded.legacy_source_schema_version, 1);
-    const persisted = JSON.parse(await readFile(recordPath, "utf8"));
-    assert.equal(persisted.schema_version, 2);
-    assert.equal(persisted.legacy_source_schema_version, 1);
-    assert.equal(persisted.legacy_attempt_count, 1);
-    assert.equal(persisted.attempts[0].host_preflight_id, null);
-    const newAttempt = await beginTaskOperationAttempt({
-      stateRoot,
-      operationId: prepared.operation_id,
-    });
-    assert.equal(newAttempt.attempt.sequence, 2);
-    assert.notEqual(newAttempt.attempt.host_preflight_id, null);
-  } finally {
-    await removeFixture(root);
-  }
-});
-
-test("legacy observed records preserve the v0.3.2 object-ID limit", async () => {
-  const root = await createGitFixture();
-  const stateRoot = resolve(root, ".git", "codex-flow");
-  try {
-    const prepared = await prepareTaskOperation({
-      stateRoot,
-      projectId: "fixture-project",
-      packet: packet({ run_id: "run-v1-long-object-id-01" }),
-    });
-    await recordCompatiblePreflight(stateRoot, prepared.operation_id);
-    const dispatch = await beginTaskOperationAttempt({ stateRoot, operationId: prepared.operation_id });
-    const objectId = `thread-${"a".repeat(190)}`;
-    const observed = await reconcileTaskOperation({
-      stateRoot,
-      operationId: prepared.operation_id,
-      attemptId: dispatch.attempt.attempt_id,
-      outcome: "observed",
-      objectId,
-      actualKind: "task-thread",
-      evidence: taskThreadEvidence(),
-    });
-    const recordPath = resolve(stateRoot, "task-operations", "records", `${prepared.operation_id}.json`);
-    const legacy = JSON.parse(await readFile(recordPath, "utf8"));
-    legacy.schema_version = 1;
-    delete legacy.host_preflights;
-    delete legacy.active_host_preflight_id;
-    delete legacy.incompatibility;
-    delete legacy.legacy_source_schema_version;
-    delete legacy.legacy_attempt_count;
-    legacy.attempts = legacy.attempts.map((attempt) => ({
-      attempt_id: attempt.attempt_id,
-      sequence: attempt.sequence,
-      status: attempt.status,
-      started_at: attempt.started_at,
-      ambiguous_after: attempt.ambiguous_after,
-      finished_at: attempt.finished_at,
-    }));
-    legacy.observed = {
-      object_id: observed.observed.object_id,
-      actual_kind: observed.observed.actual_kind,
-      title: "Bounded executor 01",
-      visible: true,
-      observed_at: observed.observed.observed_at,
-    };
-    const legacyBytes = `${JSON.stringify(legacy, null, 2)}\n`;
-    await writeFile(recordPath, legacyBytes, "utf8");
-
-    const migrated = (await taskOperationStatus({ stateRoot, operationId: prepared.operation_id }))[0];
-    assert.equal(migrated.observed.object_id, objectId);
-    assert.equal(migrated.legacy_attempt_count, 1);
-    assert.equal(await readFile(recordPath, "utf8"), legacyBytes);
+    const old = JSON.parse(await readFile(recordPath, "utf8"));
+    old.schema_version = 2;
+    await writeFile(recordPath, `${JSON.stringify(old, null, 2)}\n`, "utf8");
+    await assert.rejects(
+      taskOperationStatus({ stateRoot, operationId: prepared.operation_id }),
+      /Unsupported task-operation record/,
+    );
   } finally {
     await removeFixture(root);
   }
@@ -793,7 +685,7 @@ test("legacy observed records preserve the v0.3.2 object-ID limit", async () => 
 
 test("task operation refuses expired launches and identity collisions", async () => {
   const root = await createGitFixture();
-  const stateRoot = resolve(root, ".git", "codex-flow");
+  const stateRoot = resolve(root, ".git", "codex-flow", "v0.4");
   try {
     const expired = await prepareTaskOperation({
       stateRoot,
@@ -834,7 +726,7 @@ test("task operation refuses expired launches and identity collisions", async ()
 
 test("an in-flight host call remains reconcilable after the launch deadline", async () => {
   const root = await createGitFixture();
-  const stateRoot = resolve(root, ".git", "codex-flow");
+  const stateRoot = resolve(root, ".git", "codex-flow", "v0.4");
   try {
     const prepared = await prepareTaskOperation({
       stateRoot,

@@ -36,6 +36,11 @@ that session; record a new session preflight after restart. Use the smallest
 concurrency that shortens the critical path and never launch after the packet
 deadline.
 
+For a project-backed executor, bind the observed operation to its exact
+canonical worktree with `codex-flow git bind` before implementation begins.
+Task creation fails closed at the configured cleanup threshold; reconcile
+completed Git ownership before launching another wave.
+
 Task-thread title must be independently reread. If the host used the delegation
 envelope, make one bounded title update, reread the exact requested title, and
 record that normalization. A subagent nickname is a host label, not title proof.

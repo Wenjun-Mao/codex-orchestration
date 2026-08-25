@@ -1,6 +1,6 @@
 {
   "name": "codex-orchestration",
-  "version": "0.3.3",
+  "version": "0.4.0",
   "description": "Coordinate independent Codex tasks with explicit ownership, durable callbacks, and serial integration.",
   "author": {
     "name": "Wenjun Mao"
@@ -11,7 +11,7 @@
   "interface": {
     "displayName": "Codex Orchestration",
     "shortDescription": "Coordinate parallel Codex work safely.",
-    "longDescription": "Plan and run coordinator/executor workflows with explicit task kinds, bounded ownership, reconciled host operations, durable terminal callbacks, shared-resource leases, and post-integration verification.",
+    "longDescription": "Plan and run coordinator/executor workflows with explicit task kinds, bounded ownership, reconciled host operations, durable terminal callbacks, shared-resource leases, and audited Git cleanup.",
     "developerName": "Wenjun Mao",
     "category": "Productivity",
     "capabilities": ["Planning", "Task coordination", "Workflow validation"],

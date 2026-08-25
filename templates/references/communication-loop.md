@@ -10,18 +10,16 @@ Use two delivery classes:
 
 Coordinator integration is exactly once by the deterministic callback ID.
 Persisted integration lifecycle is `persisted`, `observed`, then `consumed`;
-explicit `superseded` and `expired` are terminal alternatives. Notification
-lifecycle is independent. The default `journal-monitor` authority disables
-host queue notification entirely. The coordinator calls `callback observe`
-with `--source journal-monitor`, then calls `callback consume` only after the
-result has been integrated or deliberately rejected and recorded.
+explicit `superseded` and `expired` are terminal alternatives. The v0.4
+`journal-monitor` authority creates no host queue notification. The coordinator
+calls `callback observe`, then `callback consume` only after the result has
+been integrated or deliberately rejected and recorded.
 
 A monitor or coordinator inspects `callback status`; it suppresses duplicate
 IDs and remains silent on unchanged state. It must not invent a result from
 task age, UI state, or arrival order. Never combine monitor integration with a
-separate ordinary-completion queue. Legacy records with potentially live queue
-notifications remain fail-closed until the actual queue turn arrives or a
-retractable identity is proven.
+separate ordinary-completion queue. v0.4 rejects older callback journals rather
+than retaining a second delivery model.
 
 Bind one coordinator lineage before launch. After a fork or authoritative
 replacement, fence and rebind that lineage to the new thread generation.

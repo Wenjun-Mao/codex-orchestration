@@ -6,11 +6,10 @@
   "required": [
     "schema_version", "kind", "operation_id", "project_id", "packet_hash",
     "request", "host_preflights", "active_host_preflight_id", "status", "attempts", "observed",
-    "incompatibility", "created_at", "updated_at", "legacy_source_schema_version",
-    "legacy_attempt_count"
+    "incompatibility", "created_at", "updated_at"
   ],
   "properties": {
-    "schema_version": { "const": 2 },
+    "schema_version": { "const": 3 },
     "kind": { "const": "codex-flow-task-create-operation" },
     "operation_id": { "$ref": "#/$defs/journalId" },
     "project_id": { "$ref": "#/$defs/safeId" },
@@ -51,18 +50,7 @@
       ]
     },
     "created_at": { "$ref": "#/$defs/timestamp" },
-    "updated_at": { "$ref": "#/$defs/timestamp" },
-    "legacy_source_schema_version": {
-      "oneOf": [
-        { "type": "null" },
-        { "const": 1 }
-      ]
-    },
-    "legacy_attempt_count": {
-      "type": "integer",
-      "minimum": 0,
-      "maximum": 32
-    }
+    "updated_at": { "$ref": "#/$defs/timestamp" }
   },
   "$defs": {
     "safeId": {
@@ -125,7 +113,7 @@
       "additionalProperties": false,
       "required": [
         "task_id", "run_id", "role", "execution_kind", "title",
-        "launch_deadline", "model", "reasoning_effort"
+        "launch_deadline", "model", "reasoning_effort", "baseline", "environment"
       ],
       "properties": {
         "task_id": { "$ref": "#/$defs/safeId" },
@@ -145,17 +133,7 @@
         },
         "baseline": { "$ref": "#/$defs/baseline" },
         "environment": { "$ref": "#/$defs/environment" }
-      },
-      "allOf": [
-        {
-          "if": { "required": ["baseline"] },
-          "then": { "required": ["environment"] }
-        },
-        {
-          "if": { "required": ["environment"] },
-          "then": { "required": ["baseline"] }
-        }
-      ]
+      }
     },
     "supportEvidence": {
       "type": "object",
@@ -289,12 +267,7 @@
             { "$ref": "#/$defs/timestamp" }
           ]
         },
-        "host_preflight_id": {
-          "oneOf": [
-            { "type": "null" },
-            { "$ref": "#/$defs/journalId" }
-          ]
-        },
+        "host_preflight_id": { "$ref": "#/$defs/journalId" },
         "failure_code": {
           "oneOf": [
             { "type": "null" },
@@ -332,14 +305,14 @@
       "additionalProperties": false,
       "required": ["source", "value", "normalization"],
       "properties": {
-        "source": { "enum": ["host-observed", "unavailable", "legacy-claimed"] },
+        "source": { "enum": ["host-observed", "unavailable"] },
         "value": {
           "oneOf": [
             { "type": "null" },
             { "type": "string", "minLength": 1, "maxLength": 160 }
           ]
         },
-        "normalization": { "enum": ["none", "bounded-host-write", "not-applicable", "legacy-unknown"] }
+        "normalization": { "enum": ["none", "bounded-host-write", "not-applicable"] }
       },
       "oneOf": [
         {
@@ -355,13 +328,6 @@
             "value": { "type": "null" },
             "normalization": { "const": "not-applicable" }
           }
-        },
-        {
-          "properties": {
-            "source": { "const": "legacy-claimed" },
-            "value": { "type": "string", "minLength": 1, "maxLength": 160 },
-            "normalization": { "const": "legacy-unknown" }
-          }
         }
       ]
     },
@@ -370,7 +336,7 @@
       "additionalProperties": false,
       "required": ["source", "value"],
       "properties": {
-        "source": { "enum": ["host-observed", "host-contract", "legacy-claimed"] },
+        "source": { "enum": ["host-observed", "host-contract"] },
         "value": { "type": "boolean" }
       }
     },

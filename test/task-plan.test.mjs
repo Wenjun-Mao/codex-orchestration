@@ -75,7 +75,6 @@ test("task packets resolve Terra xhigh defaults and preserve per-task overrides"
   const resolved = applyTaskDefaults(raw, {
     default_model: "gpt-5.6-terra",
     default_reasoning_effort: "xhigh",
-    ordinary_completion_authority: "journal-monitor",
   });
   assert.equal(resolved.model, "gpt-5.6-terra");
   assert.equal(resolved.reasoning_effort, "xhigh");

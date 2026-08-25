@@ -1,6 +1,4 @@
 import assert from "node:assert/strict";
-import { readFile, writeFile } from "node:fs/promises";
-import { resolve } from "node:path";
 import test from "node:test";
 import { cleanupAudit } from "../lib/cleanup.mjs";
 import { runDoctor } from "../lib/doctor.mjs";
@@ -75,7 +73,7 @@ function partialEvidence(title) {
   };
 }
 
-test("doctor and cleanup disclose incompatible, session-blocked, partial, and legacy operations", async () => {
+test("doctor and cleanup disclose incompatible, session-blocked, and partial operations", async () => {
   const root = await createGitFixture("codex-flow-host-reporting-");
   try {
     initializeFixture([], { cwd: root });
@@ -138,43 +136,20 @@ test("doctor and cleanup disclose incompatible, session-blocked, partial, and le
       evidence: partialEvidence(partial.request.title),
     });
 
-    const legacy = await prepareTaskOperation({
-      stateRoot: git.stateRoot,
-      projectId: "fixture",
-      packet: packet(git.revision, "legacy"),
-    });
-    const legacyPath = resolve(
-      git.stateRoot,
-      "task-operations",
-      "records",
-      `${legacy.operation_id}.json`,
-    );
-    const legacyRecord = JSON.parse(await readFile(legacyPath, "utf8"));
-    legacyRecord.schema_version = 1;
-    delete legacyRecord.host_preflights;
-    delete legacyRecord.active_host_preflight_id;
-    delete legacyRecord.incompatibility;
-    delete legacyRecord.legacy_source_schema_version;
-    delete legacyRecord.legacy_attempt_count;
-    await writeFile(legacyPath, `${JSON.stringify(legacyRecord, null, 2)}\n`, "utf8");
-
     const doctor = await runDoctor(gitSnapshot(root));
     assert.equal(doctor.ok, true);
     assert.equal(doctor.task_operations.host_incompatible_count, 1);
     assert.equal(doctor.task_operations.host_session_blocked_count, 1);
     assert.equal(doctor.task_operations.partial_evidence_count, 1);
-    assert.equal(doctor.task_operations.legacy_record_count, 1);
     assert.match(doctor.warnings.join("\n"), /incompatible with their recorded host selector/);
     assert.match(doctor.warnings.join("\n"), /blocked for their recorded host session/);
     assert.match(doctor.warnings.join("\n"), /partial host evidence/);
-    assert.match(doctor.warnings.join("\n"), /legacy v1 migration/);
 
     const cleanup = await cleanupAudit(gitSnapshot(root));
     assert.equal(cleanup.mutation_performed, false);
     assert.match(cleanup.recommendations.join("\n"), /compatible selector evidence/);
     assert.match(cleanup.recommendations.join("\n"), /new host-session preflight/);
     assert.match(cleanup.recommendations.join("\n"), /partial host evidence/);
-    assert.match(cleanup.recommendations.join("\n"), /legacy v1 provenance state/);
   } finally {
     await removeFixture(root);
   }

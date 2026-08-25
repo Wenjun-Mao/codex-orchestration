@@ -74,6 +74,9 @@ for (const name of [
   "host-capability-evidence",
   "host-observation-evidence",
   "terminal-receipt",
+  "git-ownership",
+  "git-integration",
+  "git-cleanup-plan",
 ]) {
   const schema = JSON.parse(await readFile(resolve(root, "schemas", `${name}.schema.json`), "utf8"));
   if (schema.type !== "object" || schema.additionalProperties !== false || !schema.properties) {
