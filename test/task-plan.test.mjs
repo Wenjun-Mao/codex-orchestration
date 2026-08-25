@@ -7,6 +7,7 @@ import {
   applyTaskDefaults,
   isLaunchExpired,
   renderHostWorktreeBootstrap,
+  renderReleasedTaskPacket,
   renderTaskPacket,
   validateLaunchDeadline,
   validateTaskPacket,
@@ -134,6 +135,11 @@ test("host-worktree packets expose only a bootstrap prompt before Git binding", 
   const bootstrap = renderHostWorktreeBootstrap(hostWorktree, "task-operation-v1-bootstrap");
   assert.match(bootstrap, /bootstrap turn only/);
   assert.doesNotMatch(bootstrap, new RegExp(hostWorktree.objective));
+  assert.doesNotMatch(bootstrap, /Saved project path:/);
+  const released = renderReleasedTaskPacket(hostWorktree);
+  assert.match(released, /Saved project path: .* identifies the host-addressable project; it is not this executor's working directory\./);
+  assert.match(released, /Git-bound `worktree_path`.*authoritative/);
+  assert.match(released, /absence is expected until this executor branch is pushed.*not a provenance blocker/);
   assert.throws(
     () => validateTaskPacket({ ...hostWorktree, execution_kind: "subagent" }),
     /requires a user-visible task-thread/,

@@ -35,8 +35,10 @@ the operation as observed. Do not use a subagent nickname as packet-title proof.
 During execution, accept direct Steer only for true blockers, approvals, and
 high-risk drift. Before acting, observe its `urgent_id` and
 `delivery_attempt_id`; act only on `disposition: process`, suppress every
-duplicate, and consume the logical signal after handling it. Identity-less
-urgent messages are nonauthoritative.
+duplicate, and consume the logical signal after handling it using the exact
+`consume_arguments` returned by observation. The executor ID there identifies
+the sender, not this coordinator. Identity-less urgent messages are
+nonauthoritative.
 Leave ordinary completion to the durable callback journal. The quiet journal
 monitor is the sole ordinary-completion authority; do not also queue completion
 messages. Observe each callback through the journal monitor, integrate its

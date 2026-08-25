@@ -24,8 +24,9 @@ reverse.
 
 For a true blocker, approval request, ownership collision, or high-risk drift,
 persist an urgent signal, prepare one numbered attempt, and direct Steer only
-with the returned identified envelope. Reconcile the host attempt afterward;
-never resend the same attempt. On terminal completion, leave a reviewable branch
+with the returned `host_prompt` string unchanged. Reconcile afterward with the
+operator-observed `sent`, `rejected-before-send`, or `ambiguous` result; never
+resend the same attempt. On terminal completion, leave a reviewable branch
 state and persist one bounded schema-v2 receipt with `codex-flow callback deliver`.
 Do not separately queue ordinary completion.
 Retries retain the same run, sequence, and callback ID. A correction advances

@@ -136,8 +136,11 @@ codex-flow urgent persist --file <urgent-signal.json>
 codex-flow urgent attempt prepare --urgent-id <id> --attempt-sequence <n>
                   [--retry-reason <reason>]
 codex-flow urgent attempt reconcile --urgent-id <id>
-                  --delivery-attempt-id <id> --outcome <outcome>
-codex-flow urgent observe|consume|expire|status ...
+                  --delivery-attempt-id <id>
+                  --host-call-result sent|rejected-before-send|ambiguous
+codex-flow urgent observe --urgent-id <id> --delivery-attempt-id <id> ...
+codex-flow urgent consume --urgent-id <id> ... --sender-executor-id <id>
+codex-flow urgent expire|status ...
 codex-flow git bind --operation-id <id>
 codex-flow git integrate --operation-id <id> --main-branch <branch>
                   [--superseded-by <ref>]
@@ -205,10 +208,11 @@ procedure and bounded host-list fallback.
 
 Urgent blockers, approval requests, and high-risk drift use `journal-direct`.
 The sender first persists a strict urgent signal, prepares one numbered
-delivery attempt, and calls direct Steer exactly once with the returned bounded
-envelope. It then reconciles that attempt as `accepted`, `failed`, or
-`ambiguous`. A second host call requires a new numbered attempt and an explicit
-retry reason. Raw identity-less Steer is invalid for new work.
+delivery attempt, and passes the returned `host_prompt` string directly to one
+Steer call. It then reports the operator-observed host result as `sent`,
+`rejected-before-send`, or `ambiguous`. The public CLI intentionally has no
+`--outcome` alias. A second host call requires a new numbered attempt and an
+explicit retry reason. Raw identity-less Steer is invalid for new work.
 
 The coordinator calls `urgent observe` with the signal and attempt IDs before
 acting. The first observed attempt returns `disposition: process`; every later
@@ -218,6 +222,9 @@ ID for the same signal is classified as an additional sender attempt. The
 coordinator calls `urgent consume` after handling the signal. Corrected urgent
 content advances the logical sequence and explicitly names its predecessor.
 Host-added envelope fields never participate in identity.
+`urgent observe --json` returns the exact `consume_arguments`, including the
+sender's executor ID; urgent consumption therefore uses
+`--sender-executor-id`, not the receiver task ID.
 
 Ordinary terminal completion uses `callback deliver`, which persists a strict
 receipt in the repository journal. The default and only installed project
@@ -304,4 +311,4 @@ defines the v0.4 ownership and cleanup contract.
 defines the two-phase Desktop worktree contract.
 [Journaled urgent direct delivery](docs/adr/0009-journaled-urgent-direct-delivery.md)
 defines urgent-signal and delivery-attempt identity. The current covered
-boundary is listed in [v0.4.1 orchestration coverage](docs/coverage-v0.4.1.md).
+boundary is listed in [v0.4.2 orchestration coverage](docs/coverage-v0.4.2.md).

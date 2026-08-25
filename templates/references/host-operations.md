@@ -55,10 +55,12 @@ kind as fallback.
 
 Urgent direct delivery uses the same one-shot boundary without adding a host
 adapter. Persist the logical signal, prepare one attempt, release every journal
-lock, and call direct Steer once only when `dispatch_permitted` is true. Then
-reconcile the attempt. A timeout is ambiguous; it never authorizes replaying
-that attempt. The recipient observes the IDs before acting so a host replay or
-explicit later attempt cannot trigger duplicate work.
+lock, and pass the returned `host_prompt` string unchanged to direct Steer once
+only when `dispatch_permitted` is true. Reconcile with the operator-observed
+`--host-call-result`: `sent`, `rejected-before-send`, or `ambiguous`. A timeout
+is ambiguous; it never authorizes replaying that attempt. The recipient observes
+the IDs before acting so a host replay or explicit later attempt cannot trigger
+duplicate work.
 
 If dispatch fails before creation with a serializer, adapter, backend,
 schema-runtime, or host-control error, reconcile `host-session-blocked` with a

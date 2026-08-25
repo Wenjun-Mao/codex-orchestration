@@ -63,17 +63,39 @@ test("CLI persists, identifies, suppresses, and reports urgent direct delivery",
     assertSuccess(prepareResult, "urgent attempt prepare");
     const prepared = JSON.parse(prepareResult.stdout);
     assert.equal(prepared.dispatch_permitted, true);
-    assert.ok(Buffer.byteLength(JSON.stringify(prepared.direct_envelope)) <= 512);
-    assert.equal("requested_action" in prepared.direct_envelope, false);
+    assert.equal("direct_envelope" in prepared, false);
+    assert.ok(Buffer.byteLength(prepared.host_prompt) <= 512);
+    const hostPrompt = JSON.parse(prepared.host_prompt);
+    assert.equal(hostPrompt.delivery_attempt_id, prepared.delivery_attempt_id);
+    assert.equal("requested_action" in hostPrompt, false);
 
-    const reconcileResult = runCli([
+    const legacyReconcile = runCli([
       "urgent", "attempt", "reconcile",
       "--urgent-id", persisted.urgent_id,
       "--delivery-attempt-id", prepared.delivery_attempt_id,
       "--outcome", "accepted",
       "--json",
     ], { cwd: root });
+    assert.notEqual(legacyReconcile.status, 0);
+    assert.match(legacyReconcile.stderr, /Unknown option '--outcome'/);
+    const stillPrepared = runCli([
+      "urgent", "attempt", "prepare",
+      "--urgent-id", persisted.urgent_id,
+      "--attempt-sequence", "1",
+      "--json",
+    ], { cwd: root });
+    assertSuccess(stillPrepared, "urgent duplicate prepare after rejected legacy flag");
+    assert.equal(JSON.parse(stillPrepared.stdout).status, "already-prepared");
+
+    const reconcileResult = runCli([
+      "urgent", "attempt", "reconcile",
+      "--urgent-id", persisted.urgent_id,
+      "--delivery-attempt-id", prepared.delivery_attempt_id,
+      "--host-call-result", "sent",
+      "--json",
+    ], { cwd: root });
     assertSuccess(reconcileResult, "urgent attempt reconcile");
+    assert.equal(JSON.parse(reconcileResult.stdout).status, "sent");
 
     const observeArgs = [
       "urgent", "observe",
@@ -89,6 +111,13 @@ test("CLI persists, identifies, suppresses, and reports urgent direct delivery",
     const observed = JSON.parse(observedResult.stdout);
     assert.equal(observed.disposition, "process");
     assert.equal(observed.signal.requested_action, signal().requested_action);
+    assert.deepEqual(observed.consume_arguments, {
+      urgent_id: persisted.urgent_id,
+      lineage_id: "cli-urgent-lineage",
+      thread_id: "cli-urgent-coordinator",
+      generation: 1,
+      sender_executor_id: "cli-urgent-executor",
+    });
 
     const replayResult = runCli(observeArgs, { cwd: root });
     assertSuccess(replayResult, "urgent replay observe");
@@ -99,7 +128,7 @@ test("CLI persists, identifies, suppresses, and reports urgent direct delivery",
       delivery_attempt_id: prepared.delivery_attempt_id,
     });
 
-    const consumedResult = runCli([
+    const legacyConsumeResult = runCli([
       "urgent", "consume",
       "--urgent-id", persisted.urgent_id,
       "--lineage-id", "cli-urgent-lineage",
@@ -108,7 +137,23 @@ test("CLI persists, identifies, suppresses, and reports urgent direct delivery",
       "--executor-id", "cli-urgent-executor",
       "--json",
     ], { cwd: root });
+    assert.notEqual(legacyConsumeResult.status, 0);
+    assert.match(legacyConsumeResult.stderr, /Unknown option '--executor-id'/);
+    const pendingAfterLegacyConsume = runCli(["urgent", "status", "--json"], { cwd: root });
+    assertSuccess(pendingAfterLegacyConsume, "urgent status after rejected legacy consume flag");
+    assert.equal(JSON.parse(pendingAfterLegacyConsume.stdout).pending.length, 1);
+
+    const consumedResult = runCli([
+      "urgent", "consume",
+      "--urgent-id", persisted.urgent_id,
+      "--lineage-id", "cli-urgent-lineage",
+      "--thread-id", "cli-urgent-coordinator",
+      "--generation", "1",
+      "--sender-executor-id", "cli-urgent-executor",
+      "--json",
+    ], { cwd: root });
     assertSuccess(consumedResult, "urgent consume");
+    assert.equal(JSON.parse(consumedResult.stdout).status, "consumed");
 
     const statusResult = runCli(["urgent", "status", "--json"], { cwd: root });
     assertSuccess(statusResult, "urgent status");
@@ -129,6 +174,55 @@ test("CLI persists, identifies, suppresses, and reports urgent direct delivery",
     const cleanup = JSON.parse(cleanupResult.stdout);
     assert.equal(cleanup.mutation_performed, false);
     assert.equal(cleanup.urgent_signals.host_replay_count, 1);
+  } finally {
+    await removeFixture(root);
+  }
+});
+
+test("CLI human observe output prints the sender-explicit consume command", async () => {
+  const root = await createGitFixture("codex-flow-urgent-human-cli-");
+  try {
+    initializeFixture([], { cwd: root });
+    assertSuccess(runCli([
+      "recipient", "bind",
+      "--lineage-id", "cli-urgent-lineage",
+      "--thread-id", "cli-urgent-coordinator",
+      "--json",
+    ], { cwd: root }), "recipient bind");
+    const persistedResult = runCli(["urgent", "persist", "--json"], {
+      cwd: root,
+      input: signal(),
+    });
+    assertSuccess(persistedResult, "urgent persist");
+    const persisted = JSON.parse(persistedResult.stdout);
+    const prepareResult = runCli([
+      "urgent", "attempt", "prepare",
+      "--urgent-id", persisted.urgent_id,
+      "--attempt-sequence", "1",
+      "--json",
+    ], { cwd: root });
+    assertSuccess(prepareResult, "urgent attempt prepare");
+    const prepared = JSON.parse(prepareResult.stdout);
+    assertSuccess(runCli([
+      "urgent", "attempt", "reconcile",
+      "--urgent-id", persisted.urgent_id,
+      "--delivery-attempt-id", prepared.delivery_attempt_id,
+      "--host-call-result", "sent",
+      "--json",
+    ], { cwd: root }), "urgent attempt reconcile");
+
+    const observedResult = runCli([
+      "urgent", "observe",
+      "--urgent-id", persisted.urgent_id,
+      "--delivery-attempt-id", prepared.delivery_attempt_id,
+      "--lineage-id", "cli-urgent-lineage",
+      "--thread-id", "cli-urgent-coordinator",
+      "--generation", "1",
+    ], { cwd: root });
+    assertSuccess(observedResult, "urgent human observe");
+    assert.match(observedResult.stdout, new RegExp(
+      `Next: codex-flow urgent consume --urgent-id ${persisted.urgent_id} .* --sender-executor-id cli-urgent-executor`,
+    ));
   } finally {
     await removeFixture(root);
   }

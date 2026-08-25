@@ -65,6 +65,8 @@ Read the detailed references only as needed:
 The coordinator owns task creation, monitors, callback integration, archiving,
 resource release, and post-merge reproof. Executors do not.
 
-For an urgent direct envelope, run `urgent observe` before acting. Process only
+For an urgent direct message, run `urgent observe` before acting. Process only
 the first logical observation, suppress host replays and additional sender
-attempts, then run `urgent consume` after the decision is handled.
+attempts, then run `urgent consume` with the returned exact
+`consume_arguments` after the decision is handled. Its sender executor ID is
+not the receiver task ID.

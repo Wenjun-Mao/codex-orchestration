@@ -134,11 +134,11 @@ Usage:
                   [--retry-reason host-ambiguous|recipient-rebound|operator-approved-retry]
                   [--json]
   codex-flow urgent attempt reconcile --urgent-id ID --delivery-attempt-id ID
-                  --outcome accepted|failed|ambiguous [--json]
+                  --host-call-result sent|rejected-before-send|ambiguous [--json]
   codex-flow urgent observe --urgent-id ID --delivery-attempt-id ID
                   --lineage-id ID --thread-id ID --generation N [--json]
   codex-flow urgent consume --urgent-id ID --lineage-id ID --thread-id ID
-                  --generation N --executor-id ID [--json]
+                  --generation N --sender-executor-id ID [--json]
   codex-flow urgent expire [--urgent-id ID] [--at TIMESTAMP] [--json]
   codex-flow urgent status [--json]
   codex-flow git bind --operation-id ID [--json]
@@ -804,7 +804,7 @@ async function commandUrgent(args) {
         human: (item) => [
           `Urgent delivery attempt ${item.status}: ${item.delivery_attempt_id}`,
           `Dispatch permitted: ${item.dispatch_permitted ? "yes" : "no"}`,
-          stableStringify(item.direct_envelope, 2),
+          `Host prompt: ${item.host_prompt}`,
         ].join("\n"),
       });
       return;
@@ -813,13 +813,13 @@ async function commandUrgent(args) {
       const { values } = parse(boolAndJsonOptions({
         "urgent-id": { type: "string" },
         "delivery-attempt-id": { type: "string" },
-        outcome: { type: "string" },
+        "host-call-result": { type: "string" },
       }), actionArgs);
       const result = await reconcileUrgentAttempt({
         stateRoot: git.stateRoot,
         urgentId: values["urgent-id"],
         deliveryAttemptId: values["delivery-attempt-id"],
-        outcome: values.outcome,
+        hostCallResult: values["host-call-result"],
       });
       output(result, {
         json: values.json,
@@ -845,7 +845,12 @@ async function commandUrgent(args) {
     });
     output(result, {
       json: values.json,
-      human: (item) => `Urgent signal ${item.status}: ${item.urgent_id} (${item.disposition})`,
+      human: (item) => [
+        `Urgent signal ${item.status}: ${item.urgent_id} (${item.disposition})`,
+        ...(item.consume_arguments ? [
+          `Next: codex-flow urgent consume --urgent-id ${item.consume_arguments.urgent_id} --lineage-id ${item.consume_arguments.lineage_id} --thread-id ${item.consume_arguments.thread_id} --generation ${item.consume_arguments.generation} --sender-executor-id ${item.consume_arguments.sender_executor_id}`,
+        ] : []),
+      ].join("\n"),
     });
     return;
   }
@@ -855,13 +860,13 @@ async function commandUrgent(args) {
       "lineage-id": { type: "string" },
       "thread-id": { type: "string" },
       generation: { type: "string" },
-      "executor-id": { type: "string" },
+      "sender-executor-id": { type: "string" },
     }), rest);
     const result = await consumeUrgentSignal({
       stateRoot: git.stateRoot,
       urgentId: values["urgent-id"],
       recipient: recipientFromValues(values),
-      executorId: values["executor-id"],
+      senderExecutorId: values["sender-executor-id"],
     });
     output(result, {
       json: values.json,

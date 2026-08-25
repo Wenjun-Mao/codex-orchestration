@@ -2,8 +2,9 @@
 
 ## Status
 
-Accepted for v0.4.1. The normal direct-delivery path is held-out proven; a
-natural host replay remains pending field evidence.
+Accepted for v0.4.1 and amended for the v0.4.2 operator surface. The normal
+direct-delivery path is held-out proven; a natural host replay remains pending
+field evidence.
 
 ## Context
 
@@ -29,12 +30,15 @@ Preparing an existing attempt never authorizes another host call. A retry
 requires the prior attempt to be reconciled, a new contiguous sequence, and an
 explicit reason. No host call occurs while a journal lock is held.
 
-The sender Steers only the returned bounded envelope and reconciles the attempt
-as accepted, failed, or ambiguous. The recipient observes the IDs before
-acting. The first observation processes the logical signal; later observations
-are suppressed. Repeating one attempt identifies a host replay. Observing a
-different attempt for the same urgent ID identifies an additional sender
-attempt. Consumption is exactly once after the coordinator handles the signal.
+The sender passes the returned bounded `host_prompt` string unchanged to Steer
+and reports the operator-observed result as `sent`, `rejected-before-send`, or
+`ambiguous`. The public names deliberately describe the host call rather than
+invite a claim about delivery. The recipient observes the IDs before acting.
+Observation returns exact consumption arguments, including the sender executor
+ID. The first observation processes the logical signal; later observations are
+suppressed. Repeating one attempt identifies a host replay. Observing a different
+attempt for the same urgent ID identifies an additional sender attempt.
+Consumption is exactly once after the coordinator handles the signal.
 
 Corrected urgent content creates the next logical sequence and names the
 immediate predecessor. Host-added envelope fields never participate in
@@ -50,6 +54,9 @@ identity. Identity-less urgent messages are nonauthoritative for new work.
   The repository journal and existing direct host call are sufficient.
 - Automatically resend an ambiguous attempt. A timeout may hide successful
   asynchronous delivery, so retry must be explicit and separately identified.
+- Add a mutable correction event for an operator who misreports a host result.
+  Attempt attribution remains immutable; use the existing explicit retry path
+  when the actual host outcome is ambiguous.
 
 ## Consequences
 
@@ -59,8 +66,9 @@ identity. Identity-less urgent messages are nonauthoritative for new work.
   raw transcripts, secrets, account identifiers, or user data.
 - Recipient rebinding invalidates an old target attempt; delivery to the new
   coordinator uses an explicit new attempt.
-- v0.4.1 adds this journal inside the existing fresh v0.4 state namespace. It
-  does not add a compatibility reader because no earlier urgent journal exists.
+- v0.4.1 added this journal inside the existing fresh v0.4 state namespace.
+  v0.4.2 changes only the public operator surface; the stored journal contract
+  is unchanged and no compatibility alias is retained.
 
 ## Guardrails
 
@@ -68,4 +76,6 @@ Tests cover sender idempotence, host replay, distinct sender attempts,
 correction sequence, recipient rebinding, expiry, bounded payloads, unsafe
 content rejection, CLI lifecycle, doctor reporting, and audit-only cleanup. A
 held-out cross-task direct delivery proved the normal host path. Host replay is
-claimed only if the host actually reproduces one.
+claimed only if the host actually reproduces one. v0.4.2 regressions also prove
+the ready-to-dispatch host prompt, rejection of the removed flags, exact
+consume arguments, and released host-worktree path/upstream guidance.

@@ -72,9 +72,10 @@ test("one sender attempt replayed by the host is processed exactly once", async 
     });
     assert.equal(prepared.status, "prepared");
     assert.equal(prepared.dispatch_permitted, true);
-    assert.equal(prepared.direct_envelope.urgent_id, persisted.urgent_id);
-    assert.equal(prepared.direct_envelope.delivery_attempt_id, prepared.delivery_attempt_id);
-    assert.deepEqual(prepared.direct_envelope.recipient, payload.recipient);
+    const hostPrompt = JSON.parse(prepared.host_prompt);
+    assert.equal(hostPrompt.urgent_id, persisted.urgent_id);
+    assert.equal(hostPrompt.delivery_attempt_id, prepared.delivery_attempt_id);
+    assert.deepEqual(hostPrompt.recipient, payload.recipient);
 
     const duplicatePrepare = await prepareUrgentAttempt({
       stateRoot: stateRoot(root),
@@ -89,8 +90,16 @@ test("one sender attempt replayed by the host is processed exactly once", async 
       stateRoot: stateRoot(root),
       urgentId: persisted.urgent_id,
       deliveryAttemptId: prepared.delivery_attempt_id,
-      outcome: "accepted",
-    })).status, "accepted");
+      hostCallResult: "sent",
+    })).status, "sent");
+    const alreadySent = await prepareUrgentAttempt({
+      stateRoot: stateRoot(root),
+      urgentId: persisted.urgent_id,
+      attemptSequence: 1,
+    });
+    assert.equal(alreadySent.status, "already-sent");
+    assert.equal(alreadySent.dispatch_permitted, false);
+    assert.equal((await record(root, payload)).attempts[0].outcome, "accepted");
     const first = await observeUrgentSignal({
       stateRoot: stateRoot(root),
       urgentId: persisted.urgent_id,
@@ -100,6 +109,13 @@ test("one sender attempt replayed by the host is processed exactly once", async 
     assert.equal(first.status, "observed");
     assert.equal(first.disposition, "process");
     assert.deepEqual(first.signal, payload);
+    assert.deepEqual(first.consume_arguments, {
+      urgent_id: persisted.urgent_id,
+      lineage_id: payload.recipient.lineage_id,
+      thread_id: payload.recipient.thread_id,
+      generation: payload.recipient.generation,
+      sender_executor_id: payload.executor_id,
+    });
 
     const replay = await observeUrgentSignal({
       stateRoot: stateRoot(root),
@@ -119,13 +135,13 @@ test("one sender attempt replayed by the host is processed exactly once", async 
       stateRoot: stateRoot(root),
       urgentId: persisted.urgent_id,
       recipient: payload.recipient,
-      executorId: payload.executor_id,
+      senderExecutorId: payload.executor_id,
     })).status, "consumed");
     assert.equal((await consumeUrgentSignal({
       stateRoot: stateRoot(root),
       urgentId: persisted.urgent_id,
       recipient: payload.recipient,
-      executorId: payload.executor_id,
+      senderExecutorId: payload.executor_id,
     })).status, "already-consumed");
 
     const status = await urgentSignalStatus(stateRoot(root));
@@ -166,7 +182,7 @@ test("different delivery attempts remain one logical urgent signal", async () =>
       stateRoot: stateRoot(root),
       urgentId,
       deliveryAttemptId: first.delivery_attempt_id,
-      outcome: "ambiguous",
+      hostCallResult: "ambiguous",
     });
     const second = await prepareUrgentAttempt({
       stateRoot: stateRoot(root),
@@ -179,7 +195,7 @@ test("different delivery attempts remain one logical urgent signal", async () =>
       stateRoot: stateRoot(root),
       urgentId,
       deliveryAttemptId: second.delivery_attempt_id,
-      outcome: "accepted",
+      hostCallResult: "sent",
     });
 
     assert.equal((await observeUrgentSignal({
@@ -208,7 +224,7 @@ test("different delivery attempts remain one logical urgent signal", async () =>
       stateRoot: stateRoot(root),
       urgentId,
       recipient: payload.recipient,
-      executorId: payload.executor_id,
+      senderExecutorId: payload.executor_id,
     });
     const status = await urgentSignalStatus(stateRoot(root));
     assert.equal(status.host_replay_count, 1);
@@ -218,7 +234,7 @@ test("different delivery attempts remain one logical urgent signal", async () =>
   }
 });
 
-test("an observed host attempt cannot later be reconciled as failed", async () => {
+test("an observed host attempt cannot later be reconciled as rejected-before-send", async () => {
   const root = await createGitFixture("codex-flow-urgent-observed-reconcile-");
   try {
     await bind(root);
@@ -242,13 +258,13 @@ test("an observed host attempt cannot later be reconciled as failed", async () =
       stateRoot: stateRoot(root),
       urgentId,
       deliveryAttemptId: attempt.delivery_attempt_id,
-      outcome: "failed",
-    }), /cannot be reconciled as failed/);
+      hostCallResult: "rejected-before-send",
+    }), /cannot be reconciled as rejected-before-send/);
     assert.equal((await reconcileUrgentAttempt({
       stateRoot: stateRoot(root),
       urgentId,
       deliveryAttemptId: attempt.delivery_attempt_id,
-      outcome: "ambiguous",
+      hostCallResult: "ambiguous",
     })).status, "ambiguous");
   } finally {
     await removeFixture(root);
@@ -270,7 +286,7 @@ test("corrected urgent signals advance sequence and suppress an unobserved prede
       stateRoot: stateRoot(root),
       urgentId: firstPersisted.urgent_id,
       deliveryAttemptId: firstAttempt.delivery_attempt_id,
-      outcome: "accepted",
+      hostCallResult: "sent",
     });
 
     await assert.rejects(persistUrgentSignal({
@@ -314,7 +330,7 @@ test("corrected urgent signals advance sequence and suppress an unobserved prede
       stateRoot: stateRoot(root),
       urgentId: correctedPersisted.urgent_id,
       recipient: corrected.recipient,
-      executorId: corrected.executor_id,
+      senderExecutorId: corrected.executor_id,
     });
 
     const third = signal({
@@ -352,7 +368,7 @@ test("delivery attempts freeze the current recipient generation", async () => {
       stateRoot: stateRoot(root),
       urgentId,
       deliveryAttemptId: first.delivery_attempt_id,
-      outcome: "ambiguous",
+      hostCallResult: "ambiguous",
     });
     const rebound = await rebindRecipient({
       stateRoot: stateRoot(root),
@@ -380,7 +396,7 @@ test("delivery attempts freeze the current recipient generation", async () => {
       attemptSequence: 2,
       retryReason: "recipient-rebound",
     });
-    assert.deepEqual(second.direct_envelope.recipient, current);
+    assert.deepEqual(JSON.parse(second.host_prompt).recipient, current);
     assert.notEqual(second.delivery_attempt_id, first.delivery_attempt_id);
     await assert.rejects(observeUrgentSignal({
       stateRoot: stateRoot(root),
@@ -431,7 +447,7 @@ test("urgent signals expire fail closed and reject unsafe content", async () => 
   }
 });
 
-test("oversized direct envelopes fail before an attempt is journaled", async () => {
+test("oversized host prompts fail before an attempt is journaled", async () => {
   const root = await createGitFixture("codex-flow-urgent-envelope-bound-");
   try {
     await bind(root);
