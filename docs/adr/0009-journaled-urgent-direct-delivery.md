@@ -2,9 +2,9 @@
 
 ## Status
 
-Accepted for v0.4.1 and amended for the v0.4.2 operator surface. The normal
-direct-delivery path is held-out proven; a natural host replay remains pending
-field evidence.
+Accepted for v0.4.1 and amended for the v0.4.2 operator surface. Both the normal
+direct-delivery path and the amended operator flow are held-out proven; a
+natural host replay remains pending field evidence.
 
 ## Context
 
@@ -78,4 +78,6 @@ content rejection, CLI lifecycle, doctor reporting, and audit-only cleanup. A
 held-out cross-task direct delivery proved the normal host path. Host replay is
 claimed only if the host actually reproduces one. v0.4.2 regressions also prove
 the ready-to-dispatch host prompt, rejection of the removed flags, exact
-consume arguments, and released host-worktree path/upstream guidance.
+consume arguments, and released host-worktree path/upstream guidance. A held-out
+UK Dev v0.4.2 task exercised those same boundaries through integration and exact
+cleanup without finding a package defect.

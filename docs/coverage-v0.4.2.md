@@ -29,14 +29,15 @@ adapter, compatibility alias, or state migration.
 - No compatibility aliases for the removed urgent flags or output field.
 - No prevention of host replay; the journal continues to suppress duplicate
   authority at observation time.
-- No held-out v0.4.2 repository task result until the downstream pilot reports
-  one.
 
-## Field gate
+## Held-out result
 
-Adoption should exercise one real urgent signal through prepare, one direct
-host call using `host_prompt`, reconcile, observe, and consume using the returned
-arguments. It should also confirm that a released host-worktree executor starts
-without treating the saved project path or initially absent upstream as a
-blocker. A natural host replay is evidence only if the host actually produces
-one.
+The 2026-08-25 UK Dev pilot accepted exact package revision `67d655d` through a
+visible Terra/xhigh host-worktree task. The removed consume flag failed with a
+byte-identical journal, the executor correctly distinguished the saved project
+from its bound worktree and accepted an initially absent upstream, and one
+`host_prompt` made one direct host call. Observation returned `process` plus the
+exact sender-bound consume arguments; consume and ordinary callback integration
+were each exactly once. Doctor, reproof, archive, and exact worktree/local/remote
+cleanup passed. No natural host replay occurred, so replay remains regression
+evidence rather than a held-out observation.
