@@ -2,7 +2,8 @@
 
 ## Status
 
-Accepted for v0.3.2; amended for the v0.4.3 active-wait contract.
+Accepted for v0.3.2; amended for the v0.4.3 active-wait contract and v0.4.4
+receipt-selection boundary.
 
 ## Context
 
@@ -23,8 +24,16 @@ universally callable package foundation.
 Every repository declares exactly one authority for ordinary completion.
 v0.3.2 installs `journal-monitor` with no host notification transport. An
 executor persists the strict receipt; the coordinator's quiet monitor reads
-the journal, observes with an explicit source, and consumes only after
-integration.
+the journal. Status inspection is discovery and does not mutate the receipt.
+The coordinator leaves it persisted while authenticating the branch and
+completing independent review, rechecks status, then observes only the exact
+receipt selected for integration or durable rejection. Consumption follows
+the completed disposition.
+
+Observation makes a receipt an immutable checkpoint. Sequence supersession is
+available only while the predecessor remains persisted. Work discovered after
+observation is a fresh task operation and run with a new `run_id`; it does not
+rewrite or supersede the observed checkpoint.
 
 A capability-probed host wait primitive such as `wait_threads` may wake an
 active coordinator when a task completes or needs attention. It is neither a
@@ -78,6 +87,9 @@ deterministic callback ID remain v2.
 - An active coordinator can wait efficiently without busy polling when the host
   exposes a bounded wait primitive; durable resumption still starts from the
   journal.
+- Independent review can request a corrected sequence while the original
+  receipt remains persisted; observation deliberately closes that correction
+  window.
 - Fresh v0.3.2 repositories create no ordinary-completion queue backlog.
 - Existing accepted v0.3.1 submissions cannot be recalled generically; doctor
   reports that residual risk.

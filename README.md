@@ -229,8 +229,13 @@ sender's executor ID; urgent consumption therefore uses
 Ordinary terminal completion uses `callback deliver`, which persists a strict
 receipt in the repository journal. The default and only installed project
 authority is `journal-monitor`: it creates no Codex thread-queue entry. The
-coordinator or its quiet monitor reads `callback status`, then observes with
-the current recipient identity and consumes only after integration.
+coordinator or its quiet monitor reads `callback status` without mutating the
+receipt. Keep a completion persisted while authenticating its branch and
+running any independent review. Observe only the exact receipt selected for an
+integration or durable-rejection disposition, then consume it only after that
+disposition is complete. An observed receipt is an immutable checkpoint and
+cannot be superseded; later correction requires a fresh task operation and
+`run_id`, not a higher callback sequence in the observed run.
 
 When the current host exposes `wait_threads`, the active coordinator should use
 it to wait efficiently on the current wave and carry returned cursors into later
@@ -283,8 +288,11 @@ Deletion requires an explicit deterministic `cleanup plan`, followed by an
 main revision, pinned remote identity, every exact tip, active leases, and a
 worktree scan that includes ignored and normally hidden untracked files. It
 then removes only the planned clean linked worktree, local ref, and remote ref,
-in that preservation-first order. An interruption invalidates the old plan;
-audit again and make a fresh plan for what remains. Executors never run cleanup.
+in that preservation-first order. A failed apply exits nonzero and emits a
+bounded structured result containing the requested plan ID, every completed
+action, the action where it stopped, and a nonempty reason. An interruption or
+partial result invalidates the old plan; audit again and make a fresh plan for
+what remains. Executors never run cleanup.
 Remote cleanup requires exactly one fetch URL and one identical push URL;
 split or fan-out remotes fail closed.
 This is a process-role rule rather than a security claim: a local CLI cannot
@@ -319,4 +327,4 @@ defines the v0.4 ownership and cleanup contract.
 defines the two-phase Desktop worktree contract.
 [Journaled urgent direct delivery](docs/adr/0009-journaled-urgent-direct-delivery.md)
 defines urgent-signal and delivery-attempt identity. The current covered
-boundary is listed in [v0.4.3 orchestration coverage](docs/coverage-v0.4.3.md).
+boundary is listed in [v0.4.4 orchestration coverage](docs/coverage-v0.4.4.md).

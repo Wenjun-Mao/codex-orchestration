@@ -20,8 +20,9 @@ capabilities and retention value vary.
 For records proven merged, patch-equivalent, or superseded, create an explicit
 `cleanup plan` from clean pushed main. Review its operation IDs and actions,
 then apply that exact plan ID. Drift invalidates the plan. If apply is
-interrupted, audit again and create a fresh plan for the remaining state. Never
-delete from a branch-name pattern, and never
-remove dirty, active, protected, unmerged, or ambiguous state. Do not remove
-repositories, Cocos projects, ignored authority, generated evidence, or user
-files through this workflow.
+interrupted or partially succeeds, it exits nonzero with the completed actions,
+stopping action, and bounded reason. Do not retry that plan; audit again and
+create a fresh plan for the remaining state. Never delete from a branch-name
+pattern, and never remove dirty, active, protected, unmerged, or ambiguous
+state. Do not remove repositories, Cocos projects, ignored authority, generated
+evidence, or user files through this workflow.

@@ -58,6 +58,12 @@ upstream ref are checked against the protected-branch set. The local CLI is not
 an authentication boundary and cannot prove the caller's Codex role; process
 policy assigns cleanup commands only to the coordinator, never an executor.
 
+Each verified mutation is accumulated in memory before the next action. If
+apply stops, it exits nonzero with a structured partial or failed result that
+contains the requested plan ID, completed actions, stopping action, and a
+bounded nonempty reason. This evidence assists recovery but does not make the
+old plan resumable; audit and plan again from observed state.
+
 Task preparation checks configurable warning and block thresholds using cheap
 local evidence. Crossing the block threshold stops a new wave until the
 coordinator reconciles its local backlog. Exact remote cleanup remains an

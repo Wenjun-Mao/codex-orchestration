@@ -36,6 +36,7 @@ import {
   authorizeGitBoundTaskRelease,
   bindGitOwnership,
   createGitCleanupPlan,
+  GitCleanupApplyError,
   gitLifecycleAudit,
   gitLifecycleReadiness,
   recordGitIntegration,
@@ -1034,9 +1035,26 @@ async function commandCleanup(args) {
       mainBranch: values["main-branch"],
       includeRemote: values["include-remote"],
     };
-    const result = subcommand === "plan"
-      ? await createGitCleanupPlan(common)
-      : await applyGitCleanupPlan({ ...common, expectedPlanId: values["plan-id"] });
+    let result;
+    try {
+      result = subcommand === "plan"
+        ? await createGitCleanupPlan(common)
+        : await applyGitCleanupPlan({ ...common, expectedPlanId: values["plan-id"] });
+    } catch (error) {
+      if (!(error instanceof GitCleanupApplyError)) throw error;
+      output(error.result, {
+        json: values.json,
+        human: (item) => [
+          `Git cleanup ${item.status}: ${item.plan_id}`,
+          ...item.completed_actions.map((action) => `  completed: ${action}`),
+          `  stopped at: ${item.failed_action}`,
+          `  error: ${item.error}`,
+          "Run cleanup audit and create a fresh plan; do not retry this plan.",
+        ].join("\n"),
+      });
+      process.exitCode = error.exitCode;
+      return;
+    }
     output(result, {
       json: values.json,
       human: (item) => subcommand === "plan"

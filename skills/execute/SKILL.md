@@ -30,7 +30,9 @@ resend the same attempt. On terminal completion, leave a reviewable branch
 state and persist one bounded schema-v2 receipt with `codex-flow callback deliver`.
 Do not separately queue ordinary completion.
 Retries retain the same run, sequence, and callback ID. A correction advances
-the sequence and explicitly supersedes the earlier unconsumed callback.
+the sequence and explicitly supersedes only the earlier persisted, unobserved
+callback. If the coordinator already observed it, correction requires a fresh
+task operation and run rather than rewriting that checkpoint.
 
 Read [Stop policy](../../templates/references/stop-policy.md) when the packet's
 authority or boundary is challenged. Receipts must never contain secrets, raw

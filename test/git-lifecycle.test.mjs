@@ -11,6 +11,7 @@ import {
   authorizeGitBoundTaskRelease,
   bindGitOwnership,
   createGitCleanupPlan,
+  GitCleanupApplyError,
   gitLifecycleAudit,
   gitLifecycleReadiness,
   recordGitIntegration,
@@ -430,22 +431,34 @@ test("cleanup plan removes only a proven merged worktree and exact local/remote 
       includeRemote: true,
     });
     let interrupted = false;
-    await assert.rejects(applyGitCleanupPlan({
-      git: gitSnapshot(value.root),
-      config: value.config,
-      expectedPlanId: plan.plan_id,
-      operationIds: [operationId],
-      mainBranch: "main",
-      includeRemote: true,
-      hooks: {
-        afterAction({ action }) {
-          if (action === "worktree-remove" && !interrupted) {
-            interrupted = true;
-            throw new Error("simulated interruption");
-          }
+    let partialFailure;
+    try {
+      await applyGitCleanupPlan({
+        git: gitSnapshot(value.root),
+        config: value.config,
+        expectedPlanId: plan.plan_id,
+        operationIds: [operationId],
+        mainBranch: "main",
+        includeRemote: true,
+        hooks: {
+          afterAction({ action }) {
+            if (action === "worktree-remove" && !interrupted) {
+              interrupted = true;
+              throw undefined;
+            }
+          },
         },
-      },
-    }), /simulated interruption/);
+      });
+    } catch (error) {
+      partialFailure = error;
+    }
+    assert.equal(partialFailure instanceof GitCleanupApplyError, true);
+    assert.equal(partialFailure.result.status, "partial");
+    assert.equal(partialFailure.result.plan_id, plan.plan_id);
+    assert.deepEqual(partialFailure.result.completed_actions, [`${operationId}:worktree-remove`]);
+    assert.equal(partialFailure.result.failed_action, `${operationId}:worktree-remove:post-action`);
+    assert.equal(partialFailure.result.error, "Unknown cleanup failure");
+    assert.match(partialFailure.message, /Unknown cleanup failure/);
     await assert.rejects(applyGitCleanupPlan({
       git: gitSnapshot(value.root),
       config: value.config,

@@ -15,12 +15,15 @@
 6. **Wait:** when the host exposes `wait_threads`, use it to suspend on the
    active wave. Treat every wake as a prompt to inspect the repository journal,
    never as completion or integration authority.
-7. **Integrate:** observe under the current recipient generation, authenticate,
-   review, merge serially, reprove combined behavior, and record the exact Git
-   integration disposition.
+7. **Integrate:** keep the receipt persisted while authenticating and reviewing
+   it, recheck status, observe only the selected exact result under the current
+   recipient generation, merge serially, reprove combined behavior, and record
+   the exact Git integration disposition. Corrections after observation are new
+   runs, never superseding sequences.
 8. **Close:** consume the callback exactly once, release resources, archive
    appropriate task threads when the host permits it, audit Git state, and use
-   an explicit cleanup plan/apply pair for eligible task branches/worktrees.
+   an explicit cleanup plan/apply pair for eligible task branches/worktrees. A
+   failed or partial apply requires a fresh audit and plan for what remains.
 
 Thread creation, archiving, deletion, and host-specific role binding are
 capabilities, not assumptions. Record what the current session actually

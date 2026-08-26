@@ -72,6 +72,12 @@ is transient notification only; the callback journal remains the sole
 integration authority. An interrupted wait or ended coordinator turn resumes
 from journal state, not from an assumed background waiter.
 
+Treat callback status as discovery, not observation. Leave a completion
+persisted while its exact branch and any independent review are evaluated;
+observe only the receipt selected for disposition. An observed receipt cannot
+be corrected by sequence supersession, so later work requires a fresh task
+operation and run.
+
 For an urgent direct message, run `urgent observe` before acting. Process only
 the first logical observation, suppress host replays and additional sender
 attempts, then run `urgent consume` with the returned exact

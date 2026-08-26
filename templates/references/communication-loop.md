@@ -14,14 +14,21 @@ Coordinator integration is exactly once by the deterministic callback ID.
 Persisted integration lifecycle is `persisted`, `observed`, then `consumed`;
 explicit `superseded` and `expired` are terminal alternatives. The v0.4
 `journal-monitor` authority creates no host queue notification. The coordinator
-calls `callback observe`, then `callback consume` only after the result has
-been integrated or deliberately rejected and recorded.
+uses `callback status` as discovery only. Keep the receipt persisted while
+authenticating its branch and completing any independent review. Call
+`callback observe` only after selecting that exact receipt for integration or
+durable rejection, then call `callback consume` after the disposition is
+complete. An observed receipt is an immutable checkpoint and cannot be
+superseded. Later corrections require a fresh task operation and `run_id`, not
+a replacement sequence in the observed run.
 
 A monitor or coordinator inspects `callback status`; it suppresses duplicate
 IDs and remains silent on unchanged state. It must not invent a result from
-task age, UI state, or arrival order. Never combine monitor integration with a
-separate ordinary-completion queue. v0.4 rejects older callback journals rather
-than retaining a second delivery model.
+task age, UI state, or arrival order. Recheck status immediately before
+observation so a review-time supersession cannot be mistaken for the selected
+receipt. Never combine monitor integration with a separate ordinary-completion
+queue. v0.4 rejects older callback journals rather than retaining a second
+delivery model.
 
 When the current Codex host exposes `wait_threads`, prefer it as the active
 coordinator's transient wake-up mechanism. Wait on the active wave, carry each
