@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted for v0.3.2.
+Accepted for v0.3.2; amended for the v0.4.3 active-wait contract.
 
 ## Context
 
@@ -25,6 +25,13 @@ v0.3.2 installs `journal-monitor` with no host notification transport. An
 executor persists the strict receipt; the coordinator's quiet monitor reads
 the journal, observes with an explicit source, and consumes only after
 integration.
+
+A capability-probed host wait primitive such as `wait_threads` may wake an
+active coordinator when a task completes or needs attention. It is neither a
+notification transport nor an integration authority: the coordinator must
+return to the repository journal after every wake. Host cursors optimize one
+active waiting session but do not replace callback identity or durable state
+across interruption, compaction, restart, or a completed coordinator turn.
 
 Integration and notification are independent state machines:
 
@@ -60,11 +67,17 @@ deterministic callback ID remain v2.
   potentially live host notifications and weaken auditability.
 - Queue the full receipt. A pointer is sufficient and avoids stale-turn token
   and data exposure.
+- Treat a host wait result or task final text as the receipt. Those are transient
+  host observations without the journal's deterministic identity, fencing, or
+  exactly-once integration state.
 
 ## Consequences
 
 - Ordinary completion is pull-based and requires the coordinator monitor to
   remain active or be resumed.
+- An active coordinator can wait efficiently without busy polling when the host
+  exposes a bounded wait primitive; durable resumption still starts from the
+  journal.
 - Fresh v0.3.2 repositories create no ordinary-completion queue backlog.
 - Existing accepted v0.3.1 submissions cannot be recalled generically; doctor
   reports that residual risk.

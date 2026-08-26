@@ -53,6 +53,16 @@ created, reconcile `not-created`, then start a new attempt only before the
 launch deadline. Never infer failure from a local timeout or create a different
 kind as fallback.
 
+For active-turn monitoring, capability-probe `wait_threads`. On the current
+Codex App contract it can wait on up to eight task IDs, returns when one task
+finishes or needs attention, supports an immediate snapshot with a zero
+timeout, and accepts per-task cursors that suppress already-delivered final
+text. Batch larger waves within the advertised host limit. New user input may
+end a wait early, so every wake or interruption must return to repository
+`callback status`; do not busy-poll or treat the wait result as integration
+authority. If the capability is absent, use bounded list/read inspection or an
+explicit monitor without changing the journal contract.
+
 Urgent direct delivery uses the same one-shot boundary without adding a host
 adapter. Persist the logical signal, prepare one attempt, release every journal
 lock, and pass the returned `host_prompt` string unchanged to direct Steer once

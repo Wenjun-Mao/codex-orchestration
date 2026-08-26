@@ -65,6 +65,13 @@ Read the detailed references only as needed:
 The coordinator owns task creation, monitors, callback integration, archiving,
 resource release, and post-merge reproof. Executors do not.
 
+When `wait_threads` is callable, use it for bounded active-wave waiting instead
+of repeated thread reads. Carry returned cursors forward and inspect
+`codex-flow callback status` after every completion wake. The host wait result
+is transient notification only; the callback journal remains the sole
+integration authority. An interrupted wait or ended coordinator turn resumes
+from journal state, not from an assumed background waiter.
+
 For an urgent direct message, run `urgent observe` before acting. Process only
 the first logical observation, suppress host replays and additional sender
 attempts, then run `urgent consume` with the returned exact

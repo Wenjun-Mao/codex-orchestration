@@ -232,6 +232,14 @@ authority is `journal-monitor`: it creates no Codex thread-queue entry. The
 coordinator or its quiet monitor reads `callback status`, then observes with
 the current recipient identity and consumes only after integration.
 
+When the current host exposes `wait_threads`, the active coordinator should use
+it to wait efficiently on the current wave and carry returned cursors into later
+waits. It is notification only: after every completion wake, inspect
+`callback status` and follow the same observe, integration, reproof, and consume
+path. Task final text, needs-attention state, timeout, or wait interruption is
+not a receipt. If the coordinator turn ends, durable resumption still comes
+from the journal or an explicit automation.
+
 Integration is exactly once by deterministic callback ID and a durable
 observed/consumed journal. Corrected receipts use increasing sequence numbers
 and explicit supersession; arrival order is never authority. Task packets and
@@ -311,4 +319,4 @@ defines the v0.4 ownership and cleanup contract.
 defines the two-phase Desktop worktree contract.
 [Journaled urgent direct delivery](docs/adr/0009-journaled-urgent-direct-delivery.md)
 defines urgent-signal and delivery-attempt identity. The current covered
-boundary is listed in [v0.4.2 orchestration coverage](docs/coverage-v0.4.2.md).
+boundary is listed in [v0.4.3 orchestration coverage](docs/coverage-v0.4.3.md).

@@ -23,6 +23,15 @@ task age, UI state, or arrival order. Never combine monitor integration with a
 separate ordinary-completion queue. v0.4 rejects older callback journals rather
 than retaining a second delivery model.
 
+When the current Codex host exposes `wait_threads`, prefer it as the active
+coordinator's transient wake-up mechanism. Wait on the active wave, carry each
+returned cursor into the next bounded wait, and inspect `callback status` after
+a completion wake. A wait result, final task text, timeout, or needs-attention
+event is never a receipt and cannot authorize integration. The repository
+journal survives compaction, restart, and interrupted waits; wait cursors do
+not replace it. A coordinator that has ended its turn still needs an explicit
+resume or automation rather than an assumed background wait.
+
 Bind one coordinator lineage before launch. After a fork or authoritative
 replacement, fence and rebind that lineage to the new thread generation.
 Delivery resolves stale packets to the current generation; observation and

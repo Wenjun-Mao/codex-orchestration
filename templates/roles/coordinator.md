@@ -41,9 +41,11 @@ the sender, not this coordinator. Identity-less urgent messages are
 nonauthoritative.
 Leave ordinary completion to the durable callback journal. The quiet journal
 monitor is the sole ordinary-completion authority; do not also queue completion
-messages. Observe each callback through the journal monitor, integrate its
-ID once under the current recipient generation, reauthenticate the branch and
-scope, merge serially, reprove the combined state, record Git integration,
-consume the callback, and audit stale operational state. Cleanup requires a
-reviewed coordinator-owned plan/apply pair. After a fork, rebind the lineage before
-accepting new callbacks.
+messages. When callable, use `wait_threads` to suspend efficiently on the active
+wave, then inspect `callback status` after each wake; neither the wait result nor
+task final text is a receipt. Observe each callback through the journal monitor,
+integrate its ID once under the current recipient generation, reauthenticate the
+branch and scope, merge serially, reprove the combined state, record Git
+integration, consume the callback, and audit stale operational state. Cleanup
+requires a reviewed coordinator-owned plan/apply pair. After a fork, rebind the
+lineage before accepting new callbacks.

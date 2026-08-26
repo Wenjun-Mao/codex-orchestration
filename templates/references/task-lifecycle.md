@@ -12,10 +12,13 @@
 4. **Execute:** remain inside packet ownership and verify proportionally.
 5. **Signal:** persist and identify urgent conditions before direct Steer;
    persist one ordinary terminal callback for the declared journal monitor.
-6. **Integrate:** observe under the current recipient generation, authenticate,
+6. **Wait:** when the host exposes `wait_threads`, use it to suspend on the
+   active wave. Treat every wake as a prompt to inspect the repository journal,
+   never as completion or integration authority.
+7. **Integrate:** observe under the current recipient generation, authenticate,
    review, merge serially, reprove combined behavior, and record the exact Git
    integration disposition.
-7. **Close:** consume the callback exactly once, release resources, archive
+8. **Close:** consume the callback exactly once, release resources, archive
    appropriate task threads when the host permits it, audit Git state, and use
    an explicit cleanup plan/apply pair for eligible task branches/worktrees.
 
