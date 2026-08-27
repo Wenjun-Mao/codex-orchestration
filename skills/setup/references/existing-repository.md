@@ -59,6 +59,12 @@ only planned Codex Flow files and instruction integration. Commit and integrate
 through the repository's normal reviewed path; never integrate an adoption
 that weakens an existing contract.
 
+After the integration is verified on the authoritative branch, remove the
+clean adoption and integration worktrees created by this setup run and delete
+only the proven-merged `codex/codex-flow-v0.5-adoption` branch (including its
+exact remote branch when one exists). Reinspect the inventory and rehash any
+pre-existing dirty files; do not leave setup residue or alter ongoing work.
+
 After integration, use the pinned coordinator workflow for newly launched
 tasks. Pre-adoption tasks finish under their original contract and must not be
 retroactively journaled, integrated, archived, or cleaned by Codex Flow.

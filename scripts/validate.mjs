@@ -131,6 +131,7 @@ const setupContracts = new Map([
     "codex/codex-flow-v0.5-bootstrap",
     "--setup-mode new",
     "--project-id \"$CODEX_FLOW_PROJECT_ID\"",
+    "do not leave setup residue behind",
     "Use managed AGENTS mode",
     "Do not modify product files or launch delegated",
   ]],
@@ -140,6 +141,7 @@ const setupContracts = new Map([
     "--setup-mode existing",
     "temporary adoption worktree suffix",
     "--project-id \"$CODEX_FLOW_PROJECT_ID\"",
+    "do not leave setup residue or alter ongoing work",
     "must not be retroactively journaled, integrated, archived, or cleaned",
   ]],
 ]);
@@ -156,6 +158,8 @@ for (const [name, contractMarkers] of setupContracts) {
 const setupSkill = await readFile(resolve(root, "skills/setup/SKILL.md"), "utf8");
 for (const marker of [
   "installed plugin containing this skill as the accepted package",
+  "CODEX_FLOW_SETUP_SKILL_DIR/scripts/resolve-plugin-root.mjs",
+  "the resolver is packaged under `skills/setup/scripts/`",
   "Automatic discovery is not mutation authority",
   "explicit retirement and fresh installation",
   "populated non-Git directory",

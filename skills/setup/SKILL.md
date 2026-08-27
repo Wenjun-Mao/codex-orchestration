@@ -6,10 +6,18 @@ description: Set up or adopt the installed Codex Flow plugin in a repository whe
 # Set Up Codex Flow
 
 Treat the installed plugin containing this skill as the accepted package
-authority. Run the adjacent `scripts/resolve-plugin-root.mjs` by its absolute
-path as loaded with this skill. Use its single stdout line as
-`CODEX_FLOW_PLUGIN_ROOT`; the resolver fails unless package, plugin, and runtime
-versions agree. Run the bundled CLI with:
+authority. Let `CODEX_FLOW_SETUP_SKILL_DIR` be the absolute directory that
+contains this loaded `SKILL.md`, then run exactly:
+
+```bash
+CODEX_FLOW_PLUGIN_ROOT="$(node \
+  "$CODEX_FLOW_SETUP_SKILL_DIR/scripts/resolve-plugin-root.mjs")"
+```
+
+Do not shorten that path to `<plugin-root>/scripts/resolve-plugin-root.mjs`;
+the resolver is packaged under `skills/setup/scripts/`. Use its single stdout
+line as `CODEX_FLOW_PLUGIN_ROOT`; the resolver fails unless package, plugin,
+and runtime versions agree. Run the bundled CLI with:
 
 ```bash
 node "$CODEX_FLOW_PLUGIN_ROOT/bin/codex-flow.mjs" ...

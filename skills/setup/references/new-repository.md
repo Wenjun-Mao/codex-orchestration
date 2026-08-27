@@ -46,6 +46,12 @@ Confirm the diff contains only the planned Codex Flow installation and
 explicitly authorized baseline files. Commit and integrate through the
 repository's normal reviewed path.
 
+After the integration is verified on the authoritative branch, remove the
+clean bootstrap worktree if one was created and delete only the proven-merged
+`codex/codex-flow-v0.5-bootstrap` branch (including its exact remote branch when
+one exists). Reinspect the final worktree and branch inventory; do not leave
+setup residue behind.
+
 After integration, start coordinator work with the pinned runtime:
 
 ```bash
