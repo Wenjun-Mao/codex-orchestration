@@ -19,11 +19,18 @@ v0.4 ordinary callback authority.
   cleanup error message.
 - Recovery remains audit-first: partial mutation invalidates the old plan and
   requires a fresh deterministic plan for what remains.
+- The canonical package includes separate, version-neutral prompts for a new
+  repository and an existing-project cutover. Both require an exact package
+  path, commit, and version before use.
+- Source validation keeps both prompt contracts and their package inclusion
+  from silently drifting or disappearing.
 
 ## Not claimed
 
 - No review scheduler, callback reservation state, correction queue, cleanup
   event journal, daemon, or compatibility layer.
+- Pre-installation prompts are not copied into every target repository; the
+  pinned runtime owns only post-activation roles and references.
 - No automatic retry or resume of a partially applied cleanup plan.
 - No change to callback identity, journal schemas, Git cleanup plan identity,
   or mutation ordering.

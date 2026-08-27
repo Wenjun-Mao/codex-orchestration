@@ -21,6 +21,7 @@
     "lib/",
     "schemas/",
     "examples/",
+    "prompts/",
     "skills/",
     "templates/",
     "docs/",

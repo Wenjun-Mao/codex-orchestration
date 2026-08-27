@@ -31,6 +31,9 @@ if (packageJson.version !== PACKAGE_VERSION || plugin.version !== PACKAGE_VERSIO
   throw new Error("Package, plugin, and runtime versions must match");
 }
 if (packageJson.private !== true) throw new Error("Package must remain private");
+if (!packageJson.files.includes("prompts/")) {
+  throw new Error("Published package must include reusable adoption prompts");
+}
 for (const field of [
   "dependencies",
   "devDependencies",
@@ -120,6 +123,31 @@ for (const skillName of ["index", "coordinate", "execute", "integrate", "cleanup
   const skill = await readFile(resolve(root, "skills", skillName, "SKILL.md"), "utf8");
   if (!skill.startsWith("---\n") || !skill.includes(`\nname: ${skillName}\n`)) {
     throw new Error(`Invalid skill entrypoint: ${skillName}`);
+  }
+}
+
+const promptContracts = new Map([
+  ["bootstrap-new-project.md", [
+    "Use managed AGENTS mode because this is a new repository.",
+    "Do not modify product files or launch delegated tasks",
+  ]],
+  ["adopt-existing-project.md", [
+    "Do not migrate or assume ownership of tasks launched before this adoption.",
+    "external AGENTS mode only when an explicitly reviewed equivalent orchestration",
+    "must not be retroactively journaled, integrated, archived, or cleaned",
+  ]],
+]);
+for (const [name, contractMarkers] of promptContracts) {
+  const prompt = await readFile(resolve(root, "prompts", name), "utf8");
+  for (const placeholder of [
+    "{{CODEX_FLOW_PACKAGE_PATH}}",
+    "{{CODEX_FLOW_PACKAGE_COMMIT}}",
+    "{{CODEX_FLOW_VERSION}}",
+  ]) {
+    if (!prompt.includes(placeholder)) throw new Error(`${name} is missing placeholder ${placeholder}`);
+  }
+  for (const marker of contractMarkers) {
+    if (!prompt.includes(marker)) throw new Error(`${name} is missing adoption contract: ${marker}`);
   }
 }
 

@@ -104,6 +104,19 @@ reasoning. `config set` changes repository defaults, and each task packet may
 override either value. The resolved values must be passed to the actual host
 creation call; prompt text alone does not configure a task.
 
+## Reusable adoption prompts
+
+The canonical package maintains two operator-facing copy-paste prompts:
+
+- [Bootstrap a new repository](prompts/bootstrap-new-project.md)
+- [Adopt Codex Flow in an existing repository](prompts/adopt-existing-project.md)
+
+Replace their package path, commit, and version placeholders with one exact
+accepted checkpoint before use. These prompts intentionally remain in the
+canonical package rather than the pinned repository runtime: they govern the
+pre-installation boundary, while installed roles and references govern work
+after activation.
+
 ## Core commands
 
 ```text
