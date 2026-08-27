@@ -15,12 +15,18 @@ Use this mode only when the user explicitly identifies the repository as new.
 
 ## Plan And Activate
 
+Choose one stable `CODEX_FLOW_PROJECT_ID` for the repository before creating
+the bootstrap branch. Keep that same exact identifier for plan and apply;
+setup fails closed when it is omitted.
+
 From the exact bootstrap worktree, run:
 
 ```bash
-node "$CODEX_FLOW_PLUGIN_ROOT/bin/codex-flow.mjs" init --plan --setup-mode new --json
+node "$CODEX_FLOW_PLUGIN_ROOT/bin/codex-flow.mjs" init --plan \
+  --setup-mode new --project-id "$CODEX_FLOW_PROJECT_ID" --json
 node "$CODEX_FLOW_PLUGIN_ROOT/bin/codex-flow.mjs" init \
-  --apply-plan <plan_id> --setup-mode new --json
+  --apply-plan <plan_id> --setup-mode new \
+  --project-id "$CODEX_FLOW_PROJECT_ID" --json
 ```
 
 Review the complete write set, AGENTS before/after result, conflicts, branch,

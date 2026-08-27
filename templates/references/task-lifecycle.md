@@ -3,8 +3,10 @@
 1. **Admit:** bind objective, authority, baseline, and exclusions.
 2. **Map:** validate dependencies, write ownership, resources, and gates.
 3. **Launch:** persist a creation operation, record capability evidence for the
-   current host session, create the exact requested task kind before its
-   deadline, pass resolved `model` and `reasoning_effort` as actual host
+   current host session, create a project-backed visible task in the
+   coordinator's same saved Codex App project by default, and create the exact
+   requested task kind before its deadline. Pass resolved `model` and
+   `reasoning_effort` as actual host
    arguments, then inspect and reconcile field-level evidence. Normalize a
    substituted task-thread title only through a bounded write and exact reread.
    For a host-created worktree, create with the no-action bootstrap, observe and
@@ -20,8 +22,10 @@
    recipient generation, merge serially, reprove combined behavior, and record
    the exact Git integration disposition. Corrections after observation are new
    runs, never superseding sequences.
-8. **Close:** consume the callback exactly once, release resources, archive
-   appropriate task threads when the host permits it, audit Git state, and use
+8. **Close:** consume the callback exactly once, release resources, archive a
+   terminal visible task by default after its result and Git disposition are
+   preserved (while leaving blocked or attention-needed tasks visible), audit
+   Git state, and use
    an explicit cleanup plan/apply pair for eligible task branches/worktrees. A
    failed or partial apply requires a fresh audit and plan for what remains.
 

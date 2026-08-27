@@ -27,12 +27,19 @@ file state. Never infer equivalence merely because instructions exist.
 
 ## Plan And Activate
 
+Before creating the linked worktree, derive one stable `CODEX_FLOW_PROJECT_ID`
+from the original repository's intended identity. It must not contain the
+temporary adoption worktree suffix. Keep that same exact identifier for plan
+and apply; setup fails closed when it is omitted.
+
 Create the adoption branch before planning, then run from its exact worktree:
 
 ```bash
-node "$CODEX_FLOW_PLUGIN_ROOT/bin/codex-flow.mjs" init --plan --setup-mode existing --json
+node "$CODEX_FLOW_PLUGIN_ROOT/bin/codex-flow.mjs" init --plan \
+  --setup-mode existing --project-id "$CODEX_FLOW_PROJECT_ID" --json
 node "$CODEX_FLOW_PLUGIN_ROOT/bin/codex-flow.mjs" init \
-  --apply-plan <plan_id> --setup-mode existing --json
+  --apply-plan <plan_id> --setup-mode existing \
+  --project-id "$CODEX_FLOW_PROJECT_ID" --json
 ```
 
 Review the complete write set, AGENTS before/after result, conflicts, branch,

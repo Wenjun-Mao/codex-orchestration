@@ -36,6 +36,13 @@ that session; record a new session preflight after restart. Use the smallest
 concurrency that shortens the critical path and never launch after the packet
 deadline.
 
+Create every project-backed visible task thread in the coordinator's same saved
+Codex App project by default, using that project's exact host ID. A different
+saved project requires an explicit target and reason. Projectless is an explicit
+exception only for a truly repositoryless task or an unsaved disposable fixture;
+record that reason in the operation evidence instead of silently losing project
+context.
+
 For a host-created worktree, create the task with only the generated bootstrap
 prompt. Observe its actual path, reconcile, run `codex-flow git bind`, then
 generate and send `task operation release`. Binding persists its claim receipt
@@ -63,7 +70,10 @@ Read the detailed references only as needed:
   creation or timeout recovery.
 
 The coordinator owns task creation, monitors, callback integration, archiving,
-resource release, and post-merge reproof. Executors do not.
+resource release, and post-merge reproof. Executors do not. After a visible task
+has reached its terminal disposition, its result is preserved, its callback is
+consumed, and owned Git/worktree cleanup is reconciled, archive it by default.
+Keep blocked or attention-needed tasks visible until their handoff is resolved.
 
 When `wait_threads` is callable, use it for bounded active-wave waiting instead
 of repeated thread reads. Carry returned cursors forward and inspect

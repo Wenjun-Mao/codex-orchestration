@@ -10,24 +10,30 @@ For task creation:
    derive the exact worktree root, full `HEAD`, and cleanliness. For
    `host-worktree`, derive the saved repository root, local starting branch,
    exact branch tip, and a distinct unclaimed executor branch from Git.
-2. Record a stable, nonsecret host-session marker and capability evidence for
+2. Resolve the coordinator's saved Codex App project and create a project-backed
+   visible task in that same project by default. Record its exact project ID in
+   the coordinator's host-call evidence. A cross-project target needs an explicit
+   reason.
+   Projectless is an explicit exception only for a truly repositoryless task or
+   an unsaved disposable fixture, and its reason must be recorded.
+3. Record a stable, nonsecret host-session marker and capability evidence for
    the requested kind, model, and reasoning. Also record whether filtered
    discovery works or which bounded fallback is available.
-3. Run `task operation prepare`, `task operation preflight`, then
+4. Run `task operation prepare`, `task operation preflight`, then
    `task operation attempt`. Preparation and attempt fail closed on baseline
    mismatch; unsupported or unverified required selectors stop before dispatch.
-4. For `local` or `projectless`, call the host once with the released packet.
+5. For `local` or `projectless`, call the host once with the released packet.
    For `host-worktree`, render `task operation bootstrap` and use only that
    no-action prompt in the one creation call.
-5. List/read the resulting host object. A task thread must be user-visible and
+6. List/read the resulting host object. A task thread must be user-visible and
    its title must be independently reread. If the host used the delegation
    envelope, perform one bounded title update, reread the exact requested title,
    and record `bounded-host-write`. A subagent may have no title field; keep its
    host nickname separate.
-6. Reconcile the attempt as `observed` with field-level provenance for title,
+7. Reconcile the attempt as `observed` with field-level provenance for title,
    visibility, model, reasoning, host label, and execution path. A
    `host-worktree` path must come from host observation.
-7. For `host-worktree`, run `git bind`, then `task operation release` and send
+8. For `host-worktree`, run `git bind`, then `task operation release` and send
    the resulting full packet to the same task. A pristine detached worktree may
    be claimed only as the packet-declared executor branch after an immutable
    claim receipt is persisted; an unreceipted named branch is rejected. An
@@ -81,8 +87,11 @@ are different states.
 
 Archive and send operations remain host capabilities. Apply the same
 operation-ID, bounded-wait, inspect-before-retry, and duplicate-safe principles,
-but the current portable journal directly models creation only. Cleanup never
-auto-archives or auto-deletes tasks.
+but the current portable journal directly models creation only. The coordinator
+archives a visible task by default only after terminal disposition, preserved
+result, consumed callback, and reconciled Git/worktree cleanup. It never archives
+a blocked or attention-needed task merely because its current turn ended, and
+cleanup never auto-deletes tasks.
 
 There is an unavoidable narrow gap between a successful pre-dispatch check and
 the private host call. Keep that call immediate and one-shot; the executor must

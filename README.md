@@ -95,8 +95,10 @@ then plan and apply.
 
 Plugin setup passes `--setup-mode new` or `--setup-mode existing` to both plan
 and apply. That option additionally requires the corresponding dedicated v0.5
-bootstrap/adoption branch and a clean worktree. It is optional only for
-headless callers intentionally using the lower-level installation primitive.
+bootstrap/adoption branch, a clean worktree, and an explicit stable
+`--project-id` that is not derived from a disposable worktree name. It is
+optional only for headless callers intentionally using the lower-level
+installation primitive.
 
 Managed instruction mode preserves existing `AGENTS.md` content and owns one
 bounded block. A mature repository with an equivalent contract may instead use:
@@ -187,6 +189,14 @@ tool, persist a deterministic operation with `task operation prepare`, record
 strict capability evidence for the current host session with `preflight`, then
 start a bounded attempt. After the host call, inspect the actual object and
 reconcile its ID, kind, and field-level evidence provenance.
+
+Project-backed visible tasks are created in the coordinator's same saved Codex
+App project by default. Cross-project placement requires an explicit target and
+reason. Projectless placement is an explicit exception for repositoryless work
+or an unsaved disposable fixture, and the coordinator records why it was used.
+After terminal disposition, preserved evidence, callback consumption, and Git
+cleanup reconciliation, the coordinator archives the visible task by default;
+blocked or attention-needed tasks remain visible until resolved.
 
 `local` packets name an existing exact Git worktree in
 `environment.project_path`; preparation and attempt authenticate its full

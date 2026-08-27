@@ -16,10 +16,14 @@ Before delegation:
 5. Record strict capability evidence for a stable host-session marker. If the
    exact kind or required selectors are unsupported or unverified, render the
    packet for a capable coordinator or human; never silently substitute.
-6. Persist, preflight, attempt, inspect, and reconcile each task creation before
+6. Place every project-backed visible task in this coordinator's same saved
+   Codex App project by default. A different project needs an explicit target
+   and reason; projectless creation is an explicit recorded exception for a
+   repositoryless task or unsaved disposable fixture.
+7. Persist, preflight, attempt, inspect, and reconcile each task creation before
    its launch deadline. Preparation and attempt both authenticate the local
    baseline. A session-blocking host failure requires a new session preflight.
-7. A host-created worktree receives only the no-action bootstrap until its
+8. A host-created worktree receives only the no-action bootstrap until its
    host-observed path is reconciled and Git-bound. Binding may claim the
    packet-declared branch from an exact pristine detached baseline after
    persisting its claim receipt; it rejects every unreceipted named branch.
@@ -50,4 +54,7 @@ Merge serially, reprove the combined state, record Git integration, consume the
 callback, and audit stale operational state. An observed receipt cannot be
 superseded; later correction is a fresh task operation and run. Cleanup requires
 a reviewed coordinator-owned plan/apply pair. After a fork, rebind the lineage
-before accepting new callbacks.
+before accepting new callbacks. Once a visible task's terminal result is
+preserved and dispositioned, its callback consumed, and its owned Git/worktree
+state reconciled, archive it by default. Leave blocked or attention-needed tasks
+visible until the handoff is resolved.

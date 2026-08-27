@@ -130,6 +130,7 @@ const setupContracts = new Map([
   ["new-repository.md", [
     "codex/codex-flow-v0.5-bootstrap",
     "--setup-mode new",
+    "--project-id \"$CODEX_FLOW_PROJECT_ID\"",
     "Use managed AGENTS mode",
     "Do not modify product files or launch delegated",
   ]],
@@ -137,6 +138,8 @@ const setupContracts = new Map([
     "Do not migrate or assume ownership of tasks launched before adoption.",
     "codex/codex-flow-v0.5-adoption",
     "--setup-mode existing",
+    "temporary adoption worktree suffix",
+    "--project-id \"$CODEX_FLOW_PROJECT_ID\"",
     "must not be retroactively journaled, integrated, archived, or cleaned",
   ]],
 ]);
@@ -180,6 +183,32 @@ for (const marker of [
 if (!plugin.interface.defaultPrompt.some((item) => item.includes("Set up Codex Flow"))
   || !plugin.interface.defaultPrompt.some((item) => item.includes("Adopt Codex Flow"))) {
   throw new Error("Plugin interface must expose setup and adoption starter prompts");
+}
+
+const coordinationContracts = new Map([
+  ["skills/coordinate/SKILL.md", [
+    "same saved Codex App project by default",
+    "Projectless is an explicit exception",
+    "archive it by default",
+  ]],
+  ["templates/references/host-operations.md", [
+    "same project by default",
+    "Projectless is an explicit exception",
+    "archives a visible task by default",
+  ]],
+  ["templates/roles/coordinator.md", [
+    "same saved Codex App project by default",
+    "archive it by default",
+  ]],
+]);
+for (const [path, markers] of coordinationContracts) {
+  const source = await readFile(resolve(root, path), "utf8");
+  const normalizedSource = source.replace(/\s+/g, " ");
+  for (const marker of markers) {
+    if (!normalizedSource.includes(marker.replace(/\s+/g, " "))) {
+      throw new Error(`${path} is missing coordination contract: ${marker}`);
+    }
+  }
 }
 try {
   await access(resolve(root, "prompts"));

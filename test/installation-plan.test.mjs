@@ -82,8 +82,19 @@ test("setup mode binds installation to its clean dedicated branch", async () => 
     );
 
     execFileSync("git", ["switch", "-c", "codex/codex-flow-v0.5-adoption"], { cwd: root });
-    const cleanPlanResult = runCli(
+    const missingProjectId = runCli(
       ["init", "--plan", "--setup-mode", "existing", "--json"],
+      { cwd: root },
+    );
+    assert.notEqual(missingProjectId.status, 0);
+    assert.ok(JSON.parse(missingProjectId.stdout).conflicts.some(
+      (item) => item.code === "setup-project-id",
+    ));
+    const cleanPlanResult = runCli(
+      [
+        "init", "--plan", "--setup-mode", "existing",
+        "--project-id", "stable-project", "--json",
+      ],
       { cwd: root },
     );
     assertSuccess(cleanPlanResult, "clean adoption plan");
@@ -93,7 +104,10 @@ test("setup mode binds installation to its clean dedicated branch", async () => 
     const dirtyPath = resolve(root, "ongoing.py");
     await writeFile(dirtyPath, "print('ongoing')\n", "utf8");
     const dirtyPlan = runCli(
-      ["init", "--plan", "--setup-mode", "existing", "--json"],
+      [
+        "init", "--plan", "--setup-mode", "existing",
+        "--project-id", "stable-project", "--json",
+      ],
       { cwd: root },
     );
     assert.notEqual(dirtyPlan.status, 0);
@@ -121,12 +135,16 @@ test("setup mode binds installation to its clean dedicated branch", async () => 
           cleanPlan.plan_id,
           "--setup-mode",
           "existing",
+          "--project-id",
+          "stable-project",
           "--json",
         ],
         { cwd: root },
       ),
       "adoption apply",
     );
+    const config = JSON.parse(await readFile(resolve(root, ".codex/orchestration/project.json"), "utf8"));
+    assert.equal(config.project_id, "stable-project");
   } finally {
     await removeFixture(root);
   }
