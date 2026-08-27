@@ -12,7 +12,7 @@ Use two delivery classes:
 
 Coordinator integration is exactly once by the deterministic callback ID.
 Persisted integration lifecycle is `persisted`, `observed`, then `consumed`;
-explicit `superseded` and `expired` are terminal alternatives. The v0.4
+explicit `superseded` and `expired` are terminal alternatives. The v0.5
 `journal-monitor` authority creates no host queue notification. The coordinator
 uses `callback status` as discovery only. Keep the receipt persisted while
 authenticating its branch and completing any independent review. Call
@@ -27,7 +27,7 @@ IDs and remains silent on unchanged state. It must not invent a result from
 task age, UI state, or arrival order. Recheck status immediately before
 observation so a review-time supersession cannot be mistaken for the selected
 receipt. Never combine monitor integration with a separate ordinary-completion
-queue. v0.4 rejects older callback journals rather than retaining a second
+queue. v0.5 rejects older callback journals rather than retaining a second
 delivery model.
 
 When the current Codex host exposes `wait_threads`, prefer it as the active

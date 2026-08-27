@@ -42,7 +42,7 @@ function signal(overrides = {}) {
 }
 
 function stateRoot(root) {
-  return resolve(root, ".git", "codex-flow", "v0.4");
+  return resolve(root, ".git", "codex-flow", "v0.5");
 }
 
 async function bind(root, recipient = signal().recipient) {

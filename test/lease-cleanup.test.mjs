@@ -7,6 +7,7 @@ import { assertSuccess, createGitFixture, initializeFixture, removeFixture, runC
 test("exclusive leases prevent competing owners and release idempotently", async () => {
   const root = await createGitFixture("codex-flow-lease-");
   try {
+    initializeFixture([], { cwd: root });
     const acquired = runCli([
       "lease", "acquire", "--resource", "browser", "--owner", "executor-a", "--ttl-seconds", "60", "--json",
     ], { cwd: root });
@@ -46,12 +47,13 @@ test("exclusive leases prevent competing owners and release idempotently", async
 test("an expired holder token cannot release a replacement lease with the same owner name", async () => {
   const root = await createGitFixture("codex-flow-lease-fence-");
   try {
+    initializeFixture([], { cwd: root });
     const first = runCli([
       "lease", "acquire", "--resource", "browser", "--owner", "executor-a", "--ttl-seconds", "60", "--json",
     ], { cwd: root });
     assertSuccess(first, "first lease");
     const firstLease = JSON.parse(first.stdout).lease;
-    const leasePath = resolve(root, ".git", "codex-flow", "v0.4", "leases", "browser", "lease.json");
+    const leasePath = resolve(root, ".git", "codex-flow", "v0.5", "leases", "browser", "lease.json");
     const stored = JSON.parse(await readFile(leasePath, "utf8"));
     stored.expires_at = "2000-01-01T00:00:00.000Z";
     await writeFile(leasePath, JSON.stringify(stored), "utf8");
@@ -90,7 +92,7 @@ test("cleanup is audit-only and reports repository-scoped state", async () => {
     const report = JSON.parse(audit.stdout);
     assert.equal(report.mutation_performed, false);
     assert.equal(report.leases.length, 1);
-    assert.match(report.state_root, /\.git\/codex-flow\/v0\.4$/);
+    assert.match(report.state_root, /\.git\/codex-flow\/v0\.5$/);
   } finally {
     await removeFixture(root);
   }

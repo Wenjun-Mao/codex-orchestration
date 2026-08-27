@@ -11,7 +11,7 @@ deliberately separate layers:
 This is not a daemon, secretary task, or MCP server. Each repository pins a
 reviewable runtime under `.codex/orchestration/`. Mutable recipient bindings,
 task-operation attempts, urgent-signal and callback journals, and leases live under that
-repository's Git common directory at `.git/codex-flow/v0.4/`, so linked worktrees
+repository's Git common directory at `.git/codex-flow/v0.5/`, so linked worktrees
 share the same coordination state.
 
 ## Requirements
@@ -33,34 +33,46 @@ one outright: no compatibility readers, migration branches, deprecated aliases,
 or dual execution paths. Repositories preserve any evidence they still need,
 retire old operational state explicitly, and initialize the current version.
 
-Replacing a pre-v0.4 pinned runtime is a fresh installation on a dedicated
+Replacing any earlier pinned runtime is a fresh installation on a dedicated
 branch: retain the old `.git/codex-flow/` evidence, explicitly remove the old
 tracked `.codex/orchestration/` runtime and configuration from that branch,
-then plan and apply v0.4. New operational records live only in
-`.git/codex-flow/v0.4/`; v0.4 neither reads nor deletes the retained namespace.
+then plan and apply v0.5. New operational records live only in
+`.git/codex-flow/v0.5/`; v0.5 neither reads nor deletes retained namespaces.
 
 ## Private distribution
 
-Use the canonical checkout directly or install a private launcher from its
-local path:
+Install `codex-orchestration` from the personal Codex plugin marketplace. The
+installed plugin version is the accepted package authority: its `setup` skill
+resolves and runs the bundled canonical CLI without asking for a checkout path
+or commit. In a new Codex task, say either:
+
+```text
+Set up Codex Flow in this new repository.
+Adopt Codex Flow in this existing project without disturbing ongoing work.
+```
+
+Explicit `$codex-orchestration:setup` invocation is also supported. Skill
+discovery alone never authorizes mutation; the request must unmistakably ask
+to set up, bootstrap, install, or adopt Codex Flow.
+
+The setup skill copies a version-pinned runtime into the target repository;
+routine work uses that pinned copy. Updating the installed plugin therefore
+does not silently alter an initialized repository. A different installed
+runtime version requires explicit retirement and fresh installation.
+
+For headless environments, the canonical package CLI remains available
+directly or through an optional global npm installation. npm installation does
+not register the plugin with Codex:
 
 ```bash
 npm install --global /path/to/codex-orchestration
 codex-flow --help
 ```
 
-The global command is only a bootstrap/update entrypoint. `init` copies a
-version-pinned runtime into the target repository; routine work uses that
-pinned copy. Updating the launcher therefore does not silently alter an
-initialized repository.
-
-The npm package also contains a valid Codex plugin manifest and its skills.
-npm installation does not register the plugin with the Codex app. Marketplace
-registration remains a separate, explicit user-level operation.
-
 ## Bootstrap a repository
 
-Create or switch to the intended integration branch first, then run from that
+The setup skill owns normal bootstrap and adoption. For a headless invocation,
+create or switch to the intended integration branch first, then run from that
 exact target worktree:
 
 ```bash
@@ -80,6 +92,11 @@ The plan ID binds the repository branch, revision, and cleanliness. Apply it
 from the same branch and unchanged worktree where it was created. Switching to
 a pilot branch after planning deliberately invalidates the plan; branch first,
 then plan and apply.
+
+Plugin setup passes `--setup-mode new` or `--setup-mode existing` to both plan
+and apply. That option additionally requires the corresponding dedicated v0.5
+bootstrap/adoption branch and a clean worktree. It is optional only for
+headless callers intentionally using the lower-level installation primitive.
 
 Managed instruction mode preserves existing `AGENTS.md` content and owns one
 bounded block. A mature repository with an equivalent contract may instead use:
@@ -104,23 +121,19 @@ reasoning. `config set` changes repository defaults, and each task packet may
 override either value. The resolved values must be passed to the actual host
 creation call; prompt text alone does not configure a task.
 
-## Reusable adoption prompts
+## Plugin-first setup
 
-The canonical package maintains two operator-facing copy-paste prompts:
-
-- [Bootstrap a new repository](prompts/bootstrap-new-project.md)
-- [Adopt Codex Flow in an existing repository](prompts/adopt-existing-project.md)
-
-Replace their package path, commit, and version placeholders with one exact
-accepted checkpoint before use. These prompts intentionally remain in the
-canonical package rather than the pinned repository runtime: they govern the
-pre-installation boundary, while installed roles and references govern work
-after activation.
+The installed `codex-orchestration:setup` skill is the single onboarding
+entrypoint. It classifies a request as new-repository bootstrap, existing
+repository adoption, same-version verification, incompatible-version stop, or
+ambiguous read-only inspection. Detailed mode instructions are internal skill
+references loaded only when selected; there are no operator-facing prompt
+templates or placeholder substitutions.
 
 ## Core commands
 
 ```text
-codex-flow init --plan [--json] [initialization options]
+codex-flow init --plan [--setup-mode new|existing] [--json] [initialization options]
 codex-flow init --apply-plan <plan_id> [initialization options]
 codex-flow init --check
 codex-flow sync [--check] [--force]
@@ -264,11 +277,12 @@ and explicit supersession; arrival order is never authority. Task packets and
 project configuration must name the same ordinary-completion authority, so a
 monitor cannot silently integrate work that was also queued.
 
-v0.4 intentionally removes the experimental queue adapter and every legacy
-callback reader. An ordinary completion has one authority and one durable path.
-This is a breaking checkpoint: v0.3 configuration, task-operation records, and
-callback journals are not migrated. The package fails closed rather than carry
-compatibility code.
+v0.5 retains the single-authority callback contract: the experimental queue
+adapter and every legacy callback reader remain removed. An ordinary completion
+has one authority and one durable path.
+This is a breaking checkpoint: earlier configuration, task-operation records,
+and callback journals are not migrated into the v0.5 namespace. The package
+fails closed rather than carry compatibility code.
 
 Before launching executors, bind the coordinator lineage with `recipient bind`.
 The first successful bind returns a private fence token; idempotent bind replay
@@ -339,5 +353,7 @@ defines the v0.4 ownership and cleanup contract.
 [Host-provisioned worktree launch](docs/adr/0008-host-provisioned-worktree-launch.md)
 defines the two-phase Desktop worktree contract.
 [Journaled urgent direct delivery](docs/adr/0009-journaled-urgent-direct-delivery.md)
-defines urgent-signal and delivery-attempt identity. The current covered
-boundary is listed in [v0.4.4 orchestration coverage](docs/coverage-v0.4.4.md).
+defines urgent-signal and delivery-attempt identity. Plugin-first package
+authority is defined by [ADR 0010](docs/adr/0010-plugin-first-package-authority.md).
+The current covered boundary is listed in
+[v0.5 orchestration coverage](docs/coverage-v0.5.md).

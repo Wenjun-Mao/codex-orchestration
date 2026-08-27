@@ -66,7 +66,7 @@ test("a pinned runtime cannot self-sync from a nested repository directory", asy
     for (const command of [["init"], ["sync", "--force"]]) {
       const result = runPinned(root, command, nested);
       assert.notEqual(result.status, 0);
-      assert.match(result.stderr, /canonical codex-orchestration package/);
+      assert.match(result.stderr, /installed codex-orchestration plugin package/);
     }
   } finally {
     await removeFixture(root);
@@ -103,6 +103,8 @@ test("managed and Git-common state writes reject symlinked repository paths", {
     assert.match(managed.stderr, /symbolic link|real directory/);
     assert.deepEqual(await readdir(managedExternal), []);
 
+    initializeFixture([], { cwd: stateRoot });
+    await rm(resolve(stateRoot, ".git", "codex-flow"), { recursive: true, force: true });
     await symlink(stateExternal, resolve(stateRoot, ".git", "codex-flow"), "dir");
     const state = runCli([
       "lease", "acquire", "--resource", "browser", "--owner", "executor-a", "--ttl-seconds", "60",

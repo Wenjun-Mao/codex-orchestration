@@ -7,6 +7,7 @@
     "schema_version",
     "kind",
     "package_version",
+    "setup_mode",
     "repository",
     "project_id",
     "agents",
@@ -20,6 +21,7 @@
     "schema_version": { "const": 1 },
     "kind": { "const": "codex-flow-install-plan" },
     "package_version": { "type": "string", "minLength": 1, "maxLength": 64 },
+    "setup_mode": { "enum": [null, "new", "existing"] },
     "repository": {
       "type": "object",
       "additionalProperties": false,

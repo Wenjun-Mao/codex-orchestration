@@ -55,11 +55,11 @@ function deliveryRecipient(value) {
 }
 
 async function bind(root, recipient = receipt().recipient) {
-  return bindRecipient({ stateRoot: resolve(root, ".git", "codex-flow", "v0.4"), recipient });
+  return bindRecipient({ stateRoot: resolve(root, ".git", "codex-flow", "v0.5"), recipient });
 }
 
 async function journal(root, payload) {
-    const stateRoot = resolve(root, ".git", "codex-flow", "v0.4");
+    const stateRoot = resolve(root, ".git", "codex-flow", "v0.5");
   return JSON.parse(await readFile(callbackPaths(stateRoot, payload).record, "utf8"));
 }
 
@@ -72,7 +72,7 @@ function deferred() {
 test("journal-monitor persists and integrates exactly once", async () => {
   const root = await createGitFixture("codex-flow-callback-monitor-");
   try {
-    const stateRoot = resolve(root, ".git", "codex-flow", "v0.4");
+    const stateRoot = resolve(root, ".git", "codex-flow", "v0.5");
     await bind(root);
     const payload = receipt();
     const callbackId = callbackIdFor(payload);
@@ -125,7 +125,7 @@ test("journal-monitor persists and integrates exactly once", async () => {
 test("higher sequence supersedes only the immediate unobserved callback", async () => {
   const root = await createGitFixture("codex-flow-callback-terminal-");
   try {
-    const stateRoot = resolve(root, ".git", "codex-flow", "v0.4");
+    const stateRoot = resolve(root, ".git", "codex-flow", "v0.5");
     await bind(root);
     const first = receipt({ run_id: "run-terminal-01" });
     await deliverCallback({ stateRoot, receipt: first });
@@ -170,7 +170,7 @@ test("higher sequence supersedes only the immediate unobserved callback", async 
 test("observed callbacks remain the sole consumable result and cannot be replaced or expired", async () => {
   const root = await createGitFixture("codex-flow-callback-observed-");
   try {
-    const stateRoot = resolve(root, ".git", "codex-flow", "v0.4");
+    const stateRoot = resolve(root, ".git", "codex-flow", "v0.5");
     await bind(root);
     const first = receipt({
       run_id: "run-observed-01",
@@ -214,7 +214,7 @@ test("observed callbacks remain the sole consumable result and cannot be replace
 test("supersession interruption cannot leave two consumable callbacks", async () => {
   const root = await createGitFixture("codex-flow-callback-supersession-crash-");
   try {
-    const stateRoot = resolve(root, ".git", "codex-flow", "v0.4");
+    const stateRoot = resolve(root, ".git", "codex-flow", "v0.5");
     await bind(root);
     const first = receipt({ run_id: "run-crash-01" });
     await deliverCallback({ stateRoot, receipt: first });
@@ -252,7 +252,7 @@ test("supersession interruption cannot leave two consumable callbacks", async ()
 test("stale packets resolve through the current recipient binding", async () => {
   const root = await createGitFixture("codex-flow-callback-routing-");
   try {
-    const stateRoot = resolve(root, ".git", "codex-flow", "v0.4");
+    const stateRoot = resolve(root, ".git", "codex-flow", "v0.5");
     const initial = await bind(root);
     const rebound = await rebindRecipient({
       stateRoot,
@@ -280,7 +280,7 @@ test("stale packets resolve through the current recipient binding", async () => 
 test("observe holds the recipient generation stable against concurrent rebind", async () => {
   const root = await createGitFixture("codex-flow-callback-observe-rebind-");
   try {
-    const stateRoot = resolve(root, ".git", "codex-flow", "v0.4");
+    const stateRoot = resolve(root, ".git", "codex-flow", "v0.5");
     const initial = await bind(root);
     const payload = receipt({ run_id: "run-observe-rebind-01" });
     await deliverCallback({ stateRoot, receipt: payload });
@@ -330,7 +330,7 @@ test("observe holds the recipient generation stable against concurrent rebind", 
 test("consume holds the recipient generation stable against concurrent rebind", async () => {
   const root = await createGitFixture("codex-flow-callback-consume-rebind-");
   try {
-    const stateRoot = resolve(root, ".git", "codex-flow", "v0.4");
+    const stateRoot = resolve(root, ".git", "codex-flow", "v0.5");
     const initial = await bind(root);
     const payload = receipt({ run_id: "run-consume-rebind-01" });
     await deliverCallback({ stateRoot, receipt: payload });
@@ -376,10 +376,10 @@ test("consume holds the recipient generation stable against concurrent rebind", 
   }
 });
 
-test("v0.4 rejects older callback journal records instead of migrating them", async () => {
+test("v0.5 rejects older callback journal records instead of migrating them", async () => {
   const root = await createGitFixture("codex-flow-callback-breaking-");
   try {
-    const stateRoot = resolve(root, ".git", "codex-flow", "v0.4");
+    const stateRoot = resolve(root, ".git", "codex-flow", "v0.5");
     await bind(root);
     const payload = receipt({ run_id: "run-old-record-01" });
     await deliverCallback({ stateRoot, receipt: payload });

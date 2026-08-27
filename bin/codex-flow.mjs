@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { parseArgs } from "node:util";
 import { dirname, resolve } from "node:path";
@@ -96,6 +96,7 @@ Usage:
   initialization options:
                   [--force] [--project-id ID] [--max-concurrency N]
                   [--model MODEL] [--reasoning-effort EFFORT]
+                  [--setup-mode new|existing]
                   [--agents-mode managed|external]
                   [--external-agents-path PATH] [--attest-external-agents]
   codex-flow sync [--check] [--force]
@@ -170,14 +171,50 @@ function output(value, { json = false, human } = {}) {
 }
 
 function requireCanonicalSource() {
+  const packagePath = resolve(packageRoot, "package.json");
+  const pluginPath = resolve(packageRoot, ".codex-plugin", "plugin.json");
+  const agentsTemplate = resolve(packageRoot, "templates", "agents-block.md");
+  if (![packagePath, pluginPath, agentsTemplate].every((path) => existsSync(path))) {
+    throw new CliError(
+      "Run init/sync from the installed codex-orchestration plugin package, not a repository-pinned snapshot",
+    );
+  }
+
+  let packageMetadata;
+  let pluginMetadata;
+  try {
+    packageMetadata = JSON.parse(readFileSync(packagePath, "utf8"));
+    pluginMetadata = JSON.parse(readFileSync(pluginPath, "utf8"));
+  } catch {
+    throw new CliError("Installed codex-orchestration package metadata is not valid JSON");
+  }
   if (
-    existsSync(resolve(packageRoot, "package.json"))
-    && existsSync(resolve(packageRoot, "templates", "agents-block.md"))
-  ) return;
-  throw new CliError("Run init/sync from the canonical codex-orchestration package, not a repository-pinned snapshot");
+    packageMetadata.name !== "@wjmao/codex-flow"
+    || packageMetadata.private !== true
+    || packageMetadata.version !== PACKAGE_VERSION
+    || !Array.isArray(packageMetadata.files)
+    || !packageMetadata.files.includes("skills/")
+    || pluginMetadata.name !== "codex-orchestration"
+    || pluginMetadata.version !== PACKAGE_VERSION
+    || pluginMetadata.skills !== "./skills/"
+  ) {
+    throw new CliError(
+      `Installed codex-orchestration package metadata must exactly match version ${PACKAGE_VERSION}`,
+    );
+  }
 }
 
 async function loadConfig(gitRoot) {
+  const manifestPath = resolve(gitRoot, ".codex", "orchestration", "version.json");
+  const manifest = await readJson(manifestPath, { allowMissing: true, guardRoot: gitRoot });
+  if (!manifest) {
+    throw new CliError("Pinned Codex Flow runtime is missing; run the setup skill from the accepted plugin");
+  }
+  if (manifest.package_version !== PACKAGE_VERSION) {
+    throw new CliError(
+      `Installed Codex Flow ${manifest.package_version ?? "unknown"} requires explicit retirement before fresh ${PACKAGE_VERSION} installation`,
+    );
+  }
   const raw = await readJson(projectConfigPath(gitRoot), { allowMissing: true, guardRoot: gitRoot });
   if (!raw) throw new CliError("Project is not initialized; run codex-flow init from the canonical package");
   return validateProjectConfig(raw);
@@ -221,6 +258,7 @@ async function commandInit(args) {
     "max-concurrency": { type: "string" },
     model: { type: "string" },
     "reasoning-effort": { type: "string" },
+    "setup-mode": { type: "string" },
     "agents-mode": { type: "string" },
     "external-agents-path": { type: "string" },
     "attest-external-agents": { type: "boolean", default: false },
@@ -236,12 +274,16 @@ async function commandInit(args) {
     || values["max-concurrency"] !== undefined
     || values.model !== undefined
     || values["reasoning-effort"] !== undefined
+    || values["setup-mode"] !== undefined
     || values["agents-mode"] !== undefined
     || values["external-agents-path"] !== undefined
     || values["attest-external-agents"]
   )) throw new CliError("init --check does not accept initialization changes");
   if (values["agents-mode"] !== undefined) {
     requireEnum(values["agents-mode"], ["managed", "external"], "agents_mode");
+  }
+  if (values["setup-mode"] !== undefined) {
+    requireEnum(values["setup-mode"], ["new", "existing"], "setup_mode");
   }
   const git = gitSnapshot();
   const max = values["max-concurrency"] === undefined
@@ -264,6 +306,7 @@ async function commandInit(args) {
     maxParallelExecutors: max,
     defaultModel: values.model === "host-default" ? null : values.model,
     defaultReasoningEffort: values["reasoning-effort"] === "host-default" ? null : values["reasoning-effort"],
+    setupMode: values["setup-mode"],
     agentsMode: values["agents-mode"],
     externalAgentsPath: values["external-agents-path"],
     attestExternalAgents: values["attest-external-agents"],
@@ -610,6 +653,7 @@ async function commandPlan(args) {
 async function commandRecipient(args) {
   const [subcommand, ...rest] = args;
   const git = discoverGit();
+  await loadConfig(git.root);
   if (subcommand === "bind") {
     const { values } = parse(boolAndJsonOptions({
       "lineage-id": { type: "string" },
@@ -697,9 +741,9 @@ async function commandRecipient(args) {
 async function commandCallback(args) {
   const [subcommand, ...rest] = args;
   const git = discoverGit();
+  await loadConfig(git.root);
   if (subcommand === "deliver") {
     const { values } = parse(boolAndJsonOptions({ file: { type: "string" } }), rest);
-    await loadConfig(git.root);
     const receipt = await readJsonInput(values.file ? resolve(values.file) : null);
     const result = await deliverCallback({
       stateRoot: git.stateRoot,
@@ -775,9 +819,9 @@ async function commandCallback(args) {
 async function commandUrgent(args) {
   const [subcommand, ...rest] = args;
   const git = discoverGit();
+  await loadConfig(git.root);
   if (subcommand === "persist") {
     const { values } = parse(boolAndJsonOptions({ file: { type: "string" } }), rest);
-    await loadConfig(git.root);
     const signal = await readJsonInput(values.file ? resolve(values.file) : null);
     const result = await persistUrgentSignal({ stateRoot: git.stateRoot, signal });
     output(result, {
@@ -911,6 +955,7 @@ async function commandUrgent(args) {
 async function commandLease(args) {
   const [subcommand, ...rest] = args;
   const git = discoverGit();
+  await loadConfig(git.root);
   if (subcommand === "acquire") {
     const { values } = parse(boolAndJsonOptions({
       resource: { type: "string" },

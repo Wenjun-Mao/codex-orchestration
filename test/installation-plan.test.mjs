@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { lstat, readFile, writeFile } from "node:fs/promises";
+import { execFileSync } from "node:child_process";
+import { lstat, readFile, rm, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import test from "node:test";
 import {
@@ -63,6 +64,69 @@ test("init plan is read-only, reports the full AGENTS delta, and direct unplanne
     const unplanned = runCli(["init"], { cwd: root });
     assert.notEqual(unplanned.status, 0);
     assert.match(unplanned.stderr, /requires exactly one/);
+  } finally {
+    await removeFixture(root);
+  }
+});
+
+test("setup mode binds installation to its clean dedicated branch", async () => {
+  const root = await createGitFixture("codex-flow-setup-mode-");
+  try {
+    const wrongBranch = runCli(["init", "--plan", "--setup-mode", "existing", "--json"], { cwd: root });
+    assert.notEqual(wrongBranch.status, 0);
+    const wrongBranchPlan = JSON.parse(wrongBranch.stdout);
+    assert.ok(wrongBranchPlan.conflicts.some((item) => item.code === "setup-branch"));
+    await assert.rejects(
+      readFile(resolve(root, ".codex/orchestration/version.json")),
+      { code: "ENOENT" },
+    );
+
+    execFileSync("git", ["switch", "-c", "codex/codex-flow-v0.5-adoption"], { cwd: root });
+    const cleanPlanResult = runCli(
+      ["init", "--plan", "--setup-mode", "existing", "--json"],
+      { cwd: root },
+    );
+    assertSuccess(cleanPlanResult, "clean adoption plan");
+    const cleanPlan = JSON.parse(cleanPlanResult.stdout);
+    assert.equal(cleanPlan.setup_mode, "existing");
+
+    const dirtyPath = resolve(root, "ongoing.py");
+    await writeFile(dirtyPath, "print('ongoing')\n", "utf8");
+    const dirtyPlan = runCli(
+      ["init", "--plan", "--setup-mode", "existing", "--json"],
+      { cwd: root },
+    );
+    assert.notEqual(dirtyPlan.status, 0);
+    assert.ok(JSON.parse(dirtyPlan.stdout).conflicts.some(
+      (item) => item.code === "setup-cleanliness",
+    ));
+    await rm(dirtyPath);
+
+    const omittedMode = runCli(
+      ["init", "--apply-plan", cleanPlan.plan_id, "--json"],
+      { cwd: root },
+    );
+    assert.notEqual(omittedMode.status, 0);
+    assert.match(omittedMode.stderr, /Installation plan changed/);
+    await assert.rejects(
+      readFile(resolve(root, ".codex/orchestration/version.json")),
+      { code: "ENOENT" },
+    );
+
+    assertSuccess(
+      runCli(
+        [
+          "init",
+          "--apply-plan",
+          cleanPlan.plan_id,
+          "--setup-mode",
+          "existing",
+          "--json",
+        ],
+        { cwd: root },
+      ),
+      "adoption apply",
+    );
   } finally {
     await removeFixture(root);
   }

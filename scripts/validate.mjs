@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { spawnSync } from "node:child_process";
-import { readdir, readFile } from "node:fs/promises";
+import { access, readdir, readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { PACKAGE_VERSION } from "../lib/core.mjs";
 import { validatePlan } from "../lib/plan.mjs";
@@ -31,8 +31,8 @@ if (packageJson.version !== PACKAGE_VERSION || plugin.version !== PACKAGE_VERSIO
   throw new Error("Package, plugin, and runtime versions must match");
 }
 if (packageJson.private !== true) throw new Error("Package must remain private");
-if (!packageJson.files.includes("prompts/")) {
-  throw new Error("Published package must include reusable adoption prompts");
+if (!packageJson.files.includes("skills/") || packageJson.files.includes("prompts/")) {
+  throw new Error("Published package must include skills and exclude retired copy-paste prompts");
 }
 for (const field of [
   "dependencies",
@@ -119,36 +119,73 @@ validateHostObservationEvidence(JSON.parse(
   await readFile(resolve(root, "examples/host-observation-evidence.json"), "utf8"),
 ));
 
-for (const skillName of ["index", "coordinate", "execute", "integrate", "cleanup"]) {
+for (const skillName of ["index", "setup", "coordinate", "execute", "integrate", "cleanup"]) {
   const skill = await readFile(resolve(root, "skills", skillName, "SKILL.md"), "utf8");
   if (!skill.startsWith("---\n") || !skill.includes(`\nname: ${skillName}\n`)) {
     throw new Error(`Invalid skill entrypoint: ${skillName}`);
   }
 }
 
-const promptContracts = new Map([
-  ["bootstrap-new-project.md", [
-    "Use managed AGENTS mode because this is a new repository.",
-    "Do not modify product files or launch delegated tasks",
+const setupContracts = new Map([
+  ["new-repository.md", [
+    "codex/codex-flow-v0.5-bootstrap",
+    "--setup-mode new",
+    "Use managed AGENTS mode",
+    "Do not modify product files or launch delegated",
   ]],
-  ["adopt-existing-project.md", [
-    "Do not migrate or assume ownership of tasks launched before this adoption.",
-    "external AGENTS mode only when an explicitly reviewed equivalent orchestration",
+  ["existing-repository.md", [
+    "Do not migrate or assume ownership of tasks launched before adoption.",
+    "codex/codex-flow-v0.5-adoption",
+    "--setup-mode existing",
     "must not be retroactively journaled, integrated, archived, or cleaned",
   ]],
 ]);
-for (const [name, contractMarkers] of promptContracts) {
-  const prompt = await readFile(resolve(root, "prompts", name), "utf8");
-  for (const placeholder of [
-    "{{CODEX_FLOW_PACKAGE_PATH}}",
-    "{{CODEX_FLOW_PACKAGE_COMMIT}}",
-    "{{CODEX_FLOW_VERSION}}",
-  ]) {
-    if (!prompt.includes(placeholder)) throw new Error(`${name} is missing placeholder ${placeholder}`);
-  }
+for (const [name, contractMarkers] of setupContracts) {
+  const reference = await readFile(resolve(root, "skills", "setup", "references", name), "utf8");
+  const normalizedReference = reference.replace(/\s+/g, " ");
   for (const marker of contractMarkers) {
-    if (!prompt.includes(marker)) throw new Error(`${name} is missing adoption contract: ${marker}`);
+    if (!normalizedReference.includes(marker.replace(/\s+/g, " "))) {
+      throw new Error(`${name} is missing setup contract: ${marker}`);
+    }
   }
+}
+
+const setupSkill = await readFile(resolve(root, "skills/setup/SKILL.md"), "utf8");
+for (const marker of [
+  "installed plugin containing this skill as the accepted package",
+  "Automatic discovery is not mutation authority",
+  "explicit retirement and fresh installation",
+  "populated non-Git directory",
+]) {
+  if (!setupSkill.includes(marker)) throw new Error(`setup skill is missing authority contract: ${marker}`);
+}
+const setupMetadata = await readFile(resolve(root, "skills/setup/agents/openai.yaml"), "utf8");
+for (const marker of [
+  "allow_implicit_invocation: true",
+  "$codex-orchestration:setup",
+]) {
+  if (!setupMetadata.includes(marker)) throw new Error(`setup skill metadata is missing: ${marker}`);
+}
+const setupResolver = await readFile(
+  resolve(root, "skills/setup/scripts/resolve-plugin-root.mjs"),
+  "utf8",
+);
+for (const marker of [
+  'resolve(import.meta.dirname, "../../..")',
+  "packageMetadata.version !== PACKAGE_VERSION",
+  "pluginMetadata.version !== PACKAGE_VERSION",
+]) {
+  if (!setupResolver.includes(marker)) throw new Error(`setup root resolver is missing: ${marker}`);
+}
+if (!plugin.interface.defaultPrompt.some((item) => item.includes("Set up Codex Flow"))
+  || !plugin.interface.defaultPrompt.some((item) => item.includes("Adopt Codex Flow"))) {
+  throw new Error("Plugin interface must expose setup and adoption starter prompts");
+}
+try {
+  await access(resolve(root, "prompts"));
+  throw new Error("Retired copy-paste prompts directory must not exist");
+} catch (error) {
+  if (error?.code !== "ENOENT") throw error;
 }
 
 console.log(`codex-orchestration ${PACKAGE_VERSION} source contracts validated`);

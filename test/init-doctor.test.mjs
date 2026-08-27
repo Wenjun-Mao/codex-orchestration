@@ -116,7 +116,7 @@ test("sync refuses locally modified managed runtime files", async () => {
   }
 });
 
-test("v0.4 rejects older project configuration instead of migrating it", async () => {
+test("v0.5 rejects older project configuration instead of migrating it", async () => {
   const root = await createGitFixture();
   try {
     initializeFixture([], { cwd: root });
@@ -138,13 +138,14 @@ test("v0.4 rejects older project configuration instead of migrating it", async (
   }
 });
 
-test("v0.4 uses a fresh state namespace and ignores retained pre-v0.4 evidence", async () => {
-  const root = await createGitFixture("codex-flow-state-v04-");
+test("v0.5 uses a fresh state namespace and ignores retained v0.4 evidence", async () => {
+  const root = await createGitFixture("codex-flow-state-v05-");
   try {
     const legacyRecord = resolve(
       root,
       ".git",
       "codex-flow",
+      "v0.4",
       "task-operations",
       "records",
       "incompatible-v03.json",
@@ -154,10 +155,10 @@ test("v0.4 uses a fresh state namespace and ignores retained pre-v0.4 evidence",
 
     initializeFixture([], { cwd: root });
     const context = discoverGit(root);
-    assert.equal(context.stateRoot, resolve(context.commonDir, "codex-flow", "v0.4"));
+    assert.equal(context.stateRoot, resolve(context.commonDir, "codex-flow", "v0.5"));
     assert.equal(await readFile(legacyRecord, "utf8"), "{\"schema_version\":2}\n");
     const doctor = runCli(["doctor", "--json"], { cwd: root });
-    assertSuccess(doctor, "v0.4 namespaced doctor");
+    assertSuccess(doctor, "v0.5 namespaced doctor");
     assert.equal(JSON.parse(doctor.stdout).ok, true);
   } finally {
     await removeFixture(root);

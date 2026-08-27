@@ -1,0 +1,7 @@
+interface:
+  display_name: "Set Up Codex Flow"
+  short_description: "Bootstrap or safely adopt Codex Flow."
+  default_prompt: "Use $codex-orchestration:setup to set up Codex Flow in this repository."
+policy:
+  allow_implicit_invocation: true
+

@@ -1,6 +1,6 @@
 {
   "name": "codex-orchestration",
-  "version": "0.4.4",
+  "version": "0.5.0",
   "description": "Coordinate independent Codex tasks with explicit ownership, idempotent urgent signals, durable callbacks, and serial integration.",
   "author": {
     "name": "Wenjun Mao"
@@ -16,6 +16,8 @@
     "category": "Productivity",
     "capabilities": ["Planning", "Task coordination", "Workflow validation"],
     "defaultPrompt": [
+      "Set up Codex Flow in this new repository.",
+      "Adopt Codex Flow in this existing project without disturbing ongoing work.",
       "Plan this work across independent Codex tasks.",
       "Validate this executor task packet.",
       "Integrate journaled task results safely."
