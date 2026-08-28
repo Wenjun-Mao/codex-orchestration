@@ -386,4 +386,4 @@ authority is defined by [ADR 0010](docs/adr/0010-plugin-first-package-authority.
 [Host project placement and pre-release rejection](docs/adr/0011-host-project-placement-and-pre-release-rejection.md)
 defines the v0.5.1 placement-evidence and terminal-bootstrap contract.
 The current covered boundary is listed in
-[v0.5 orchestration coverage](docs/coverage-v0.5.md).
+[v0.5.1 orchestration coverage](docs/coverage-v0.5.1.md).
