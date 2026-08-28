@@ -50,9 +50,14 @@ An observed operation may be closed as `rejected-before-release` only while it
 has no Git ownership. The coordinator must first archive the host object. For a
 host-created worktree, the CLI also verifies that the exact observed path is
 absent. The journal then preserves a strict reason, archive assertion, verified
-path disposition, and timestamp. Exact replay is idempotent; conflicting replay,
-retry, Git binding, and objective release are rejected. Doctor and cleanup keep
-the terminal evidence but stop classifying it as an unresolved unbound task.
+path disposition, and timestamp. When binding was interrupted after its branch
+claim but before ownership, rejection may settle that claim only after proving
+the path absent and the local branch unowned, unchecked out, unpushed, and still
+at the exact baseline. It deletes that exact ref and embeds the immutable claim
+and deletion outcome in the terminal resolution; drift remains blocked. Exact
+replay is idempotent; conflicting replay, retry, Git binding, and objective
+release are rejected. Doctor and cleanup keep the terminal evidence but stop
+classifying it as an unresolved unbound task or incomplete claim.
 
 The affected packet, operation, capability, and observation schemas advance
 without compatibility readers or state migration. A pre-v0.5.1 operation must
@@ -68,6 +73,8 @@ be retired or preserved under its original runtime.
   reconciliation or audit.
 - Delete or rewrite the old observed operation after cleanup. That would erase
   the failed pilot and make cleanup unauditable.
+- Ignore or delete an interrupted branch claim. A terminal settlement instead
+  retains the original claim and proves any exact-baseline ref cleanup.
 - Add a daemon or host adapter service. One extra intent/evidence field and one
   terminal journal transition are sufficient.
 
@@ -81,4 +88,3 @@ be retired or preserved under its original runtime.
   release.
 - Failed bootstrap objects can be archived and settled without weakening the
   warning for genuinely unresolved observed worktrees.
-

@@ -50,8 +50,12 @@ If the coordinator rejects an observed object before Git binding or objective
 release, first archive the task. For `host-worktree`, remove the pristine
 unbound path and verify that exact path is absent. Then record the terminal
 `rejected-before-release` operation disposition. Conflicting replay, later
-retry, binding, or release is forbidden. Without this explicit disposition,
-doctor and cleanup continue to treat the object as unresolved.
+retry, binding, or release is forbidden. If binding left an immutable claim
+without ownership, rejection may settle it only when the branch is unowned,
+unchecked out, unpushed, and still exactly at baseline; the exact local ref is
+removed and the claim is retained in the terminal receipt. Drift requires
+recovery. Without this explicit disposition, doctor and cleanup continue to
+treat the object or claim as unresolved.
 
 When a host advertises filtered thread listing but rejects the filter at
 runtime, make one bounded recent-list call without that filter and match only

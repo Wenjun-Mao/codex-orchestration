@@ -233,8 +233,12 @@ If an observed object is rejected before Git binding and objective release, the
 coordinator archives it and removes its unbound host worktree. Only then may
 `task operation reject` persist the terminal disposition. The CLI verifies the
 exact observed path is absent, preserves the rejection evidence, and prevents
-retry or release. An observed operation without that disposition continues to
-warn as unresolved.
+retry or release. If binding was interrupted after its immutable branch claim,
+rejection also requires the claimed branch to be unowned, unpushed, unchecked
+out, and still exactly at the authenticated baseline; it removes only that
+exact local ref and retains the claim in the terminal receipt. Any drift stays
+blocked for recovery. An observed operation without a terminal disposition
+continues to warn as unresolved.
 
 A timeout is ambiguous, not failure. List/read the host state before retrying,
 then reconcile `observed` or `not-created`. No new launch may start after the

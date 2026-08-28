@@ -15,8 +15,12 @@ gaps found by the first same-project UK Dev pilot.
 - Projectless and inherited operations cannot acquire a saved-project target.
 - An observed, unbound task may be recorded as rejected before release only
   after archival and, for host-created worktrees, verified path removal.
+- An interrupted pre-ownership branch claim can be terminally settled only when
+  its local ref is absent or safely deleted at the exact baseline with no
+  checkout or fetched remote evidence; the claim remains in the resolution.
 - Rejected operations remain auditable but no longer appear as unresolved
-  unbound worktrees. Unresolved observed operations still warn.
+  unbound worktrees or incomplete claims. Unresolved observed operations still
+  warn.
 - Schema changes are breaking; no compatibility reader or migration is added.
 
 ## Not claimed
