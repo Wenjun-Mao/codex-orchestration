@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted for v0.5.1 pending held-out replay.
+Accepted.
 
 ## Context
 
@@ -91,3 +91,12 @@ be retired or preserved under its original runtime.
   release.
 - Failed bootstrap objects can be archived and settled without weakening the
   warning for genuinely unresolved observed worktrees.
+
+## Acceptance evidence
+
+A fresh UK Dev v0.5.1 held-out replay exercised exact-release state isolation,
+same-project task creation, Git bind and release, journal completion, serial
+integration and reproof, deterministic branch/worktree cleanup, and task
+archival. The older v0.5 state remained byte-identical throughout. Current host
+list/read surfaces still omit project, model, and reasoning fields, so those
+facts remain host-accepted rather than independently observed.

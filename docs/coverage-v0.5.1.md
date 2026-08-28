@@ -36,7 +36,8 @@ gaps found by the first same-project UK Dev pilot.
 
 Source acceptance requires focused placement and rejection regressions, the
 complete dependency-free Node suite, source validation, package dry run, and
-diff checks. Release acceptance additionally requires a fresh UK Dev
-same-project Terra/xhigh host-worktree pilot proving exact placement intent,
-partial or complete evidence, Git bind/release, ordinary callback integration,
-deterministic cleanup, and task archival.
+diff checks. Release acceptance required a fresh UK Dev same-project
+Terra/xhigh host-worktree pilot proving exact placement intent, partial or
+complete evidence, Git bind/release, ordinary callback integration,
+deterministic cleanup, and task archival. That boundary passed in
+[the v0.5.1 exact-state replay](field-tests/2026-08-28-uk-dev-v0.5.1-exact-state-replay.md).
