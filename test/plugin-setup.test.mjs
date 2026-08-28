@@ -219,7 +219,7 @@ test("a different installed Codex Flow version requires explicit retirement", as
       ));
       assert.equal(await readFile(manifestPath, "utf8"), retainedBytes);
     }
-    const stateRoot = resolve(repositoryRoot, ".git/codex-flow/v0.5");
+    const stateRoot = resolve(repositoryRoot, ".git/codex-flow/v0.5.1");
     const stateBefore = await snapshotFiles(stateRoot);
 
     for (const args of [

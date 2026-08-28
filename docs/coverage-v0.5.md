@@ -11,7 +11,8 @@ mutable coordination state in their Git common directory.
   to `codex-orchestration:setup`; explicit invocation remains available.
 - Skill discovery alone is not mutation authority. Questions and unrelated
   project work do not authorize setup.
-- Package, plugin, and runtime metadata must all equal `0.5.0` before planning.
+- Package, plugin, and runtime metadata must all equal the selected release
+  before planning.
 - The setup root resolver authenticates the installed cache path without a
   package checkout, global npm installation, or user-supplied placeholder.
 - New and existing setup modes bind plan and apply to their exact dedicated
@@ -20,12 +21,12 @@ mutable coordination state in their Git common directory.
 - Managed AGENTS integration preserves existing content. External mode remains
   an explicit, hash-attested exception for an equivalent reviewed contract.
 - A different installed version requires explicit retirement. Setup, sync,
-  doctor, and operational commands cannot create or use v0.5 state through an
-  older runtime.
+  doctor, and operational commands cannot create or use the current release's
+  state through an older runtime.
 - Copy-paste prompt templates are absent from source validation and package
   contents.
-- The complete v0.4 orchestration lifecycle remains available in v0.5's fresh
-  state namespace; no old operational journal is migrated.
+- The complete v0.4 orchestration lifecycle remains available in v0.5's
+  exact-release state namespace; no old operational journal is migrated.
 - Project-backed visible executors default to the coordinator's same saved
   Codex App project. Projectless creation is an explicit recorded exception
   for repositoryless work or an unsaved disposable fixture.

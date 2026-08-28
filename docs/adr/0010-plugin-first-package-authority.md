@@ -23,7 +23,8 @@ before planning. Installation plans continue to bind every managed target file
 by hash. Repositories pin the runtime and instruction integration locally;
 installing a newer plugin does not update them. Another pinned package version
 requires explicit retirement and fresh installation. Operational records use
-the fresh `.git/codex-flow/v0.5/` namespace.
+an exact-release namespace such as `.git/codex-flow/v0.5.1/`. A patch release
+does not parse, migrate, rewrite, or delete an earlier release's journal.
 
 Implicit skill discovery is permitted, but mutation requires an unmistakable
 user request to set up, bootstrap, install, or adopt Codex Flow. Questions and
@@ -37,8 +38,8 @@ ambiguous non-Git directories remain read-only.
   explicitly installed plugin is already the selected distribution artifact.
 - Add a release service, daemon, MCP server, or hook: rejected because local
   skill guidance and the dependency-free CLI cover the workflow.
-- Migrate prior runtime or journal state: rejected under the private
-  pre-release breaking-change policy.
+- Migrate or tolerantly read prior runtime or journal state: rejected under the
+  private pre-release breaking-change policy.
 
 ## Consequences
 
@@ -46,4 +47,3 @@ Users install the private plugin once, then use a short natural-language request
 or `$codex-orchestration:setup`. The package no longer ships operator-facing
 prompt templates. Personal marketplace installation becomes the primary Codex
 distribution path; direct CLI execution remains a headless fallback.
-

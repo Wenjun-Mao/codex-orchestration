@@ -11,8 +11,9 @@ deliberately separate layers:
 This is not a daemon, secretary task, or MCP server. Each repository pins a
 reviewable runtime under `.codex/orchestration/`. Mutable recipient bindings,
 task-operation attempts, urgent-signal and callback journals, and leases live under that
-repository's Git common directory at `.git/codex-flow/v0.5/`, so linked worktrees
-share the same coordination state.
+repository's Git common directory in an exact-release namespace such as
+`.git/codex-flow/v0.5.1/`, so linked worktrees on the same release share the
+same coordination state.
 
 ## Requirements
 
@@ -36,8 +37,9 @@ retire old operational state explicitly, and initialize the current version.
 Replacing any earlier pinned runtime is a fresh installation on a dedicated
 branch: retain the old `.git/codex-flow/` evidence, explicitly remove the old
 tracked `.codex/orchestration/` runtime and configuration from that branch,
-then plan and apply v0.5. New operational records live only in
-`.git/codex-flow/v0.5/`; v0.5 neither reads nor deletes retained namespaces.
+then plan and apply the selected release. New operational records live only in
+that exact release's namespace, currently `.git/codex-flow/v0.5.1/`; the
+current release neither reads nor deletes retained namespaces.
 
 ## Private distribution
 

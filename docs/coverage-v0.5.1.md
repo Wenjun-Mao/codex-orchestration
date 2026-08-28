@@ -21,6 +21,8 @@ gaps found by the first same-project UK Dev pilot.
 - Rejected operations remain auditable but no longer appear as unresolved
   unbound worktrees or incomplete claims. Unresolved observed operations still
   warn.
+- Mutable state lives only under `.git/codex-flow/v0.5.1/`. Retained v0.5.0
+  state remains byte-preserved and is neither read nor migrated.
 - Schema changes are breaking; no compatibility reader or migration is added.
 
 ## Not claimed

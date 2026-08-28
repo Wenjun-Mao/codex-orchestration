@@ -53,7 +53,7 @@ test("an expired holder token cannot release a replacement lease with the same o
     ], { cwd: root });
     assertSuccess(first, "first lease");
     const firstLease = JSON.parse(first.stdout).lease;
-    const leasePath = resolve(root, ".git", "codex-flow", "v0.5", "leases", "browser", "lease.json");
+    const leasePath = resolve(root, ".git", "codex-flow", "v0.5.1", "leases", "browser", "lease.json");
     const stored = JSON.parse(await readFile(leasePath, "utf8"));
     stored.expires_at = "2000-01-01T00:00:00.000Z";
     await writeFile(leasePath, JSON.stringify(stored), "utf8");
@@ -92,7 +92,7 @@ test("cleanup is audit-only and reports repository-scoped state", async () => {
     const report = JSON.parse(audit.stdout);
     assert.equal(report.mutation_performed, false);
     assert.equal(report.leases.length, 1);
-    assert.match(report.state_root, /\.git\/codex-flow\/v0\.5$/);
+    assert.match(report.state_root, /\.git\/codex-flow\/v0\.5\.1$/);
   } finally {
     await removeFixture(root);
   }

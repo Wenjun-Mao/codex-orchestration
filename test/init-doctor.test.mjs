@@ -138,10 +138,10 @@ test("v0.5 rejects older project configuration instead of migrating it", async (
   }
 });
 
-test("v0.5 uses a fresh state namespace and ignores retained v0.4 evidence", async () => {
+test("v0.5.1 uses an exact-release state namespace and ignores retained earlier evidence", async () => {
   const root = await createGitFixture("codex-flow-state-v05-");
   try {
-    const legacyRecord = resolve(
+    const v04Record = resolve(
       root,
       ".git",
       "codex-flow",
@@ -150,15 +150,27 @@ test("v0.5 uses a fresh state namespace and ignores retained v0.4 evidence", asy
       "records",
       "incompatible-v03.json",
     );
-    await mkdir(resolve(legacyRecord, ".."), { recursive: true });
-    await writeFile(legacyRecord, "{\"schema_version\":2}\n", "utf8");
+    const v05Record = resolve(
+      root,
+      ".git",
+      "codex-flow",
+      "v0.5",
+      "task-operations",
+      "records",
+      "pre-observation-policy.json",
+    );
+    await mkdir(resolve(v04Record, ".."), { recursive: true });
+    await mkdir(resolve(v05Record, ".."), { recursive: true });
+    await writeFile(v04Record, "{\"schema_version\":2}\n", "utf8");
+    await writeFile(v05Record, "{\"schema_version\":8}\n", "utf8");
 
     initializeFixture([], { cwd: root });
     const context = discoverGit(root);
-    assert.equal(context.stateRoot, resolve(context.commonDir, "codex-flow", "v0.5"));
-    assert.equal(await readFile(legacyRecord, "utf8"), "{\"schema_version\":2}\n");
+    assert.equal(context.stateRoot, resolve(context.commonDir, "codex-flow", "v0.5.1"));
+    assert.equal(await readFile(v04Record, "utf8"), "{\"schema_version\":2}\n");
+    assert.equal(await readFile(v05Record, "utf8"), "{\"schema_version\":8}\n");
     const doctor = runCli(["doctor", "--json"], { cwd: root });
-    assertSuccess(doctor, "v0.5 namespaced doctor");
+    assertSuccess(doctor, "v0.5.1 namespaced doctor");
     assert.equal(JSON.parse(doctor.stdout).ok, true);
   } finally {
     await removeFixture(root);
