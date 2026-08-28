@@ -521,30 +521,56 @@ test("host-created worktree resumes only from its persisted branch-claim receipt
     });
     assert.equal(interruptedAudit.incomplete_claim_count, 1);
     assert.equal(interruptedAudit.blocked, true);
-    await assert.rejects(
-      rejectTaskOperationBeforeRelease({
-        stateRoot: observed.controller.stateRoot,
-        operationId: observed.operationId,
-        reasonCode: "operator-cancelled",
-        hostObjectState: "archived",
-      }),
-      /branch claim requires recovery/,
-    );
-    assert.equal((await taskOperationStatus({
+    git(value.root, ["worktree", "remove", "--force", value.worktree]);
+    const rejected = await rejectTaskOperationBeforeRelease({
       stateRoot: observed.controller.stateRoot,
       operationId: observed.operationId,
-    }))[0].status, "observed");
-    const ownership = await bindGitOwnership({
-      git: observed.controller,
-      operationId: observed.operationId,
+      reasonCode: "operator-cancelled",
+      hostObjectState: "archived",
     });
-    assert.equal(ownership.branch, "codex/host-claim-recovery");
+    assert.equal(rejected.status, "rejected-before-release");
+    assert.equal(rejected.resolution.branch_claim_settlement.claim.branch, "codex/host-claim-recovery");
     const recoveredAudit = await gitLifecycleAudit({
       git: observed.controller,
       config: value.config,
       inspectRemotes: false,
     });
     assert.equal(recoveredAudit.incomplete_claim_count, 0);
+    assert.equal(recoveredAudit.blocked, false);
+  } finally {
+    await dispose(value);
+  }
+});
+
+test("claim settlement refuses drifted or fetched remote branches", async () => {
+  const value = await fixture();
+  try {
+    git(value.worktree, ["switch", "--detach", "main"]);
+    const observed = await observedHostWorktree(value, "claim-refusal");
+    await assert.rejects(bindGitOwnership({
+      git: observed.controller,
+      operationId: observed.operationId,
+      hooks: { afterBranchClaim() { throw new Error("post-claim interruption"); } },
+    }), /post-claim interruption/);
+    git(value.worktree, ["switch", "--detach", "main"]);
+    git(value.root, ["worktree", "remove", "--force", value.worktree]);
+    git(value.root, ["commit", "--allow-empty", "--quiet", "-m", "advance source"]);
+    git(value.root, ["branch", "-f", observed.request.environment.executor_branch, "HEAD"]);
+    await assert.rejects(rejectTaskOperationBeforeRelease({
+      stateRoot: observed.controller.stateRoot,
+      operationId: observed.operationId,
+      reasonCode: "operator-cancelled",
+      hostObjectState: "archived",
+    }), /claimed branch drift/);
+    git(value.root, ["branch", "-f", observed.request.environment.executor_branch, observed.request.baseline.revision]);
+    git(value.root, ["push", "origin", `${observed.request.environment.executor_branch}:${observed.request.environment.executor_branch}`]);
+    git(value.root, ["fetch", "origin"]);
+    await assert.rejects(rejectTaskOperationBeforeRelease({
+      stateRoot: observed.controller.stateRoot,
+      operationId: observed.operationId,
+      reasonCode: "operator-cancelled",
+      hostObjectState: "archived",
+    }), /fetched remote branch evidence/);
   } finally {
     await dispose(value);
   }

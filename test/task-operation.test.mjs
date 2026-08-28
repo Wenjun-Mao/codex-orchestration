@@ -922,7 +922,7 @@ test("v0.5.1 rejects older task-operation records instead of migrating them", as
     });
     const recordPath = resolve(stateRoot, "task-operations", "records", `${prepared.operation_id}.json`);
     const old = JSON.parse(await readFile(recordPath, "utf8"));
-    old.schema_version = 5;
+    old.schema_version = 6;
     await writeFile(recordPath, `${JSON.stringify(old, null, 2)}\n`, "utf8");
     await assert.rejects(
       taskOperationStatus({ stateRoot, operationId: prepared.operation_id }),
@@ -1284,6 +1284,7 @@ test("rejected-before-release requires an archived absent worktree and is termin
       reason_code: "operator-cancelled",
       host_object_state: "archived",
       execution_path_state: "absent",
+      branch_claim_settlement: null,
       recorded_at: rejected.resolution.recorded_at,
     });
     assert.equal((await rejectTaskOperationBeforeRelease({
