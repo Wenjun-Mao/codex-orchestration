@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdtemp, realpath, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import test from "node:test";
@@ -537,6 +537,20 @@ test("host-created worktree resumes only from its persisted branch-claim receipt
     });
     assert.equal(recoveredAudit.incomplete_claim_count, 0);
     assert.equal(recoveredAudit.blocked, false);
+    const recordPath = resolve(
+      observed.controller.stateRoot,
+      "task-operations",
+      "records",
+      `${observed.operationId}.json`,
+    );
+    const predecessor = JSON.parse(await readFile(recordPath, "utf8"));
+    predecessor.schema_version = 8;
+    predecessor.resolution.branch_claim_settlement.local_branch_state = "deleted";
+    await writeFile(recordPath, `${JSON.stringify(predecessor, null, 2)}\n`, "utf8");
+    await assert.rejects(
+      taskOperationStatus({ stateRoot: observed.controller.stateRoot, operationId: observed.operationId }),
+      /Unsupported task-operation record/,
+    );
   } finally {
     await dispose(value);
   }

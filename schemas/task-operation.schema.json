@@ -9,7 +9,7 @@
     "observation_policy", "incompatibility", "resolution", "created_at", "updated_at"
   ],
   "properties": {
-    "schema_version": { "const": 8 },
+    "schema_version": { "const": 9 },
     "kind": { "const": "codex-flow-task-create-operation" },
     "operation_id": { "$ref": "#/$defs/journalId" },
     "project_id": { "$ref": "#/$defs/safeId" },

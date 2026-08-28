@@ -922,7 +922,7 @@ test("v0.5.1 rejects older task-operation records instead of migrating them", as
     });
     const recordPath = resolve(stateRoot, "task-operations", "records", `${prepared.operation_id}.json`);
     const old = JSON.parse(await readFile(recordPath, "utf8"));
-    old.schema_version = 6;
+    old.schema_version = 8;
     await writeFile(recordPath, `${JSON.stringify(old, null, 2)}\n`, "utf8");
     await assert.rejects(
       taskOperationStatus({ stateRoot, operationId: prepared.operation_id }),
