@@ -130,9 +130,14 @@ test("host-worktree packets expose only a bootstrap prompt before Git binding", 
       starting_branch: "codex/pilot-source",
       executor_branch: "codex/pilot-executor",
     },
+    host_placement: {
+      mode: "same-project",
+      target_project_id: "saved-project-uuid-01",
+      reason: null,
+    },
   });
   assert.throws(() => renderTaskPacket(hostWorktree), /Git-bound task-operation release/);
-  const bootstrap = renderHostWorktreeBootstrap(hostWorktree, "task-operation-v1-bootstrap");
+  const bootstrap = renderHostWorktreeBootstrap(hostWorktree, "task-operation-v2-bootstrap");
   assert.match(bootstrap, /bootstrap turn only/);
   assert.doesNotMatch(bootstrap, new RegExp(hostWorktree.objective));
   assert.doesNotMatch(bootstrap, /Saved project path:/);
@@ -169,10 +174,10 @@ test("host-worktree packets expose only a bootstrap prompt before Git binding", 
   }
 });
 
-test("v4 task packets and v2 plans fail closed on older versions and ambiguous kinds", async () => {
+test("v5 task packets and v2 plans fail closed on older versions and ambiguous kinds", async () => {
   const packet = JSON.parse(await readFile(resolve(packageRoot, "examples/task-packet.json"), "utf8"));
   const plan = JSON.parse(await readFile(resolve(packageRoot, "examples/parallel-plan.json"), "utf8"));
-  assert.throws(() => validateTaskPacket({ ...packet, schema_version: 3 }), /Unsupported task packet schema_version/);
+  assert.throws(() => validateTaskPacket({ ...packet, schema_version: 4 }), /Unsupported task packet schema_version/);
   assert.throws(() => validatePlan({ ...plan, schema_version: 1 }), /Unsupported plan schema_version/);
   assert.throws(() => validateTaskPacket({ ...packet, role: "coordinator-or-executor" }), /role must be one of/);
   assert.throws(() => validateTaskPacket({ ...packet, execution_kind: "task-thread-or-subagent" }), /execution_kind must be one of/);

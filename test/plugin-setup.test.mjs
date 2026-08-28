@@ -119,7 +119,7 @@ test("cached plugin initializes a Python repository without a source checkout", 
     const manifest = JSON.parse(
       await readFile(resolve(repositoryRoot, ".codex/orchestration/version.json"), "utf8"),
     );
-    assert.equal(manifest.package_version, "0.5.0");
+    assert.equal(manifest.package_version, "0.5.1");
     assertSuccess(
       runCachedCli(cacheRoot, ["init", "--check"], repositoryRoot),
       "cached plugin check",
@@ -130,7 +130,7 @@ test("cached plugin initializes a Python repository without a source checkout", 
       { cwd: repositoryRoot, encoding: "utf8" },
     );
     assertSuccess(pinnedDoctor, "pinned doctor");
-    assert.equal(JSON.parse(pinnedDoctor.stdout).runtime.package_version, "0.5.0");
+    assert.equal(JSON.parse(pinnedDoctor.stdout).runtime.package_version, "0.5.1");
   } finally {
     await removeFixture(repositoryRoot);
     await rm(cacheRoot, { recursive: true, force: true });
@@ -155,7 +155,7 @@ for (const mismatch of ["package", "plugin", "runtime"]) {
       } else {
         const path = resolve(cacheRoot, "lib/core.mjs");
         const source = await readFile(path, "utf8");
-        await writeFile(path, source.replace('"0.5.0"', '"9.9.9"'), "utf8");
+        await writeFile(path, source.replace('"0.5.1"', '"9.9.9"'), "utf8");
       }
 
       const result = runCachedCli(cacheRoot, ["init", "--plan", "--json"], repositoryRoot);

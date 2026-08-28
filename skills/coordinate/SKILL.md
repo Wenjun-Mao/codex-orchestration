@@ -40,8 +40,12 @@ Create every project-backed visible task thread in the coordinator's same saved
 Codex App project by default, using that project's exact host ID. A different
 saved project requires an explicit target and reason. Projectless is an explicit
 exception only for a truly repositoryless task or an unsaved disposable fixture;
-record that reason in the operation evidence instead of silently losing project
-context.
+record that reason in the operation before dispatch instead of silently losing
+project context. Hidden subagents explicitly inherit their host context. During
+reconciliation, distinguish an exact project ID independently observed by the
+host from the same target merely accepted by the create call. Accepted-only
+placement is partial evidence; any non-null mismatch stops before Git binding
+or objective release.
 
 For a host-created worktree, create the task with only the generated bootstrap
 prompt. Observe its actual path, reconcile, run `codex-flow git bind`, then
@@ -51,6 +55,10 @@ an interrupted bind may resume only from that exact receipt, and any other named
 branch is a hard stop. Never guess a host path or send the objective before binding. For any
 project-backed executor, bind the observed operation to its exact canonical
 worktree before implementation begins.
+If policy rejects an observed object before binding, archive it and remove its
+unbound host worktree before recording the terminal rejected-before-release
+disposition. Do not leave a cleaned object permanently reported as unresolved,
+and do not use rejection to conceal an object whose path or host task remains.
 Task creation fails closed at the configured cleanup threshold; reconcile
 completed Git ownership before launching another wave.
 

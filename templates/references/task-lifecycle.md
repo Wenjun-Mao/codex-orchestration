@@ -9,6 +9,8 @@
    `reasoning_effort` as actual host
    arguments, then inspect and reconcile field-level evidence. Normalize a
    substituted task-thread title only through a bounded write and exact reread.
+   Persist placement intent before creation and distinguish host-observed
+   placement from an exact target merely accepted by the create call.
    For a host-created worktree, create with the no-action bootstrap, observe and
    bind its exact path, then release the full task packet.
 4. **Execute:** remain inside packet ownership and verify proportionally.
@@ -28,6 +30,8 @@
    Git state, and use
    an explicit cleanup plan/apply pair for eligible task branches/worktrees. A
    failed or partial apply requires a fresh audit and plan for what remains.
+   An observed task rejected before release is terminal only after host archival
+   and verified removal of its unbound worktree.
 
 Thread creation, archiving, deletion, and host-specific role binding are
 capabilities, not assumptions. Record what the current session actually

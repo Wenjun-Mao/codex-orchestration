@@ -38,7 +38,7 @@ function receipt() {
 
 function operationPacket(root) {
   return {
-    schema_version: 4,
+    schema_version: 5,
     task_id: "cli-task-operation",
     run_id: "cli-task-operation-run-01",
     role: "executor",
@@ -50,6 +50,11 @@ function operationPacket(root) {
       cleanliness: "dirty-authorized",
     },
     environment: { type: "local", project_path: root },
+    host_placement: {
+      mode: "same-project",
+      target_project_id: "cli-saved-project",
+      reason: null,
+    },
     model: "gpt-5.6-terra",
     reasoning_effort: "xhigh",
     launch_deadline: { at: "2030-08-23T17:15:00-04:00", timezone: "America/Toronto" },
@@ -96,18 +101,20 @@ function hostWorktreeOperationPacket(root) {
 
 function hostCapability(environmentType = "local") {
   return {
-    schema_version: 2,
+    schema_version: 3,
     adapter_id: "cli-test-host",
     host_session_id: "cli-test-session",
     checked_at: "2026-08-23T12:00:00Z",
     execution_kind: "task-thread",
     environment_type: environmentType,
+    placement_mode: "same-project",
     support: {
       execution_kind: { state: "supported", basis: "host-contract" },
       environment: { state: "supported", basis: "tool-schema" },
       execution_path: environmentType === "host-worktree"
         ? { state: "supported", basis: "host-contract" }
         : { state: "not-required", basis: "not-required" },
+      project_placement: { state: "supported", basis: "tool-schema" },
       model: { state: "supported", basis: "open-selector" },
       reasoning_effort: { state: "supported", basis: "open-selector" },
     },
@@ -117,7 +124,7 @@ function hostCapability(environmentType = "local") {
 
 function hostObservation(executionPath = null, title = "CLI task operation probe") {
   return {
-    schema_version: 2,
+    schema_version: 3,
     title: {
       source: "host-observed",
       value: title,
@@ -130,6 +137,7 @@ function hostObservation(executionPath = null, title = "CLI task operation probe
     execution_path: executionPath === null
       ? { source: "not-required", value: null }
       : { source: "host-observed", value: executionPath },
+    project_placement: { source: "host-accepted", value: "cli-saved-project" },
   };
 }
 

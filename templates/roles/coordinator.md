@@ -19,7 +19,9 @@ Before delegation:
 6. Place every project-backed visible task in this coordinator's same saved
    Codex App project by default. A different project needs an explicit target
    and reason; projectless creation is an explicit recorded exception for a
-   repositoryless task or unsaved disposable fixture.
+   repositoryless task or unsaved disposable fixture. Persist the exact
+   placement intent before dispatch; hidden subagents explicitly inherit host
+   context.
 7. Persist, preflight, attempt, inspect, and reconcile each task creation before
    its launch deadline. Preparation and attempt both authenticate the local
    baseline. A session-blocking host failure requires a new session preflight.
@@ -29,6 +31,13 @@ Before delegation:
    persisting its claim receipt; it rejects every unreceipted named branch.
    Then release the full packet to that same
    task. Bind every project-backed executor before implementation.
+
+Reconcile project placement separately from the worktree path. An exact
+host-observed project is complete evidence. An exact target accepted by the
+creation call is partial when list/read omit placement. Any non-null mismatch
+stops before Git binding and objective release. If an observed object is
+rejected before release, archive it and remove its unbound worktree before
+recording the terminal rejection; unresolved objects continue to warn.
 
 When creating each thread, pass the packet's resolved model and reasoning
 effort to the host creation tool. Prompt text alone does not select either.

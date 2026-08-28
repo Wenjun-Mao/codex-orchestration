@@ -12,10 +12,11 @@ For task creation:
    exact branch tip, and a distinct unclaimed executor branch from Git.
 2. Resolve the coordinator's saved Codex App project and create a project-backed
    visible task in that same project by default. Record its exact project ID in
-   the coordinator's host-call evidence. A cross-project target needs an explicit
-   reason.
+   the operation before dispatch. A cross-project target needs an exact ID and
+   explicit reason.
    Projectless is an explicit exception only for a truly repositoryless task or
-   an unsaved disposable fixture, and its reason must be recorded.
+   an unsaved disposable fixture, and its reason must be recorded. Hidden
+   subagents explicitly inherit their host context.
 3. Record a stable, nonsecret host-session marker and capability evidence for
    the requested kind, model, and reasoning. Also record whether filtered
    discovery works or which bounded fallback is available.
@@ -31,7 +32,10 @@ For task creation:
    and record `bounded-host-write`. A subagent may have no title field; keep its
    host nickname separate.
 7. Reconcile the attempt as `observed` with field-level provenance for title,
-   visibility, model, reasoning, host label, and execution path. A
+   visibility, model, reasoning, project placement, host label, and execution
+   path. Exact host-observed placement is complete. Exact host-accepted
+   placement is partial when list/read omit the selected project. Any non-null
+   mismatch stops before binding. A
    `host-worktree` path must come from host observation.
 8. For `host-worktree`, run `git bind`, then `task operation release` and send
    the resulting full packet to the same task. A pristine detached worktree may
@@ -41,6 +45,13 @@ For task creation:
    unless the final path is distinct from
    the saved checkout, in the same repository, and at the exact starting
    revision.
+
+If the coordinator rejects an observed object before Git binding or objective
+release, first archive the task. For `host-worktree`, remove the pristine
+unbound path and verify that exact path is absent. Then record the terminal
+`rejected-before-release` operation disposition. Conflicting replay, later
+retry, binding, or release is forbidden. Without this explicit disposition,
+doctor and cleanup continue to treat the object as unresolved.
 
 When a host advertises filtered thread listing but rejects the filter at
 runtime, make one bounded recent-list call without that filter and match only

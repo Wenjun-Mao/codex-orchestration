@@ -193,15 +193,21 @@ const coordinationContracts = new Map([
   ["skills/coordinate/SKILL.md", [
     "same saved Codex App project by default",
     "Projectless is an explicit exception",
+    "Accepted-only placement is partial evidence",
+    "rejected-before-release",
     "archive it by default",
   ]],
   ["templates/references/host-operations.md", [
     "same project by default",
     "Projectless is an explicit exception",
+    "Exact host-accepted placement is partial",
+    "rejected-before-release",
     "archives a visible task by default",
   ]],
   ["templates/roles/coordinator.md", [
     "same saved Codex App project by default",
+    "host-observed project is complete evidence",
+    "terminal rejection",
     "archive it by default",
   ]],
 ]);

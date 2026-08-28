@@ -34,7 +34,7 @@ or adopt Codex Flow. A question about Codex Flow receives an explanation only.
 
 Inspect before choosing a mode:
 
-1. If `.codex/orchestration/version.json` exists at package version `0.5.0`,
+1. If `.codex/orchestration/version.json` exists at package version `0.5.1`,
    run canonical `init --check` and the pinned `doctor`; do not reinstall.
 2. If an installed runtime names any other package version, stop. Codex Flow is
    pre-stable and requires explicit retirement and fresh installation rather

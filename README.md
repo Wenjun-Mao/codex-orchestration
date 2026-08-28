@@ -150,6 +150,8 @@ codex-flow task operation attempt --operation-id <id>
 codex-flow task operation bootstrap --operation-id <id> --file <packet.json>
 codex-flow task operation reconcile --operation-id <id> --attempt-id <id>
                   --outcome observed|not-created|ambiguous|failed|host-session-blocked ...
+codex-flow task operation reject --operation-id <id> --reason-code <code>
+                  --host-object-state archived
 codex-flow task operation release --operation-id <id> --file <packet.json>
 codex-flow task operation status [--operation-id <id>]
 codex-flow plan validate <plan.json>
@@ -190,10 +192,19 @@ strict capability evidence for the current host session with `preflight`, then
 start a bounded attempt. After the host call, inspect the actual object and
 reconcile its ID, kind, and field-level evidence provenance.
 
-Project-backed visible tasks are created in the coordinator's same saved Codex
-App project by default. Cross-project placement requires an explicit target and
+Every operation persists host placement before creation. Project-backed visible
+tasks use the coordinator's same saved Codex App project by default, including
+its exact project ID. Cross-project placement requires an explicit target and
 reason. Projectless placement is an explicit exception for repositoryless work
-or an unsaved disposable fixture, and the coordinator records why it was used.
+or an unsaved disposable fixture, and hidden subagents explicitly inherit their
+host context.
+
+Reconciliation keeps project placement separate from repository execution.
+`host-observed` is complete evidence. When the exact targeted creation call
+succeeds but list/read omit project placement, `host-accepted` is permitted as
+partial evidence; it is never reported as independently observed. Any non-null
+observed or accepted mismatch fails closed before Git binding or objective
+release.
 After terminal disposition, preserved evidence, callback consumption, and Git
 cleanup reconciliation, the coordinator archives the visible task by default;
 blocked or attention-needed tasks remain visible until resolved.
@@ -217,6 +228,13 @@ receipt, claims the packet-declared executor branch, and rereads every invariant
 before recording ownership. An interrupted bind resumes only from that exact
 receipt. Never guess the path, accept an unreceipted named branch, or bind the
 saved checkout.
+
+If an observed object is rejected before Git binding and objective release, the
+coordinator archives it and removes its unbound host worktree. Only then may
+`task operation reject` persist the terminal disposition. The CLI verifies the
+exact observed path is absent, preserves the rejection evidence, and prevents
+retry or release. An observed operation without that disposition continues to
+warn as unresolved.
 
 A timeout is ambiguous, not failure. List/read the host state before retrying,
 then reconcile `observed` or `not-created`. No new launch may start after the
@@ -365,5 +383,7 @@ defines the two-phase Desktop worktree contract.
 [Journaled urgent direct delivery](docs/adr/0009-journaled-urgent-direct-delivery.md)
 defines urgent-signal and delivery-attempt identity. Plugin-first package
 authority is defined by [ADR 0010](docs/adr/0010-plugin-first-package-authority.md).
+[Host project placement and pre-release rejection](docs/adr/0011-host-project-placement-and-pre-release-rejection.md)
+defines the v0.5.1 placement-evidence and terminal-bootstrap contract.
 The current covered boundary is listed in
 [v0.5 orchestration coverage](docs/coverage-v0.5.md).
