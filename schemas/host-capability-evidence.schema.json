@@ -5,23 +5,25 @@
   "additionalProperties": false,
   "required": [
     "schema_version", "adapter_id", "host_session_id", "checked_at",
-    "execution_kind", "environment_type", "support", "thread_discovery"
+    "execution_kind", "environment_type", "placement_mode", "support", "thread_discovery"
   ],
   "properties": {
-    "schema_version": { "const": 2 },
+    "schema_version": { "const": 3 },
     "adapter_id": { "$ref": "#/$defs/safeId" },
     "host_session_id": { "$ref": "#/$defs/safeId" },
     "checked_at": { "type": "string", "format": "date-time", "maxLength": 64 },
     "execution_kind": { "enum": ["task-thread", "subagent"] },
     "environment_type": { "enum": ["local", "host-worktree", "projectless"] },
+    "placement_mode": { "enum": ["same-project", "cross-project", "projectless", "inherited"] },
     "support": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["execution_kind", "environment", "execution_path", "model", "reasoning_effort"],
+      "required": ["execution_kind", "environment", "execution_path", "project_placement", "model", "reasoning_effort"],
       "properties": {
         "execution_kind": { "$ref": "#/$defs/supportEvidence" },
         "environment": { "$ref": "#/$defs/supportEvidence" },
         "execution_path": { "$ref": "#/$defs/supportEvidence" },
+        "project_placement": { "$ref": "#/$defs/supportEvidence" },
         "model": { "$ref": "#/$defs/supportEvidence" },
         "reasoning_effort": { "$ref": "#/$defs/supportEvidence" }
       }
@@ -65,6 +67,49 @@
           "properties": {
             "query": { "const": "not-applicable" },
             "fallback": { "const": "none" }
+          }
+        }
+      }
+    }
+  ],
+  "allOf": [
+    {
+      "if": { "properties": { "execution_kind": { "const": "subagent" } } },
+      "then": { "properties": { "placement_mode": { "const": "inherited" } } }
+    },
+    {
+      "if": { "properties": { "execution_kind": { "const": "task-thread" } } },
+      "then": { "properties": { "placement_mode": { "enum": ["same-project", "cross-project", "projectless"] } } }
+    },
+    {
+      "if": { "properties": { "placement_mode": { "enum": ["projectless", "inherited"] } } },
+      "then": {
+        "properties": {
+          "support": {
+            "properties": {
+              "project_placement": {
+                "properties": {
+                  "state": { "const": "not-required" },
+                  "basis": { "const": "not-required" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "placement_mode": { "enum": ["same-project", "cross-project"] } } },
+      "then": {
+        "properties": {
+          "support": {
+            "properties": {
+              "project_placement": {
+                "properties": {
+                  "state": { "enum": ["supported", "unsupported", "unknown"] }
+                }
+              }
+            }
           }
         }
       }

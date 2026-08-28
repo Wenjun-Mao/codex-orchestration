@@ -9,16 +9,18 @@ import {
   beginTaskOperationAttempt,
   prepareTaskOperation,
   recordTaskOperationHostPreflight,
+  rejectTaskOperationBeforeRelease,
   reconcileTaskOperation,
   taskOperationStatus,
   validateHostCapabilityEvidence,
   validateHostObservationEvidence,
 } from "../lib/task-operations.mjs";
+import { validateTaskPacket } from "../lib/task-packet.mjs";
 import { createGitFixture, removeFixture } from "./helpers.mjs";
 
 function packet(overrides = {}) {
   return {
-    schema_version: 4,
+    schema_version: 5,
     task_id: "bounded-executor-01",
     run_id: "run-20260823-01",
     role: "executor",
@@ -27,6 +29,11 @@ function packet(overrides = {}) {
     objective: "Exercise one bounded task operation.",
     baseline: { revision: "0123456789abcdef", cleanliness: "clean" },
     environment: { type: "projectless" },
+    host_placement: {
+      mode: "projectless",
+      target_project_id: null,
+      reason: "This task does not use a saved Codex App project.",
+    },
     model: "gpt-5.6-terra",
     reasoning_effort: "xhigh",
     launch_deadline: { at: "2030-08-23T17:15:00-04:00", timezone: "America/Toronto" },
@@ -62,6 +69,11 @@ function repositoryPacket(root, overrides = {}) {
     run_id: "run-local-baseline-01",
     baseline: { revision: gitRevision(root), cleanliness: "clean" },
     environment: { type: "local", project_path: root },
+    host_placement: {
+      mode: "same-project",
+      target_project_id: "saved-project-uuid-01",
+      reason: null,
+    },
     ...overrides,
   });
 }
@@ -75,6 +87,11 @@ function hostWorktreePacket(root, overrides = {}) {
       repository_path: root,
       starting_branch: "main",
       executor_branch: "codex/host-worktree-executor",
+    },
+    host_placement: {
+      mode: "same-project",
+      target_project_id: "saved-project-uuid-01",
+      reason: null,
     },
     ...overrides,
   });
@@ -91,18 +108,24 @@ function hostCapability({
   environmentType = "projectless",
   environment = { state: "supported", basis: "tool-schema" },
   executionPath = { state: "not-required", basis: "not-required" },
+  placementMode = "projectless",
+  projectPlacement = ["same-project", "cross-project"].includes(placementMode)
+    ? { state: "supported", basis: "tool-schema" }
+    : { state: "not-required", basis: "not-required" },
 } = {}) {
   return {
-    schema_version: 2,
+    schema_version: 3,
     adapter_id: "codex-desktop-host",
     host_session_id: hostSessionId,
     checked_at: checkedAt,
     execution_kind: executionKind,
     environment_type: environmentType,
+    placement_mode: placementMode,
     support: {
       execution_kind: { state: "supported", basis: "host-contract" },
       environment,
       execution_path: executionPath,
+      project_placement: projectPlacement,
       model,
       reasoning_effort: reasoningEffort,
     },
@@ -116,9 +139,10 @@ function taskThreadEvidence({
   modelSource = "host-accepted",
   reasoningSource = "host-accepted",
   executionPath = null,
+  projectPlacement = { source: "not-applicable", value: null },
 } = {}) {
   return {
-    schema_version: 2,
+    schema_version: 3,
     title: { source: "host-observed", value: title, normalization: titleNormalization },
     visibility: { source: "host-observed", value: true },
     model: { source: modelSource, value: "gpt-5.6-terra" },
@@ -127,18 +151,20 @@ function taskThreadEvidence({
     execution_path: executionPath === null
       ? { source: "not-required", value: null }
       : { source: "host-observed", value: executionPath },
+    project_placement: projectPlacement,
   };
 }
 
 function subagentEvidence() {
   return {
-    schema_version: 2,
+    schema_version: 3,
     title: { source: "unavailable", value: null, normalization: "not-applicable" },
     visibility: { source: "host-contract", value: false },
     model: { source: "role-contract", value: "gpt-5.6-terra" },
     reasoning_effort: { source: "role-contract", value: "xhigh" },
     host_label: { source: "host-observed", value: "focused-runner" },
     execution_path: { source: "not-required", value: null },
+    project_placement: { source: "not-applicable", value: null },
   };
 }
 
@@ -152,6 +178,7 @@ test("host evidence validators reject contradictory provenance and values", () =
   assert.throws(
     () => validateHostCapabilityEvidence(hostCapability({
       executionKind: "subagent",
+      placementMode: "inherited",
       query: "supported",
       fallback: "none",
     })),
@@ -183,14 +210,19 @@ test("host evidence validators reject contradictory provenance and values", () =
 async function recordCompatiblePreflight(stateRoot, operationId, overrides = {}) {
   const operation = (await taskOperationStatus({ stateRoot, operationId }))[0];
   const environmentType = operation.request.environment.type;
+  const placementMode = operation.request.host_placement.mode;
   return recordTaskOperationHostPreflight({
     stateRoot,
     operationId,
     evidence: hostCapability({
       ...overrides,
       environmentType,
+      placementMode,
       executionPath: environmentType === "host-worktree"
         ? { state: "supported", basis: "host-contract" }
+        : { state: "not-required", basis: "not-required" },
+      projectPlacement: ["same-project", "cross-project"].includes(placementMode)
+        ? { state: "supported", basis: "tool-schema" }
         : { state: "not-required", basis: "not-required" },
     }),
     now: Date.parse(overrides.checkedAt ?? "2026-08-23T12:00:00Z"),
@@ -297,6 +329,8 @@ test("local task operation authenticates its exact full Git baseline", async () 
     });
     assert.deepEqual(prepared.request.baseline, current.baseline);
     assert.deepEqual(prepared.request.environment, current.environment);
+    assert.equal(prepared.project_id, "fixture-project");
+    assert.equal(prepared.request.host_placement.target_project_id, "saved-project-uuid-01");
 
     await recordCompatiblePreflight(stateRoot, prepared.operation_id);
 
@@ -437,7 +471,10 @@ test("host-worktree authenticates a source branch before creation and requires a
       outcome: "observed",
       objectId: "host-worktree-thread",
       actualKind: "task-thread",
-      evidence: taskThreadEvidence({ executionPath: "/tmp/codex-host-worktree" }),
+      evidence: taskThreadEvidence({
+        executionPath: "/tmp/codex-host-worktree",
+        projectPlacement: { source: "host-observed", value: "saved-project-uuid-01" },
+      }),
     });
     assert.equal(observed.observed.evidence.execution_path.value, "/tmp/codex-host-worktree");
   } finally {
@@ -460,6 +497,7 @@ test("host-worktree preflight and starting-ref drift fail before a host call", a
       operationId: unsupported.operation_id,
       evidence: hostCapability({
         environmentType: "host-worktree",
+        placementMode: "same-project",
         executionPath: { state: "unknown", basis: "unavailable" },
       }),
     });
@@ -818,6 +856,11 @@ test("subagent reconciliation keeps unavailable title distinct from its host nic
       packet: packet({
         run_id: "run-subagent-evidence-01",
         execution_kind: "subagent",
+        host_placement: {
+          mode: "inherited",
+          target_project_id: null,
+          reason: null,
+        },
       }),
     });
     await recordCompatiblePreflight(stateRoot, prepared.operation_id, {
@@ -853,7 +896,7 @@ test("subagent reconciliation keeps unavailable title distinct from its host nic
   }
 });
 
-test("v0.5 rejects older task-operation records instead of migrating them", async () => {
+test("v0.5.1 rejects older task-operation records instead of migrating them", async () => {
   const root = await createGitFixture();
   const stateRoot = resolve(root, ".git", "codex-flow", "v0.5");
   try {
@@ -864,7 +907,7 @@ test("v0.5 rejects older task-operation records instead of migrating them", asyn
     });
     const recordPath = resolve(stateRoot, "task-operations", "records", `${prepared.operation_id}.json`);
     const old = JSON.parse(await readFile(recordPath, "utf8"));
-    old.schema_version = 4;
+    old.schema_version = 5;
     await writeFile(recordPath, `${JSON.stringify(old, null, 2)}\n`, "utf8");
     await assert.rejects(
       taskOperationStatus({ stateRoot, operationId: prepared.operation_id }),
@@ -959,6 +1002,282 @@ test("an in-flight host call remains reconcilable after the launch deadline", as
       operationId: prepared.operation_id,
       now: Date.parse("2026-08-23T12:01:07Z"),
     }))[0].status, "ambiguous");
+  } finally {
+    await removeFixture(root);
+  }
+});
+
+test("host placement is independently bound and project-backed evidence is qualified", async () => {
+  const root = await createGitFixture("codex-flow-host-placement-");
+  const stateRoot = resolve(root, ".git", "codex-flow", "v0.5");
+  try {
+    const samePacket = repositoryPacket(root, { run_id: "run-placement-observed-01" });
+    const observed = await prepareTaskOperation({
+      stateRoot,
+      projectId: "repository-project-id",
+      packet: samePacket,
+    });
+    assert.equal(observed.project_id, "repository-project-id");
+    assert.equal(observed.request.host_placement.target_project_id, "saved-project-uuid-01");
+    await recordCompatiblePreflight(stateRoot, observed.operation_id);
+    const observedAttempt = await beginTaskOperationAttempt({ stateRoot, operationId: observed.operation_id });
+    const complete = await reconcileTaskOperation({
+      stateRoot,
+      operationId: observed.operation_id,
+      attemptId: observedAttempt.attempt.attempt_id,
+      outcome: "observed",
+      objectId: "thread-placement-observed",
+      actualKind: "task-thread",
+      evidence: taskThreadEvidence({
+        modelSource: "host-observed",
+        reasoningSource: "host-observed",
+        projectPlacement: { source: "host-observed", value: "saved-project-uuid-01" },
+      }),
+    });
+    assert.deepEqual(complete.observation_evidence, { quality: "complete", gaps: [] });
+
+    const accepted = await prepareTaskOperation({
+      stateRoot,
+      projectId: "repository-project-id",
+      packet: repositoryPacket(root, { run_id: "run-placement-accepted-01" }),
+    });
+    await recordCompatiblePreflight(stateRoot, accepted.operation_id);
+    const acceptedAttempt = await beginTaskOperationAttempt({ stateRoot, operationId: accepted.operation_id });
+    const partial = await reconcileTaskOperation({
+      stateRoot,
+      operationId: accepted.operation_id,
+      attemptId: acceptedAttempt.attempt.attempt_id,
+      outcome: "observed",
+      objectId: "thread-placement-accepted",
+      actualKind: "task-thread",
+      evidence: taskThreadEvidence({
+        modelSource: "host-observed",
+        reasoningSource: "host-observed",
+        projectPlacement: { source: "host-accepted", value: "saved-project-uuid-01" },
+      }),
+    });
+    assert.deepEqual(partial.observation_evidence, {
+      quality: "partial",
+      gaps: ["project-placement-host-accepted"],
+    });
+
+    const mismatch = await prepareTaskOperation({
+      stateRoot,
+      projectId: "repository-project-id",
+      packet: repositoryPacket(root, { run_id: "run-placement-mismatch-01" }),
+    });
+    await recordCompatiblePreflight(stateRoot, mismatch.operation_id);
+    const mismatchAttempt = await beginTaskOperationAttempt({ stateRoot, operationId: mismatch.operation_id });
+    await assert.rejects(
+      reconcileTaskOperation({
+        stateRoot,
+        operationId: mismatch.operation_id,
+        attemptId: mismatchAttempt.attempt.attempt_id,
+        outcome: "observed",
+        objectId: "thread-placement-mismatch",
+        actualKind: "task-thread",
+        evidence: taskThreadEvidence({
+          projectPlacement: { source: "host-observed", value: "different-saved-project" },
+        }),
+      }),
+      /does not match the requested target project ID/,
+    );
+
+    const unavailable = await prepareTaskOperation({
+      stateRoot,
+      projectId: "repository-project-id",
+      packet: repositoryPacket(root, { run_id: "run-placement-unavailable-01" }),
+    });
+    await recordCompatiblePreflight(stateRoot, unavailable.operation_id);
+    const unavailableAttempt = await beginTaskOperationAttempt({ stateRoot, operationId: unavailable.operation_id });
+    await assert.rejects(
+      reconcileTaskOperation({
+        stateRoot,
+        operationId: unavailable.operation_id,
+        attemptId: unavailableAttempt.attempt.attempt_id,
+        outcome: "observed",
+        objectId: "thread-placement-unavailable",
+        actualKind: "task-thread",
+        evidence: taskThreadEvidence({ projectPlacement: { source: "unavailable", value: null } }),
+      }),
+      /requires host-observed or host-accepted project placement/,
+    );
+
+    const unsupported = await prepareTaskOperation({
+      stateRoot,
+      projectId: "repository-project-id",
+      packet: repositoryPacket(root, { run_id: "run-placement-unsupported-01" }),
+    });
+    const blocked = await recordTaskOperationHostPreflight({
+      stateRoot,
+      operationId: unsupported.operation_id,
+      evidence: hostCapability({
+        environmentType: "local",
+        placementMode: "same-project",
+        projectPlacement: { state: "unsupported", basis: "closed-selector" },
+      }),
+    });
+    assert.equal(blocked.status, "host-incompatible");
+    assert.equal(blocked.incompatibility.reason_code, "project-placement-unsupported");
+    assert.equal(blocked.attempts.length, 0);
+    await assert.rejects(
+      beginTaskOperationAttempt({ stateRoot, operationId: unsupported.operation_id }),
+      /project-placement-unsupported/,
+    );
+
+    const identityBase = repositoryPacket(root, { run_id: "run-placement-identity-01" });
+    const crossProject = {
+      ...identityBase,
+      host_placement: {
+        mode: "cross-project",
+        target_project_id: "saved-project-uuid-02",
+        reason: "This task must run in a separately selected saved project.",
+      },
+    };
+    const sameOperation = await prepareTaskOperation({
+      stateRoot,
+      projectId: "repository-project-id",
+      packet: identityBase,
+    });
+    const crossOperation = await prepareTaskOperation({
+      stateRoot,
+      projectId: "repository-project-id",
+      packet: crossProject,
+    });
+    assert.notEqual(sameOperation.operation_id, crossOperation.operation_id);
+    assert.notEqual(sameOperation.packet_hash, crossOperation.packet_hash);
+  } finally {
+    await removeFixture(root);
+  }
+});
+
+test("projectless and inherited placement invariants reject ambiguous task contracts", () => {
+  assert.throws(
+    () => validateTaskPacket({
+      ...packet(),
+      host_placement: { mode: "same-project", target_project_id: "saved-project-uuid-01", reason: null },
+    }),
+    /Projectless task-thread execution requires projectless host placement/,
+  );
+  assert.throws(
+    () => validateTaskPacket({ ...packet(), execution_kind: "subagent" }),
+    /Subagent host placement must be inherited/,
+  );
+  assert.throws(
+    () => validateTaskPacket({
+      ...packet(),
+      host_placement: { mode: "inherited", target_project_id: null, reason: null },
+    }),
+    /Task-thread host placement cannot be inherited/,
+  );
+  assert.equal(validateTaskPacket({
+    ...packet(),
+    execution_kind: "subagent",
+    host_placement: { mode: "inherited", target_project_id: null, reason: null },
+  }).host_placement.mode, "inherited");
+});
+
+test("rejected-before-release requires an archived absent worktree and is terminal", async () => {
+  const root = await createGitFixture("codex-flow-rejection-");
+  const stateRoot = resolve(root, ".git", "codex-flow", "v0.5");
+  try {
+    const observedWithPath = await prepareTaskOperation({
+      stateRoot,
+      projectId: "repository-project-id",
+      packet: hostWorktreePacket(root, { run_id: "run-rejection-path-exists-01" }),
+    });
+    await recordCompatiblePreflight(stateRoot, observedWithPath.operation_id);
+    const existingAttempt = await beginTaskOperationAttempt({
+      stateRoot,
+      operationId: observedWithPath.operation_id,
+    });
+    await reconcileTaskOperation({
+      stateRoot,
+      operationId: observedWithPath.operation_id,
+      attemptId: existingAttempt.attempt.attempt_id,
+      outcome: "observed",
+      objectId: "thread-rejection-path-exists",
+      actualKind: "task-thread",
+      evidence: taskThreadEvidence({
+        executionPath: root,
+        projectPlacement: { source: "host-observed", value: "saved-project-uuid-01" },
+      }),
+    });
+    await assert.rejects(
+      rejectTaskOperationBeforeRelease({
+        stateRoot,
+        operationId: observedWithPath.operation_id,
+        reasonCode: "operator-cancelled",
+        hostObjectState: "archived",
+      }),
+      /execution path still exists/,
+    );
+
+    const removedPath = resolve(root, "archived-host-worktree");
+    const settled = await prepareTaskOperation({
+      stateRoot,
+      projectId: "repository-project-id",
+      packet: hostWorktreePacket(root, {
+        run_id: "run-rejection-settled-01",
+        environment: {
+          type: "host-worktree",
+          repository_path: root,
+          starting_branch: "main",
+          executor_branch: "codex/host-worktree-rejected",
+        },
+      }),
+    });
+    await recordCompatiblePreflight(stateRoot, settled.operation_id);
+    const settledAttempt = await beginTaskOperationAttempt({ stateRoot, operationId: settled.operation_id });
+    await reconcileTaskOperation({
+      stateRoot,
+      operationId: settled.operation_id,
+      attemptId: settledAttempt.attempt.attempt_id,
+      outcome: "observed",
+      objectId: "thread-rejection-settled",
+      actualKind: "task-thread",
+      evidence: taskThreadEvidence({
+        executionPath: removedPath,
+        projectPlacement: { source: "host-observed", value: "saved-project-uuid-01" },
+      }),
+    });
+    const rejected = await rejectTaskOperationBeforeRelease({
+      stateRoot,
+      operationId: settled.operation_id,
+      reasonCode: "operator-cancelled",
+      hostObjectState: "archived",
+    });
+    assert.equal(rejected.status, "rejected-before-release");
+    assert.deepEqual(rejected.resolution, {
+      disposition: "rejected-before-release",
+      reason_code: "operator-cancelled",
+      host_object_state: "archived",
+      execution_path_state: "absent",
+      recorded_at: rejected.resolution.recorded_at,
+    });
+    assert.equal((await rejectTaskOperationBeforeRelease({
+      stateRoot,
+      operationId: settled.operation_id,
+      reasonCode: "operator-cancelled",
+      hostObjectState: "archived",
+    })).status, "rejected-before-release");
+    await assert.rejects(
+      rejectTaskOperationBeforeRelease({
+        stateRoot,
+        operationId: settled.operation_id,
+        reasonCode: "host-object-archived",
+        hostObjectState: "archived",
+      }),
+      /replay conflicts/,
+    );
+    await assert.rejects(
+      beginTaskOperationAttempt({ stateRoot, operationId: settled.operation_id }),
+      /terminal: rejected-before-release/,
+    );
+    await assert.rejects(
+      recordCompatiblePreflight(stateRoot, settled.operation_id),
+      /cannot accept host preflight evidence while rejected-before-release/,
+    );
   } finally {
     await removeFixture(root);
   }

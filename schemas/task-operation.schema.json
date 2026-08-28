@@ -6,10 +6,10 @@
   "required": [
     "schema_version", "kind", "operation_id", "project_id", "packet_hash",
     "request", "host_preflights", "active_host_preflight_id", "status", "attempts", "observed",
-    "incompatibility", "created_at", "updated_at"
+    "incompatibility", "resolution", "created_at", "updated_at"
   ],
   "properties": {
-    "schema_version": { "const": 5 },
+    "schema_version": { "const": 6 },
     "kind": { "const": "codex-flow-task-create-operation" },
     "operation_id": { "$ref": "#/$defs/journalId" },
     "project_id": { "$ref": "#/$defs/safeId" },
@@ -29,7 +29,7 @@
     "status": {
       "enum": [
         "prepared", "dispatching", "ambiguous", "observed", "failed", "expired",
-        "host-incompatible", "host-session-blocked"
+        "host-incompatible", "host-session-blocked", "rejected-before-release"
       ]
     },
     "attempts": {
@@ -47,6 +47,12 @@
       "oneOf": [
         { "type": "null" },
         { "$ref": "#/$defs/incompatibility" }
+      ]
+    },
+    "resolution": {
+      "oneOf": [
+        { "type": "null" },
+        { "$ref": "#/$defs/resolution" }
       ]
     },
     "created_at": { "$ref": "#/$defs/timestamp" },
@@ -125,12 +131,62 @@
         }
       ]
     },
+    "hostPlacement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "target_project_id", "reason"],
+      "properties": {
+        "mode": { "enum": ["same-project", "cross-project", "projectless", "inherited"] },
+        "target_project_id": {
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "#/$defs/safeId" }
+          ]
+        },
+        "reason": {
+          "oneOf": [
+            { "type": "null" },
+            { "type": "string", "minLength": 1, "maxLength": 512 }
+          ]
+        }
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "mode": { "const": "same-project" },
+            "target_project_id": { "$ref": "#/$defs/safeId" },
+            "reason": { "type": "null" }
+          }
+        },
+        {
+          "properties": {
+            "mode": { "const": "cross-project" },
+            "target_project_id": { "$ref": "#/$defs/safeId" },
+            "reason": { "type": "string", "minLength": 1, "maxLength": 512 }
+          }
+        },
+        {
+          "properties": {
+            "mode": { "const": "projectless" },
+            "target_project_id": { "type": "null" },
+            "reason": { "type": "string", "minLength": 1, "maxLength": 512 }
+          }
+        },
+        {
+          "properties": {
+            "mode": { "const": "inherited" },
+            "target_project_id": { "type": "null" },
+            "reason": { "type": "null" }
+          }
+        }
+      ]
+    },
     "request": {
       "type": "object",
       "additionalProperties": false,
       "required": [
         "task_id", "run_id", "role", "execution_kind", "title",
-        "launch_deadline", "model", "reasoning_effort", "baseline", "environment"
+        "launch_deadline", "model", "reasoning_effort", "baseline", "environment", "host_placement"
       ],
       "properties": {
         "task_id": { "$ref": "#/$defs/safeId" },
@@ -149,7 +205,8 @@
           "enum": [null, "none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"]
         },
         "baseline": { "$ref": "#/$defs/baseline" },
-        "environment": { "$ref": "#/$defs/environment" }
+        "environment": { "$ref": "#/$defs/environment" },
+        "host_placement": { "$ref": "#/$defs/hostPlacement" }
       }
     },
     "supportEvidence": {
@@ -199,24 +256,26 @@
       "additionalProperties": false,
       "required": [
         "preflight_id", "schema_version", "adapter_id", "host_session_id", "checked_at",
-        "execution_kind", "environment_type", "support", "thread_discovery"
+        "execution_kind", "environment_type", "placement_mode", "support", "thread_discovery"
       ],
       "properties": {
         "preflight_id": { "$ref": "#/$defs/journalId" },
-        "schema_version": { "const": 2 },
+        "schema_version": { "const": 3 },
         "adapter_id": { "$ref": "#/$defs/safeId" },
         "host_session_id": { "$ref": "#/$defs/safeId" },
         "checked_at": { "$ref": "#/$defs/timestamp" },
         "execution_kind": { "enum": ["task-thread", "subagent"] },
         "environment_type": { "enum": ["local", "host-worktree", "projectless"] },
+        "placement_mode": { "enum": ["same-project", "cross-project", "projectless", "inherited"] },
         "support": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["execution_kind", "environment", "execution_path", "model", "reasoning_effort"],
+          "required": ["execution_kind", "environment", "execution_path", "project_placement", "model", "reasoning_effort"],
           "properties": {
             "execution_kind": { "$ref": "#/$defs/supportEvidence" },
             "environment": { "$ref": "#/$defs/supportEvidence" },
             "execution_path": { "$ref": "#/$defs/supportEvidence" },
+            "project_placement": { "$ref": "#/$defs/supportEvidence" },
             "model": { "$ref": "#/$defs/supportEvidence" },
             "reasoning_effort": { "$ref": "#/$defs/supportEvidence" }
           }
@@ -260,6 +319,49 @@
               "properties": {
                 "query": { "const": "not-applicable" },
                 "fallback": { "const": "none" }
+              }
+            }
+          }
+        }
+      ],
+      "allOf": [
+        {
+          "if": { "properties": { "execution_kind": { "const": "subagent" } } },
+          "then": { "properties": { "placement_mode": { "const": "inherited" } } }
+        },
+        {
+          "if": { "properties": { "execution_kind": { "const": "task-thread" } } },
+          "then": { "properties": { "placement_mode": { "enum": ["same-project", "cross-project", "projectless"] } } }
+        },
+        {
+          "if": { "properties": { "placement_mode": { "enum": ["projectless", "inherited"] } } },
+          "then": {
+            "properties": {
+              "support": {
+                "properties": {
+                  "project_placement": {
+                    "properties": {
+                      "state": { "const": "not-required" },
+                      "basis": { "const": "not-required" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "placement_mode": { "enum": ["same-project", "cross-project"] } } },
+          "then": {
+            "properties": {
+              "support": {
+                "properties": {
+                  "project_placement": {
+                    "properties": {
+                      "state": { "enum": ["supported", "unsupported", "unknown"] }
+                    }
+                  }
+                }
               }
             }
           }
@@ -469,21 +571,50 @@
         }
       ]
     },
+    "projectPlacementEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "value"],
+      "properties": {
+        "source": { "enum": ["host-observed", "host-accepted", "not-applicable", "unavailable"] },
+        "value": {
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "#/$defs/safeId" }
+          ]
+        }
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "source": { "enum": ["host-observed", "host-accepted"] },
+            "value": { "$ref": "#/$defs/safeId" }
+          }
+        },
+        {
+          "properties": {
+            "source": { "enum": ["not-applicable", "unavailable"] },
+            "value": { "type": "null" }
+          }
+        }
+      ]
+    },
     "observationEvidence": {
       "type": "object",
       "additionalProperties": false,
       "required": [
         "schema_version", "title", "visibility", "model", "reasoning_effort",
-        "host_label", "execution_path"
+        "host_label", "execution_path", "project_placement"
       ],
       "properties": {
-        "schema_version": { "const": 2 },
+        "schema_version": { "const": 3 },
         "title": { "$ref": "#/$defs/titleEvidence" },
         "visibility": { "$ref": "#/$defs/visibilityEvidence" },
         "model": { "$ref": "#/$defs/selectorEvidence" },
         "reasoning_effort": { "$ref": "#/$defs/reasoningEvidence" },
         "host_label": { "$ref": "#/$defs/hostLabelEvidence" },
-        "execution_path": { "$ref": "#/$defs/executionPathEvidence" }
+        "execution_path": { "$ref": "#/$defs/executionPathEvidence" },
+        "project_placement": { "$ref": "#/$defs/projectPlacementEvidence" }
       }
     },
     "observed": {
@@ -524,7 +655,7 @@
             "type": { "const": "selector-incompatible" },
             "stage": { "const": "preflight" },
             "reason_code": {
-              "pattern": "^(?:execution-kind|environment|execution-path|model|reasoning-effort)-(?:unsupported|unverified)$"
+              "pattern": "^(?:execution-kind|environment|execution-path|project-placement|model|reasoning-effort)-(?:unsupported|unverified)$"
             },
             "attempt_id": { "type": "null" }
           }
@@ -543,6 +674,23 @@
           }
         }
       ]
+    },
+    "resolution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["disposition", "reason_code", "host_object_state", "execution_path_state", "recorded_at"],
+      "properties": {
+        "disposition": { "const": "rejected-before-release" },
+        "reason_code": {
+          "enum": [
+            "operator-cancelled", "host-object-archived",
+            "pre-release-validation-failed", "host-placement-rejected"
+          ]
+        },
+        "host_object_state": { "const": "archived" },
+        "execution_path_state": { "enum": ["absent", "not-applicable"] },
+        "recorded_at": { "$ref": "#/$defs/timestamp" }
+      }
     }
   }
 }

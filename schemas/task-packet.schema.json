@@ -5,11 +5,11 @@
   "additionalProperties": false,
   "required": [
     "schema_version", "task_id", "run_id", "title", "objective", "role", "execution_kind", "launch_deadline", "baseline",
-    "environment", "model", "reasoning_effort", "ownership", "dependencies",
+    "environment", "host_placement", "model", "reasoning_effort", "ownership", "dependencies",
     "shared_resources", "verification", "callback", "integration_gate", "cleanup_owner", "stop_policy"
   ],
   "properties": {
-    "schema_version": { "const": 4 },
+    "schema_version": { "const": 5 },
     "task_id": { "$ref": "#/$defs/safeId" },
     "run_id": { "$ref": "#/$defs/safeId" },
     "title": { "type": "string", "minLength": 1, "maxLength": 160 },
@@ -27,6 +27,7 @@
       }
     },
     "environment": { "$ref": "#/$defs/environment" },
+    "host_placement": { "$ref": "#/$defs/hostPlacement" },
     "model": {
       "oneOf": [
         { "type": "null" },
@@ -119,9 +120,85 @@
           "baseline": { "properties": { "cleanliness": { "const": "clean" } } }
         }
       }
+    },
+    {
+      "if": { "properties": { "execution_kind": { "const": "subagent" } } },
+      "then": { "properties": { "host_placement": { "properties": { "mode": { "const": "inherited" } } } } }
+    },
+    {
+      "if": { "properties": { "execution_kind": { "const": "task-thread" } } },
+      "then": { "properties": { "host_placement": { "properties": { "mode": { "enum": ["same-project", "cross-project", "projectless"] } } } } }
+    },
+    {
+      "if": {
+        "properties": {
+          "execution_kind": { "const": "task-thread" },
+          "environment": { "properties": { "type": { "const": "projectless" } } }
+        }
+      },
+      "then": { "properties": { "host_placement": { "properties": { "mode": { "const": "projectless" } } } } }
+    },
+    {
+      "if": {
+        "properties": {
+          "execution_kind": { "const": "task-thread" },
+          "environment": { "properties": { "type": { "enum": ["local", "host-worktree"] } } }
+        }
+      },
+      "then": { "properties": { "host_placement": { "properties": { "mode": { "enum": ["same-project", "cross-project"] } } } } }
     }
   ],
   "$defs": {
+    "hostPlacement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "target_project_id", "reason"],
+      "properties": {
+        "mode": { "enum": ["same-project", "cross-project", "projectless", "inherited"] },
+        "target_project_id": {
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "#/$defs/safeId" }
+          ]
+        },
+        "reason": {
+          "oneOf": [
+            { "type": "null" },
+            { "type": "string", "minLength": 1, "maxLength": 512 }
+          ]
+        }
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "mode": { "const": "same-project" },
+            "target_project_id": { "$ref": "#/$defs/safeId" },
+            "reason": { "type": "null" }
+          }
+        },
+        {
+          "properties": {
+            "mode": { "const": "cross-project" },
+            "target_project_id": { "$ref": "#/$defs/safeId" },
+            "reason": { "type": "string", "minLength": 1, "maxLength": 512 }
+          }
+        },
+        {
+          "properties": {
+            "mode": { "const": "projectless" },
+            "target_project_id": { "type": "null" },
+            "reason": { "type": "string", "minLength": 1, "maxLength": 512 }
+          }
+        },
+        {
+          "properties": {
+            "mode": { "const": "inherited" },
+            "target_project_id": { "type": "null" },
+            "reason": { "type": "null" }
+          }
+        }
+      ]
+    },
     "environment": {
       "oneOf": [
         {

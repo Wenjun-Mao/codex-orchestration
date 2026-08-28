@@ -20,7 +20,9 @@ import {
   beginTaskOperationAttempt,
   prepareTaskOperation,
   recordTaskOperationHostPreflight,
+  rejectTaskOperationBeforeRelease,
   reconcileTaskOperation,
+  taskOperationStatus,
 } from "../lib/task-operations.mjs";
 import { acquireLease, releaseLease } from "../lib/leases.mjs";
 import { createGitFixture, removeFixture } from "./helpers.mjs";
@@ -62,7 +64,7 @@ async function dispose(value) {
 
 function packet(worktree, revision, suffix) {
   return {
-    schema_version: 4,
+    schema_version: 5,
     task_id: `git-executor-${suffix}`,
     run_id: `run-git-${suffix}`,
     role: "executor",
@@ -71,6 +73,11 @@ function packet(worktree, revision, suffix) {
     objective: "Exercise bounded Git lifecycle ownership.",
     baseline: { revision, cleanliness: "clean" },
     environment: { type: "local", project_path: worktree },
+    host_placement: {
+      mode: "same-project",
+      target_project_id: "saved-project-git-lifecycle",
+      reason: null,
+    },
     model: "gpt-5.6-terra",
     reasoning_effort: "xhigh",
     launch_deadline: { at: "2030-08-24T17:00:00-04:00", timezone: "America/Toronto" },
@@ -106,18 +113,20 @@ function hostWorktreePacket(value, suffix) {
 
 function capability(suffix, environmentType = "local") {
   return {
-    schema_version: 2,
+    schema_version: 3,
     adapter_id: "codex-desktop-host",
     host_session_id: `host-session-${suffix}`,
     checked_at: "2026-08-24T12:00:00Z",
     execution_kind: "task-thread",
     environment_type: environmentType,
+    placement_mode: "same-project",
     support: {
       execution_kind: { state: "supported", basis: "host-contract" },
       environment: { state: "supported", basis: "tool-schema" },
       execution_path: environmentType === "host-worktree"
         ? { state: "supported", basis: "host-contract" }
         : { state: "not-required", basis: "not-required" },
+      project_placement: { state: "supported", basis: "tool-schema" },
       model: { state: "supported", basis: "open-selector" },
       reasoning_effort: { state: "supported", basis: "open-selector" },
     },
@@ -127,7 +136,7 @@ function capability(suffix, environmentType = "local") {
 
 function observation(title, executionPath = null) {
   return {
-    schema_version: 2,
+    schema_version: 3,
     title: { source: "host-observed", value: title, normalization: "none" },
     visibility: { source: "host-observed", value: true },
     model: { source: "host-observed", value: "gpt-5.6-terra" },
@@ -136,6 +145,7 @@ function observation(title, executionPath = null) {
     execution_path: executionPath === null
       ? { source: "not-required", value: null }
       : { source: "host-observed", value: executionPath },
+    project_placement: { source: "host-observed", value: "saved-project-git-lifecycle" },
   };
 }
 
@@ -273,6 +283,73 @@ test("host-created worktree binds only from observed path and gates task release
       }),
       /drifted after Git ownership binding/,
     );
+  } finally {
+    await dispose(value);
+  }
+});
+
+test("rejection and Git binding share one mutation boundary", async () => {
+  const value = await fixture();
+  try {
+    const rejectedHost = await observedHostWorktree(
+      value,
+      "rejected-release",
+      resolve(value.root, "archived-host-worktree"),
+    );
+    await rejectTaskOperationBeforeRelease({
+      stateRoot: rejectedHost.controller.stateRoot,
+      operationId: rejectedHost.operationId,
+      reasonCode: "operator-cancelled",
+      hostObjectState: "archived",
+    });
+    await assert.rejects(
+      authorizeGitBoundTaskRelease({
+        git: rejectedHost.controller,
+        operationId: rejectedHost.operationId,
+        packet: rejectedHost.request,
+      }),
+      /requires an observed task operation/,
+    );
+
+    const operationId = await observedOperation(value, "rejection-race", "local", false);
+    let releaseBinding;
+    const holdBinding = new Promise((resolveBinding) => {
+      releaseBinding = resolveBinding;
+    });
+    let bindingPaused;
+    const bindingReady = new Promise((resolveBindingReady) => {
+      bindingPaused = resolveBindingReady;
+    });
+    const binding = bindGitOwnership({
+      git: gitSnapshot(value.root),
+      operationId,
+      hooks: {
+        async beforeMutationLock() {
+          bindingPaused();
+          await holdBinding;
+        },
+      },
+    });
+    await bindingReady;
+    const rejected = await rejectTaskOperationBeforeRelease({
+      stateRoot: gitSnapshot(value.root).stateRoot,
+      operationId,
+      reasonCode: "operator-cancelled",
+      hostObjectState: "archived",
+    });
+    releaseBinding();
+    await assert.rejects(binding, /requires an observed task operation/);
+    assert.equal(rejected.status, "rejected-before-release");
+    assert.equal((await taskOperationStatus({
+      stateRoot: gitSnapshot(value.root).stateRoot,
+      operationId,
+    }))[0].status, "rejected-before-release");
+    const lifecycle = await gitLifecycleAudit({
+      git: gitSnapshot(value.root),
+      config: value.config,
+      inspectRemotes: false,
+    });
+    assert.equal(lifecycle.items.some((item) => item.operation_id === operationId), false);
   } finally {
     await dispose(value);
   }

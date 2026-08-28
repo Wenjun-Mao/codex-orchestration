@@ -71,6 +71,7 @@ import {
   beginTaskOperationAttempt,
   prepareTaskOperation,
   recordTaskOperationHostPreflight,
+  rejectTaskOperationBeforeRelease,
   reconcileTaskOperation,
   taskOperationStatus,
 } from "../lib/task-operations.mjs";
@@ -116,6 +117,8 @@ Usage:
                   --outcome observed|not-created|ambiguous|failed|host-session-blocked
                   [--object-id ID --actual-kind KIND --evidence <observation.json>]
                   [--reason-code CODE] [--json]
+  codex-flow task operation reject --operation-id ID --reason-code CODE
+                  --host-object-state archived [--json]
   codex-flow task operation release --operation-id ID --file <packet.json> [--json]
   codex-flow task operation status [--operation-id ID] [--json]
   codex-flow plan validate <plan.json> [--json]
@@ -428,7 +431,7 @@ async function commandDoctor(args) {
       `task-thread creation: ${item.thread_creation}`,
       `callbacks: ${item.callbacks.pending_count} pending, ${item.callbacks.consumed_count} consumed`,
       `urgent signals: ${item.urgent_signals.pending_count} pending, ${item.urgent_signals.consumed_count} consumed, ${item.urgent_signals.host_replay_count} host replay(s)`,
-      `task operations: ${item.task_operations.total_count} total, ${item.task_operations.ambiguous_count} ambiguous, ${item.task_operations.host_session_blocked_count} session-blocked, ${item.task_operations.partial_evidence_count} partial-evidence`,
+      `task operations: ${item.task_operations.total_count} total, ${item.task_operations.ambiguous_count} ambiguous, ${item.task_operations.host_session_blocked_count} session-blocked, ${item.task_operations.partial_evidence_count} partial-evidence, ${item.task_operations.rejected_before_release_count} rejected-before-release`,
       `recipient lineages: ${item.recipients.lineage_count}`,
       ...item.warnings.map((warning) => `warning: ${warning}`),
       ...item.errors.map((error) => `error: ${error}`),
@@ -595,6 +598,24 @@ async function commandTask(args) {
       });
       return;
     }
+    if (action === "reject") {
+      const { values } = parse(boolAndJsonOptions({
+        "operation-id": { type: "string" },
+        "reason-code": { type: "string" },
+        "host-object-state": { type: "string" },
+      }), operationArgs);
+      const result = await rejectTaskOperationBeforeRelease({
+        stateRoot: git.stateRoot,
+        operationId: values["operation-id"],
+        reasonCode: values["reason-code"],
+        hostObjectState: values["host-object-state"],
+      });
+      output(result, {
+        json: values.json,
+        human: (item) => `Task operation ${item.status}: ${item.operation_id}`,
+      });
+      return;
+    }
     if (action === "release") {
       const { values } = parse(boolAndJsonOptions({
         "operation-id": { type: "string" },
@@ -621,12 +642,16 @@ async function commandTask(args) {
       output(result, {
         json: values.json,
         human: (items) => items.length
-          ? items.map((item) => `${item.operation_id}: ${item.effective_status} (${item.request.execution_kind})`).join("\n")
+          ? items.map((item) => [
+            `${item.operation_id}: ${item.effective_status} (${item.request.execution_kind})`,
+            `placement ${item.request.host_placement.mode}${item.request.host_placement.target_project_id ? ` -> ${item.request.host_placement.target_project_id}` : ""}`,
+            item.resolution ? `resolution ${item.resolution.disposition}` : null,
+          ].filter(Boolean).join("; ")).join("\n")
           : "No task operations.",
       });
       return;
     }
-    throw new CliError("task operation requires prepare, preflight, attempt, bootstrap, reconcile, release, or status");
+    throw new CliError("task operation requires prepare, preflight, attempt, bootstrap, reconcile, reject, release, or status");
   }
   throw new CliError("task requires start or packet");
 }

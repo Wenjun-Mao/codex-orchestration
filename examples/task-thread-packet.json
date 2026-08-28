@@ -1,5 +1,5 @@
 {
-  "schema_version": 4,
+  "schema_version": 5,
   "task_id": "host-adapter-probe-01",
   "run_id": "host-adapter-probe-v2",
   "title": "Codex Flow Host Adapter Probe",
@@ -15,6 +15,11 @@
     "cleanliness": "clean"
   },
   "environment": { "type": "projectless" },
+  "host_placement": {
+    "mode": "projectless",
+    "target_project_id": null,
+    "reason": "This controlled host probe does not use a saved project."
+  },
   "model": "gpt-5.6-terra",
   "reasoning_effort": "xhigh",
   "ownership": {
