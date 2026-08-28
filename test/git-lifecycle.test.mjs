@@ -576,6 +576,52 @@ test("claim settlement refuses drifted or fetched remote branches", async () => 
   }
 });
 
+test("claim settlement retries after branch deletion before terminal journaling", async () => {
+  const value = await fixture();
+  try {
+    git(value.worktree, ["switch", "--detach", "main"]);
+    const observed = await observedHostWorktree(value, "claim-delete-crash");
+    await assert.rejects(bindGitOwnership({
+      git: observed.controller,
+      operationId: observed.operationId,
+      hooks: { afterBranchClaim() { throw new Error("post-claim interruption"); } },
+    }), /post-claim interruption/);
+    git(value.worktree, ["switch", "--detach", "main"]);
+    git(value.root, ["worktree", "remove", "--force", value.worktree]);
+    await assert.rejects(rejectTaskOperationBeforeRelease({
+      stateRoot: observed.controller.stateRoot,
+      operationId: observed.operationId,
+      reasonCode: "operator-cancelled",
+      hostObjectState: "archived",
+      hooks: { afterClaimBranchDeletion() { throw new Error("post-delete interruption"); } },
+    }), /post-delete interruption/);
+    assert.equal((await taskOperationStatus({
+      stateRoot: observed.controller.stateRoot,
+      operationId: observed.operationId,
+    }))[0].status, "observed");
+    assert.equal(spawnSync("git", ["rev-parse", "--verify", `refs/heads/${observed.request.environment.executor_branch}`], {
+      cwd: value.root,
+    }).status, 128);
+    assert.equal((await gitLifecycleAudit({
+      git: observed.controller,
+      config: value.config,
+      inspectRemotes: false,
+    })).incomplete_claim_count, 1);
+    const settled = await rejectTaskOperationBeforeRelease({
+      stateRoot: observed.controller.stateRoot,
+      operationId: observed.operationId,
+      reasonCode: "operator-cancelled",
+      hostObjectState: "archived",
+    });
+    assert.equal(settled.resolution.branch_claim_settlement.local_branch_state, "absent");
+    const audit = await gitLifecycleAudit({ git: observed.controller, config: value.config, inspectRemotes: false });
+    assert.equal(audit.incomplete_claim_count, 0);
+    assert.equal(audit.blocked, false);
+  } finally {
+    await dispose(value);
+  }
+});
+
 test("cleanup plan removes only a proven merged worktree and exact local/remote refs", async () => {
   const value = await fixture();
   try {

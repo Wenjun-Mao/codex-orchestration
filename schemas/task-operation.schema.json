@@ -766,7 +766,7 @@
                     "claim_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
                   }
                 },
-                "local_branch_state": { "enum": ["deleted", "already-absent"] }
+                "local_branch_state": { "const": "absent" }
               }
             }
           ]
