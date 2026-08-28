@@ -161,6 +161,38 @@ test("doctor and cleanup disclose incompatible, session-blocked, and partial ope
       evidence: partialEvidence(partial.request.title),
     });
 
+    const policyRejected = await prepareTaskOperation({
+      stateRoot: git.stateRoot,
+      projectId: "fixture",
+      packet: packet(git.revision, "policy-rejected"),
+    });
+    await recordTaskOperationHostPreflight({
+      stateRoot: git.stateRoot,
+      operationId: policyRejected.operation_id,
+      evidence: capability("session-policy-rejected"),
+    });
+    const policyRejectedAttempt = await beginTaskOperationAttempt({
+      stateRoot: git.stateRoot,
+      operationId: policyRejected.operation_id,
+    });
+    const policyRejectedObserved = await reconcileTaskOperation({
+      stateRoot: git.stateRoot,
+      operationId: policyRejected.operation_id,
+      attemptId: policyRejectedAttempt.attempt.attempt_id,
+      outcome: "observed",
+      objectId: "thread-policy-rejected",
+      actualKind: "task-thread",
+      evidence: partialEvidence(
+        policyRejected.request.title,
+        null,
+        { source: "host-observed", value: "unexpected-saved-project" },
+      ),
+    });
+    assert.deepEqual(policyRejectedObserved.observation_policy, {
+      state: "rejected",
+      reason_code: "project-placement-unexpected",
+    });
+
     const unbound = await prepareTaskOperation({
       stateRoot: git.stateRoot,
       projectId: "fixture",
@@ -288,12 +320,14 @@ test("doctor and cleanup disclose incompatible, session-blocked, and partial ope
     assert.equal(doctor.ok, true);
     assert.equal(doctor.task_operations.host_incompatible_count, 1);
     assert.equal(doctor.task_operations.host_session_blocked_count, 1);
-    assert.equal(doctor.task_operations.partial_evidence_count, 2);
+    assert.equal(doctor.task_operations.partial_evidence_count, 3);
     assert.equal(doctor.task_operations.complete_evidence_count, 0);
+    assert.equal(doctor.task_operations.observation_policy_rejected_count, 1);
     assert.equal(doctor.task_operations.rejected_before_release_count, 2);
     assert.match(doctor.warnings.join("\n"), /incompatible with their recorded host selector/);
     assert.match(doctor.warnings.join("\n"), /blocked for their recorded host session/);
     assert.match(doctor.warnings.join("\n"), /partial host evidence/);
+    assert.match(doctor.warnings.join("\n"), /violate requested host observation policy/);
     assert.match(doctor.warnings.join("\n"), /host worktree.*lack Git ownership binding/);
 
     const cleanup = await cleanupAudit(gitSnapshot(root));
@@ -301,6 +335,8 @@ test("doctor and cleanup disclose incompatible, session-blocked, and partial ope
     assert.match(cleanup.recommendations.join("\n"), /compatible selector evidence/);
     assert.match(cleanup.recommendations.join("\n"), /new host-session preflight/);
     assert.match(cleanup.recommendations.join("\n"), /partial host evidence/);
+    assert.equal(cleanup.observation_policy_rejected_count, 1);
+    assert.match(cleanup.recommendations.join("\n"), /require archive or policy reconciliation before release/);
     assert.equal(cleanup.unbound_host_worktrees.length, 1);
     assert.equal(cleanup.rejected_before_release_count, 2);
     assert.equal(cleanup.unbound_host_worktrees[0].object_id, "thread-unbound");
@@ -310,6 +346,19 @@ test("doctor and cleanup disclose incompatible, session-blocked, and partial ope
       cleanup.task_operations.find((operation) => operation.operation_id === settled.operation_id).resolution.disposition,
       "rejected-before-release",
     );
+
+    await rejectTaskOperationBeforeRelease({
+      stateRoot: git.stateRoot,
+      operationId: policyRejected.operation_id,
+      reasonCode: "host-placement-rejected",
+      hostObjectState: "archived",
+    });
+    const settledDoctor = await runDoctor(gitSnapshot(root));
+    assert.equal(settledDoctor.task_operations.observation_policy_rejected_count, 0);
+    assert.doesNotMatch(settledDoctor.warnings.join("\n"), /violate requested host observation policy/);
+    const settledCleanup = await cleanupAudit(gitSnapshot(root));
+    assert.equal(settledCleanup.observation_policy_rejected_count, 0);
+    assert.doesNotMatch(settledCleanup.recommendations.join("\n"), /require archive or policy reconciliation before release/);
   } finally {
     await removeFixture(root);
   }

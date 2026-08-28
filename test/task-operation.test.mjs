@@ -265,18 +265,6 @@ test("task operation requires explicit kind and reconciles an observed task thre
       }),
       /already in progress/,
     );
-    await assert.rejects(
-      reconcileTaskOperation({
-        stateRoot,
-        operationId: prepared.operation_id,
-        attemptId: dispatch.attempt.attempt_id,
-        outcome: "observed",
-        objectId: "agent-01",
-        actualKind: "subagent",
-        evidence: subagentEvidence(),
-      }),
-      /Requested task-thread but observed subagent/,
-    );
     const observed = await reconcileTaskOperation({
       stateRoot,
       operationId: prepared.operation_id,
@@ -311,6 +299,32 @@ test("task operation requires explicit kind and reconciles an observed task thre
       }),
       /replay conflicts/,
     );
+
+    const kindMismatch = await prepareTaskOperation({
+      stateRoot,
+      projectId: "fixture-project",
+      packet: packet({ run_id: "run-observed-kind-mismatch-01" }),
+    });
+    await recordCompatiblePreflight(stateRoot, kindMismatch.operation_id);
+    const kindMismatchAttempt = await beginTaskOperationAttempt({
+      stateRoot,
+      operationId: kindMismatch.operation_id,
+    });
+    const rejectedPolicy = await reconcileTaskOperation({
+      stateRoot,
+      operationId: kindMismatch.operation_id,
+      attemptId: kindMismatchAttempt.attempt.attempt_id,
+      outcome: "observed",
+      objectId: "agent-01",
+      actualKind: "subagent",
+      evidence: subagentEvidence(),
+    });
+    assert.equal(rejectedPolicy.status, "observed");
+    assert.equal(rejectedPolicy.attempts.at(-1).status, "observed");
+    assert.deepEqual(rejectedPolicy.observation_policy, {
+      state: "rejected",
+      reason_code: "execution-kind-mismatch",
+    });
   } finally {
     await removeFixture(root);
   }
@@ -414,7 +428,7 @@ test("prepare accepts a linked worktree sharing the operation journal", async ()
   }
 });
 
-test("host-worktree authenticates a source branch before creation and requires an observed path", async () => {
+test("host-worktree authenticates a source branch and journals an unverified path policy", async () => {
   const root = await createGitFixture("codex-flow-host-worktree-");
   const stateRoot = resolve(root, ".git", "codex-flow", "v0.5");
   try {
@@ -452,18 +466,6 @@ test("host-worktree authenticates a source branch before creation and requires a
       packet: request,
     });
     assert.equal(bootstrap.attempt_id, attempt.attempt.attempt_id);
-    await assert.rejects(
-      reconcileTaskOperation({
-        stateRoot,
-        operationId: prepared.operation_id,
-        attemptId: attempt.attempt.attempt_id,
-        outcome: "observed",
-        objectId: "host-worktree-thread",
-        actualKind: "task-thread",
-        evidence: taskThreadEvidence(),
-      }),
-      /requires a host-observed execution path/,
-    );
     const observed = await reconcileTaskOperation({
       stateRoot,
       operationId: prepared.operation_id,
@@ -471,12 +473,13 @@ test("host-worktree authenticates a source branch before creation and requires a
       outcome: "observed",
       objectId: "host-worktree-thread",
       actualKind: "task-thread",
-      evidence: taskThreadEvidence({
-        executionPath: "/tmp/codex-host-worktree",
-        projectPlacement: { source: "host-observed", value: "saved-project-uuid-01" },
-      }),
+      evidence: taskThreadEvidence(),
     });
-    assert.equal(observed.observed.evidence.execution_path.value, "/tmp/codex-host-worktree");
+    assert.equal(observed.observed.evidence.execution_path.value, null);
+    assert.deepEqual(observed.observation_policy, {
+      state: "rejected",
+      reason_code: "execution-path-unverified",
+    });
   } finally {
     await removeFixture(root);
   }
@@ -808,7 +811,7 @@ test("transient serializer failure blocks only its host session", async () => {
   }
 });
 
-test("task-thread reconciliation requires exact reread title and records bounded normalization", async () => {
+test("task-thread reconciliation journals title policy rejection and records bounded normalization", async () => {
   const root = await createGitFixture();
   const stateRoot = resolve(root, ".git", "codex-flow", "v0.5");
   try {
@@ -819,22 +822,34 @@ test("task-thread reconciliation requires exact reread title and records bounded
     });
     await recordCompatiblePreflight(stateRoot, prepared.operation_id);
     const dispatch = await beginTaskOperationAttempt({ stateRoot, operationId: prepared.operation_id });
-    await assert.rejects(
-      reconcileTaskOperation({
-        stateRoot,
-        operationId: prepared.operation_id,
-        attemptId: dispatch.attempt.attempt_id,
-        outcome: "observed",
-        objectId: "thread-title-01",
-        actualKind: "task-thread",
-        evidence: taskThreadEvidence({ title: "Delegation envelope" }),
-      }),
-      /title must be independently verified/,
-    );
-    const observed = await reconcileTaskOperation({
+    const rejected = await reconcileTaskOperation({
       stateRoot,
       operationId: prepared.operation_id,
       attemptId: dispatch.attempt.attempt_id,
+      outcome: "observed",
+      objectId: "thread-title-01",
+      actualKind: "task-thread",
+      evidence: taskThreadEvidence({ title: "Delegation envelope" }),
+    });
+    assert.deepEqual(rejected.observation_policy, {
+      state: "rejected",
+      reason_code: "title-mismatch",
+    });
+
+    const accepted = await prepareTaskOperation({
+      stateRoot,
+      projectId: "fixture-project",
+      packet: packet({ run_id: "run-title-normalization-accepted-01" }),
+    });
+    await recordCompatiblePreflight(stateRoot, accepted.operation_id);
+    const acceptedDispatch = await beginTaskOperationAttempt({
+      stateRoot,
+      operationId: accepted.operation_id,
+    });
+    const observed = await reconcileTaskOperation({
+      stateRoot,
+      operationId: accepted.operation_id,
+      attemptId: acceptedDispatch.attempt.attempt_id,
       outcome: "observed",
       objectId: "thread-title-01",
       actualKind: "task-thread",
@@ -1068,20 +1083,32 @@ test("host placement is independently bound and project-backed evidence is quali
     });
     await recordCompatiblePreflight(stateRoot, mismatch.operation_id);
     const mismatchAttempt = await beginTaskOperationAttempt({ stateRoot, operationId: mismatch.operation_id });
-    await assert.rejects(
-      reconcileTaskOperation({
-        stateRoot,
-        operationId: mismatch.operation_id,
-        attemptId: mismatchAttempt.attempt.attempt_id,
-        outcome: "observed",
-        objectId: "thread-placement-mismatch",
-        actualKind: "task-thread",
-        evidence: taskThreadEvidence({
-          projectPlacement: { source: "host-observed", value: "different-saved-project" },
-        }),
+    const mismatched = await reconcileTaskOperation({
+      stateRoot,
+      operationId: mismatch.operation_id,
+      attemptId: mismatchAttempt.attempt.attempt_id,
+      outcome: "observed",
+      objectId: "thread-placement-mismatch",
+      actualKind: "task-thread",
+      evidence: taskThreadEvidence({
+        projectPlacement: { source: "host-observed", value: "different-saved-project" },
       }),
-      /does not match the requested target project ID/,
-    );
+    });
+    assert.equal(mismatched.status, "observed");
+    assert.equal(mismatched.observed.object_id, "thread-placement-mismatch");
+    assert.equal(mismatched.attempts.at(-1).status, "observed");
+    assert.deepEqual(mismatched.observation_policy, {
+      state: "rejected",
+      reason_code: "project-placement-mismatch",
+    });
+    assert.deepEqual((await taskOperationStatus({
+      stateRoot,
+      operationId: mismatch.operation_id,
+    }))[0].observation_policy, mismatched.observation_policy);
+    assert.equal((await beginTaskOperationAttempt({
+      stateRoot,
+      operationId: mismatch.operation_id,
+    })).status, "already-observed");
 
     const unavailable = await prepareTaskOperation({
       stateRoot,
@@ -1090,18 +1117,22 @@ test("host placement is independently bound and project-backed evidence is quali
     });
     await recordCompatiblePreflight(stateRoot, unavailable.operation_id);
     const unavailableAttempt = await beginTaskOperationAttempt({ stateRoot, operationId: unavailable.operation_id });
-    await assert.rejects(
-      reconcileTaskOperation({
-        stateRoot,
-        operationId: unavailable.operation_id,
-        attemptId: unavailableAttempt.attempt.attempt_id,
-        outcome: "observed",
-        objectId: "thread-placement-unavailable",
-        actualKind: "task-thread",
-        evidence: taskThreadEvidence({ projectPlacement: { source: "unavailable", value: null } }),
-      }),
-      /requires host-observed or host-accepted project placement/,
-    );
+    const unavailableObserved = await reconcileTaskOperation({
+      stateRoot,
+      operationId: unavailable.operation_id,
+      attemptId: unavailableAttempt.attempt.attempt_id,
+      outcome: "observed",
+      objectId: "thread-placement-unavailable",
+      actualKind: "task-thread",
+      evidence: taskThreadEvidence({ projectPlacement: { source: "unavailable", value: null } }),
+    });
+    assert.equal(unavailableObserved.status, "observed");
+    assert.equal(unavailableObserved.observed.object_id, "thread-placement-unavailable");
+    assert.equal(unavailableObserved.attempts.at(-1).status, "observed");
+    assert.deepEqual(unavailableObserved.observation_policy, {
+      state: "rejected",
+      reason_code: "project-placement-unavailable",
+    });
 
     const unsupported = await prepareTaskOperation({
       stateRoot,

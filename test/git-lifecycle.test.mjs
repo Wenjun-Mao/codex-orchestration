@@ -192,7 +192,12 @@ async function observedOperation(
   return prepared.operation_id;
 }
 
-async function observedHostWorktree(value, suffix = "host", executionPath = value.worktree) {
+async function observedHostWorktree(
+  value,
+  suffix = "host",
+  executionPath = value.worktree,
+  evidenceOverrides = {},
+) {
   const controller = gitSnapshot(value.root);
   const request = hostWorktreePacket(value, suffix);
   const prepared = await prepareTaskOperation({
@@ -216,7 +221,7 @@ async function observedHostWorktree(value, suffix = "host", executionPath = valu
     outcome: "observed",
     objectId: `thread-${suffix}`,
     actualKind: "task-thread",
-    evidence: observation(request.title, executionPath),
+    evidence: { ...observation(request.title, executionPath), ...evidenceOverrides },
   });
   return { controller, request, operationId: prepared.operation_id };
 }
@@ -283,6 +288,56 @@ test("host-created worktree binds only from observed path and gates task release
       }),
       /drifted after Git ownership binding/,
     );
+  } finally {
+    await dispose(value);
+  }
+});
+
+test("policy-rejected host placement is journaled, blocks bind and release, then settles after archive", async () => {
+  const value = await fixture();
+  try {
+    const observed = await observedHostWorktree(
+      value,
+      "placement-rejected",
+      resolve(value.root, "archived-placement-worktree"),
+      {
+        project_placement: { source: "host-observed", value: "different-saved-project" },
+      },
+    );
+    const status = (await taskOperationStatus({
+      stateRoot: observed.controller.stateRoot,
+      operationId: observed.operationId,
+    }))[0];
+    assert.equal(status.status, "observed");
+    assert.equal(status.attempts.at(-1).status, "observed");
+    assert.equal(status.observed.object_id, "thread-placement-rejected");
+    assert.deepEqual(status.observation_policy, {
+      state: "rejected",
+      reason_code: "project-placement-mismatch",
+    });
+    await assert.rejects(
+      bindGitOwnership({ git: observed.controller, operationId: observed.operationId }),
+      /requires accepted host observation policy: project-placement-mismatch/,
+    );
+    await assert.rejects(
+      authorizeGitBoundTaskRelease({
+        git: observed.controller,
+        operationId: observed.operationId,
+        packet: observed.request,
+      }),
+      /requires accepted host observation policy: project-placement-mismatch/,
+    );
+    const rejected = await rejectTaskOperationBeforeRelease({
+      stateRoot: observed.controller.stateRoot,
+      operationId: observed.operationId,
+      reasonCode: "host-placement-rejected",
+      hostObjectState: "archived",
+    });
+    assert.equal(rejected.status, "rejected-before-release");
+    assert.deepEqual(rejected.observation_policy, {
+      state: "rejected",
+      reason_code: "project-placement-mismatch",
+    });
   } finally {
     await dispose(value);
   }
@@ -466,6 +521,19 @@ test("host-created worktree resumes only from its persisted branch-claim receipt
     });
     assert.equal(interruptedAudit.incomplete_claim_count, 1);
     assert.equal(interruptedAudit.blocked, true);
+    await assert.rejects(
+      rejectTaskOperationBeforeRelease({
+        stateRoot: observed.controller.stateRoot,
+        operationId: observed.operationId,
+        reasonCode: "operator-cancelled",
+        hostObjectState: "archived",
+      }),
+      /branch claim requires recovery/,
+    );
+    assert.equal((await taskOperationStatus({
+      stateRoot: observed.controller.stateRoot,
+      operationId: observed.operationId,
+    }))[0].status, "observed");
     const ownership = await bindGitOwnership({
       git: observed.controller,
       operationId: observed.operationId,

@@ -594,8 +594,14 @@ async function commandTask(args) {
       });
       output(result, {
         json: values.json,
-        human: (item) => `Task operation ${item.status}: ${item.operation_id}`,
+        human: (item) => [
+          `Task operation ${item.status}: ${item.operation_id}`,
+          item.observation_policy?.state === "rejected"
+            ? `Host observation policy rejected: ${item.observation_policy.reason_code}`
+            : null,
+        ].filter(Boolean).join("\n"),
       });
+      if (result.observation_policy?.state === "rejected") process.exitCode = 74;
       return;
     }
     if (action === "reject") {
@@ -645,6 +651,7 @@ async function commandTask(args) {
           ? items.map((item) => [
             `${item.operation_id}: ${item.effective_status} (${item.request.execution_kind})`,
             `placement ${item.request.host_placement.mode}${item.request.host_placement.target_project_id ? ` -> ${item.request.host_placement.target_project_id}` : ""}`,
+            item.observation_policy ? `observation policy ${item.observation_policy.state}${item.observation_policy.reason_code ? `: ${item.observation_policy.reason_code}` : ""}` : null,
             item.resolution ? `resolution ${item.resolution.disposition}` : null,
           ].filter(Boolean).join("; ")).join("\n")
           : "No task operations.",
