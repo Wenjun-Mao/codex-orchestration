@@ -60,8 +60,9 @@ unbound host worktree before recording the terminal rejected-before-release
 disposition. Do not leave a cleaned object permanently reported as unresolved,
 and do not use rejection to conceal an object whose path or host task remains.
 If an interrupted bind left a branch claim, let rejection settle it only after
-the exact-baseline, unowned, unchecked-out, unpushed branch can be removed; the
-claim must remain in the terminal receipt and any drift is a hard stop.
+the exact-baseline, unowned, unchecked-out branch has no fetched remote-tracking
+evidence and its local ref can be proven absent; the claim must remain in the
+terminal receipt and any drift is a hard stop.
 Task creation fails closed at the configured cleanup threshold; reconcile
 completed Git ownership before launching another wave.
 

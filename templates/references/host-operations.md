@@ -52,10 +52,12 @@ unbound path and verify that exact path is absent. Then record the terminal
 `rejected-before-release` operation disposition. Conflicting replay, later
 retry, binding, or release is forbidden. If binding left an immutable claim
 without ownership, rejection may settle it only when the branch is unowned,
-unchecked out, unpushed, and still exactly at baseline; the exact local ref is
-removed and the claim is retained in the terminal receipt. Drift requires
-recovery. Without this explicit disposition, doctor and cleanup continue to
-treat the object or claim as unresolved.
+unchecked out, free of fetched remote-tracking evidence, and still exactly at
+baseline if present. The exact local ref is conditionally removed, and the
+terminal receipt retains the claim plus an absent-ref state without attributing
+deletion across a crash. Drift requires recovery. Without this explicit
+disposition, doctor and cleanup continue to treat the object or claim as
+unresolved.
 
 When a host advertises filtered thread listing but rejects the filter at
 runtime, make one bounded recent-list call without that filter and match only

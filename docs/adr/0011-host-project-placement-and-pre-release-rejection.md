@@ -52,9 +52,11 @@ host-created worktree, the CLI also verifies that the exact observed path is
 absent. The journal then preserves a strict reason, archive assertion, verified
 path disposition, and timestamp. When binding was interrupted after its branch
 claim but before ownership, rejection may settle that claim only after proving
-the path absent and the local branch unowned, unchecked out, unpushed, and still
-at the exact baseline. It deletes that exact ref and embeds the immutable claim
-and deletion outcome in the terminal resolution; drift remains blocked. Exact
+the path absent and the local branch unowned, unchecked out, free of fetched
+remote-tracking evidence, and still at the exact baseline if present. It
+conditionally deletes that exact ref and embeds the immutable claim plus the
+verified absent-ref state in the terminal resolution. The receipt deliberately
+does not attribute deletion across crash recovery; drift remains blocked. Exact
 replay is idempotent; conflicting replay, retry, Git binding, and objective
 release are rejected. Doctor and cleanup keep the terminal evidence but stop
 classifying it as an unresolved unbound task or incomplete claim.
@@ -74,7 +76,8 @@ be retired or preserved under its original runtime.
 - Delete or rewrite the old observed operation after cleanup. That would erase
   the failed pilot and make cleanup unauditable.
 - Ignore or delete an interrupted branch claim. A terminal settlement instead
-  retains the original claim and proves any exact-baseline ref cleanup.
+  retains the original claim and proves the local ref absent after any safe,
+  exact-baseline cleanup.
 - Add a daemon or host adapter service. One extra intent/evidence field and one
   terminal journal transition are sufficient.
 

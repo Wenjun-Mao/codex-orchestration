@@ -234,11 +234,13 @@ coordinator archives it and removes its unbound host worktree. Only then may
 `task operation reject` persist the terminal disposition. The CLI verifies the
 exact observed path is absent, preserves the rejection evidence, and prevents
 retry or release. If binding was interrupted after its immutable branch claim,
-rejection also requires the claimed branch to be unowned, unpushed, unchecked
-out, and still exactly at the authenticated baseline; it removes only that
-exact local ref and retains the claim in the terminal receipt. Any drift stays
-blocked for recovery. An observed operation without a terminal disposition
-continues to warn as unresolved.
+rejection also requires the claimed branch to be unowned, unchecked out, and
+still exactly at the authenticated baseline; it refuses fetched
+remote-tracking evidence, conditionally removes only that exact local ref, and
+records the ref as absent together with the claim. The receipt does not
+attribute deletion across crash recovery. Any drift stays blocked for recovery.
+An observed operation without a terminal disposition continues to warn as
+unresolved.
 
 A timeout is ambiguous, not failure. List/read the host state before retrying,
 then reconcile `observed` or `not-created`. No new launch may start after the
