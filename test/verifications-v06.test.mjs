@@ -79,7 +79,7 @@ function receipt({ baseline, final = baseline, kind = "unchanged" }) {
 }
 
 function stateRoot(root) {
-  return resolve(root, ".git", "codex-flow", "v0.6.0-dev.0");
+  return resolve(root, ".git", "codex-flow", "v0.6.0");
 }
 
 test("combined verification persists content-addressed PASS and FAIL evidence idempotently", async () => {
