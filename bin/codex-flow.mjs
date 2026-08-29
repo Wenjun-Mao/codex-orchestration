@@ -126,12 +126,12 @@ import {
   abandonRun,
   admitRun,
   buildFencePlan,
-  closeRun,
   fencePlanConflicts,
   readRun,
   readRunLifecycle,
   rebindRun,
   resumeRun,
+  withActiveRunMutation,
 } from "../lib/run-lifecycle.mjs";
 import {
   acquireRuntimeContext,
@@ -141,6 +141,8 @@ import {
   readRuntimeContext,
   runtimeBindingFromContext,
   runtimeContextHash,
+  validateRuntimeHost,
+  validateRuntimeLineage,
 } from "../lib/runtime-context.mjs";
 import {
   completeSubagentOperation,
@@ -176,74 +178,25 @@ const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 const LEGACY_HELP = `codex-flow ${PACKAGE_VERSION} legacy-v05
 
-Usage:
-  codex-flow init --plan [--json] [initialization options]
-  codex-flow init --apply-plan PLAN_ID [initialization options]
+Read-only historical verification:
   codex-flow init --check
-  initialization options:
-                  [--force] [--project-id ID] [--max-concurrency N]
-                  [--model MODEL] [--reasoning-effort EFFORT]
-                  [--setup-mode new|existing]
-                  [--agents-mode managed|external]
-                  [--external-agents-path PATH] [--attest-external-agents]
-  codex-flow sync [--check] [--force]
+  codex-flow sync --check
   codex-flow config show [--json]
-  codex-flow config set [--model MODEL|host-default]
-                        [--reasoning-effort EFFORT|host-default]
-                        [--max-concurrency N] [--json]
   codex-flow doctor [--json]
-  codex-flow task start --role coordinator|executor
   codex-flow task packet validate|render <packet.json> [--model MODEL]
                   [--reasoning-effort EFFORT] [--json]
-  codex-flow task operation prepare --file <packet.json> [--json]
-  codex-flow task operation preflight --operation-id ID --file <host-capabilities.json> [--json]
-  codex-flow task operation attempt --operation-id ID [--timeout-seconds N] [--json]
-  codex-flow task operation bootstrap --operation-id ID --file <packet.json> [--json]
-  codex-flow task operation reconcile --operation-id ID --attempt-id ID
-                  --outcome observed|not-created|ambiguous|failed|host-session-blocked
-                  [--object-id ID --actual-kind KIND --evidence <observation.json>]
-                  [--reason-code CODE] [--json]
-  codex-flow task operation reject --operation-id ID --reason-code CODE
-                  --host-object-state archived [--json]
-  codex-flow task operation release --operation-id ID --file <packet.json> [--json]
   codex-flow task operation status [--operation-id ID] [--json]
   codex-flow plan validate <plan.json> [--json]
-  codex-flow recipient bind --lineage-id ID --thread-id ID [--fence-token TOKEN] [--json]
-  codex-flow recipient rebind --lineage-id ID --thread-id ID --generation N
-                  --fence-token TOKEN [--next-fence-token TOKEN] [--json]
   codex-flow recipient status [--lineage-id ID] [--json]
   codex-flow recipient resolve --lineage-id ID --thread-id ID --generation N [--json]
-  codex-flow callback deliver [--file receipt.json] [--json]
-  codex-flow callback observe --callback-id ID --lineage-id ID --thread-id ID --generation N
-                  [--json]
-  codex-flow callback consume --callback-id ID --lineage-id ID --thread-id ID
-                  --generation N --executor-id ID [--json]
-  codex-flow callback expire [--callback-id ID] [--at TIMESTAMP] [--json]
   codex-flow callback status [--json]
-  codex-flow urgent persist [--file signal.json] [--json]
-  codex-flow urgent attempt prepare --urgent-id ID --attempt-sequence N
-                  [--retry-reason host-ambiguous|recipient-rebound|operator-approved-retry]
-                  [--json]
-  codex-flow urgent attempt reconcile --urgent-id ID --delivery-attempt-id ID
-                  --host-call-result sent|rejected-before-send|ambiguous [--json]
-  codex-flow urgent observe --urgent-id ID --delivery-attempt-id ID
-                  --lineage-id ID --thread-id ID --generation N [--json]
-  codex-flow urgent consume --urgent-id ID --lineage-id ID --thread-id ID
-                  --generation N --sender-executor-id ID [--json]
-  codex-flow urgent expire [--urgent-id ID] [--at TIMESTAMP] [--json]
   codex-flow urgent status [--json]
-  codex-flow git bind --operation-id ID [--json]
-  codex-flow git integrate --operation-id ID --main-branch BRANCH
-                  [--superseded-by REF] [--json]
   codex-flow git status [--json]
-  codex-flow lease acquire --resource ID --owner ID [--ttl-seconds N] [--break-expired] [--json]
-  codex-flow lease release --resource ID --owner ID --token TOKEN [--json]
   codex-flow lease status [--resource ID] [--json]
   codex-flow cleanup audit [--json]
-  codex-flow cleanup plan --operation-id ID... --main-branch BRANCH
-                  [--include-remote] [--json]
-  codex-flow cleanup apply --plan-id ID --operation-id ID... --main-branch BRANCH
-                  [--include-remote] [--json]
+
+Mutation through the predecessor CLI is permanently disabled. Historical
+verification never creates or changes repository, Git, or Codex Flow state.
 `.replaceAll("  codex-flow ", "  codex-flow legacy-v05 ");
 
 const HELP = `codex-flow ${PACKAGE_VERSION}
@@ -1389,6 +1342,19 @@ async function activeRunAuthority(git, runId, planId = null) {
   return { run, runtime, binding };
 }
 
+async function guardedActiveRunMutation(git, runId, operation) {
+  return withActiveRunMutation({
+    gitCommonDirectory: git.commonDir,
+    runId,
+  }, async (locked) => {
+    const authority = await activeRunAuthority(git, runId);
+    if (stableStringify(authority.run) !== stableStringify(locked.run)) {
+      throw new CliError("active run changed while acquiring mutation authority", 75);
+    }
+    return operation({ ...locked, ...authority });
+  });
+}
+
 function canonicalCoordinatorBinding(lineage) {
   const binding = {
     lineage_id: lineage.lineage_id,
@@ -1396,6 +1362,82 @@ function canonicalCoordinatorBinding(lineage) {
     generation: lineage.generation,
   };
   return { ...binding, binding_digest: coordinatorBindingDigest(binding) };
+}
+
+function recipientMatchesLineage(status, lineage) {
+  return status !== null
+    && status.lineage_id === lineage.lineage_id
+    && status.current.thread_id === lineage.thread_id
+    && status.current.generation === lineage.generation;
+}
+
+async function bindRunCoordinatorRecipient({ git, run, lineage }) {
+  const recipient = await bindRecipient({
+    stateRoot: git.stateRoot,
+    recipient: lineage,
+    fenceToken: run.binding.fence_token,
+  });
+  return recipient.recipient;
+}
+
+async function rebindRunCoordinatorRecipient({ git, runId, resume, next, reboundAt }) {
+  requireExactFields(next, { required: ["host", "lineage"] }, "next binding");
+  const nextHost = validateRuntimeHost(next.host, "next binding.host");
+  const nextLineage = validateRuntimeLineage(next.lineage, "next binding.lineage");
+  requireText(nextLineage.thread_id, "next binding.lineage.thread_id", {
+    max: 128,
+    safeId: true,
+  });
+  const { run: current, path } = await readRun({
+    gitCommonDirectory: git.commonDir,
+    runId,
+  });
+  if (current.status !== "active") throw new CliError(`v0.6 run is not active: ${runId}`, 73);
+  const latest = current.rebind_history.at(-1) ?? null;
+  const resumeIsCurrent = stableStringify(current.binding) === stableStringify(resume);
+  const exactReplay = !resumeIsCurrent
+    && latest !== null
+    && stableStringify(latest.from) === stableStringify(resume)
+    && stableStringify(latest.to.host) === stableStringify(nextHost)
+    && stableStringify(latest.to.lineage) === stableStringify(nextLineage);
+  if (!resumeIsCurrent && !exactReplay) {
+    throw new CliError("resume fence does not match the active run binding", 73);
+  }
+  if (
+    nextLineage.lineage_id !== resume.lineage?.lineage_id
+    || nextLineage.generation !== resume.lineage?.generation + 1
+    || nextLineage.thread_id === resume.lineage?.thread_id
+  ) {
+    throw new CliError(
+      "run rebind must advance the authoritative coordinator recipient by one generation",
+      73,
+    );
+  }
+  const recipient = await recipientStatus({
+    stateRoot: git.stateRoot,
+    lineageId: nextLineage.lineage_id,
+  });
+  const recipientIsCurrent = recipientMatchesLineage(recipient, resume.lineage);
+  const recipientIsRebound = recipientMatchesLineage(recipient, nextLineage);
+  if (!(recipientIsCurrent || (exactReplay && recipientIsRebound))) {
+    throw new CliError("run rebind does not match the authoritative coordinator recipient", 73);
+  }
+  const result = exactReplay
+    ? { run: current, path, resume: current.binding }
+    : await rebindRun({
+      gitCommonDirectory: git.commonDir,
+      runId,
+      resume,
+      next: { host: nextHost, lineage: nextLineage },
+      reboundAt,
+    });
+  const reboundRecipient = await rebindRecipient({
+    stateRoot: git.stateRoot,
+    recipient: nextLineage,
+    fenceToken: resume.fence_token,
+    nextFenceToken: result.run.binding.fence_token,
+  });
+  return { ...result, coordinator_recipient: reboundRecipient.recipient };
 }
 
 function activationFences(value) {
@@ -1462,6 +1504,26 @@ async function commandRunV06(args) {
     )) {
       throw new CliError(`v0.6 run activation does not match its immutable authority: ${runId}`, 73);
     }
+    if (runtime.lineage.generation !== 1) {
+      throw new CliError("fresh run activation coordinator lineage must start at generation 1", 73);
+    }
+    requireText(runtime.lineage.thread_id, "run activation coordinator thread_id", {
+      max: 128,
+      safeId: true,
+    });
+    const currentRecipient = await recipientStatus({
+      stateRoot: git.stateRoot,
+      lineageId: runtime.lineage.lineage_id,
+    });
+    if (existing === null && currentRecipient !== null) {
+      throw new CliError(
+        `Fresh run coordinator lineage is already bound: ${runtime.lineage.lineage_id}`,
+        73,
+      );
+    }
+    if (currentRecipient !== null && !recipientMatchesLineage(currentRecipient, runtime.lineage)) {
+      throw new CliError("run activation does not match the authoritative coordinator recipient", 73);
+    }
     for (const retained of Object.values(lifecycle.state.runs).filter((item) => item.status === "abandoned")) {
       if (fencePlanConflicts(retained.terminal.unresolved_fences, fences).length > 0) {
         throw new CliError(`Run plan conflicts with retained fences from ${retained.run_id}`, 75);
@@ -1487,6 +1549,11 @@ async function commandRunV06(args) {
       workflowRevisionDigest: workflow.revision_digest,
       plan: fences,
       admittedAt: activatedAt,
+    });
+    const coordinatorRecipient = await bindRunCoordinatorRecipient({
+      git,
+      run: admitted.run,
+      lineage: runtime.lineage,
     });
     const binding = runtimeBindingFromContext(runtime);
     const coordinatorBinding = canonicalCoordinatorBinding(runtime.lineage);
@@ -1519,6 +1586,7 @@ async function commandRunV06(args) {
         acquisition_status: acquired.status,
         host: runtime.host,
         coordinator_binding: coordinatorBinding,
+        coordinator_recipient: coordinatorRecipient,
       },
       workflow_authority: {
         run_id: runId,
@@ -1585,38 +1653,31 @@ async function commandRunV06(args) {
     if (subcommand === "resume") {
       result = await resumeRun({ gitCommonDirectory: git.commonDir, runId, resume: request.resume });
     } else if (subcommand === "rebind") {
-      result = await rebindRun({
-        gitCommonDirectory: git.commonDir,
-        runId,
-        resume: request.resume,
-        next: request.next,
-        reboundAt: request.rebound_at ?? new Date().toISOString(),
-      });
+      result = await guardedActiveRunMutation(git, runId, () => (
+        rebindRunCoordinatorRecipient({
+          git,
+          runId,
+          resume: request.resume,
+          next: request.next,
+          reboundAt: request.rebound_at ?? new Date().toISOString(),
+        })
+      ));
     } else if (subcommand === "abandon") {
-      result = await abandonRun({
+      result = await guardedActiveRunMutation(git, runId, () => abandonRun({
         gitCommonDirectory: git.commonDir,
         runId,
         resume: request.resume,
         unresolvedFences: request.unresolved_fences,
         reason: request.reason,
         abandonedAt: request.abandoned_at ?? new Date().toISOString(),
-      });
+      }));
     } else {
-      const { runClosureAuditStatus } = await import("../lib/run-audit-v06.mjs");
-      const audit = await runClosureAuditStatus({
+      const { closeRunFromAudit } = await import("../lib/run-audit-v06.mjs");
+      result = await closeRunFromAudit({
+        gitCommonDirectory: git.commonDir,
         stateRoot: git.stateRoot,
         runId,
         auditId: request.audit_id,
-      });
-      if (audit.close_permitted !== true) {
-        throw new CliError(
-          `run close requires a current terminal-ready audit: ${request.audit_id}`,
-          73,
-        );
-      }
-      result = await closeRun({
-        gitCommonDirectory: git.commonDir,
-        runId,
         resume: request.resume,
         closedAt: request.closed_at ?? new Date().toISOString(),
       });
@@ -1644,11 +1705,14 @@ async function commandWorkflowV06(args) {
   const shapes = {
     create: { required: ["plan_id", "plan_revision"], optional: ["created_at"] },
     revise: { required: ["plan_id", "draft"], optional: ["revised_at"] },
-    contract: { required: ["plan_id", "task_id", "dependency_records"], optional: ["created_at"] },
+    contract: {
+      required: ["plan_id", "task_id", "dependency_authorities"],
+      optional: ["created_at"],
+    },
   };
   if (!shapes[subcommand]) throw new CliError("workflow requires create, revise, status, or contract");
   const { runId, request } = await runScopedRequest(values, `workflow ${subcommand}`, shapes[subcommand]);
-  const runAuthority = await activeRunAuthority(git, runId, request.plan_id);
+  await activeRunAuthority(git, runId, request.plan_id);
   let result;
   if (subcommand === "create") {
     result = await createWorkflowJournal({
@@ -1677,15 +1741,7 @@ async function commandWorkflowV06(args) {
       planId: request.plan_id,
       taskId: request.task_id,
       currentBaseline: { revision: snapshot.revision },
-      dependencyRecords: request.dependency_records,
-      authority: {
-        run_id: runId,
-        runtime_context_digest: runAuthority.run.runtime_context_hash,
-        configuration_digest: runAuthority.run.binding.config_hash,
-        repository_id: runAuthority.run.binding.repository_hash,
-        common_dir: git.commonDir,
-        coordinator_binding: canonicalCoordinatorBinding(runAuthority.run.binding.lineage),
-      },
+      dependencyAuthorities: request.dependency_authorities,
       now: commandNow(request, "created_at"),
     });
   }
@@ -2237,6 +2293,33 @@ async function mainLegacyV05(argv) {
     console.log(PACKAGE_VERSION);
     return;
   }
+  const exactFlags = (allowed) => args.every((argument) => allowed.includes(argument));
+  const readOnly = (
+    (command === "init" && args.includes("--check") && exactFlags(["--check", "--json"]))
+    || (command === "sync" && args.includes("--check") && exactFlags(["--check"]))
+    || (command === "config" && args[0] === "show")
+    || command === "doctor"
+    || (
+      command === "task"
+      && (
+        (args[0] === "packet" && ["validate", "render"].includes(args[1]))
+        || (args[0] === "operation" && args[1] === "status")
+      )
+    )
+    || (command === "plan" && args[0] === "validate")
+    || (command === "recipient" && ["status", "resolve"].includes(args[0]))
+    || (command === "callback" && args[0] === "status")
+    || (command === "urgent" && args[0] === "status")
+    || (command === "git" && args[0] === "status")
+    || (command === "lease" && args[0] === "status")
+    || (command === "cleanup" && args[0] === "audit")
+  );
+  if (!readOnly) {
+    throw new CliError(
+      `legacy-v05 is read-only historical verification; ${command} mutation is disabled`,
+      64,
+    );
+  }
   if (command === "init") return commandInit(args);
   if (command === "sync") return commandSync(args);
   if (command === "config") return commandConfig(args);
@@ -2259,6 +2342,41 @@ function migratedV05Command(command) {
   ].includes(command);
 }
 
+function isV06RunBoundMutation(command, args) {
+  const subcommand = args[0];
+  if (command === "workflow") return ["create", "revise", "contract"].includes(subcommand);
+  if (command === "task") {
+    return subcommand === "create" && ["prepare", "attempt", "reconcile"].includes(args[1]);
+  }
+  if (command === "subagent") return ["prepare", "created", "complete", "dispose"].includes(subcommand);
+  if (command === "release") return ["prepare", "reconcile", "accept"].includes(subcommand);
+  if (command === "callback") return ["deliver", "observe"].includes(subcommand);
+  if (command === "disposition") return ["prepare", "finalize"].includes(subcommand);
+  if (command === "verification") return subcommand === "run";
+  if (command === "integration") return ["prepare", "reconcile"].includes(subcommand);
+  if (command === "archive") return ["prepare", "reconcile"].includes(subcommand);
+  if (command === "adopt") return ["apply", "retire-apply"].includes(subcommand);
+  return false;
+}
+
+async function dispatchV06Command(command, args, handler) {
+  if (!isV06RunBoundMutation(command, args)) return handler(args);
+  const runIds = [];
+  for (let index = 0; index < args.length; index += 1) {
+    if (args[index] === "--run-id") {
+      if (args[index + 1] !== undefined) runIds.push(args[index + 1]);
+      index += 1;
+    } else if (args[index].startsWith("--run-id=")) {
+      runIds.push(args[index].slice("--run-id=".length));
+    }
+  }
+  if (runIds.length === 0) return handler(args);
+  if (runIds.length !== 1) throw new CliError("v0.6 mutations require exactly one --run-id", 64);
+  const runId = requireText(runIds[0], "--run-id", { max: 128, safeId: true });
+  const git = v06Repository();
+  return guardedActiveRunMutation(git, runId, () => handler(args));
+}
+
 async function main() {
   const [command, ...args] = process.argv.slice(2);
   if (!command || command === "help" || command === "--help" || command === "-h") {
@@ -2271,16 +2389,16 @@ async function main() {
   }
   if (command === "legacy-v05") return mainLegacyV05(args);
   if (command === "run") return commandRunV06(args);
-  if (command === "workflow") return commandWorkflowV06(args);
-  if (command === "task") return commandTaskV06(args);
-  if (command === "subagent") return commandSubagentV06(args);
-  if (command === "release") return commandReleaseV06(args);
-  if (command === "callback") return commandCallbackV06(args);
-  if (command === "disposition") return commandDispositionV06(args);
-  if (command === "verification") return commandVerificationV06(args);
-  if (command === "integration") return commandIntegrationV06(args);
-  if (command === "archive") return commandArchiveV06(args);
-  if (command === "adopt") return commandAdoptV06(args);
+  if (command === "workflow") return dispatchV06Command(command, args, commandWorkflowV06);
+  if (command === "task") return dispatchV06Command(command, args, commandTaskV06);
+  if (command === "subagent") return dispatchV06Command(command, args, commandSubagentV06);
+  if (command === "release") return dispatchV06Command(command, args, commandReleaseV06);
+  if (command === "callback") return dispatchV06Command(command, args, commandCallbackV06);
+  if (command === "disposition") return dispatchV06Command(command, args, commandDispositionV06);
+  if (command === "verification") return dispatchV06Command(command, args, commandVerificationV06);
+  if (command === "integration") return dispatchV06Command(command, args, commandIntegrationV06);
+  if (command === "archive") return dispatchV06Command(command, args, commandArchiveV06);
+  if (command === "adopt") return dispatchV06Command(command, args, commandAdoptV06);
   if (migratedV05Command(command)) {
     throw new CliError(
       `${command} is a quarantined v0.5 command; v0.6 does not retain dual authority. `

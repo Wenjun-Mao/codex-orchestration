@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtemp, readdir, rm, stat, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import test from "node:test";
@@ -116,6 +116,39 @@ test("v0.6 help exposes no bare callback consume and direct v0.5 paths fail clos
   assert.match(oldInit.stderr, /quarantined v0\.5 command/);
 });
 
+test("legacy-v05 exposes read-only verification and refuses every mutation family", async (t) => {
+  const root = await createGitFixture("codex-flow-cli-v06-legacy-read-only-");
+  t.after(() => removeFixture(root));
+  const help = runCli(["legacy-v05", "--help"], { cwd: root });
+  assertSuccess(help, "legacy-v05 help");
+  assert.match(help.stdout, /Read-only historical verification/);
+  assert.doesNotMatch(help.stdout, /init --plan|recipient bind|callback deliver|cleanup apply/);
+
+  const refused = [
+    ["init", "--plan"],
+    ["sync"],
+    ["config", "set", "--model", "gpt-5.6-terra"],
+    ["task", "start", "--role", "coordinator"],
+    ["task", "operation", "prepare"],
+    ["recipient", "bind", "--lineage-id", "legacy", "--thread-id", "legacy-thread"],
+    ["callback", "deliver"],
+    ["urgent", "persist"],
+    ["git", "bind", "--operation-id", "legacy-operation"],
+    ["lease", "acquire", "--resource", "legacy", "--owner", "legacy"],
+    ["cleanup", "plan", "--main-branch", "main"],
+  ];
+  for (const command of refused) {
+    const result = runCli(["legacy-v05", ...command], { cwd: root });
+    assert.notEqual(result.status, 0, `legacy mutation unexpectedly passed: ${command.join(" ")}`);
+    assert.match(result.stderr, /legacy-v05 is read-only historical verification/);
+  }
+  assert.equal(execFileSync("git", ["status", "--porcelain=v1"], {
+    cwd: root,
+    encoding: "utf8",
+  }), "");
+  await assert.rejects(stat(resolve(root, ".git", "codex-flow")), /ENOENT/);
+});
+
 test("run activation needs no tracked setup and replays the same disclosed authority", async (t) => {
   const context = await activatedFixture(t, "activation");
   await assert.rejects(stat(resolve(context.root, ".codex", "orchestration")), /ENOENT/);
@@ -127,6 +160,20 @@ test("run activation needs no tracked setup and replays the same disclosed autho
   assert.equal(context.result.model_routing[0].model, "gpt-5.6-terra");
   assert.equal(context.result.model_routing[0].reasoning_effort, "xhigh");
   assert.equal(context.result.host_call_performed, false);
+  const recipientPath = resolve(
+    context.result.state_authority.state_root,
+    "recipients",
+    "bindings",
+    `${context.activation.runtime.lineage.lineage_id}.json`,
+  );
+  const recipient = JSON.parse(await readFile(recipientPath, "utf8"));
+  assert.equal(recipient.current.thread_id, context.activation.runtime.lineage.thread_id);
+  assert.equal(recipient.current.generation, context.activation.runtime.lineage.generation);
+  assert.equal(recipient.current.fence_token, context.result.run.binding.fence_token);
+  assert.deepEqual(
+    context.result.runtime_authority.coordinator_recipient,
+    { ...context.activation.runtime.lineage, fence_token: context.result.run.binding.fence_token },
+  );
 
   const replay = runCli([
     "run", "activate", "--run-id", context.runId,
@@ -144,6 +191,66 @@ test("run activation needs no tracked setup and replays the same disclosed autho
     repeated.workflow_authority.journal_digest,
     context.result.workflow_authority.journal_digest,
   );
+  assert.deepEqual(
+    repeated.runtime_authority.coordinator_recipient,
+    context.result.runtime_authority.coordinator_recipient,
+  );
+});
+
+test("run rebind advances the canonical recipient with the same fenced authority", async (t) => {
+  const context = await activatedFixture(t, "recipient-rebind");
+  const request = {
+    run_id: context.runId,
+    resume: context.result.run.binding,
+    next: {
+      host: { host_id: "local", session_id: "cli-v06-session-rebound" },
+      lineage: {
+        lineage_id: context.activation.runtime.lineage.lineage_id,
+        thread_id: "cli-v06-coordinator-rebound",
+        generation: 2,
+      },
+    },
+    rebound_at: "2026-08-29T20:00:30.000Z",
+  };
+  const path = await requestFile(context.requests, "recipient-rebind", request);
+  const first = runCli([
+    "run", "rebind", "--run-id", context.runId, "--file", path, "--json",
+  ], { cwd: context.root });
+  assertSuccess(first, "coordinator rebind");
+  const rebound = JSON.parse(first.stdout);
+  assert.deepEqual(rebound.run.binding.lineage, request.next.lineage);
+
+  const recipientPath = resolve(
+    context.result.state_authority.state_root,
+    "recipients",
+    "bindings",
+    `${request.next.lineage.lineage_id}.json`,
+  );
+  const recipient = JSON.parse(await readFile(recipientPath, "utf8"));
+  assert.equal(recipient.current.thread_id, request.next.lineage.thread_id);
+  assert.equal(recipient.current.generation, request.next.lineage.generation);
+  assert.equal(recipient.current.fence_token, rebound.run.binding.fence_token);
+  assert.equal(recipient.bindings.length, 2);
+
+  const replay = runCli([
+    "run", "rebind", "--run-id", context.runId, "--file", path, "--json",
+  ], { cwd: context.root });
+  assertSuccess(replay, "idempotent coordinator rebind");
+  assert.equal(JSON.parse(replay.stdout).run.binding.fence_token, rebound.run.binding.fence_token);
+  assert.equal(
+    JSON.parse(await readFile(recipientPath, "utf8")).bindings.length,
+    2,
+  );
+
+  const stale = structuredClone(request);
+  stale.next.lineage.thread_id = "cli-v06-coordinator-forged";
+  stale.next.lineage.generation = 3;
+  const stalePath = await requestFile(context.requests, "recipient-stale-rebind", stale);
+  const refused = runCli([
+    "run", "rebind", "--run-id", context.runId, "--file", stalePath, "--json",
+  ], { cwd: context.root });
+  assert.notEqual(refused.status, 0);
+  assert.match(refused.stderr, /resume fence|authoritative coordinator recipient/);
 });
 
 test("request.run_id mismatch is rejected before operational state is created", async (t) => {
@@ -197,7 +304,7 @@ test("task creation and release expose each native host payload at most once", a
     run_id: context.runId,
     plan_id: context.result.workflow_authority.plan_id,
     task_id: "visible-implementation",
-    dependency_records: [],
+    dependency_authorities: [],
     authority: {
       run_id: context.runId,
       runtime_context_digest: "f".repeat(64),
@@ -210,11 +317,24 @@ test("task creation and release expose each native host payload at most once", a
   assert.notEqual(forgedContractResult.status, 0);
   assert.match(forgedContractResult.stderr, /field is not allowed: authority/);
 
-  const contractPath = await requestFile(context.requests, "contract", {
+  const injectedRecordsPath = await requestFile(context.requests, "injected-records", {
     run_id: context.runId,
     plan_id: context.result.workflow_authority.plan_id,
     task_id: "visible-implementation",
     dependency_records: [],
+  });
+  const injectedRecordsResult = runCli([
+    "workflow", "contract", "--run-id", context.runId,
+    "--file", injectedRecordsPath, "--json",
+  ], { cwd: context.root });
+  assert.notEqual(injectedRecordsResult.status, 0);
+  assert.match(injectedRecordsResult.stderr, /dependency_authorities|dependency_records/);
+
+  const contractPath = await requestFile(context.requests, "contract", {
+    run_id: context.runId,
+    plan_id: context.result.workflow_authority.plan_id,
+    task_id: "visible-implementation",
+    dependency_authorities: [],
     created_at: "2026-08-29T20:00:01.000Z",
   });
   const contractResult = runCli([
@@ -352,11 +472,80 @@ test("audited close refuses an incomplete run and keeps it active", async (t) =>
     "run", "close", "--run-id", context.runId, "--file", closePath, "--json",
   ], { cwd: context.root });
   assert.notEqual(closeResult.status, 0);
-  assert.match(closeResult.stderr, /current terminal-ready audit/);
+  assert.match(closeResult.stderr, /current terminal-ready.*audit/);
 
   const status = runCli(["run", "status", "--run-id", context.runId, "--json"], {
     cwd: context.root,
   });
   assertSuccess(status, "run status after refused close");
   assert.equal(JSON.parse(status.stdout).run.status, "active");
+});
+
+test("terminal runs remain inspectable but every public mutation family fails closed", async (t) => {
+  const context = await activatedFixture(t, "terminal-mutation-fence");
+  const abandonPath = await requestFile(context.requests, "abandon", {
+    run_id: context.runId,
+    resume: context.result.run.binding,
+    unresolved_fences: context.result.workflow_authority.fences,
+    reason: "Bounded regression terminalizes the run with its admitted fences intact.",
+    abandoned_at: "2026-08-29T20:01:30.000Z",
+  });
+  const abandoned = runCli([
+    "run", "abandon", "--run-id", context.runId, "--file", abandonPath, "--json",
+  ], { cwd: context.root });
+  assertSuccess(abandoned, "run abandonment");
+  assert.equal(JSON.parse(abandoned.stdout).run.status, "abandoned");
+
+  const inertPath = await requestFile(context.requests, "terminal-mutation", {
+    run_id: context.runId,
+  });
+  const mutations = [
+    ["workflow", "create"],
+    ["task", "create", "prepare"],
+    ["subagent", "prepare"],
+    ["release", "prepare"],
+    ["callback", "deliver"],
+    ["disposition", "prepare"],
+    ["verification", "run"],
+    ["integration", "prepare"],
+    ["archive", "prepare"],
+    ["adopt", "apply"],
+  ];
+  for (const command of mutations) {
+    const result = runCli([
+      ...command, "--run-id", context.runId, "--file", inertPath, "--json",
+    ], { cwd: context.root });
+    assert.notEqual(result.status, 0, `terminal mutation unexpectedly passed: ${command.join(" ")}`);
+    assert.match(result.stderr, /v0\.6 run is not active/);
+  }
+
+  const rebind = structuredClone(JSON.parse(await readFile(abandonPath, "utf8")));
+  delete rebind.unresolved_fences;
+  delete rebind.reason;
+  delete rebind.abandoned_at;
+  rebind.next = {
+    host: { host_id: "local", session_id: "terminal-rebind" },
+    lineage: {
+      lineage_id: context.activation.runtime.lineage.lineage_id,
+      thread_id: "terminal-rebind-thread",
+      generation: 2,
+    },
+  };
+  const rebindPath = await requestFile(context.requests, "terminal-rebind", rebind);
+  const terminalRebind = runCli([
+    "run", "rebind", "--run-id", context.runId, "--file", rebindPath, "--json",
+  ], { cwd: context.root });
+  assert.notEqual(terminalRebind.status, 0);
+  assert.match(terminalRebind.stderr, /v0\.6 run is not active/);
+
+  const runStatus = runCli(["run", "status", "--run-id", context.runId, "--json"], {
+    cwd: context.root,
+  });
+  assertSuccess(runStatus, "terminal run status");
+  assert.equal(JSON.parse(runStatus.stdout).run.status, "abandoned");
+  const workflowStatus = runCli([
+    "workflow", "status", "--run-id", context.runId,
+    "--plan-id", context.result.workflow_authority.plan_id, "--json",
+  ], { cwd: context.root });
+  assertSuccess(workflowStatus, "terminal workflow status");
 });
