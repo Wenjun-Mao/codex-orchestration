@@ -3,7 +3,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { gitSnapshot } from "../lib/git.mjs";
-import { admitRun, emptyFencePlan } from "../lib/run-lifecycle.mjs";
+import { admitRun, buildFencePlan } from "../lib/run-lifecycle.mjs";
 import {
   acquireRuntimeContext,
   buildRuntimeContext,
@@ -11,7 +11,10 @@ import {
   runtimeBindingFromContext,
   runtimeContextHash,
 } from "../lib/runtime-context.mjs";
-import { coordinatorBindingDigest } from "../lib/workflow-plan.mjs";
+import {
+  coordinatorBindingDigest,
+  workflowReservationClaims,
+} from "../lib/workflow-plan.mjs";
 
 export const packageRoot = resolve(import.meta.dirname, "..");
 export const cli = resolve(packageRoot, "bin", "codex-flow.mjs");
@@ -21,6 +24,8 @@ export async function activateV06FixtureRun({
   runId,
   plan,
   lineage,
+  branchFences = [],
+  fencePlan = null,
   now = Date.parse("2026-08-29T00:00:00.000Z"),
 }) {
   const snapshot = gitSnapshot(root);
@@ -44,13 +49,19 @@ export async function activateV06FixtureRun({
     context: runtime,
     bundleSource,
   });
+  const workflowClaims = workflowReservationClaims(plan);
+  const admittedFencePlan = fencePlan ?? buildFencePlan({
+    pathFences: workflowClaims.path_fences,
+    resourceFences: workflowClaims.resource_fences,
+    branchFences,
+  });
   const admitted = await admitRun({
     gitCommonDirectory: snapshot.commonDir,
     runId,
     runtimeId: runtime.runtime_id,
     workflowPlanId: plan.plan_id,
     workflowRevisionDigest: plan.revision_digest,
-    plan: emptyFencePlan(),
+    plan: admittedFencePlan,
     admittedAt: new Date(now).toISOString(),
   });
   const binding = runtimeBindingFromContext(runtime);

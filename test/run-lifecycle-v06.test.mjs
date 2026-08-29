@@ -19,6 +19,8 @@ import {
   retainedRunFences,
   resumeRun,
 } from "../lib/run-lifecycle.mjs";
+import { createWorkflowJournal } from "../lib/workflow-journal-v06.mjs";
+import { createWorkflowPlanRevision } from "../lib/workflow-plan.mjs";
 import { createGitFixture, removeFixture } from "./helpers.mjs";
 
 const REVISION = "a".repeat(40);
@@ -93,7 +95,6 @@ function fullPlan(suffix) {
     pathFences: [`lib/${suffix}`],
     resourceFences: [`resource-${suffix}`],
     branchFences: [`codex/${suffix}`],
-    operationFences: [`operation-${suffix}`],
   });
 }
 
@@ -260,7 +261,7 @@ test("abandoned runs retain all fence types and permit only a disjoint next plan
     gitCommonDirectory: commonDir,
     runId: "run-abandoned",
     resume: admitted.run.binding,
-    unresolvedFences: abandonedPlan,
+    unresolvedFences: buildFencePlan({ pathFences: ["lib/claimed"] }),
     reason: "Executor ownership could not be reconciled.",
     abandonedAt: "2026-08-29T13:01:00.000Z",
   });
@@ -279,7 +280,6 @@ test("abandoned runs retain all fence types and permit only a disjoint next plan
         pathFences: ["lib/claimed/child"],
         resourceFences: [],
         branchFences: [],
-        operationFences: [],
       }),
       admittedAt: "2026-08-29T13:02:00.000Z",
     }),
@@ -307,23 +307,93 @@ test("abandoned runs retain all fence types and permit only a disjoint next plan
   assert.deepEqual(await readFile(v05.path), v05.bytes);
 });
 
-test("fence conflict detection covers paths, resources, branches, and operations", () => {
+test("fence conflict detection covers path, resource, and branch reservations", () => {
   const original = buildFencePlan({
     pathFences: ["lib/foundation"],
     resourceFences: ["shared-resource"],
     branchFences: ["codex/foundation"],
-    operationFences: ["task-operation-foundation"],
   });
   const candidate = buildFencePlan({
     pathFences: ["lib/foundation/runtime"],
     resourceFences: ["shared-resource"],
     branchFences: ["codex/foundation"],
-    operationFences: ["task-operation-foundation"],
   });
   assert.deepEqual(
     fencePlanConflicts(original, candidate).map((conflict) => conflict.type),
-    ["path", "resource", "branch", "operation"],
+    ["path", "resource", "branch"],
   );
+});
+
+test("run admission binds a persisted root workflow to its path and resource envelope", async (t) => {
+  const root = await createGitFixture("codex-flow-v06-root-envelope-");
+  t.after(() => removeFixture(root));
+  const commonDir = resolve(root, ".git");
+  const { bundleSource } = await runtimeBundleFor(root, "root-envelope");
+  const runtime = runtimeFor(root, bundleSource);
+  await acquireRuntimeContext({
+    gitCommonDirectory: commonDir,
+    context: runtime,
+    bundleSource,
+  });
+  const workflow = createWorkflowPlanRevision({
+    schema_version: 1,
+    plan_id: "root-envelope-plan",
+    revision: 1,
+    parent_revision_digest: null,
+    tasks: [{
+      task_id: "implementation",
+      title: "Implement inside the reservation",
+      execution_kind: "task-thread",
+      mode: "write",
+      model: "gpt-5.6-terra",
+      reasoning_effort: "xhigh",
+      fork_turns: null,
+      dependencies: [],
+      read_paths: ["lib"],
+      write_paths: ["lib/reserved.mjs"],
+      shared_resources: ["browser-session"],
+      primary_outcome: "Implement one bounded change.",
+      causal_question: null,
+      cheapest_safe_direct_attempt: "Implement the file and run its focused test.",
+      instrument_role: "none",
+      supporting_follow_up: null,
+      supporting_authorization: null,
+    }],
+  });
+  await createWorkflowJournal({
+    stateRoot: resolve(commonDir, "codex-flow", "v0.6.0"),
+    runId: "run-root-envelope",
+    planId: workflow.plan_id,
+    planRevision: workflow,
+    now: Date.parse("2026-08-29T14:00:00.000Z"),
+  });
+  const request = {
+    gitCommonDirectory: commonDir,
+    runId: "run-root-envelope",
+    runtimeId: runtime.runtime_id,
+    workflowPlanId: workflow.plan_id,
+    workflowRevisionDigest: workflow.revision_digest,
+    admittedAt: "2026-08-29T14:01:00.000Z",
+  };
+  await assert.rejects(
+    admitRun({ ...request, plan: buildFencePlan() }),
+    /write path is outside the admitted run fence envelope/,
+  );
+  await assert.rejects(
+    admitRun({
+      ...request,
+      plan: buildFencePlan({ pathFences: ["lib"] }),
+    }),
+    /shared resource is outside the admitted run fence envelope/,
+  );
+  const admitted = await admitRun({
+    ...request,
+    plan: buildFencePlan({
+      pathFences: ["lib"],
+      resourceFences: ["browser-session"],
+    }),
+  });
+  assert.equal(admitted.status, "admitted");
 });
 
 test("runtime reads retain the exact bundle after the plugin source disappears", async (t) => {

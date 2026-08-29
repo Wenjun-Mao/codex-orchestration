@@ -45,6 +45,7 @@ function visibleTask(overrides = {}) {
     dependencies: [],
     read_paths: ["lib"],
     write_paths: ["lib/bounded-change.mjs"],
+    shared_resources: [],
     primary_outcome: "Complete one bounded implementation.",
     causal_question: null,
     cheapest_safe_direct_attempt: "Implement the smallest source change and run its focused test.",
@@ -63,10 +64,11 @@ function subagentTask(overrides = {}) {
     mode: "read",
     model: "gpt-5.6-terra",
     reasoning_effort: "high",
-    fork_turns: "all",
+    fork_turns: "3",
     dependencies: [],
     read_paths: ["docs"],
     write_paths: [],
+    shared_resources: [],
     primary_outcome: "Return a bounded source review.",
     causal_question: "Does the source preserve the named contract?",
     cheapest_safe_direct_attempt: "Read the bounded source and report the result.",
@@ -118,13 +120,14 @@ async function fixture(t, suffix) {
   };
 }
 
-async function createJournal(context, planId, tasks, now = START) {
+async function createJournal(context, planId, tasks, now = START, { branchFences = [] } = {}) {
   const planRevision = revisionOne(planId, tasks);
   await activateV06FixtureRun({
     root: context.root,
     runId: context.runId,
     plan: createWorkflowPlanRevision(planRevision),
     lineage: context.coordinator,
+    branchFences,
     now: now - 1_000,
   });
   return createWorkflowJournal({
@@ -271,10 +274,55 @@ test("unstarted claims are revoked by the next revision and cannot authorize a s
   assert.equal(currentContract.revision_digest, revised.current_revision.revision_digest);
 });
 
+test("workflow revisions cannot exceed the admitted path or resource envelope", async (t) => {
+  const context = await fixture(t, "reservation-envelope");
+  const planId = "reservation-envelope-plan";
+  const created = await createJournal(context, planId, [visibleTask()]);
+
+  await assert.rejects(
+    () => reviseWorkflowJournal({
+      stateRoot: context.stateRoot,
+      runId: context.runId,
+      planId,
+      draft: revisionTwo(created.current_revision, [visibleTask({
+        write_paths: ["lib/outside-envelope.mjs"],
+      })]),
+      now: START + 1_000,
+    }),
+    /write path is outside the admitted run fence envelope/,
+  );
+  await assert.rejects(
+    () => reviseWorkflowJournal({
+      stateRoot: context.stateRoot,
+      runId: context.runId,
+      planId,
+      draft: revisionTwo(created.current_revision, [visibleTask({
+        shared_resources: ["browser-session"],
+      })]),
+      now: START + 2_000,
+    }),
+    /shared resource is outside the admitted run fence envelope/,
+  );
+
+  const status = await workflowJournalStatus({
+    stateRoot: context.stateRoot,
+    runId: context.runId,
+    planId,
+  });
+  assert.equal(status.current_revision.revision, 1);
+  assert.equal(status.journal.revisions.length, 1);
+});
+
 test("revision admission derives visible-task starts from the persisted native operation", async (t) => {
   const context = await fixture(t, "visible-started");
   const planId = "visible-started-plan";
-  const created = await createJournal(context, planId, [visibleTask()]);
+  const created = await createJournal(
+    context,
+    planId,
+    [visibleTask()],
+    START,
+    { branchFences: ["codex/visible-started"] },
+  );
   const contract = await contractFor(context, planId, "implementation");
   await prepareVisibleTaskCreation({
     stateRoot: context.stateRoot,

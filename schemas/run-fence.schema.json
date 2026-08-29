@@ -8,8 +8,7 @@
     "kind",
     "path_fences",
     "resource_fences",
-    "branch_fences",
-    "operation_fences"
+    "branch_fences"
   ],
   "properties": {
     "schema_version": { "const": 1 },
@@ -41,12 +40,6 @@
         "maxLength": 256,
         "pattern": "^(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*\\\\)(?!.*\\s).+$"
       }
-    },
-    "operation_fences": {
-      "type": "array",
-      "maxItems": 128,
-      "uniqueItems": true,
-      "items": { "$ref": "#/$defs/safeId" }
     }
   },
   "$defs": {

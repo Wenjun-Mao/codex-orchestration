@@ -43,10 +43,11 @@ function workflowTask(overrides = {}) {
     mode: "read",
     model: "gpt-5.6-terra",
     reasoning_effort: "high",
-    fork_turns: "all",
+    fork_turns: "3",
     dependencies: [],
     read_paths: ["docs/mission.md"],
     write_paths: [],
+    shared_resources: [],
     primary_outcome: "A read-only evidence digest for the direct implementation attempt.",
     causal_question: "What source-backed constraint should the direct attempt preserve?",
     cheapest_safe_direct_attempt: "Inspect the bounded source and return evidence only.",
@@ -69,6 +70,7 @@ function implementationTask(overrides = {}) {
     dependencies: ["research"],
     read_paths: ["lib"],
     write_paths: ["lib/new-module.mjs"],
+    shared_resources: [],
     primary_outcome: "A reviewed implementation that preserves the evidence-backed contract.",
     causal_question: null,
     cheapest_safe_direct_attempt: "Implement and run the focused test.",
@@ -276,6 +278,43 @@ test("DAG ordering uses transitive closure and rejects unordered write/read over
       tasks: [direct, { ...transitiveReader, dependencies: [] }],
     })),
     /Unordered tasks.*write\/read/,
+  );
+
+  const sharedBrowser = { shared_resources: ["browser-session"] };
+  assert.throws(
+    () => createWorkflowPlanRevision(rootDraft({
+      tasks: [
+        direct,
+        implementationTask({
+          task_id: "other",
+          dependencies: [],
+          write_paths: ["src/other"],
+          ...sharedBrowser,
+        }),
+        implementationTask({
+          task_id: "third",
+          dependencies: [],
+          write_paths: ["src/third"],
+          ...sharedBrowser,
+        }),
+      ],
+    })),
+    /Unordered tasks.*share exclusive resources: browser-session/,
+  );
+  assert.doesNotThrow(() => createWorkflowPlanRevision(rootDraft({
+    tasks: [
+      implementationTask({ task_id: "first", dependencies: [], ...sharedBrowser }),
+      implementationTask({ task_id: "second", dependencies: ["first"], ...sharedBrowser }),
+    ],
+  })));
+});
+
+test("native subagent routing rejects full-history inheritance", () => {
+  assert.throws(
+    () => createWorkflowPlanRevision(rootDraft({
+      tasks: [workflowTask({ fork_turns: "all" }), implementationTask()],
+    })),
+    /fork_turns must explicitly be none or a positive integer string/,
   );
 });
 
