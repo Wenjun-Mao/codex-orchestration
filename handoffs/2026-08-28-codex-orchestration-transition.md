@@ -7,7 +7,7 @@ new task rooted directly at this repository. This document is project memory,
 not a plugin instruction, runtime contract, or substitute for the ADRs and
 skills. It is intentionally outside `package.json`'s packaged file list.
 
-## Start here
+## Resume checklist
 
 Before changing anything:
 
@@ -19,15 +19,6 @@ Before changing anything:
    newly scoped checkpoint is agreed.
 4. Do not mutate UK Dev, its Cocos plugins, or its active tasks from this
    repository without an explicit cross-project handoff.
-
-Suggested first message for the new task:
-
-```text
-Read handoffs/2026-08-28-codex-orchestration-transition.md in full before
-acting. Authenticate the repository and summarize the current authority,
-outstanding decisions, and your recommended first bounded checkpoint. Do not
-edit files until we discuss that checkpoint.
-```
 
 ## Current source authority
 
@@ -48,9 +39,9 @@ edit files until we discuss that checkpoint.
   first decide whether to fast-forward `main`, create a private remote, and
   preserve or tag release history.
 
-The handoff commit itself changes no packaged path. Resolve the current `HEAD`
+The handoff-only commits change no packaged path. Resolve the current `HEAD`
 after opening this repository; the accepted package bytes are those at
-`d03cabf` plus any later source-only handoff commit.
+`d03cabf` plus any later source-only handoff commits.
 
 ## Private distribution state
 
@@ -318,11 +309,3 @@ marketplace source from that artifact, run
 `codex plugin add codex-orchestration@personal`, and prove the installed cache
 is byte-identical to the marketplace artifact. Do not hand-edit marketplace
 configuration or treat the generated cache as source.
-
-## Handoff completion rule
-
-After the new repository-rooted task has read and summarized this document,
-keep it as historical project memory unless the user explicitly asks to remove
-it. Do not promote its prose into `AGENTS.md`, plugin skills, or runtime docs
-wholesale. Only stable, reusable decisions belong in the existing ADR, skill,
-coverage, or reference structure.
