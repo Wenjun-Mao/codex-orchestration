@@ -106,6 +106,7 @@ import {
   observeCallbackV06,
 } from "../lib/callbacks-v06.mjs";
 import {
+  cancelTaskBeforeExecution,
   finalizeTaskDisposition,
   prepareTaskDisposition,
   taskDispositionStatus,
@@ -216,7 +217,7 @@ Usage:
   codex-flow release status --run-id ID --release-id ID [--json]
   codex-flow callback deliver|observe --run-id ID --file request.json [--json]
   codex-flow callback status --run-id ID [--json]
-  codex-flow disposition prepare|finalize --run-id ID --file request.json [--json]
+  codex-flow disposition prepare|finalize|cancel --run-id ID --file request.json [--json]
   codex-flow disposition status --run-id ID --disposition-id ID [--json]
   codex-flow verification run --run-id ID --file request.json [--json]
   codex-flow verification status --run-id ID [--verification-id ID] [--json]
@@ -2046,23 +2047,34 @@ async function commandDispositionV06(args) {
       required: ["disposition_id", "recipient", "executor_thread_id"],
       optional: ["integration_id", "verification_id", "finalized_at"],
     },
+    cancel: {
+      required: ["release_id", "reason"],
+      optional: ["cancelled_at"],
+    },
   };
-  if (!shapes[subcommand]) throw new CliError("disposition requires prepare, finalize, or status");
+  if (!shapes[subcommand]) throw new CliError("disposition requires prepare, finalize, cancel, or status");
   const { runId, request } = await runScopedRequest(values, `disposition ${subcommand}`, shapes[subcommand]);
-  const result = subcommand === "prepare"
-    ? await (async () => {
-      await callbackAuthority(git, request.callback_id, runId);
-      return prepareTaskDisposition({
+  let result;
+  if (subcommand === "cancel") {
+    await releaseAuthority(git, request.release_id, runId);
+    result = await cancelTaskBeforeExecution({
+      stateRoot: git.stateRoot,
+      releaseId: request.release_id,
+      reason: request.reason,
+      now: commandNow(request, "cancelled_at"),
+    });
+  } else if (subcommand === "prepare") {
+    await callbackAuthority(git, request.callback_id, runId);
+    result = await prepareTaskDisposition({
       stateRoot: git.stateRoot,
       callbackId: request.callback_id,
       decision: request.decision,
       reason: request.reason,
       now: commandNow(request, "prepared_at"),
-      });
-    })()
-    : await (async () => {
-      await dispositionAuthority(git, request.disposition_id, runId);
-      return finalizeTaskDisposition({
+    });
+  } else {
+    await dispositionAuthority(git, request.disposition_id, runId);
+    result = await finalizeTaskDisposition({
       stateRoot: git.stateRoot,
       dispositionId: request.disposition_id,
       recipient: request.recipient,
@@ -2070,8 +2082,8 @@ async function commandDispositionV06(args) {
       integrationId: request.integration_id ?? null,
       verificationId: request.verification_id ?? null,
       now: commandNow(request, "finalized_at"),
-      });
-    })();
+    });
+  }
   v06Output(assertRunIdentity(result, runId, "task disposition"));
 }
 
@@ -2351,7 +2363,7 @@ function isV06RunBoundMutation(command, args) {
   if (command === "subagent") return ["prepare", "created", "complete", "dispose"].includes(subcommand);
   if (command === "release") return ["prepare", "reconcile", "accept"].includes(subcommand);
   if (command === "callback") return ["deliver", "observe"].includes(subcommand);
-  if (command === "disposition") return ["prepare", "finalize"].includes(subcommand);
+  if (command === "disposition") return ["prepare", "finalize", "cancel"].includes(subcommand);
   if (command === "verification") return subcommand === "run";
   if (command === "integration") return ["prepare", "reconcile"].includes(subcommand);
   if (command === "archive") return ["prepare", "reconcile"].includes(subcommand);

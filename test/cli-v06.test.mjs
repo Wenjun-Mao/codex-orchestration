@@ -450,6 +450,43 @@ test("task creation and release expose each native host payload at most once", a
   const repeatedRelease = JSON.parse(repeatedReleaseResult.stdout);
   assert.equal(repeatedRelease.dispatch_permitted, false);
   assert.equal(Object.hasOwn(repeatedRelease, "host_request"), false);
+
+  const rejectedReleasePath = await requestFile(context.requests, "release-rejected", {
+    run_id: context.runId,
+    release_id: release.release_id,
+    outcome: "rejected-before-send",
+    reconciled_at: "2026-08-29T20:00:07.000Z",
+  });
+  const rejectedReleaseResult = runCli([
+    "release", "reconcile", "--run-id", context.runId,
+    "--file", rejectedReleasePath, "--json",
+  ], { cwd: context.root });
+  assertSuccess(rejectedReleaseResult, "release rejected before objective send");
+  assert.equal(JSON.parse(rejectedReleaseResult.stdout).delivery.outcome, "rejected-before-send");
+
+  const cancelPath = await requestFile(context.requests, "disposition-cancel", {
+    run_id: context.runId,
+    release_id: release.release_id,
+    reason: "The native host refused the one allowed objective delivery.",
+    cancelled_at: "2026-08-29T20:00:08.000Z",
+  });
+  const cancelResult = runCli([
+    "disposition", "cancel", "--run-id", context.runId,
+    "--file", cancelPath, "--json",
+  ], { cwd: context.root });
+  assertSuccess(cancelResult, "pre-execution task cancellation");
+  const cancelled = JSON.parse(cancelResult.stdout);
+  assert.equal(cancelled.decision, "cancelled");
+  assert.equal(cancelled.state, "completed");
+  assert.equal(cancelled.callback_id, null);
+  assert.equal(cancelled.release_id, release.release_id);
+
+  const cancelReplayResult = runCli([
+    "disposition", "cancel", "--run-id", context.runId,
+    "--file", cancelPath, "--json",
+  ], { cwd: context.root });
+  assertSuccess(cancelReplayResult, "pre-execution cancellation replay");
+  assert.equal(JSON.parse(cancelReplayResult.stdout).disposition_id, cancelled.disposition_id);
 });
 
 test("audited close refuses an incomplete run and keeps it active", async (t) => {
@@ -506,6 +543,7 @@ test("terminal runs remain inspectable but every public mutation family fails cl
     ["release", "prepare"],
     ["callback", "deliver"],
     ["disposition", "prepare"],
+    ["disposition", "cancel"],
     ["verification", "run"],
     ["integration", "prepare"],
     ["archive", "prepare"],
