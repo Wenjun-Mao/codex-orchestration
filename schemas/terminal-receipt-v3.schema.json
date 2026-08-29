@@ -4,9 +4,10 @@
   "type": "object",
   "additionalProperties": false,
   "required": [
-    "schema_version", "recipient", "executor_id", "run_id", "runtime_digest",
-    "config_digest", "plan_id", "revision_id", "task_id",
-    "task_contract_digest", "operation_id", "release_id", "classification",
+    "schema_version", "recipient", "executor_thread_id", "run_id",
+    "runtime_context_digest", "configuration_digest", "repository_id", "common_dir",
+    "plan_id", "revision_digest", "task_id", "task_digest", "contract_id",
+    "operation_id", "release_id", "classification",
     "git_outcome", "model_evidence", "result_or_blocker", "next_decision",
     "accounting", "completed_at"
   ],
@@ -18,19 +19,22 @@
       "required": ["lineage_id", "thread_id", "generation", "binding_digest"],
       "properties": {
         "lineage_id": { "$ref": "#/$defs/safeId" },
-        "thread_id": { "$ref": "#/$defs/safeId" },
-        "generation": { "type": "integer", "minimum": 1 },
+        "thread_id": { "$ref": "#/$defs/threadId" },
+        "generation": { "type": "integer", "minimum": 1, "maximum": 2147483647 },
         "binding_digest": { "$ref": "#/$defs/digest" }
       }
     },
-    "executor_id": { "$ref": "#/$defs/safeId" },
+    "executor_thread_id": { "$ref": "#/$defs/safeId" },
     "run_id": { "$ref": "#/$defs/safeId" },
-    "runtime_digest": { "$ref": "#/$defs/digest" },
-    "config_digest": { "$ref": "#/$defs/digest" },
+    "runtime_context_digest": { "$ref": "#/$defs/digest" },
+    "configuration_digest": { "$ref": "#/$defs/digest" },
+    "repository_id": { "$ref": "#/$defs/safeId" },
+    "common_dir": { "type": "string", "minLength": 1, "maxLength": 2048, "pattern": "^/" },
     "plan_id": { "$ref": "#/$defs/safeId" },
-    "revision_id": { "$ref": "#/$defs/safeId" },
+    "revision_digest": { "$ref": "#/$defs/digest" },
     "task_id": { "$ref": "#/$defs/safeId" },
-    "task_contract_digest": { "$ref": "#/$defs/digest" },
+    "task_digest": { "$ref": "#/$defs/digest" },
+    "contract_id": { "$ref": "#/$defs/digest" },
     "operation_id": { "$ref": "#/$defs/safeId" },
     "release_id": { "$ref": "#/$defs/safeId" },
     "classification": { "enum": ["PASS", "BLOCKED", "FAIL"] },
@@ -94,6 +98,22 @@
     },
     "completed_at": { "type": "string", "format": "date-time" }
   },
+  "allOf": [
+    {
+      "not": {
+        "type": "object",
+        "required": ["classification", "git_outcome"],
+        "properties": {
+          "classification": { "const": "PASS" },
+          "git_outcome": {
+            "type": "object",
+            "required": ["kind"],
+            "properties": { "kind": { "const": "dirty-blocked" } }
+          }
+        }
+      }
+    }
+  ],
   "$defs": {
     "safeId": {
       "type": "string",
@@ -102,7 +122,13 @@
       "pattern": "^[A-Za-z0-9_.-]+$"
     },
     "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
-    "commit": { "type": "string", "pattern": "^[0-9a-f]{40,64}$" },
+    "commit": { "type": "string", "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$" },
+    "threadId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9_.-]+$"
+    },
     "nullableRef": {
       "oneOf": [
         { "type": "null" },
