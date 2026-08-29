@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { mkdir, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import test from "node:test";
 import {
@@ -150,6 +151,71 @@ test("v0.6 callback rejects cross-run delivery", async () => {
         expectedRunId: "different-run",
       }),
       /does not match the active run/,
+    );
+  } finally {
+    await removeFixture(root);
+  }
+});
+
+test("v0.6 callback rejects a disposition-shaped lookalike with invalid canonical identity", async () => {
+  const root = await createGitFixture("codex-flow-v06-callback-lookalike-");
+  const stateRoot = resolve(root, ".git", "codex-flow", "v0.6.0");
+  const recipient = {
+    lineage_id: "callback-lineage-v06",
+    thread_id: "callback-coordinator-v06",
+    generation: 1,
+  };
+  try {
+    await bindRecipient({ stateRoot, recipient });
+    const payload = receipt(resolve(root, ".git"));
+    const delivered = await deliverCallbackV06({ stateRoot, receipt: payload });
+    await observeCallbackV06({
+      stateRoot,
+      callbackId: delivered.callback_id,
+      recipient,
+    });
+    const dispositionId = "forged-disposition-lookalike";
+    const dispositionDirectory = resolve(stateRoot, "dispositions", "records");
+    await mkdir(dispositionDirectory, { recursive: true });
+    await writeFile(resolve(dispositionDirectory, `${dispositionId}.json`), `${JSON.stringify({
+      schema_version: 1,
+      kind: "codex-flow-v06-task-disposition",
+      disposition_id: dispositionId,
+      run_id: payload.run_id,
+      runtime_context_digest: payload.runtime_context_digest,
+      configuration_digest: payload.configuration_digest,
+      repository_id: payload.repository_id,
+      common_dir: payload.common_dir,
+      coordinator_binding: payload.recipient,
+      plan_id: payload.plan_id,
+      revision_digest: payload.revision_digest,
+      task_id: payload.task_id,
+      task_digest: payload.task_digest,
+      contract_id: payload.contract_id,
+      operation_id: payload.operation_id,
+      release_id: payload.release_id,
+      executor_thread_id: payload.executor_thread_id,
+      callback_id: delivered.callback_id,
+      receipt_digest: "0".repeat(64),
+      decision: "rejected",
+      reason: "This object matches the former callback-local field parser only.",
+      integration_id: null,
+      verification_id: null,
+      verification_digest: null,
+      state: "finalized",
+      prepared_at: "2026-08-29T12:00:01-04:00",
+      finalized_at: "2026-08-29T12:00:02-04:00",
+      callback_consumed_at: null,
+    }, null, 2)}\n`, "utf8");
+    await assert.rejects(
+      consumeCallbackV06({
+        stateRoot,
+        callbackId: delivered.callback_id,
+        recipient,
+        executorThreadId: payload.executor_thread_id,
+        dispositionId,
+      }),
+      /disposition_id does not match its terminal authority/,
     );
   } finally {
     await removeFixture(root);
