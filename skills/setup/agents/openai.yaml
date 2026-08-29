@@ -1,7 +1,6 @@
 interface:
-  display_name: "Set Up Codex Flow"
-  short_description: "Bootstrap or safely adopt Codex Flow."
-  default_prompt: "Use $codex-orchestration:setup to set up Codex Flow in this repository."
+  display_name: "Adopt Codex Flow"
+  short_description: "Plan permanent Codex Flow adoption or retirement."
+  default_prompt: "Use $codex-orchestration:setup to plan permanent Codex Flow adoption in this repository."
 policy:
   allow_implicit_invocation: true
-

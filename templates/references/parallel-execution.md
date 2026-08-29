@@ -1,20 +1,23 @@
 # Parallel Execution
 
-Parallelism is an evidence-backed optimization, not the default.
+Parallelism is an evidence-backed optimization. Use the smallest concurrency
+that shortens the critical path.
 
-A task may run concurrently only when the plan proves:
+One immutable workflow revision must prove:
 
-- an authenticated common baseline;
-- an absolute zoned launch deadline for every task;
-- an explicit visible task-thread or hidden subagent kind;
-- an acyclic dependency graph;
-- disjoint write ownership or explicit dependency ordering;
-- ordering for every exclusive shared resource;
-- independent verification that does not mutate sibling-owned state;
-- a serial merge and combined reproof gate.
+- a concrete common baseline and coordinator/run/runtime authority;
+- an acyclic dependency graph, including transitive ordering;
+- disjoint unordered read/write ownership and exclusive-resource gates;
+- explicit path, resource, branch, operation, and lease boundaries;
+- actual native surface plus requested model/reasoning for each task;
+- one direct follow-up or pause/replan after supporting instrumentation; and
+- serial integration and combined verification gates.
 
-Read-only exploration can fan out more freely. Mutating work should use the
-smallest concurrency that shortens the critical path. Do not use concurrency
-to bypass unresolved product authority or to create multiple competing owners
-of the same editor, browser, simulator, device, account session, or build root.
-Stop launching after the plan deadline even when unfinished tasks remain.
+Visible tasks are the primary independent/mutating lanes. Native subagents are
+read-only supporting lanes with explicit `fork_turns`, no Ultra, and no Git or
+callback lifecycle. Never silently substitute one for the other.
+
+Only a completed accepted durable disposition unblocks a dependency. Task
+final text, wait status, or the existence of a branch does not. A workflow
+revision may change only unstarted tasks and edges; started/released contracts
+remain immutable.

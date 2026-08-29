@@ -1,18 +1,20 @@
 <!-- codex-flow:start v0.6.0-dev.0 -->
 ## Codex Orchestration
 
-For work that creates, coordinates, or integrates other Codex tasks, invoke
-`codex-orchestration:index` and run
-`node .codex/orchestration/bin/codex-flow.mjs task start --role coordinator`
-before delegated planning. Executors must start from a validated task packet.
-Create only the packet's explicit task kind and journal ambiguous host calls.
-Use journaled direct Steer only for true blockers, approvals, or high-risk
-drift; raw identity-less Steer is invalid. Route ordinary terminal completion
-through the journal with `codex-flow callback deliver`.
-When callable, `wait_threads` may wake an active coordinator; the journal
-remains the sole integration authority.
-After a coordinator fork, rebind its recipient lineage before integration.
-For host-created worktrees, bootstrap without the objective, bind the observed
-path, then release the full packet. Record integration, and
-use only a reviewed `cleanup plan` / `cleanup apply` pair for Git deletion.
+For work that creates, coordinates, or integrates separate Codex tasks, invoke
+`codex-orchestration:index`. Questions and plans are read-only. An authorized
+actionable request may progressively activate one explicit v0.6 run without
+tracked setup, after disclosing its exact runtime snapshot, Git-common state,
+workflow revision, task/project/model routing, fences, leases, and external host
+calls. Use visible tasks for independently running or mutating work; native
+subagents are a separate read-only supporting lane.
+
+Generate task contracts only from the immutable workflow. Correlate one-shot
+visible creation through the bootstrap launch nonce, bind the observed
+worktree, and require the exact release handshake before execution. Routine
+completion goes only to the quiet durable journal; direct interruption is
+reserved for a persisted blocker, approval, or high-risk drift. Task finals and
+raw digests are never result authority. Complete the durable
+result -> disposition -> integration/no-change -> combined verification ->
+archive/cleanup proof chain before releasing state.
 <!-- codex-flow:end -->

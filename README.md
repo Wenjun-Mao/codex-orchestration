@@ -1,415 +1,251 @@
 # Codex Orchestration
 
-Codex Orchestration is publicly readable source for privately distributed,
-repository-portable Codex coordination. Public visibility does not grant an
-open-source license: the source and package remain `UNLICENSED`.
+Codex Orchestration lets one lead Codex task coordinate multiple separate,
+user-visible Codex tasks as one safe repository workflow. A stronger model can
+coordinate cheaper or specialized models without making any current model name
+part of the product contract.
 
-## Mission
+It preserves intent, dependency and path ownership, model-routing evidence,
+task and Git identity, non-interrupting completion, exactly-once disposition,
+combined verification, and safe closure across independently running tasks.
+Codex App remains the native execution harness; this plugin is a portable
+cross-task governance layer above it.
 
-Codex Orchestration enables a lead Codex task, often using a stronger model,
-to coordinate multiple separate, user-visible Codex tasks, often using cheaper
-or specialized models, as one safe and accountable repository workflow. It
-preserves delegation intent, dependencies, ownership, task and Git identity,
-non-disruptive result delivery, and exactly-once integration across task
-boundaries while leaving native task execution, model selection, and any
-host-managed worktree lifecycle to the Codex host.
+See [Mission and product boundary](docs/mission.md) for the durable charter.
 
-The plugin consumes native Codex capabilities instead of recreating them. Its
-product boundary is the cross-task governance that must remain durable while
-the coordinator and executor tasks work independently. See
-[Mission and product boundary](docs/mission.md) for the promises, responsibility
-boundary, non-goals, and feature-admission test.
+## Current authority
 
-## Architecture and runtime authority
+This public repository is the editing authority and remains `UNLICENSED`;
+public visibility does not grant an open-source license. The editable source is
+`0.6.0-dev.0`. The accepted personal-marketplace package and this repository's
+currently pinned consumer runtime remain v0.5.1 until a separate release and
+installation checkpoint is approved.
 
-The project has two deliberately separate layers:
+Editing this checkout never changes an installed plugin or active repository
+runtime. An activated v0.6 run snapshots its exact bundle into the repository's
+Git common directory, so its authority survives task restart, compaction,
+plugin upgrade, and plugin removal. v0.6 does not read, migrate, or delete
+retained v0.5 operational state.
 
-- `codex-orchestration` is a Codex plugin that teaches coordinator, executor,
-  integration, and cleanup decisions through progressively loaded skills.
-- `codex-flow` is an npm-compatible CLI that enforces mechanical contracts
-  using only Node.js built-ins.
-
-This is not a daemon, secretary task, or MCP server. Each repository pins a
-reviewable runtime under `.codex/orchestration/`. This repository's active
-pinned runtime remains the accepted `v0.5.1` release. Mutable recipient
-bindings, task-operation attempts, urgent-signal and callback journals, and
-leases live under a repository's Git common directory in that installed
-runtime's exact release namespace, so linked worktrees on the same release
-share coordination state. The editable `v0.6.0-dev.0` source uses a fresh
-`.git/codex-flow/v0.6.0/` authority only when explicitly activated or adopted;
-editing this checkout does not change the active v0.5.1 runtime or its
-namespace. The former `0.5.2-dev.0` work rolls into v0.6 and will not be
-released separately.
-
-## Requirements
-
-- Git
-- Node.js 20.11 or newer
-- Codex host tools only for task creation and other explicitly requested host actions
-
-No third-party npm packages are required. Target repositories do not need to
-be JavaScript projects. JSON Schemas provide portable structural validation;
-the CLI remains authoritative for graph, path, identity, expiry, redaction,
-and lifecycle semantics.
-
-## Pre-release compatibility policy
-
-This privately distributed tool is intentionally allowed to break. Until the
-user explicitly declares a stable compatibility boundary, a better contract
-replaces the old one outright: no compatibility readers, migration branches,
-deprecated aliases, or dual execution paths. Repositories preserve any
-evidence they still need, retire old operational state explicitly, and
-initialize the current version.
-
-Replacing any earlier pinned runtime is a fresh installation on a dedicated
-branch: retain the old `.git/codex-flow/` evidence, explicitly remove the old
-tracked `.codex/orchestration/` runtime and configuration from that branch,
-then plan and apply the selected release. New operational records live only in
-the newly installed exact release's namespace. For example, an explicitly
-activated or adopted `v0.6.0-dev.0` runtime uses
-`.git/codex-flow/v0.6.0/`; until then this repository continues to use its
-pinned v0.5.1 runtime and that runtime neither reads nor deletes retained
-namespaces.
-
-## Source and private distribution
-
-This public GitHub repository is the editing authority, not a public package
-channel. Immutable annotated `v<semver>` tags identify exact source commits
-used for accepted private packages. A tag does not publish or refresh the
-personal-marketplace plugin, alter installed caches, or upgrade a pinned
-consumer runtime. See
-[ADR 0012](docs/adr/0012-public-source-private-distribution-and-release-tags.md).
-
-The editable source currently has the unreleased identity `0.6.0-dev.0`; the
-accepted marketplace artifact and this repository's pinned consumer runtime
-remain `0.5.1`. An exact namespace for `0.6.0-dev.0` exists only if that
-development runtime is explicitly activated or adopted. During `npm run validate` and
-the `prepack` lifecycle, a matching annotated `v<version>` tag requires every
-relevant package path to still match that tag. This prevents source changes
-from being packaged under an already accepted version; see
-[ADR 0014](docs/adr/0014-post-release-development-identity.md).
-
-Install `codex-orchestration` from the personal Codex plugin marketplace. The
-installed plugin version is the accepted package authority: its `setup` skill
-resolves and runs the bundled canonical CLI without asking for a checkout path
-or commit. In a new Codex task, say either:
+## Layered architecture
 
 ```text
-Set up Codex Flow in this new repository.
-Adopt Codex Flow in this existing project without disturbing ongoing work.
+GPT models
+   |
+   v
+Codex App native harness
+   |  projects, visible tasks, subagents, model selection, worktrees,
+   |  messaging, waits, Handoff, archive
+   v
+Codex Orchestration meta-harness
+      workflow DAG, ownership, run/task/Git identity, quiet results,
+      urgent interruption policy, dispositions, verification, leases,
+      integration and cleanup proof
 ```
 
-Explicit `$codex-orchestration:setup` invocation is also supported. Skill
-discovery alone never authorizes mutation; the request must unmistakably ask
-to set up, bootstrap, install, or adopt Codex Flow.
+The plugin consumes native primitives; it does not recreate the task runtime,
+worktree manager, project system, model selector, task queue, or archive API.
 
-The setup skill copies a version-pinned runtime into the target repository;
-routine work uses that pinned copy. Updating the installed plugin therefore
-does not silently alter an initialized repository. A different installed
-runtime version requires explicit retirement and fresh installation.
+| Surface | Intended use | Codex Orchestration lifecycle |
+| --- | --- | --- |
+| Visible Codex task | Independently running, heterogeneous-model work; required for mutating executor lanes | Creation, nonce correlation, Git binding, release, result, disposition, integration/no-change, verification, archive and cleanup proof |
+| Native subagent | Bounded read-only research or review inside the coordinator task | Explicit model/reasoning/`fork_turns`, result classification, unchanged-Git proof and accept/reject disposition only |
 
-For headless environments, the canonical package CLI remains available
-directly or through an optional global npm installation. npm installation does
-not register the plugin with Codex:
+Subagents are never a silent fallback for visible tasks. They cannot own writes,
+worktrees, branches, callbacks, integration, archive, or cleanup.
 
-```bash
-npm install --global /path/to/codex-orchestration
-codex-flow --help
-```
+## v0.6 operating model
 
-## Bootstrap a repository
+### Progressive run activation
 
-The setup skill owns normal bootstrap and adoption. For a headless invocation,
-create or switch to the intended integration branch first, then run from that
-exact target worktree:
+Questions, explanations, audits, and plans are read-only. A repository no
+longer needs `.codex/orchestration/` before it can use the plugin.
 
-```bash
-node /path/to/codex-orchestration/bin/codex-flow.mjs init --plan --json
-node /path/to/codex-orchestration/bin/codex-flow.mjs init \
-  --apply-plan <plan_id> --json
-node .codex/orchestration/bin/codex-flow.mjs doctor
-```
+When the user authorizes actionable orchestration, the plugin may activate one
+run after disclosing:
 
-Planning is mandatory and completely read-only. The plan aggregates the exact
-write set, before/after hashes and line counts, activation roots, compatibility
-conflicts, and a deterministic `plan_id`. Application recomputes the plan and
-refuses stale IDs. Configuration, pinned runtime, and instruction integration
-activate as one transaction and roll back together on failure.
+- the exact package/runtime source and bundle hash;
+- the `.git/codex-flow/v0.6.0/` operational state root;
+- repository/common-directory, baseline, host, and coordinator binding;
+- the immutable workflow revision, fences, shared resources, and leases;
+- every native task surface, saved project, model/reasoning request, placement,
+  and proposed host call; and
+- the difference between configured, requested, host-accepted, independently
+  observed, and unavailable evidence.
 
-The plan ID binds the repository branch, revision, and cleanliness. Apply it
-from the same branch and unchanged worktree where it was created. Switching to
-a pilot branch after planning deliberately invalidates the plan; branch first,
-then plan and apply.
+Run activation writes no tracked setup. Every stateful operation names its
+exact run ID; no command infers the newest run. One coordinator run may be
+active per clone/Git common directory. A normal close requires terminal
+reconciled state. Explicit abandonment releases the active slot but retains
+unresolved path, resource, branch, operation, callback, urgent, recipient, and
+lease fences.
 
-Plugin setup passes `--setup-mode new` or `--setup-mode existing` to both plan
-and apply. That option additionally requires the corresponding dedicated v0.5
-bootstrap/adoption branch, a clean worktree, and an explicit stable
-`--project-id` that is not derived from a disposable worktree name. It is
-optional only for headless callers intentionally using the lower-level
-installation primitive.
+### Content-addressed workflow
 
-Managed instruction mode preserves existing `AGENTS.md` content and owns one
-bounded block. A mature repository with an equivalent contract may instead use:
+One stable logical plan groups immutable workflow revisions. Task contracts are
+generated from a revision rather than authored independently. Each contract
+binds the run, runtime/configuration, repository/common directory, coordinator,
+plan/revision, concrete dependency dispositions, and baseline.
 
-```bash
-node /path/to/codex-orchestration/bin/codex-flow.mjs init --plan --json \
-  --agents-mode external --external-agents-path AGENTS.md \
-  --attest-external-agents
-```
+Each task states:
 
-Repeat those same mode/path/attestation options with `--apply-plan <plan_id>`.
-External mode records the repository-relative instruction path, exact content
-hash, contract version, and explicit human attestation without injecting prompt
-text. `doctor` and `sync --check` fail on drift until the changed instructions
-are reviewed and explicitly re-attested through a new plan.
+- the primary outcome;
+- a nullable causal question;
+- the cheapest safe direct attempt; and
+- an instrument role: `none`, `supporting`, or `primary-deliverable`.
 
-Use `init --check` for installed-state compliance. Run `init` and `sync` from
-the canonical package; the pinned copy intentionally refuses to update itself.
+A supporting-instrument task must immediately enable its named dependent direct
+attempt or pause/replan. After one instrument-only checkpoint, more supporting
+instrumentation needs explicit authorization in a later immutable revision.
+Only unstarted tasks and edges may change; started or released contracts do not.
 
-New repositories default delegated tasks to `gpt-5.6-terra` with `xhigh`
-reasoning. `config set` changes repository defaults, and each task packet may
-override either value. The resolved values must be passed to the actual host
-creation call; prompt text alone does not configure a task.
+### Model routing
 
-## Plugin-first setup
+The coordinator explicitly selects the executor model and reasoning effort in
+the native creation call. Prompt text alone does not configure them. Sol
+coordinating Terra is a useful default shape, not a permanent dependency.
 
-The installed `codex-orchestration:setup` skill is the single onboarding
-entrypoint. It classifies a request as new-repository bootstrap, existing
-repository adoption, same-version verification, incompatible-version stop, or
-ambiguous read-only inspection. Detailed mode instructions are internal skill
-references loaded only when selected; there are no operator-facing prompt
-templates or placeholder substitutions.
+The plugin records configuration, request, host acceptance, and independent
+observation separately. Accepted-but-unobservable selectors remain partial
+evidence; a contradictory observed selector blocks. Native subagents also name
+`fork_turns` explicitly and cannot use Ultra.
 
-## Core commands
+### One-shot task identity and release
+
+A visible task contract authorizes exactly one native creation attempt. The
+bootstrap prompt contains a cryptographic launch nonce and no objective.
+Provisional `clientThreadId` and ready task ID are different identities. The
+ready task is accepted only when its initial host-visible user turn contains
+the exact nonce; title and timing similarity are never enough.
+
+After project/model/effort/worktree reconciliation, the coordinator binds the
+observed pristine worktree at the authenticated baseline. It then prepares one
+release, sends its exact prompt at most once, and requires the executor to
+accept the exact release, contract, runtime, and common directory before work.
+Ambiguous creation or release fails closed rather than authorizing retry or
+substitution.
+
+### Quiet results and urgent interrupts
+
+Routine completion writes one terminal-receipt-v3 result to the durable
+Git-common journal. It never direct-messages or Steers the coordinator. Native
+waits and task finals are liveness signals only; they do not authorize
+integration.
+
+A true blocker, approval request, or high-risk drift uses a separate urgent
+path. The signal is persisted before one identified direct interrupt attempt.
+Ambiguous delivery cannot be replayed blindly, and recipient observation
+suppresses duplicate host delivery.
+
+### Result proof chain
 
 ```text
-codex-flow init --plan [--setup-mode new|existing] [--json] [initialization options]
-codex-flow init --apply-plan <plan_id> [initialization options]
-codex-flow init --check
-codex-flow sync [--check] [--force]
-codex-flow config show|set ...
-codex-flow doctor [--json]
-codex-flow task start --role coordinator|executor
-codex-flow task packet validate|render <packet.json>
-codex-flow task operation prepare --file <packet.json>
-codex-flow task operation preflight --operation-id <id>
-                  --file <host-capability-evidence.json>
-codex-flow task operation attempt --operation-id <id>
-codex-flow task operation bootstrap --operation-id <id> --file <packet.json>
-codex-flow task operation reconcile --operation-id <id> --attempt-id <id>
-                  --outcome observed|not-created|ambiguous|failed|host-session-blocked ...
-codex-flow task operation reject --operation-id <id> --reason-code <code>
-                  --host-object-state archived
-codex-flow task operation release --operation-id <id> --file <packet.json>
-codex-flow task operation status [--operation-id <id>]
-codex-flow plan validate <plan.json>
-codex-flow recipient bind|rebind|status|resolve ...
-codex-flow callback deliver --file <receipt.json>
-codex-flow callback observe --callback-id <id> --lineage-id <id>
-                  --thread-id <id> --generation <n>
-codex-flow callback consume --callback-id <id> --lineage-id <id>
-                  --thread-id <id> --generation <n> --executor-id <id>
-codex-flow callback expire|status ...
-codex-flow urgent persist --file <urgent-signal.json>
-codex-flow urgent attempt prepare --urgent-id <id> --attempt-sequence <n>
-                  [--retry-reason <reason>]
-codex-flow urgent attempt reconcile --urgent-id <id>
-                  --delivery-attempt-id <id>
-                  --host-call-result sent|rejected-before-send|ambiguous
-codex-flow urgent observe --urgent-id <id> --delivery-attempt-id <id> ...
-codex-flow urgent consume --urgent-id <id> ... --sender-executor-id <id>
-codex-flow urgent expire|status ...
-codex-flow git bind --operation-id <id>
-codex-flow git integrate --operation-id <id> --main-branch <branch>
-                  [--superseded-by <ref>]
-codex-flow git status
-codex-flow lease acquire|release|status ...
-codex-flow cleanup audit [--json]
-codex-flow cleanup plan --operation-id <id>... --main-branch <branch>
-                  [--include-remote]
-codex-flow cleanup apply --plan-id <id> --operation-id <id>...
-                  --main-branch <branch> [--include-remote]
+journaled terminal result
+          |
+          v
+coordinator disposition prepared
+          |
+          v
+serial integration or authoritative no-change
+          |
+          v
+content-addressed combined verification at exact repository state
+          |
+          v
+disposition finalized and result consumed exactly once
+          |
+          v
+reconciled task archive, lease/fence release, reviewed Git cleanup
 ```
 
-## Task creation contract
+Task final text, branch names, UI status, and caller-supplied raw digests are
+never proof. Git outcome is derived as `unchanged`, `clean-commit`, or
+`dirty-blocked`; upstream is nullable. Dirty or attention-needed tasks remain
+visible and fenced. Archive and Git cleanup are separate reconciled actions.
 
-Every packet explicitly requests either a user-visible `task-thread` or a
-hidden `subagent`; the kinds are not interchangeable. Before calling a host
-tool, persist a deterministic operation with `task operation prepare`, record
-strict capability evidence for the current host session with `preflight`, then
-start a bounded attempt. After the host call, inspect the actual object and
-reconcile its ID, kind, and field-level evidence provenance.
+## Use from Codex App
 
-Every operation persists host placement before creation. Project-backed visible
-tasks use the coordinator's same saved Codex App project by default, including
-its exact project ID. Cross-project placement requires an explicit target and
-reason. Projectless placement is an explicit exception for repositoryless work
-or an unsaved disposable fixture, and hidden subagents explicitly inherit their
-host context.
+Ask or at-mention the installed Codex Orchestration plugin naturally:
 
-Reconciliation keeps project placement separate from repository execution.
-`host-observed` is complete evidence. When the exact targeted creation call
-succeeds but list/read omit project placement, `host-accepted` is permitted as
-partial evidence; it is never reported as independently observed. Any non-null
-observed or accepted mismatch fails closed before Git binding or objective
-release.
-After terminal disposition, preserved evidence, callback consumption, and Git
-cleanup reconciliation, the coordinator archives the visible task by default;
-blocked or attention-needed tasks remain visible until resolved.
+```text
+How would Codex Flow split this work across visible tasks?
+Use Codex Flow to run these two independent implementation lanes.
+Use one Terra task for implementation and one read-only subagent for review.
+```
 
-`local` packets name an existing exact Git worktree in
-`environment.project_path`; preparation and attempt authenticate its full
-`HEAD` and declared cleanliness. `host-worktree` packets instead name the
-saved repository, an exact local `starting_branch`, and an unclaimed
-`executor_branch`. Preparation and attempt authenticate the source tip and
-branch-name availability without requiring the saved checkout itself to be
-clean or on that branch.
+The first request is read-only. An actionable request routes through
+`codex-orchestration:coordinate` and can activate a run without permanent
+repository setup. External task creation remains visible in the disclosed
+plan.
 
-Desktop-created worktrees use a two-phase launch. After `attempt`, render the
-bootstrap-only prompt and make one host call. The bootstrap contains no task
-objective and forbids repository work. Reread the created task's actual worktree
-path, reconcile it as host-observed, run `git bind`, then render `release` and
-send that full packet to the same task. Binding proves the path is a pristine,
-distinct worktree in the same Git repository at the exact starting revision.
-If Desktop supplied it detached, binding first persists an immutable claim
-receipt, claims the packet-declared executor branch, and rereads every invariant
-before recording ownership. An interrupted bind resumes only from that exact
-receipt. Never guess the path, accept an unreceipted named branch, or bind the
-saved checkout.
+Permanent tracked adoption is a separate explicit choice for team policy,
+portable clones, or headless operation:
 
-If an observed object is rejected before Git binding and objective release, the
-coordinator archives it and removes its unbound host worktree. Only then may
-`task operation reject` persist the terminal disposition. The CLI verifies the
-exact observed path is absent, preserves the rejection evidence, and prevents
-retry or release. If binding was interrupted after its immutable branch claim,
-rejection also requires the claimed branch to be unowned, unchecked out, and
-still exactly at the authenticated baseline; it refuses fetched
-remote-tracking evidence, conditionally removes only that exact local ref, and
-records the ref as absent together with the claim. The receipt does not
-attribute deletion across crash recovery. Any drift stays blocked for recovery.
-An observed operation without a terminal disposition continues to warn as
-unresolved.
+```text
+Permanently adopt Codex Flow v0.6 in this repository.
+Plan retirement of the tracked v0.5 authority, but do not apply it yet.
+```
 
-A timeout is ambiguous, not failure. List/read the host state before retrying,
-then reconcile `observed` or `not-created`. No new launch may start after the
-packet's absolute zoned deadline. The CLI journals the operation but does not
-invoke private in-session model tools; the coordinator performs the one-shot
-host call using the capability available in that session.
+The setup skill uses read-only `adopt plan` followed by an exact reviewed
+`adopt apply`. Tracked adoption stores the same runtime/configuration/policy
+semantics under `.codex/orchestration/v0.6/`; it is not a second engine. A
+tracked v0.5 authority must be retired through its own explicit plan/apply, with
+its evidence byte-preserved, before v0.6 adoption.
 
-Unsupported or unverified required selectors stop before an attempt exists. A
-dispatch-time serializer, adapter, backend, schema-runtime, or host-control
-failure is `host-session-blocked`; retry requires compatible evidence from a
-different host session. Preflight history remains immutable so every attempt is
-bound to the exact session evidence that authorized it.
+## Public CLI families
 
-Task-thread title must be independently reread and exactly match the request.
-When the host substitutes the delegation envelope, perform one bounded title
-write, reread the exact title, and record `bounded-host-write`. A subagent may
-have no title field; keep its host nickname separate and report title evidence
-as unavailable. Requested, accepted, role-derived, and independently observed
-model/reasoning facts are never conflated.
+The v0.6 CLI is pre-release; use `codex-flow --help` for exact flags. Its public
+lifecycle is organized around these command families:
 
-See [Host operations](templates/references/host-operations.md) for the adapter
-procedure and bounded host-list fallback.
+```text
+run activate|status|resume|rebind|close|abandon
+workflow create|revise|status|contract
+task create prepare|attempt|reconcile|status
+subagent prepare|created|complete|dispose|status
+release prepare|reconcile|accept|status
+callback deliver|observe|status
+disposition prepare|finalize|status
+verification run|status
+integration prepare|verification-request|reconcile|status
+archive prepare|reconcile|status
+adopt plan|apply|status|retire-plan|retire-apply
+```
 
-## Callback and fork contract
+There is no public bare callback-consume command. Consumption is an internal
+exactly-once consequence of finalizing an authoritative disposition.
 
-Urgent blockers, approval requests, and high-risk drift use `journal-direct`.
-The sender first persists a strict urgent signal, prepares one numbered
-delivery attempt, and passes the returned `host_prompt` string directly to one
-Steer call. It then reports the operator-observed host result as `sent`,
-`rejected-before-send`, or `ambiguous`. The public CLI intentionally has no
-`--outcome` alias. A second host call requires a new numbered attempt and an
-explicit retry reason. Raw identity-less Steer is invalid for new work.
+## Permanent adoption and headless use
 
-The coordinator calls `urgent observe` with the signal and attempt IDs before
-acting. The first observed attempt returns `disposition: process`; every later
-envelope for that logical signal returns `disposition: suppress`. Repeated
-observation of one attempt is classified as a host replay. A different attempt
-ID for the same signal is classified as an additional sender attempt. The
-coordinator calls `urgent consume` after handling the signal. Corrected urgent
-content advances the logical sequence and explicitly names its predecessor.
-Host-added envelope fields never participate in identity.
-`urgent observe --json` returns the exact `consume_arguments`, including the
-sender's executor ID; urgent consumption therefore uses
-`--sender-executor-id`, not the receiver task ID.
+The installed plugin is normal package authority. Its setup skill resolves and
+runs the bundled CLI and snapshots exact managed files; users should not supply
+a source checkout or manually copy runtime files.
 
-Ordinary terminal completion uses `callback deliver`, which persists a strict
-receipt in the repository journal. The default and only installed project
-authority is `journal-monitor`: it creates no Codex thread-queue entry. The
-coordinator or its quiet monitor reads `callback status` without mutating the
-receipt. Keep a completion persisted while authenticating its branch and
-running any independent review. Observe only the exact receipt selected for an
-integration or durable-rejection disposition, then consume it only after that
-disposition is complete. An observed receipt is an immutable checkpoint and
-cannot be superseded; later correction requires a fresh task operation and
-`run_id`, not a higher callback sequence in the observed run.
+For a headless package invocation, Node.js 20.11 or newer and Git are required.
+No third-party npm packages are used. Run `adopt plan` first, review the exact
+tracked write set and runtime hashes, then apply only that unchanged plan.
 
-When the current host exposes `wait_threads`, the active coordinator should use
-it to wait efficiently on the current wave and carry returned cursors into later
-waits. It is notification only: after every completion wake, inspect
-`callback status` and follow the same observe, integration, reproof, and consume
-path. Task final text, needs-attention state, timeout, or wait interruption is
-not a receipt. If the coordinator turn ends, durable resumption still comes
-from the journal or an explicit automation.
+## Pre-release compatibility and retained history
 
-Integration is exactly once by deterministic callback ID and a durable
-observed/consumed journal. Corrected receipts use increasing sequence numbers
-and explicit supersession; arrival order is never authority. Task packets and
-project configuration must name the same ordinary-completion authority, so a
-monitor cannot silently integrate work that was also queued.
+v0.6 is intentionally breaking. It has no v0.5 compatibility reader, dual
+execution path, or state migration. Retained v0.5 records remain independently
+auditable in their exact namespace. Historical v0.5 schemas, examples, field
+tests, and ADRs are labeled as such; they are not v0.6 operating authority.
 
-v0.5 retains the single-authority callback contract: the experimental queue
-adapter and every legacy callback reader remain removed. An ordinary completion
-has one authority and one durable path.
-This is a breaking checkpoint: earlier configuration, task-operation records,
-and callback journals are not migrated into the v0.5 namespace. The package
-fails closed rather than carry compatibility code.
+The accepted v0.5.1 boundary remains documented in
+[v0.5.1 orchestration coverage](docs/coverage-v0.5.1.md). The v0.6 development
+boundary is summarized in [v0.6 orchestration coverage](docs/coverage-v0.6.md).
+[ADR 0015](docs/adr/0015-progressive-run-activation-authority.md) defines
+progressive activation and [ADR 0016](docs/adr/0016-content-addressed-workflow-and-native-boundary.md)
+defines workflow identity and the native-task boundary.
 
-Before launching executors, bind the coordinator lineage with `recipient bind`.
-The first successful bind returns a private fence token; idempotent bind replay
-without the token and status redact it. Supply and retain `--fence-token` when
-initial-bind output could be interrupted. After a fork or authoritative thread
-replacement, use that token with `recipient rebind`; stale packets resolve to the current
-generation, while observe/consume requires the current recipient identity. For
-retry-safe rebinding, choose and retain `--next-fence-token`; replaying the same
-old/new token pair and generation is idempotent.
+## Source and distribution
 
-Urgent signals and terminal receipts reject unknown fields, oversized content, secret-like material,
-application/account identifiers, raw logs/transcripts, and user identity data.
-
-## Cleanup boundary
-
-Bind every local or host-created worktree executor to its observed task operation with
-`git bind` before the branch changes. After serial integration and reproof, run
-`git integrate` from a clean integrating branch. The record classifies the
-exact executor tip as an ancestor, patch-equivalent, explicitly superseded, or
-unmerged. Ownership also pins the intended task upstream and a hash of its push
-destination when the controller repository has an upstream.
-
-`cleanup audit` is read-only. It joins those records with task operations,
-leases, linked worktrees, local refs, and exact remote refs. Dirty, active,
-protected, drifted, ambiguous, or uniquely unmerged state is never eligible.
-Branch names alone are never deletion authority.
-
-Deletion requires an explicit deterministic `cleanup plan`, followed by an
-`apply` with the same plan ID and arguments. Apply rechecks the clean/pushed
-main revision, pinned remote identity, every exact tip, active leases, and a
-worktree scan that includes ignored and normally hidden untracked files. It
-then removes only the planned clean linked worktree, local ref, and remote ref,
-in that preservation-first order. A failed apply exits nonzero and emits a
-bounded structured result containing the requested plan ID, every completed
-action, the action where it stopped, and a nonempty reason. An interruption or
-partial result invalidates the old plan; audit again and make a fresh plan for
-what remains. Executors never run cleanup.
-Remote cleanup requires exactly one fetch URL and one identical push URL;
-split or fan-out remotes fail closed.
-This is a process-role rule rather than a security claim: a local CLI cannot
-authenticate which Codex role invoked it.
-Configured warning and block thresholds count integrated Git records that still
-need local reconciliation, including unsafe ones, so another task wave cannot
-grow an unattended worktree/branch backlog. Task preparation and `doctor` stay
-network-free; explicit audit and cleanup commands inspect exact remote tips.
+This public GitHub repository is source authority, not a public package channel.
+Immutable annotated `v<semver>` tags identify exact commits accepted for
+private packages. A tag does not install, publish, refresh the personal
+marketplace, or upgrade a pinned consumer runtime. See
+[ADR 0012](docs/adr/0012-public-source-private-distribution-and-release-tags.md)
+and [ADR 0014](docs/adr/0014-post-release-development-identity.md).
 
 ## Development
 
@@ -419,35 +255,6 @@ npm run validate
 npm run pack:check
 ```
 
-See [ADR 0001](docs/adr/0001-portable-layered-orchestration.md) for the layered
-architecture and [ADR 0002](docs/adr/0002-run-identity-and-host-reconciliation.md)
-for identity, queue, deadline, and host-reconciliation decisions. Installation
-planning and external instruction ownership are defined by
-[ADR 0003](docs/adr/0003-install-planning-and-instruction-ownership.md).
-Local task baseline authentication is defined by
-[ADR 0004](docs/adr/0004-authenticate-local-task-baselines.md).
-[ADR 0005](docs/adr/0005-callback-authority-and-notification-lifecycle.md)
-records the superseded v0.3 queue-lifecycle decision.
-[Host capability and observation evidence](docs/adr/0006-host-capability-and-observation-evidence.md)
-defines the v0.3.3 host-session and title-normalization contract.
-[Git lifecycle and breaking-state policy](docs/adr/0007-git-lifecycle-and-breaking-state.md)
-defines the v0.4 ownership and cleanup contract.
-[Host-provisioned worktree launch](docs/adr/0008-host-provisioned-worktree-launch.md)
-defines the two-phase Desktop worktree contract.
-[Journaled urgent direct delivery](docs/adr/0009-journaled-urgent-direct-delivery.md)
-defines urgent-signal and delivery-attempt identity. Plugin-first package
-authority is defined by [ADR 0010](docs/adr/0010-plugin-first-package-authority.md).
-[Host project placement and pre-release rejection](docs/adr/0011-host-project-placement-and-pre-release-rejection.md)
-defines the v0.5.1 placement-evidence and terminal-bootstrap contract.
-[Public source, private distribution, and release
-tags](docs/adr/0012-public-source-private-distribution-and-release-tags.md)
-defines repository visibility, licensing, distribution, and immutable release
-identity.
-[Source repository self-hosting](docs/adr/0013-source-repository-self-hosting.md)
-defines how this project consumes its own accepted plugin without making the
-editable source tree its runtime authority.
-[Post-release development identity](docs/adr/0014-post-release-development-identity.md)
-defines the tagged-package path guard and unreleased source identity.
-The current covered boundary is listed in
-[v0.5.1 orchestration coverage](docs/coverage-v0.5.1.md), with the accepted
-[UK Dev exact-state replay](docs/field-tests/2026-08-28-uk-dev-v0.5.1-exact-state-replay.md).
+Source validation checks schemas, skills, package metadata, examples, and
+managed runtime files. Release, installation, pilot contact, and cleanup of
+retained audit state are separate approval checkpoints.

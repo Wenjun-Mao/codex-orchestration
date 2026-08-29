@@ -1,107 +1,86 @@
 ---
 name: coordinate
-description: Plan and coordinate independent Codex task threads with an authenticated baseline, explicit ownership DAG, shared-resource gates, bounded task packets, and durable callback routing. Use when the user authorizes delegation or parallel task work.
+description: Activate and coordinate one Codex Flow run across separate visible Codex tasks, with content-addressed workflow revisions, explicit model routing, bounded ownership, and non-interrupting result delivery. Use when the user authorizes delegation or parallel task work.
 ---
 
 # Coordinate Codex Work
 
-Run the pinned repository entrypoint before planning:
+Use the installed plugin's bundled v0.6 CLI. Inspect its current `--help` for
+exact flags; use the public command families named below and include the
+explicit `run_id` in every stateful operation.
 
-```bash
-node .codex/orchestration/bin/codex-flow.mjs doctor
-node .codex/orchestration/bin/codex-flow.mjs task start --role coordinator
-```
+## Activate with disclosure
 
-Bind product authority and the exact baseline first. Create a plan that names
-dependencies, disjoint write paths, exclusive resources, and serial gates;
-validate it with `codex-flow plan validate` before launching mutating work.
-Bind the coordinator recipient lineage before launching executors. Render each
-task packet and pass its requested execution kind, environment, resolved
-`model`, and `reasoning_effort` as actual host creation arguments; merely
-mentioning them in a prompt does not configure the host.
+Questions and planning remain read-only. Before an actionable run writes
+operational state or creates a native task, disclose:
 
-For `local`, derive the packet's exact Git worktree root, full `HEAD`, and
-cleanliness. For `host-worktree`, derive the saved repository root, exact local
-starting branch and full branch tip, plus a distinct unclaimed executor branch.
-Do not expand or transcribe a short revision. `prepare` authenticates before
-journaling and `attempt` repeats the check immediately before dispatch.
+- the package/runtime source and exact bundle hash;
+- the `.git/codex-flow/v0.6.0/` Git-common state root;
+- the repository, baseline, host, coordinator lineage and generation;
+- the proposed workflow revision, path/resource/branch fences, and leases;
+- each task's saved project, visible-task or subagent surface, requested model
+  and reasoning effort, placement, and external host call; and
+- which facts are configured, requested, host-accepted, independently observed,
+  or unavailable.
 
-Probe the current session's actual creation tools and bind the result to a
-stable host-session marker. Journal each creation with `task operation prepare`,
-`preflight`, and `attempt`, then inspect and reconcile field-level evidence. If
-the requested kind or selector is unavailable, render the packet for a capable
-session or human. Do not silently substitute a subagent for a task thread or a
-task thread for a subagent. A serializer or host-control failure blocks retry in
-that session; record a new session preflight after restart. Use the smallest
-concurrency that shortens the critical path and never launch after the packet
-deadline.
+An explicit orchestration request permits progressive run activation, not
+unmentioned external actions. Use `run activate|status|resume|rebind|close|abandon`.
+There is no requirement for tracked `.codex/orchestration/`. Activation must
+snapshot the exact runtime under the exact-version Git-common namespace and
+fail closed on v0.5 tracked authority, runtime drift, a second active run, or
+conflicting retained fences.
 
-Create every project-backed visible task thread in the coordinator's same saved
-Codex App project by default, using that project's exact host ID. A different
-saved project requires an explicit target and reason. Projectless is an explicit
-exception only for a truly repositoryless task or an unsaved disposable fixture;
-record that reason in the operation before dispatch instead of silently losing
-project context. Hidden subagents explicitly inherit their host context. During
-reconciliation, distinguish an exact project ID independently observed by the
-host from the same target merely accepted by the create call. Accepted-only
-placement is partial evidence; any non-null mismatch stops before Git binding
-or objective release.
+## Persist one workflow
 
-For a host-created worktree, create the task with only the generated bootstrap
-prompt. Observe its actual path, reconcile, run `codex-flow git bind`, then
-generate and send `task operation release`. Binding persists its claim receipt
-before attaching the declared executor branch to a pristine detached baseline;
-an interrupted bind may resume only from that exact receipt, and any other named
-branch is a hard stop. Never guess a host path or send the objective before binding. For any
-project-backed executor, bind the observed operation to its exact canonical
-worktree before implementation begins.
-If policy rejects an observed object before binding, archive it and remove its
-unbound host worktree before recording the terminal rejected-before-release
-disposition. Do not leave a cleaned object permanently reported as unresolved,
-and do not use rejection to conceal an object whose path or host task remains.
-If an interrupted bind left a branch claim, let rejection settle it only after
-the exact-baseline, unowned, unchecked-out branch has no fetched remote-tracking
-evidence and its local ref can be proven absent; the claim must remain in the
-terminal receipt and any drift is a hard stop.
-Task creation fails closed at the configured cleanup threshold; reconcile
-completed Git ownership before launching another wave.
+Use `workflow create|revise|status|contract` to persist one content-addressed
+plan and generate contracts; never hand-author packets beside the plan. Name:
 
-Task-thread title must be independently reread. If the host used the delegation
-envelope, make one bounded title update, reread the exact requested title, and
-record that normalization. A subagent nickname is a host label, not title proof.
+- the primary outcome, nullable causal question, cheapest safe direct attempt,
+  and instrument role for every task;
+- dependencies, read/write ownership, exclusive resources, verification, and
+  a concrete baseline; and
+- the actual native surface, model, reasoning effort, and (for subagents)
+  `fork_turns`.
 
-Read the detailed references only as needed:
+A supporting-instrument task must immediately unlock the named direct attempt
+or pause/replan. After one instrument-only checkpoint, more supporting
+instrument work needs explicit authorization in a later immutable revision.
+Started or released contracts never change. Only completed accepted durable
+dispositions unblock dependencies.
 
-- [Parallel execution](../../templates/references/parallel-execution.md) for
-  any multi-executor plan.
-- [Communication loop](../../templates/references/communication-loop.md) when
-  configuring callbacks or monitors.
-- [Stop policy](../../templates/references/stop-policy.md) when authority,
-  cost, or shared resources are uncertain.
-- [Host operations](../../templates/references/host-operations.md) before task
-  creation or timeout recovery.
+Use visible Codex tasks for independently running or mutating executor work.
+Use `subagent prepare|created|complete|dispose|status` only for bounded read-only
+research/review. A subagent cannot use Ultra, own writes, or enter the visible
+task lifecycle.
 
-The coordinator owns task creation, monitors, callback integration, archiving,
-resource release, and post-merge reproof. Executors do not. After a visible task
-has reached its terminal disposition, its result is preserved, its callback is
-consumed, and owned Git/worktree cleanup is reconciled, archive it by default.
-Keep blocked or attention-needed tasks visible until their handoff is resolved.
+Read [Parallel execution](../../templates/references/parallel-execution.md)
+when the workflow has multiple lanes and [Stop policy](../../templates/references/stop-policy.md)
+when authority, cost, or instrumentation scope is uncertain.
 
-When `wait_threads` is callable, use it for bounded active-wave waiting instead
-of repeated thread reads. Carry returned cursors forward and inspect
-`codex-flow callback status` after every completion wake. The host wait result
-is transient notification only; the callback journal remains the sole
-integration authority. An interrupted wait or ended coordinator turn resumes
-from journal state, not from an assumed background waiter.
+## Create and release visible tasks
 
-Treat callback status as discovery, not observation. Leave a completion
-persisted while its exact branch and any independent review are evaluated;
-observe only the receipt selected for disposition. An observed receipt cannot
-be corrected by sequence supersession, so later work requires a fresh task
-operation and run.
+Before creation, read [Host operations](../../templates/references/host-operations.md).
+Use `task create prepare|attempt|reconcile|status` around exactly one native
+creation call. Bootstrap includes a cryptographic launch nonce and no objective.
+Record provisional `clientThreadId` and ready task ID separately; accept the
+ready identity only when its initial host-visible turn contains the exact nonce.
+Title or timing similarity never correlates identity. Ambiguity fails closed.
 
-For an urgent direct message, run `urgent observe` before acting. Process only
-the first logical observation, suppress host replays and additional sender
-attempts, then run `urgent consume` with the returned exact
-`consume_arguments` after the decision is handled. Its sender executor ID is
-not the receiver task ID.
+Reconcile project, requested/accepted/observed model and effort, and the actual
+worktree. Bind a pristine host-created worktree at the exact baseline before
+objective release. Then use `release prepare|reconcile|accept|status`: send the
+prepared prompt at most once and require the executor to accept the exact
+release, contract, runtime, and common directory before work begins. An
+ambiguous send never authorizes blind resend.
+
+## Monitor and close
+
+Use native waits only for liveness. After a wake, inspect the durable journal;
+task final text and wait status are never results. Routine completion must stay
+quiet and journal-only. A direct message or Steer is reserved for a persisted
+blocker, approval request, or high-risk drift with one identified attempt.
+
+Follow [Communication loop](../../templates/references/communication-loop.md)
+and hand terminal work to `codex-orchestration:integrate`. A normal run close
+requires reconciled terminal state. Abandonment releases the active slot but
+retains every unresolved fence and lease for later review.

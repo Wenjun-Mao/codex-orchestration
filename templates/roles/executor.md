@@ -1,27 +1,22 @@
 # Executor Role
 
-The executor owns exactly the objective, paths, baseline, dependencies, and
-verification named in its validated task packet. Other tasks may be editing the
-repository; preserve their changes and never manage siblings or coordinator
-lifecycle.
+The executor owns exactly one released generated task contract. It never
+coordinates siblings or broadens paths, resources, verification, or product
+authority.
 
-Before acting, validate the packet, confirm the requested execution kind, and
-reauthenticate its baseline. Stop for a true blocker, approval need, ownership
-collision, or high-risk scope/cost drift. Persist it with
-`codex-flow urgent persist`, prepare one delivery attempt, Steer exactly once
-only when dispatch is permitted by passing the returned `host_prompt` string
-unchanged, then reconcile with the operator-observed `--host-call-result`.
-Never send
-identity-less urgent content or reuse one attempt for another host call. Do not
-broaden write ownership to keep a run green.
+A launch-nonce bootstrap carries no objective. Perform no repository work
+until the full contract is sent and the release is accepted against this ready
+task, exact runtime/configuration, Git common directory, coordinator binding,
+and bound worktree.
 
-A host-worktree bootstrap is not an executor packet. Perform no repository work
-until the coordinator sends the released full packet after Git binding.
+Authenticate the baseline and preserve concurrent user and sibling work.
+Attempt the named cheapest safe direct action. A `supporting` instrument lane
+returns only the one checkpoint that enables its named dependent direct attempt
+or pause/replan; more instrumentation requires a later authorized workflow
+revision.
 
-When the bounded result is terminal, leave the branch clean or state the exact
-reason it is not, create one strict terminal receipt, and persist it through
-`codex-flow callback deliver`. Do not separately queue ordinary completion.
-The receipt is a signal, not an archive: never
-include secrets, raw logs, transcripts, user data, or application/account
-identifiers. Retries keep the same callback identity; corrections use explicit
-sequence supersession.
+Persist an urgent blocker, approval request, ownership collision, or high-risk
+drift before one identified direct interrupt attempt. Routine terminal
+completion never calls messaging or Steer. Derive Git outcome as `unchanged`,
+`clean-commit`, or `dirty-blocked`, allow null upstream, and persist exactly one
+terminal-receipt-v3 result in the journal. Task final text is liveness only.

@@ -101,14 +101,14 @@ coordinator, not a Codex thread-message queue.
 
 ### Bounded delegation
 
-Every executor receives an explicit objective, dependency position, path and
+Every executor receives a generated contract with an explicit objective, dependency position, path and
 shared-resource ownership, deadline, model request, verification scope, and
 terminal-result contract. A directed acyclic dependency graph identifies which
 tasks may run concurrently and which must wait; dependency cycles are invalid.
 
 ### Durable identity and evidence
 
-The authorizing plan, task packet, native creation attempt, ready task, release,
+The authorizing workflow revision, generated task contract, native creation attempt, ready task, release,
 bound recipient lineage, Git state, terminal result or urgent signal, and final
 disposition must form one traceable chain. A recipient authenticates the
 journaled identity against its current lineage before acting. Requested,
@@ -122,12 +122,22 @@ reasoning effort. Native Codex performs the actual model selection. The plugin
 records the request and available evidence; it does not claim a selector was
 observed when the host only accepted it.
 
+Separate, user-visible Codex tasks are the primary surface for independently
+running or mutating executor work. Native subagents are a distinct read-only
+supporting lane within the coordinator task; they do not acquire task branches,
+callbacks, integrations, archives, or cleanup state. Neither surface is a
+silent fallback for the other.
+
 ### Safe repository completion
 
 Executor results do not authorize integration merely because a task finishes.
 The coordinator authenticates the durable result and exact Git provenance,
 integrates serially, runs combined verification, records the disposition once,
 and removes state only through a reviewed cleanup contract.
+
+Task final text, UI status, branch names, and caller-supplied raw digests are
+not authority. Durable records are reloaded and cross-bound before a result can
+be dispositioned, verified, archived, or cleaned.
 
 ### Native-first evolution
 

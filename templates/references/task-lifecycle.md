@@ -1,38 +1,36 @@
 # Task Lifecycle
 
-1. **Admit:** bind objective, authority, baseline, and exclusions.
-2. **Map:** validate dependencies, write ownership, resources, and gates.
-3. **Launch:** persist a creation operation, record capability evidence for the
-   current host session, create a project-backed visible task in the
-   coordinator's same saved Codex App project by default, and create the exact
-   requested task kind before its deadline. Pass resolved `model` and
-   `reasoning_effort` as actual host
-   arguments, then inspect and reconcile field-level evidence. Normalize a
-   substituted task-thread title only through a bounded write and exact reread.
-   Persist placement intent before creation and distinguish host-observed
-   placement from an exact target merely accepted by the create call.
-   For a host-created worktree, create with the no-action bootstrap, observe and
-   bind its exact path, then release the full task packet.
-4. **Execute:** remain inside packet ownership and verify proportionally.
-5. **Signal:** persist and identify urgent conditions before direct Steer;
-   persist one ordinary terminal callback for the declared journal monitor.
-6. **Wait:** when the host exposes `wait_threads`, use it to suspend on the
-   active wave. Treat every wake as a prompt to inspect the repository journal,
-   never as completion or integration authority.
-7. **Integrate:** keep the receipt persisted while authenticating and reviewing
-   it, recheck status, observe only the selected exact result under the current
-   recipient generation, merge serially, reprove combined behavior, and record
-   the exact Git integration disposition. Corrections after observation are new
-   runs, never superseding sequences.
-8. **Close:** consume the callback exactly once, release resources, archive a
-   terminal visible task by default after its result and Git disposition are
-   preserved (while leaving blocked or attention-needed tasks visible), audit
-   Git state, and use
-   an explicit cleanup plan/apply pair for eligible task branches/worktrees. A
-   failed or partial apply requires a fresh audit and plan for what remains.
-   An observed task rejected before release is terminal only after host archival
-   and verified removal of its unbound worktree.
+1. **Activate:** snapshot the exact runtime under
+   `.git/codex-flow/v0.6.0/runtimes/<bundle-sha256>/`; bind repository/common
+   directory, host, coordinator lineage/generation, configuration/policy,
+   leases, and fences to an explicit run ID.
+2. **Plan:** persist a content-addressed workflow revision with dependency DAG,
+   ownership, models, primary outcomes, direct attempts, and instrument roles.
+   Generate every task contract from that revision.
+3. **Create:** for visible work, prepare one native call, bootstrap with the
+   launch nonce, and preserve provisional and ready identities separately. For
+   subagents, use the separate read-only lifecycle.
+4. **Bind and release:** reconcile selector evidence, bind the exact pristine
+   worktree/baseline, send the prepared objective once, and require exact
+   executor acceptance.
+5. **Execute:** stay inside the generated contract and attempt the named direct
+   outcome. Supporting instrumentation returns one bounded checkpoint only.
+6. **Signal:** routine completion persists one terminal-receipt-v3 journal
+   result without messaging; urgent blocker/approval/high-risk drift persists
+   before one identified interrupt attempt.
+7. **Select and dispose:** native waits and finals provide liveness only. The
+   coordinator authenticates and observes the exact journaled result, then
+   prepares its durable disposition.
+8. **Reconcile repository state:** integrate each accepted `clean-commit`
+   serially or record authoritative no-change. `dirty-blocked` remains fenced.
+9. **Verify and finalize:** run combined checks at the exact reconciled state,
+   reload the content-addressed PASS verification and integration/no-change
+   records, finalize the disposition, and consume the result internally exactly
+   once.
+10. **Archive and clean:** reconcile native archive only after the full proof
+    chain and managed-worktree reconciliation. Apply Git cleanup separately
+    from a reviewed exact-state plan, release leases/fences, then close the run.
+    Abandonment preserves unresolved fences.
 
-Thread creation, archiving, deletion, and host-specific role binding are
-capabilities, not assumptions. Record what the current session actually
-exposes.
+Every stateful command names the run explicitly. No phase infers the newest
+run, trusts a raw digest, or treats a task final as durable authority.

@@ -1,25 +1,30 @@
 ---
 name: index
-description: Route Codex Flow setup, delegation, parallel-task, callback, integration, and cleanup requests to the appropriate orchestration workflow. Use when the user asks to install or use Codex Flow, or when work may span separate Codex task threads. Do not invoke merely because an ordinary task has several local steps.
+description: Route Codex Flow questions, run-scoped orchestration, permanent adoption, result integration, and cleanup. Use when the user asks about or wants to use Codex Flow, or when work may benefit from multiple separate Codex tasks. Do not invoke merely because one task has several local steps.
 ---
 
 # Codex Orchestration Router
 
-Use orchestration only when separate task threads would materially improve
-throughput, isolation, or continuity and the user or repository permits
-delegation.
+Route by intent before inspecting or changing repository state.
 
-- For first-time repository setup or adoption, use
-  `codex-orchestration:setup` before delegated work.
-- For decomposition, task creation, parallel ownership, and monitoring, use
-  `codex-orchestration:coordinate`.
-- For a bounded executor task packet, use `codex-orchestration:execute`.
-- For callbacks, branch integration, and combined reproof, use
-  `codex-orchestration:integrate`.
-- For stale operational state, leases, or completed-task housekeeping, use
-  `codex-orchestration:cleanup`.
+- For a question, explanation, audit, or proposed plan, answer read-only. A
+  repository does not need `.codex/orchestration/` to discuss or plan Codex
+  Flow.
+- For an authorized actionable orchestration request, use
+  `codex-orchestration:coordinate`. It may progressively activate one v0.6 run
+  without tracked setup, after disclosing the exact runtime, Git-common state,
+  workflow revision, model routing, and proposed external task creation.
+- For permanent tracked team/headless policy, use
+  `codex-orchestration:setup` only when the user explicitly asks to adopt,
+  install, or retire Codex Flow.
+- Inside a released visible executor task, use
+  `codex-orchestration:execute`.
+- For durable results, dispositions, integration or no-change proof, combined
+  verification, and task archival, use `codex-orchestration:integrate`.
+- For retained fences, leases, worktrees, branches, or other completed-run
+  state, use `codex-orchestration:cleanup`.
 
-If `.codex/orchestration/` exists, run its pinned `codex-flow doctor` before
-delegated work. A missing host capability is a routing fact: render a task
-packet for a capable session instead of silently replacing a task thread with
-a subagent.
+Visible Codex tasks are the primary surface for independently running,
+heterogeneous-model work. Native subagents are a distinct, read-only supporting
+lane: never substitute one surface for the other or give a subagent task-branch,
+callback, integration, archive, or cleanup ownership.
