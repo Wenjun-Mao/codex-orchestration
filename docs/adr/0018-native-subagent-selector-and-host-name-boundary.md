@@ -58,4 +58,3 @@ valid content-addressed workflow for an unrelated naming reason.
   supplies stronger accepted or observed evidence.
 - Host-name derivation is deterministic and tested; it is never used as result,
   dependency, or integration identity.
-
