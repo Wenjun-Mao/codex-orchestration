@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://private.local/codex-flow/adoption-plan.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "kind",
+    "repository_root",
+    "runtime_context_hash",
+    "source_runtime",
+    "adoption",
+    "operations",
+    "plan_id"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "kind": { "const": "codex-flow-v06-adoption-plan" },
+    "repository_root": { "type": "string", "minLength": 1, "maxLength": 2048, "pattern": "^/" },
+    "runtime_context_hash": { "$ref": "#/$defs/digest" },
+    "source_runtime": { "$ref": "https://private.local/codex-flow/runtime-context.schema.json" },
+    "adoption": { "$ref": "https://private.local/codex-flow/adoption-manifest.schema.json" },
+    "operations": {
+      "type": "array",
+      "maxItems": 2052,
+      "items": { "$ref": "#/$defs/operation" }
+    },
+    "plan_id": { "$ref": "#/$defs/digest" }
+  },
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "nullableDigest": {
+      "oneOf": [
+        { "type": "null" },
+        { "$ref": "#/$defs/digest" }
+      ]
+    },
+    "operation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "action", "before_sha256", "after_sha256"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1, "maxLength": 1024 },
+        "action": { "enum": ["create", "update"] },
+        "before_sha256": { "$ref": "#/$defs/nullableDigest" },
+        "after_sha256": { "$ref": "#/$defs/digest" }
+      }
+    }
+  }
+}

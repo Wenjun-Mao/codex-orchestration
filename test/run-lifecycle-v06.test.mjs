@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import {
   acquireRuntimeContext,
   buildRuntimeContext,
+  loadRuntimeBundleSource,
   readRuntimeContext,
 } from "../lib/runtime-context.mjs";
 import {
@@ -23,7 +24,7 @@ import { createGitFixture, removeFixture } from "./helpers.mjs";
 const REVISION = "a".repeat(40);
 const INITIAL_TIME = "2026-08-29T12:00:00.000Z";
 
-function runtimeFor(root, runtimeId, {
+function runtimeFor(root, bundleSource, {
   hostId = "host-a",
   sessionId = "session-a",
   lineageId = "lineage-a",
@@ -32,11 +33,15 @@ function runtimeFor(root, runtimeId, {
 } = {}) {
   const commonDir = resolve(root, ".git");
   return buildRuntimeContext({
-    runtimeId,
+    bundle: bundleSource.bundle,
     createdAt: INITIAL_TIME,
     config: {
       config_id: "runtime-config-v1",
       snapshot: { mode: "ephemeral", selectors: { model: "gpt-5.6-terra" } },
+    },
+    policy: {
+      policy_id: "runtime-policy-v1",
+      snapshot: { callbacks: "journaled", urgent: "direct" },
     },
     repository: {
       common_dir: commonDir,
@@ -56,6 +61,26 @@ function runtimeFor(root, runtimeId, {
   });
 }
 
+async function runtimeBundleFor(root, suffix) {
+  const packageRoot = resolve(root, `plugin-source-${suffix}`);
+  const files = new Map([
+    ["bin/codex-flow.mjs", "#!/usr/bin/env node\n"],
+    ["lib/runtime.mjs", "export const runtime = true;\n"],
+    ["schemas/runtime.schema.json", "{}\n"],
+    ["templates/roles/coordinator.md", "Coordinator runtime role.\n"],
+    ["templates/references/lifecycle.md", "Runtime lifecycle.\n"],
+  ]);
+  for (const [path, contents] of files) {
+    const target = resolve(packageRoot, path);
+    await mkdir(resolve(target, ".."), { recursive: true });
+    await writeFile(target, contents, "utf8");
+  }
+  return {
+    packageRoot,
+    bundleSource: await loadRuntimeBundleSource({ packageRoot }),
+  };
+}
+
 async function seedV05Audit(commonDir) {
   const path = join(commonDir, "codex-flow", "v0.5.1", "audit.json");
   await mkdir(resolve(path, ".."), { recursive: true });
@@ -72,16 +97,32 @@ function fullPlan(suffix) {
   });
 }
 
+function workflowBinding(suffix) {
+  return {
+    workflowPlanId: `workflow-${suffix}`,
+    workflowRevisionDigest: "c".repeat(64),
+  };
+}
+
 test("v0.6 runtime snapshots are immutable while one active run resumes and rebinds", async (t) => {
   const root = await createGitFixture("codex-flow-v06-run-");
   t.after(() => removeFixture(root));
   const commonDir = resolve(root, ".git");
   const v05 = await seedV05Audit(commonDir);
-  const runtime = runtimeFor(root, "runtime-one");
+  const { bundleSource } = await runtimeBundleFor(root, "run");
+  const runtime = runtimeFor(root, bundleSource);
 
-  const firstAcquisition = await acquireRuntimeContext({ gitCommonDirectory: commonDir, context: runtime });
+  const firstAcquisition = await acquireRuntimeContext({
+    gitCommonDirectory: commonDir,
+    context: runtime,
+    bundleSource,
+  });
   assert.equal(firstAcquisition.status, "created");
-  const repeatedAcquisition = await acquireRuntimeContext({ gitCommonDirectory: commonDir, context: runtime });
+  const repeatedAcquisition = await acquireRuntimeContext({
+    gitCommonDirectory: commonDir,
+    context: runtime,
+    bundleSource,
+  });
   assert.equal(repeatedAcquisition.status, "existing");
   await assert.rejects(
     acquireRuntimeContext({
@@ -93,19 +134,42 @@ test("v0.6 runtime snapshots are immutable while one active run resumes and rebi
           snapshot: { mode: "different" },
         },
       },
+      bundleSource,
     }),
-    /Existing state does not match/,
+    /content-addressed context/,
   );
 
   const plan = fullPlan("runtime");
   const admitted = await admitRun({
     gitCommonDirectory: commonDir,
     runId: "run-one",
-    runtimeId: "runtime-one",
+    runtimeId: runtime.runtime_id,
+    ...workflowBinding("runtime"),
     plan,
     admittedAt: "2026-08-29T12:01:00.000Z",
   });
   assert.equal(admitted.status, "admitted");
+  const repeatedAdmission = await admitRun({
+    gitCommonDirectory: commonDir,
+    runId: "run-one",
+    runtimeId: runtime.runtime_id,
+    ...workflowBinding("runtime"),
+    plan,
+    admittedAt: "2026-08-29T12:01:00.000Z",
+  });
+  assert.equal(repeatedAdmission.status, "already-active");
+  await assert.rejects(
+    admitRun({
+      gitCommonDirectory: commonDir,
+      runId: "run-one",
+      runtimeId: runtime.runtime_id,
+      workflowPlanId: "workflow-runtime",
+      workflowRevisionDigest: "d".repeat(64),
+      plan,
+      admittedAt: "2026-08-29T12:01:00.000Z",
+    }),
+    /does not match its immutable activation/,
+  );
   const resumed = await resumeRun({
     gitCommonDirectory: commonDir,
     runId: "run-one",
@@ -115,13 +179,15 @@ test("v0.6 runtime snapshots are immutable while one active run resumes and rebi
 
   await acquireRuntimeContext({
     gitCommonDirectory: commonDir,
-    context: runtimeFor(root, "runtime-two"),
+    context: runtime,
+    bundleSource,
   });
   await assert.rejects(
     admitRun({
       gitCommonDirectory: commonDir,
       runId: "run-two",
-      runtimeId: "runtime-two",
+      runtimeId: runtime.runtime_id,
+      ...workflowBinding("other"),
       plan: fullPlan("other"),
       admittedAt: "2026-08-29T12:02:00.000Z",
     }),
@@ -139,6 +205,8 @@ test("v0.6 runtime snapshots are immutable while one active run resumes and rebi
     reboundAt: "2026-08-29T12:03:00.000Z",
   });
   assert.equal(rebound.run.binding.generation, 2);
+  assert.equal(rebound.run.workflow_plan_id, "workflow-runtime");
+  assert.equal(rebound.run.workflow_revision_digest, "c".repeat(64));
   await assert.rejects(
     resumeRun({
       gitCommonDirectory: commonDir,
@@ -172,15 +240,19 @@ test("abandoned runs retain all fence types and permit only a disjoint next plan
   t.after(() => removeFixture(root));
   const commonDir = resolve(root, ".git");
   const v05 = await seedV05Audit(commonDir);
+  const { bundleSource } = await runtimeBundleFor(root, "fence");
+  const runtime = runtimeFor(root, bundleSource);
   await acquireRuntimeContext({
     gitCommonDirectory: commonDir,
-    context: runtimeFor(root, "runtime-abandoned"),
+    context: runtime,
+    bundleSource,
   });
   const abandonedPlan = fullPlan("claimed");
   const admitted = await admitRun({
     gitCommonDirectory: commonDir,
     runId: "run-abandoned",
-    runtimeId: "runtime-abandoned",
+    runtimeId: runtime.runtime_id,
+    ...workflowBinding("claimed"),
     plan: abandonedPlan,
     admittedAt: "2026-08-29T13:00:00.000Z",
   });
@@ -197,15 +269,12 @@ test("abandoned runs retain all fence types and permit only a disjoint next plan
     unresolved_fences: abandonedPlan,
   }]);
 
-  await acquireRuntimeContext({
-    gitCommonDirectory: commonDir,
-    context: runtimeFor(root, "runtime-overlap"),
-  });
   await assert.rejects(
     admitRun({
       gitCommonDirectory: commonDir,
       runId: "run-overlap",
-      runtimeId: "runtime-overlap",
+      runtimeId: runtime.runtime_id,
+      ...workflowBinding("overlap"),
       plan: buildFencePlan({
         pathFences: ["lib/claimed/child"],
         resourceFences: [],
@@ -220,14 +289,11 @@ test("abandoned runs retain all fence types and permit only a disjoint next plan
   const disjointPlan = fullPlan("disjoint");
   const conflicts = fencePlanConflicts(abandonedPlan, disjointPlan);
   assert.deepEqual(conflicts, []);
-  await acquireRuntimeContext({
-    gitCommonDirectory: commonDir,
-    context: runtimeFor(root, "runtime-disjoint"),
-  });
   const next = await admitRun({
     gitCommonDirectory: commonDir,
     runId: "run-disjoint",
-    runtimeId: "runtime-disjoint",
+    runtimeId: runtime.runtime_id,
+    ...workflowBinding("disjoint"),
     plan: disjointPlan,
     admittedAt: "2026-08-29T13:03:00.000Z",
   });
@@ -260,12 +326,38 @@ test("fence conflict detection covers paths, resources, branches, and operations
   );
 });
 
-test("runtime reads retain the exact persisted snapshot", async (t) => {
+test("runtime reads retain the exact bundle after the plugin source disappears", async (t) => {
   const root = await createGitFixture("codex-flow-v06-runtime-read-");
   t.after(() => removeFixture(root));
   const commonDir = resolve(root, ".git");
-  const runtime = runtimeFor(root, "runtime-retained");
-  await acquireRuntimeContext({ gitCommonDirectory: commonDir, context: runtime });
-  const read = await readRuntimeContext({ gitCommonDirectory: commonDir, runtimeId: "runtime-retained" });
+  const { packageRoot, bundleSource } = await runtimeBundleFor(root, "retained");
+  const runtime = runtimeFor(root, bundleSource);
+  const acquired = await acquireRuntimeContext({
+    gitCommonDirectory: commonDir,
+    context: runtime,
+    bundleSource,
+  });
+  assert.match(acquired.bundle_root, /codex-flow\/v0\.6\.0\/runtimes\/[0-9a-f]{64}\/files$/);
+  await stat(resolve(acquired.bundle_root, "bin", "codex-flow.mjs"));
+  await rm(packageRoot, { recursive: true, force: true });
+  const read = await readRuntimeContext({
+    gitCommonDirectory: commonDir,
+    runtimeId: runtime.runtime_id,
+  });
   assert.deepEqual(read.context, runtime);
+  const admitted = await admitRun({
+    gitCommonDirectory: commonDir,
+    runId: "run-after-plugin-removal",
+    runtimeId: runtime.runtime_id,
+    ...workflowBinding("plugin-removed"),
+    plan: fullPlan("plugin-removed"),
+    admittedAt: "2026-08-29T15:00:00.000Z",
+  });
+  assert.equal(admitted.run.binding.bundle_hash, runtime.bundle.bundle_sha256);
+  assert.equal(admitted.run.binding.policy_hash.length, 64);
+  await writeFile(resolve(acquired.bundle_root, "bin", "codex-flow.mjs"), "tampered\n", "utf8");
+  await assert.rejects(
+    readRuntimeContext({ gitCommonDirectory: commonDir, runtimeId: runtime.runtime_id }),
+    /file hash does not match/,
+  );
 });

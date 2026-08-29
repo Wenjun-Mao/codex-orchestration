@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://private.local/codex-flow/runtime-context.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "kind",
+    "runtime_id",
+    "created_at",
+    "bundle",
+    "config",
+    "policy",
+    "repository",
+    "host",
+    "lineage"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "kind": { "const": "codex-flow-v06-runtime-context" },
+    "runtime_id": { "$ref": "#/$defs/digest" },
+    "created_at": { "$ref": "#/$defs/timestamp" },
+    "bundle": { "$ref": "https://private.local/codex-flow/runtime-bundle.schema.json" },
+    "config": { "$ref": "#/$defs/config" },
+    "policy": { "$ref": "#/$defs/policy" },
+    "repository": { "$ref": "#/$defs/repository" },
+    "host": { "$ref": "#/$defs/host" },
+    "lineage": { "$ref": "#/$defs/lineage" }
+  },
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "safeId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9_.-]+$"
+    },
+    "timestamp": { "type": "string", "maxLength": 64, "format": "date-time" },
+    "snapshot": { "type": "object", "maxProperties": 256 },
+    "config": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["config_id", "snapshot"],
+      "properties": {
+        "config_id": { "$ref": "#/$defs/safeId" },
+        "snapshot": { "$ref": "#/$defs/snapshot" }
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["policy_id", "snapshot"],
+      "properties": {
+        "policy_id": { "$ref": "#/$defs/safeId" },
+        "snapshot": { "$ref": "#/$defs/snapshot" }
+      }
+    },
+    "repository": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["common_dir", "root", "branch", "revision"],
+      "properties": {
+        "common_dir": { "type": "string", "minLength": 1, "maxLength": 2048, "pattern": "^/" },
+        "root": { "type": "string", "minLength": 1, "maxLength": 2048, "pattern": "^/" },
+        "branch": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "revision": { "type": "string", "pattern": "^[0-9a-f]{40,64}$" }
+      }
+    },
+    "host": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["host_id", "session_id"],
+      "properties": {
+        "host_id": { "$ref": "#/$defs/safeId" },
+        "session_id": { "$ref": "#/$defs/safeId" }
+      }
+    },
+    "lineage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["lineage_id", "thread_id", "generation"],
+      "properties": {
+        "lineage_id": { "$ref": "#/$defs/safeId" },
+        "thread_id": { "$ref": "#/$defs/safeId" },
+        "generation": { "type": "integer", "minimum": 1, "maximum": 2147483647 }
+      }
+    }
+  }
+}

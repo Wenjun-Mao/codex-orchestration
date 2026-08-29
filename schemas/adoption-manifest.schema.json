@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://private.local/codex-flow/adoption-manifest.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "kind",
+    "adopted_at",
+    "bundle",
+    "config",
+    "policy",
+    "reviewed_instructions"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "kind": { "const": "codex-flow-v06-adoption" },
+    "adopted_at": { "type": "string", "maxLength": 64, "format": "date-time" },
+    "bundle": { "$ref": "https://private.local/codex-flow/runtime-bundle.schema.json" },
+    "config": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["config_id", "snapshot"],
+      "properties": {
+        "config_id": { "$ref": "#/$defs/safeId" },
+        "snapshot": { "$ref": "#/$defs/snapshot" }
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["policy_id", "snapshot"],
+      "properties": {
+        "policy_id": { "$ref": "#/$defs/safeId" },
+        "snapshot": { "$ref": "#/$defs/snapshot" }
+      }
+    },
+    "reviewed_instructions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reviewed_by", "reviewed_at", "text"],
+      "properties": {
+        "reviewed_by": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "reviewed_at": { "type": "string", "maxLength": 64, "format": "date-time" },
+        "text": { "type": "string", "minLength": 1, "maxLength": 16384 }
+      }
+    }
+  },
+  "$defs": {
+    "safeId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9_.-]+$"
+    },
+    "snapshot": { "type": "object", "maxProperties": 256 }
+  }
+}

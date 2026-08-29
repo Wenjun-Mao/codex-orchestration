@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://private.local/codex-flow/adoption-retirement-plan.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "kind",
+    "repository_root",
+    "adoption_hash",
+    "retired_at",
+    "reason",
+    "operations",
+    "plan_id"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "kind": { "const": "codex-flow-v06-adoption-retirement-plan" },
+    "repository_root": { "type": "string", "minLength": 1, "maxLength": 2048, "pattern": "^/" },
+    "adoption_hash": { "$ref": "#/$defs/digest" },
+    "retired_at": { "type": "string", "maxLength": 64, "format": "date-time" },
+    "reason": { "type": "string", "minLength": 1, "maxLength": 512 },
+    "operations": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 2052,
+      "items": { "$ref": "#/$defs/operation" }
+    },
+    "plan_id": { "$ref": "#/$defs/digest" }
+  },
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "operation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "action", "before_sha256", "after_sha256"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1, "maxLength": 1024 },
+        "action": { "const": "delete" },
+        "before_sha256": { "$ref": "#/$defs/digest" },
+        "after_sha256": { "type": "null" }
+      }
+    }
+  }
+}
