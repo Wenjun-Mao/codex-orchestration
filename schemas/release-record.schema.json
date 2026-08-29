@@ -4,29 +4,38 @@
   "type": "object",
   "additionalProperties": false,
   "required": [
-    "schema_version", "kind", "release_id", "run_id", "plan_id",
-    "revision_id", "task_id", "task_contract_digest", "operation_id",
-    "ready_thread_id", "runtime_digest", "config_digest", "repository_id",
-    "common_dir", "prompt_digest", "prompt_length", "delivery",
-    "acceptance", "prepared_at", "updated_at"
+    "schema_version", "kind", "release_id", "run_id",
+    "runtime_context_digest", "configuration_digest", "repository_id",
+    "common_dir", "coordinator_binding", "plan_id", "revision_digest",
+    "task_id", "task_digest", "contract_id", "operation_id",
+    "ready_thread_id", "task_contract", "prompt_digest", "prompt_length",
+    "delivery", "acceptance", "prepared_at", "updated_at"
   ],
   "properties": {
     "schema_version": { "const": 1 },
     "kind": { "const": "codex-flow-v06-task-release" },
-    "release_id": { "$ref": "#/$defs/safeId" },
+    "release_id": {
+      "type": "string",
+      "pattern": "^release-v1-[0-9a-f]{64}$"
+    },
     "run_id": { "$ref": "#/$defs/safeId" },
-    "plan_id": { "$ref": "#/$defs/safeId" },
-    "revision_id": { "$ref": "#/$defs/safeId" },
-    "task_id": { "$ref": "#/$defs/safeId" },
-    "task_contract_digest": { "$ref": "#/$defs/digest" },
-    "operation_id": { "$ref": "#/$defs/safeId" },
-    "ready_thread_id": { "$ref": "#/$defs/safeId" },
-    "runtime_digest": { "$ref": "#/$defs/digest" },
-    "config_digest": { "$ref": "#/$defs/digest" },
+    "runtime_context_digest": { "$ref": "#/$defs/digest" },
+    "configuration_digest": { "$ref": "#/$defs/digest" },
     "repository_id": { "$ref": "#/$defs/safeId" },
-    "common_dir": { "type": "string", "minLength": 1, "maxLength": 1024 },
+    "common_dir": { "$ref": "#/$defs/absolutePath" },
+    "coordinator_binding": { "$ref": "#/$defs/coordinatorBinding" },
+    "plan_id": { "$ref": "#/$defs/safeId" },
+    "revision_digest": { "$ref": "#/$defs/digest" },
+    "task_id": { "$ref": "#/$defs/safeId" },
+    "task_digest": { "$ref": "#/$defs/digest" },
+    "contract_id": { "$ref": "#/$defs/digest" },
+    "operation_id": { "$ref": "#/$defs/safeId" },
+    "ready_thread_id": { "$ref": "#/$defs/safeId256" },
+    "task_contract": {
+      "$ref": "https://private.local/codex-flow/generated-task-contract.schema.json"
+    },
     "prompt_digest": { "$ref": "#/$defs/digest" },
-    "prompt_length": { "type": "integer", "minimum": 1, "maximum": 65536 },
+    "prompt_length": { "type": "integer", "minimum": 1, "maximum": 524288 },
     "delivery": {
       "oneOf": [
         { "type": "null" },
@@ -48,14 +57,14 @@
           "type": "object",
           "additionalProperties": false,
           "required": [
-            "executor_thread_id", "task_contract_digest", "runtime_digest",
+            "ready_thread_id", "contract_id", "runtime_context_digest",
             "common_dir", "accepted_at"
           ],
           "properties": {
-            "executor_thread_id": { "$ref": "#/$defs/safeId" },
-            "task_contract_digest": { "$ref": "#/$defs/digest" },
-            "runtime_digest": { "$ref": "#/$defs/digest" },
-            "common_dir": { "type": "string", "minLength": 1, "maxLength": 1024 },
+            "ready_thread_id": { "$ref": "#/$defs/safeId256" },
+            "contract_id": { "$ref": "#/$defs/digest" },
+            "runtime_context_digest": { "$ref": "#/$defs/digest" },
+            "common_dir": { "$ref": "#/$defs/absolutePath" },
             "accepted_at": { "type": "string", "format": "date-time" }
           }
         }
@@ -71,9 +80,32 @@
       "maxLength": 128,
       "pattern": "^[A-Za-z0-9_.-]+$"
     },
+    "safeId256": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9_.-]+$"
+    },
     "digest": {
       "type": "string",
       "pattern": "^[0-9a-f]{64}$"
+    },
+    "absolutePath": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2048,
+      "pattern": "^/"
+    },
+    "coordinatorBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["lineage_id", "thread_id", "generation", "binding_digest"],
+      "properties": {
+        "lineage_id": { "$ref": "#/$defs/safeId" },
+        "thread_id": { "$ref": "#/$defs/safeId256" },
+        "generation": { "type": "integer", "minimum": 1, "maximum": 2147483647 },
+        "binding_digest": { "$ref": "#/$defs/digest" }
+      }
     }
   }
 }
