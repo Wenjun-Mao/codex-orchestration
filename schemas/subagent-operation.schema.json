@@ -4,7 +4,7 @@
   "type": "object",
   "additionalProperties": false,
   "required": [
-    "schema_version", "kind", "operation_id", "task_contract_id", "run_id",
+    "schema_version", "kind", "operation_id", "contract_id", "run_id",
     "runtime_context_digest", "configuration_digest", "repository_id", "common_dir",
     "coordinator_binding", "plan_id", "revision_digest", "task_id", "task_digest",
     "mode", "model", "reasoning_effort", "fork_turns", "prompt_digest",
@@ -15,7 +15,7 @@
     "schema_version": { "const": 1 },
     "kind": { "const": "codex-flow-native-subagent-operation" },
     "operation_id": { "type": "string", "pattern": "^subagent-operation-v1-[a-f0-9]{64}$" },
-    "task_contract_id": { "$ref": "#/$defs/digest" },
+    "contract_id": { "$ref": "#/$defs/digest" },
     "run_id": { "$ref": "#/$defs/safeId" },
     "runtime_context_digest": { "$ref": "#/$defs/digest" },
     "configuration_digest": { "$ref": "#/$defs/digest" },

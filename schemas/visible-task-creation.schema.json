@@ -7,7 +7,7 @@
     "schema_version", "kind", "operation_id", "run_id",
     "runtime_context_digest", "configuration_digest", "repository_id",
     "common_dir", "coordinator_binding", "plan_id", "revision_digest",
-    "task_id", "task_digest", "task_contract_id", "task_title",
+    "task_id", "task_digest", "contract_id", "task_title",
     "launch_nonce", "bootstrap_digest", "selector_evidence", "status",
     "attempt", "provisional", "ready", "resolution", "prepared_at", "updated_at"
   ],
@@ -28,7 +28,7 @@
     "revision_digest": { "$ref": "#/$defs/digest" },
     "task_id": { "$ref": "#/$defs/safeId" },
     "task_digest": { "$ref": "#/$defs/digest" },
-    "task_contract_id": { "$ref": "#/$defs/digest" },
+    "contract_id": { "$ref": "#/$defs/digest" },
     "task_title": { "type": "string", "minLength": 1, "maxLength": 160 },
     "launch_nonce": { "$ref": "#/$defs/digest" },
     "bootstrap_digest": { "$ref": "#/$defs/digest" },
