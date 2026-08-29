@@ -17,7 +17,7 @@ import { createGitFixture, removeFixture } from "./helpers.mjs";
 
 const digest = (character) => character.repeat(64);
 
-function receipt() {
+function receipt(commonDir) {
   const recipient = {
     lineage_id: "callback-lineage-v06",
     thread_id: "callback-coordinator-v06",
@@ -29,14 +29,17 @@ function receipt() {
       ...recipient,
       binding_digest: recipientBindingDigest(recipient),
     },
-    executor_id: "callback-executor-v06",
+    executor_thread_id: "callback-executor-v06",
     run_id: "callback-run-v06",
-    runtime_digest: digest("b"),
-    config_digest: digest("c"),
+    runtime_context_digest: digest("b"),
+    configuration_digest: digest("c"),
+    repository_id: "callback-repository-v06",
+    common_dir: commonDir,
     plan_id: "callback-plan-v06",
-    revision_id: "callback-revision-v06",
+    revision_digest: digest("e"),
     task_id: "callback-task-v06",
-    task_contract_digest: digest("d"),
+    task_digest: digest("d"),
+    contract_id: digest("f"),
     operation_id: "callback-operation-v06",
     release_id: "callback-release-v06",
     classification: "PASS",
@@ -76,7 +79,7 @@ test("v0.6 callback is quiet, durable, and consumable only by a disposition", as
   };
   try {
     await bindRecipient({ stateRoot, recipient });
-    const payload = receipt();
+    const payload = receipt(resolve(root, ".git"));
     const delivered = await deliverCallbackV06({
       stateRoot,
       receipt: payload,
@@ -99,7 +102,7 @@ test("v0.6 callback is quiet, durable, and consumable only by a disposition", as
         stateRoot,
         callbackId: delivered.callback_id,
         recipient,
-        executorId: payload.executor_id,
+        executorThreadId: payload.executor_thread_id,
         dispositionId: "disposition-v06",
       }),
       /must be observed/,
@@ -114,12 +117,15 @@ test("v0.6 callback is quiet, durable, and consumable only by a disposition", as
         stateRoot,
         callbackId: delivered.callback_id,
         recipient,
-        executorId: payload.executor_id,
+        executorThreadId: payload.executor_thread_id,
         dispositionId: "disposition-v06",
       }),
       /authoritative persisted disposition/,
     );
-    assert.equal((await callbackStatusV06({ stateRoot, runId: payload.run_id })).pending.length, 1);
+    const status = await callbackStatusV06({ stateRoot, runId: payload.run_id });
+    assert.equal(status.pending.length, 1);
+    assert.equal(status.pending[0].executor_thread_id, payload.executor_thread_id);
+    assert.equal(Object.hasOwn(status.pending[0], "executor_id"), false);
   } finally {
     await removeFixture(root);
   }
@@ -138,7 +144,11 @@ test("v0.6 callback rejects cross-run delivery", async () => {
       },
     });
     await assert.rejects(
-      deliverCallbackV06({ stateRoot, receipt: receipt(), expectedRunId: "different-run" }),
+      deliverCallbackV06({
+        stateRoot,
+        receipt: receipt(resolve(root, ".git")),
+        expectedRunId: "different-run",
+      }),
       /does not match the active run/,
     );
   } finally {
