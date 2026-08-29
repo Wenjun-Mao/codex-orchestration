@@ -31,7 +31,11 @@ Before changing anything:
 - Package, plugin, and runtime version: `0.5.1`
 - Worktree was clean before this handoff was added and after the final Git
   cleanup.
-- The repository has no Git remote or upstream.
+- Canonical public remote:
+  `https://github.com/Wenjun-Mao/codex-orchestration.git`
+- Local `main` tracks `origin/main`. Release tag `v0.5.1` identifies the exact
+  accepted source tip above; later handoff and governance commits are not part
+  of that accepted package.
 - Local `main` was fast-forwarded through the accepted source and handoff-only
   commits. It is the sole local branch and the sole registered worktree is this
   repository path.
@@ -42,8 +46,9 @@ Before changing anything:
   fixture root was confirmed absent during the final cleanup audit.
 
 The handoff-only commits change no packaged path. Resolve the current `HEAD`
-after opening this repository; the accepted package bytes are those at
-`d03cabf` plus any later source-only handoff commits.
+after opening this repository; accepted v0.5.1 package bytes are exactly those
+at `d03cabf`. Later governance changes on `main` must not be repackaged or
+installed under the accepted version.
 
 ## Private distribution state
 
@@ -270,26 +275,29 @@ discusses and implements accepted generic corrections, then returns a new exact
 authority for another pilot. Adoption remains explicit per consumer; a pilot
 PASS does not automatically replace active runtimes elsewhere.
 
+## Resolved transition decisions
+
+1. **Source visibility and release protection.** The public GitHub remote is
+   the canonical shared history, while the personal marketplace remains the
+   supported private distribution channel. Immutable annotated release tags
+   bind exact accepted source tips. ADR 0012 records the full decision.
+
 ## Open decisions and useful next work
 
-1. **Remote and release protection.** Branch/worktree cleanup is complete, but
-   no remote currently protects this repository history. Decide whether to add
-   a private remote and tags for accepted private releases; do not invent or
-   publish either automatically.
-2. **Self-hosting.** This repository has no `AGENTS.md` and is not itself pinned
+1. **Self-hosting.** This repository has no `AGENTS.md` and is not itself pinned
    as a Codex Flow target. Decide whether the package source should self-host
    its own runtime or remain the canonical external authority. Do not bootstrap
    it automatically; avoid a circular or duplicate authority model.
-3. **wait_threads multi-wave field proof.** v0.4.3 guidance is source-tested,
+2. **wait_threads multi-wave field proof.** v0.4.3 guidance is source-tested,
    and later single-task pilots used the waiter, but a natural path-disjoint
    multi-task wave has not yet provided the intended held-out proof. Use the
    next genuine parallel wave rather than manufacturing work.
-4. **UK Dev adoption.** v0.5.1 is suitable for newly launched UK Dev executors,
+3. **UK Dev adoption.** v0.5.1 is suitable for newly launched UK Dev executors,
    but merging its disposable pilot or updating UK Dev `main` is a separate
    explicit choice owned with the consultant task.
-5. **Future versioning.** Keep exact-release state isolation and the breaking
+4. **Future versioning.** Keep exact-release state isolation and the breaking
    pre-stable policy. Revisit migration/compatibility only if the user later
-   declares a stable public compatibility boundary.
+   declares a stable supported compatibility boundary.
 
 ## Verification commands
 

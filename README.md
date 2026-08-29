@@ -1,7 +1,10 @@
 # Codex Orchestration
 
-Private, repository-portable coordination for Codex work. The project has two
-deliberately separate layers:
+Codex Orchestration is publicly readable source for privately distributed,
+repository-portable Codex coordination. Public visibility does not grant an
+open-source license: the source and package remain `UNLICENSED`.
+
+The project has two deliberately separate layers:
 
 - `codex-orchestration` is a Codex plugin that teaches coordinator, executor,
   integration, and cleanup decisions through progressively loaded skills.
@@ -28,11 +31,12 @@ and lifecycle semantics.
 
 ## Pre-release compatibility policy
 
-This private tool is intentionally allowed to break. Until the user explicitly
-declares a stable compatibility boundary, a better contract replaces the old
-one outright: no compatibility readers, migration branches, deprecated aliases,
-or dual execution paths. Repositories preserve any evidence they still need,
-retire old operational state explicitly, and initialize the current version.
+This privately distributed tool is intentionally allowed to break. Until the
+user explicitly declares a stable compatibility boundary, a better contract
+replaces the old one outright: no compatibility readers, migration branches,
+deprecated aliases, or dual execution paths. Repositories preserve any
+evidence they still need, retire old operational state explicitly, and
+initialize the current version.
 
 Replacing any earlier pinned runtime is a fresh installation on a dedicated
 branch: retain the old `.git/codex-flow/` evidence, explicitly remove the old
@@ -41,7 +45,14 @@ then plan and apply the selected release. New operational records live only in
 that exact release's namespace, currently `.git/codex-flow/v0.5.1/`; the
 current release neither reads nor deletes retained namespaces.
 
-## Private distribution
+## Source and private distribution
+
+This public GitHub repository is the editing authority, not a public package
+channel. Immutable annotated `v<semver>` tags identify exact source commits
+used for accepted private packages. A tag does not publish or refresh the
+personal-marketplace plugin, alter installed caches, or upgrade a pinned
+consumer runtime. See
+[ADR 0012](docs/adr/0012-public-source-private-distribution-and-release-tags.md).
 
 Install `codex-orchestration` from the personal Codex plugin marketplace. The
 installed plugin version is the accepted package authority: its `setup` skill
@@ -393,6 +404,10 @@ defines urgent-signal and delivery-attempt identity. Plugin-first package
 authority is defined by [ADR 0010](docs/adr/0010-plugin-first-package-authority.md).
 [Host project placement and pre-release rejection](docs/adr/0011-host-project-placement-and-pre-release-rejection.md)
 defines the v0.5.1 placement-evidence and terminal-bootstrap contract.
+[Public source, private distribution, and release
+tags](docs/adr/0012-public-source-private-distribution-and-release-tags.md)
+defines repository visibility, licensing, distribution, and immutable release
+identity.
 The current covered boundary is listed in
 [v0.5.1 orchestration coverage](docs/coverage-v0.5.1.md), with the accepted
 [UK Dev exact-state replay](docs/field-tests/2026-08-28-uk-dev-v0.5.1-exact-state-replay.md).
