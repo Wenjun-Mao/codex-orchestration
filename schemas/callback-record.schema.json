@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://private.local/codex-flow/callback-record.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "kind", "callback_id", "receipt", "delivery_recipient",
+    "state", "observed_by", "consumed_by", "disposition_id", "lifecycle"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "kind": { "const": "codex-flow-v06-terminal-callback" },
+    "callback_id": { "type": "string", "pattern": "^terminal-v3-[0-9a-f]{64}$" },
+    "receipt": { "$ref": "terminal-receipt-v3.schema.json" },
+    "delivery_recipient": { "$ref": "#/$defs/recipient" },
+    "state": { "enum": ["persisted", "observed", "consumed"] },
+    "observed_by": { "$ref": "#/$defs/nullableRecipient" },
+    "consumed_by": { "$ref": "#/$defs/nullableRecipient" },
+    "disposition_id": {
+      "oneOf": [
+        { "type": "null" },
+        { "$ref": "#/$defs/safeId" }
+      ]
+    },
+    "lifecycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["persisted_at", "observed_at", "consumed_at"],
+      "properties": {
+        "persisted_at": { "type": "string", "format": "date-time" },
+        "observed_at": { "$ref": "#/$defs/nullableTimestamp" },
+        "consumed_at": { "$ref": "#/$defs/nullableTimestamp" }
+      }
+    }
+  },
+  "$defs": {
+    "safeId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9_.-]+$"
+    },
+    "recipient": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["lineage_id", "thread_id", "generation"],
+      "properties": {
+        "lineage_id": { "$ref": "#/$defs/safeId" },
+        "thread_id": { "$ref": "#/$defs/safeId" },
+        "generation": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "nullableRecipient": {
+      "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/recipient" }]
+    },
+    "nullableTimestamp": {
+      "oneOf": [{ "type": "null" }, { "type": "string", "format": "date-time" }]
+    }
+  }
+}

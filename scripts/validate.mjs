@@ -90,6 +90,12 @@ for (const name of [
   "git-ownership",
   "git-integration",
   "git-cleanup-plan",
+  "release-record",
+  "terminal-receipt-v3",
+  "callback-record",
+  "task-disposition",
+  "integration-record",
+  "archive-operation",
 ]) {
   const schema = JSON.parse(await readFile(resolve(root, "schemas", `${name}.schema.json`), "utf8"));
   schemas.set(name, schema);

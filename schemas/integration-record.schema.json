@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://private.local/codex-flow/integration-record.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "kind", "integration_id", "run_id", "plan_id",
+    "revision_id", "task_id", "task_contract_digest", "operation_id",
+    "release_id", "release_record_digest", "callback_id", "receipt_digest",
+    "disposition_id", "disposition_record_digest", "runtime_digest",
+    "config_digest", "repository_id", "common_dir", "main_branch",
+    "executor_branch", "prepared_main_tip", "executor_tip",
+    "state", "outcome",
+    "reconciled_main_tip", "combined_verification_digest",
+    "reconciliation_digest", "prepared_at", "reconciled_at"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "kind": { "const": "codex-flow-v06-serial-integration" },
+    "integration_id": {
+      "type": "string",
+      "pattern": "^integration-v1-[0-9a-f]{64}$"
+    },
+    "run_id": { "$ref": "#/$defs/safeId" },
+    "plan_id": { "$ref": "#/$defs/safeId" },
+    "revision_id": { "$ref": "#/$defs/safeId" },
+    "task_id": { "$ref": "#/$defs/safeId" },
+    "task_contract_digest": { "$ref": "#/$defs/digest" },
+    "operation_id": { "$ref": "#/$defs/safeId" },
+    "release_id": { "$ref": "#/$defs/safeId" },
+    "release_record_digest": { "$ref": "#/$defs/digest" },
+    "callback_id": { "$ref": "#/$defs/safeId" },
+    "receipt_digest": { "$ref": "#/$defs/digest" },
+    "disposition_id": { "$ref": "#/$defs/safeId" },
+    "disposition_record_digest": { "$ref": "#/$defs/digest" },
+    "runtime_digest": { "$ref": "#/$defs/digest" },
+    "config_digest": { "$ref": "#/$defs/digest" },
+    "repository_id": { "$ref": "#/$defs/safeId" },
+    "common_dir": { "type": "string", "minLength": 1, "maxLength": 1024 },
+    "main_branch": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "executor_branch": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "prepared_main_tip": { "$ref": "#/$defs/commit" },
+    "executor_tip": { "$ref": "#/$defs/commit" },
+    "state": { "enum": ["prepared", "reconciled"] },
+    "outcome": { "$ref": "#/$defs/nullableOutcome" },
+    "reconciled_main_tip": { "$ref": "#/$defs/nullableCommit" },
+    "combined_verification_digest": { "$ref": "#/$defs/nullableDigest" },
+    "reconciliation_digest": { "$ref": "#/$defs/nullableDigest" },
+    "prepared_at": { "$ref": "#/$defs/timestamp" },
+    "reconciled_at": { "$ref": "#/$defs/nullableTimestamp" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "state": { "const": "prepared" } } },
+      "then": {
+        "properties": {
+          "outcome": { "type": "null" },
+          "reconciled_main_tip": { "type": "null" },
+          "combined_verification_digest": { "type": "null" },
+          "reconciliation_digest": { "type": "null" },
+          "reconciled_at": { "type": "null" }
+        }
+      },
+      "else": {
+        "properties": {
+          "outcome": { "$ref": "#/$defs/outcome" },
+          "reconciled_main_tip": { "$ref": "#/$defs/commit" },
+          "combined_verification_digest": { "$ref": "#/$defs/digest" },
+          "reconciliation_digest": { "$ref": "#/$defs/digest" },
+          "reconciled_at": { "$ref": "#/$defs/timestamp" }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "safeId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9_.-]+$"
+    },
+    "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "commit": { "type": "string", "pattern": "^[0-9a-f]{40,64}$" },
+    "outcome": {
+      "enum": ["ancestor", "patch-equivalent", "unmerged"]
+    },
+    "nullableCommit": {
+      "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/commit" }]
+    },
+    "nullableDigest": {
+      "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/digest" }]
+    },
+    "nullableOutcome": {
+      "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/outcome" }]
+    },
+    "timestamp": { "type": "string", "format": "date-time", "maxLength": 64 },
+    "nullableTimestamp": {
+      "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/timestamp" }]
+    }
+  }
+}

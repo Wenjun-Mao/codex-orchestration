@@ -1,0 +1,132 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://private.local/codex-flow/archive-operation.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "kind", "archive_id", "run_id", "plan_id", "revision_id",
+    "task_id", "task_contract_digest", "release_id", "callback_id", "disposition_id",
+    "decision", "task", "host_intent", "git_resolution", "worktree", "setter",
+    "observation", "state", "prepared_at", "updated_at"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "kind": { "const": "codex-flow-v06-task-archive-operation" },
+    "archive_id": { "$ref": "#/$defs/safeId" },
+    "run_id": { "$ref": "#/$defs/safeId" },
+    "plan_id": { "$ref": "#/$defs/safeId" },
+    "revision_id": { "$ref": "#/$defs/safeId" },
+    "task_id": { "$ref": "#/$defs/safeId" },
+    "task_contract_digest": { "$ref": "#/$defs/digest" },
+    "release_id": { "$ref": "#/$defs/safeId" },
+    "callback_id": { "$ref": "#/$defs/safeId" },
+    "disposition_id": { "$ref": "#/$defs/safeId" },
+    "decision": { "enum": ["accepted-no-change", "accepted-for-integration"] },
+    "task": { "$ref": "#/$defs/taskObservation" },
+    "host_intent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["action", "attempt_id", "thread_id", "host_id", "archived"],
+      "properties": {
+        "action": { "const": "set-thread-archived" },
+        "attempt_id": { "$ref": "#/$defs/safeId" },
+        "thread_id": { "$ref": "#/$defs/safeId" },
+        "host_id": {
+          "oneOf": [
+            { "type": "null" },
+            { "type": "string", "minLength": 1, "maxLength": 256 }
+          ]
+        },
+        "archived": { "const": true }
+      }
+    },
+    "git_resolution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "integration_id", "verification_digest"],
+      "properties": {
+        "kind": { "enum": ["unchanged", "integrated"] },
+        "integration_id": {
+          "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/safeId" }]
+        },
+        "verification_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "worktree": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["management", "path", "prepared_state"],
+      "properties": {
+        "management": { "enum": ["none", "host-managed"] },
+        "path": {
+          "oneOf": [
+            { "type": "null" },
+            { "type": "string", "minLength": 1, "maxLength": 2048 }
+          ]
+        },
+        "prepared_state": { "enum": ["not-applicable", "absent", "present-clean"] }
+      }
+    },
+    "setter": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["outcome", "reconciled_at"],
+          "properties": {
+            "outcome": { "enum": ["accepted", "rejected-before-send", "ambiguous"] },
+            "reconciled_at": { "$ref": "#/$defs/timestamp" }
+          }
+        }
+      ]
+    },
+    "observation": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["task", "worktree_state", "observed_at"],
+          "properties": {
+            "task": { "$ref": "#/$defs/taskObservation" },
+            "worktree_state": { "enum": ["not-applicable", "absent"] },
+            "observed_at": { "$ref": "#/$defs/timestamp" }
+          }
+        }
+      ]
+    },
+    "state": {
+      "enum": [
+        "prepared", "accepted-awaiting-observation", "completed",
+        "rejected-before-send", "ambiguous"
+      ]
+    },
+    "prepared_at": { "$ref": "#/$defs/timestamp" },
+    "updated_at": { "$ref": "#/$defs/timestamp" }
+  },
+  "$defs": {
+    "safeId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9_.-]+$"
+    },
+    "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "timestamp": { "type": "string", "format": "date-time", "maxLength": 64 },
+    "taskObservation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "execution_kind", "thread_id", "source", "active_visible", "archived_visible"
+      ],
+      "properties": {
+        "execution_kind": { "const": "task-thread" },
+        "thread_id": { "$ref": "#/$defs/safeId" },
+        "source": { "const": "host-observed" },
+        "active_visible": { "type": "boolean" },
+        "archived_visible": { "type": "boolean" }
+      }
+    }
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://private.local/codex-flow/task-disposition.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "kind", "disposition_id", "run_id", "plan_id",
+    "revision_id", "task_id", "task_contract_digest", "callback_id",
+    "receipt_digest", "decision", "reason", "integration_id",
+    "verification_digest", "state", "prepared_at", "finalized_at",
+    "callback_consumed_at"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "kind": { "const": "codex-flow-v06-task-disposition" },
+    "disposition_id": { "$ref": "#/$defs/safeId" },
+    "run_id": { "$ref": "#/$defs/safeId" },
+    "plan_id": { "$ref": "#/$defs/safeId" },
+    "revision_id": { "$ref": "#/$defs/safeId" },
+    "task_id": { "$ref": "#/$defs/safeId" },
+    "task_contract_digest": { "$ref": "#/$defs/digest" },
+    "callback_id": { "$ref": "#/$defs/nullableId" },
+    "receipt_digest": { "$ref": "#/$defs/nullableDigest" },
+    "decision": {
+      "enum": ["accepted-no-change", "accepted-for-integration", "rejected", "retained-blocked", "cancelled"]
+    },
+    "reason": { "type": "string", "minLength": 1, "maxLength": 512 },
+    "integration_id": { "$ref": "#/$defs/nullableId" },
+    "verification_digest": { "$ref": "#/$defs/nullableDigest" },
+    "state": { "enum": ["prepared", "finalized", "completed"] },
+    "prepared_at": { "type": "string", "format": "date-time" },
+    "finalized_at": { "$ref": "#/$defs/nullableTimestamp" },
+    "callback_consumed_at": { "$ref": "#/$defs/nullableTimestamp" }
+  },
+  "$defs": {
+    "safeId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9_.-]+$"
+    },
+    "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "nullableId": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/safeId" }] },
+    "nullableDigest": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/digest" }] },
+    "nullableTimestamp": {
+      "oneOf": [{ "type": "null" }, { "type": "string", "format": "date-time" }]
+    }
+  }
+}
