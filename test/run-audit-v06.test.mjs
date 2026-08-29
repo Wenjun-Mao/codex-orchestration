@@ -39,11 +39,12 @@ import {
   reviseWorkflowJournal,
 } from "../lib/workflow-journal-v06.mjs";
 import {
+  beginSubagentOperationAttempt,
   completeSubagentOperation,
   prepareSubagentOperation,
-  reconcileCreatedSubagent,
+  reconcileSubagentOperationAttempt,
   recordSubagentCoordinatorDisposition,
-} from "../lib/subagent-lifecycle.mjs";
+} from "../lib/subagent-operations-v06.mjs";
 import {
   prepareVisibleTaskCreation,
   reconcileVisibleTaskCreation,
@@ -55,6 +56,10 @@ import {
   reconcileTaskRelease,
 } from "../lib/release-lifecycle.mjs";
 import { bindRecipient } from "../lib/recipients.mjs";
+import {
+  expireUrgentSignal,
+  persistUrgentSignal,
+} from "../lib/urgent-signals.mjs";
 import { deliverCallbackV06, observeCallbackV06 } from "../lib/callbacks-v06.mjs";
 import {
   cancelTaskBeforeExecution,
@@ -79,6 +84,24 @@ import { createGitFixture, removeFixture } from "./helpers.mjs";
 const START = Date.parse("2026-08-29T19:00:00.000Z");
 const digest = (character) => character.repeat(64);
 const at = (offset) => START + offset;
+const SUBAGENT_PROMPT = "Inspect the bounded source and return the exact generated contract result.";
+
+async function reconcileCreatedSubagent({ stateRoot, operationId, agent_id, now = Date.now() }) {
+  await beginSubagentOperationAttempt({
+    stateRoot,
+    operationId,
+    prompt: SUBAGENT_PROMPT,
+    timeoutSeconds: 300,
+    now,
+  });
+  return reconcileSubagentOperationAttempt({
+    stateRoot,
+    operationId,
+    outcome: "accepted",
+    agent_id,
+    now: now + 1,
+  });
+}
 
 function git(root, args) {
   return execFileSync("git", args, {
@@ -215,6 +238,11 @@ async function runFixture(t, suffix, task) {
     }),
     admittedAt: new Date(at(3_000)).toISOString(),
   });
+  await bindRecipient({
+    stateRoot,
+    recipient: coordinator,
+    fenceToken: admitted.run.binding.fence_token,
+  });
   const coordinatorBinding = {
     ...coordinator,
     binding_digest: coordinatorBindingDigest(coordinator),
@@ -262,7 +290,7 @@ async function completeRejectedSubagent(context, suffix, offset = 20_000) {
     reasoning_effort: context.contract.task.reasoning_effort,
     fork_turns: context.contract.task.fork_turns,
     mode: "read",
-    prompt_digest: digest("d"),
+    prompt_digest: sha256(SUBAGENT_PROMPT),
     worktree_path: context.root,
     now: at(offset),
   });
@@ -425,7 +453,7 @@ test("terminal subagent authority produces one idempotent closure proof and stal
     reasoning_effort: context.contract.task.reasoning_effort,
     fork_turns: context.contract.task.fork_turns,
     mode: "read",
-    prompt_digest: digest("f"),
+    prompt_digest: sha256(SUBAGENT_PROMPT),
     worktree_path: context.root,
     now: at(12_000),
   });
@@ -610,7 +638,7 @@ test("audit fails closed on persisted audit tampering", async (t) => {
     reasoning_effort: context.contract.task.reasoning_effort,
     fork_turns: context.contract.task.fork_turns,
     mode: "read",
-    prompt_digest: digest("e"),
+    prompt_digest: sha256(SUBAGENT_PROMPT),
     worktree_path: context.root,
   });
   await reconcileCreatedSubagent({
@@ -642,6 +670,63 @@ test("audit fails closed on persisted audit tampering", async (t) => {
     }),
     /record digest is invalid/,
   );
+});
+
+test("closure binds the exact active recipient fence", async (t) => {
+  const context = await runFixture(t, "recipient-drift", subagentTask("recipient-drift"));
+  await completeRejectedSubagent(context, "recipient-drift");
+  let result = await audit(context);
+  assert.equal(result.audit.terminal_ready, true);
+
+  const registryPath = resolve(
+    context.stateRoot,
+    "recipients",
+    "bindings",
+    `${context.coordinator.lineage_id}.json`,
+  );
+  const registry = JSON.parse(await readFile(registryPath, "utf8"));
+  registry.current.thread_id = "different-coordinator";
+  registry.bindings.at(-1).thread_id = "different-coordinator";
+  await writeFile(registryPath, `${JSON.stringify(registry, null, 2)}\n`, "utf8");
+
+  result = await audit(context, 101_000);
+  assert.equal(result.audit.terminal_ready, false);
+  assert(blockerCodes(result).has("recipient-binding-drift"));
+});
+
+test("an unresolved urgent interrupt blocks closure until durably expired", async (t) => {
+  const context = await runFixture(t, "urgent-closure", taskThread("urgent-closure"));
+  const visible = await prepareVisible(context, "urgent-closure", { ready: true });
+  const release = await acceptRelease(context, visible, "urgent-closure");
+  const persisted = await persistUrgentSignal({
+    stateRoot: context.stateRoot,
+    signal: {
+      schema_version: 1,
+      recipient: context.coordinator,
+      executor_id: visible.readyThreadId,
+      run_id: context.admitted.run.run_id,
+      sequence: 1,
+      supersedes_urgent_ids: [],
+      expires_at: new Date(at(12_000)).toISOString(),
+      classification: "high-risk-drift",
+      summary: "A bounded authority mismatch requires immediate coordinator attention.",
+      requested_action: "Resolve the exact mismatch before continuing the run.",
+    },
+    now: at(11_000),
+  });
+
+  let result = await audit(context, 101_000);
+  assert(blockerCodes(result).has("urgent-unresolved"));
+  assert.equal(result.audit.counts.urgent_signals, 1);
+  await expireUrgentSignal({
+    stateRoot: context.stateRoot,
+    urgentId: persisted.urgent_id,
+    now: at(13_000),
+  });
+  result = await audit(context, 102_000);
+  assert.equal(blockerCodes(result).has("urgent-unresolved"), false);
+  assert(blockerCodes(result).has("callback-missing"));
+  assert.equal(release.prepared.task_id, context.contract.task_id);
 });
 
 test("visible creation reports in-flight, ambiguous, and session-blocked host authority", async (t) => {
@@ -850,7 +935,6 @@ test("accepted no-change task advances through release, callback, proof, disposi
       archived_visible: false,
     },
     hostId: "local",
-    worktree: { management: "none", path: null },
     now: at(14_000),
   });
   result = await audit(context, 107_000);

@@ -341,9 +341,15 @@ test("ambiguous and expired attempts fail closed without retry or late acceptanc
     timeoutSeconds: 5,
     now: START + 11_000,
   });
-  const status = await subagentOperationStatus({
+  const beforeReconcile = await subagentOperationStatus({
     stateRoot: expired.stateRoot,
     operationId: expired.operation.operation_id,
+  });
+  assert.equal(beforeReconcile.state, "attempting");
+  const status = await reconcileSubagentOperationAttempt({
+    stateRoot: expired.stateRoot,
+    operationId: expired.operation.operation_id,
+    outcome: "ambiguous",
     now: START + 17_000,
   });
   assert.equal(status.state, "ambiguous");

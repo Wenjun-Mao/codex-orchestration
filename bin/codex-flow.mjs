@@ -85,6 +85,7 @@ import {
   persistUrgentSignal,
   prepareUrgentAttempt,
   reconcileUrgentAttempt,
+  urgentSignalRecord,
   urgentSignalStatus,
 } from "../lib/urgent-signals.mjs";
 import {
@@ -146,12 +147,13 @@ import {
   validateRuntimeLineage,
 } from "../lib/runtime-context.mjs";
 import {
+  beginSubagentOperationAttempt,
   completeSubagentOperation,
   prepareSubagentOperation,
-  reconcileCreatedSubagent,
+  reconcileSubagentOperationAttempt,
   recordSubagentCoordinatorDisposition,
   subagentOperationStatus,
-} from "../lib/subagent-lifecycle.mjs";
+} from "../lib/subagent-operations-v06.mjs";
 import {
   prepareVisibleTaskCreation,
   reconcileVisibleTaskCreation,
@@ -211,12 +213,14 @@ Usage:
   codex-flow workflow status --run-id ID --plan-id ID [--json]
   codex-flow task create prepare|attempt|reconcile --run-id ID --file request.json [--json]
   codex-flow task create status --run-id ID --operation-id ID [--json]
-  codex-flow subagent prepare|created|complete|dispose --run-id ID --file request.json [--json]
+  codex-flow subagent prepare|attempt|reconcile|complete|dispose --run-id ID --file request.json [--json]
   codex-flow subagent status --run-id ID --operation-id ID [--json]
   codex-flow release prepare|reconcile|accept --run-id ID --file request.json [--json]
   codex-flow release status --run-id ID --release-id ID [--json]
   codex-flow callback deliver|observe --run-id ID --file request.json [--json]
   codex-flow callback status --run-id ID [--json]
+  codex-flow urgent persist|attempt|reconcile|observe|consume|expire --run-id ID --file request.json [--json]
+  codex-flow urgent status --run-id ID [--json]
   codex-flow disposition prepare|finalize|cancel --run-id ID --file request.json [--json]
   codex-flow disposition status --run-id ID --disposition-id ID [--json]
   codex-flow verification run --run-id ID --file request.json [--json]
@@ -1304,6 +1308,12 @@ async function callbackAuthority(git, callbackId, runId) {
   return record;
 }
 
+async function urgentAuthority(git, urgentId, runId) {
+  const record = await urgentSignalRecord({ stateRoot: git.stateRoot, urgentId });
+  assertRunIdentity(record.signal, runId, "urgent signal");
+  return record;
+}
+
 async function dispositionAuthority(git, dispositionId, runId) {
   const record = await taskDispositionStatus({ stateRoot: git.stateRoot, dispositionId });
   return assertRunIdentity(record, runId, "task disposition");
@@ -1858,14 +1868,23 @@ async function commandSubagentV06(args) {
       ],
       optional: ["prepared_at"],
     },
-    created: { required: ["operation_id", "agent_id"], optional: ["created_at"] },
+    attempt: {
+      required: ["operation_id", "prompt"],
+      optional: ["timeout_seconds", "attempted_at"],
+    },
+    reconcile: {
+      required: ["operation_id", "outcome"],
+      optional: ["agent_id", "reconciled_at"],
+    },
     complete: {
       required: ["operation_id", "classification", "summary", "evidence_digests"],
       optional: ["completed_at"],
     },
     dispose: { required: ["operation_id", "disposition"], optional: ["disposed_at"] },
   };
-  if (!shapes[subcommand]) throw new CliError("subagent requires prepare, created, complete, dispose, or status");
+  if (!shapes[subcommand]) {
+    throw new CliError("subagent requires prepare, attempt, reconcile, complete, dispose, or status");
+  }
   const { runId, request } = await runScopedRequest(values, `subagent ${subcommand}`, shapes[subcommand]);
   let result;
   if (subcommand === "prepare") {
@@ -1881,13 +1900,23 @@ async function commandSubagentV06(args) {
       worktree_path: request.worktree_path,
       now: commandNow(request, "prepared_at"),
     });
-  } else if (subcommand === "created") {
+  } else if (subcommand === "attempt") {
     await subagentAuthority(git, request.operation_id, runId);
-    result = await reconcileCreatedSubagent({
+    result = await beginSubagentOperationAttempt({
       stateRoot: git.stateRoot,
       operationId: request.operation_id,
-      agent_id: request.agent_id,
-      now: commandNow(request, "created_at"),
+      prompt: request.prompt,
+      timeoutSeconds: request.timeout_seconds ?? 300,
+      now: commandNow(request, "attempted_at"),
+    });
+  } else if (subcommand === "reconcile") {
+    await subagentAuthority(git, request.operation_id, runId);
+    result = await reconcileSubagentOperationAttempt({
+      stateRoot: git.stateRoot,
+      operationId: request.operation_id,
+      outcome: request.outcome,
+      agent_id: request.agent_id ?? null,
+      now: commandNow(request, "reconciled_at"),
     });
   } else if (subcommand === "complete") {
     await subagentAuthority(git, request.operation_id, runId);
@@ -1908,7 +1937,13 @@ async function commandSubagentV06(args) {
       now: commandNow(request, "disposed_at"),
     });
   }
-  v06Output(assertRunIdentity(result, runId, "subagent operation"));
+  const output = assertRunIdentity(result, runId, "subagent operation");
+  if (subcommand === "attempt" && output.dispatch_permitted !== true) {
+    const { host_request: ignored, ...withoutHostRequest } = output;
+    v06Output(withoutHostRequest);
+  } else {
+    v06Output(output);
+  }
 }
 
 function releasePrepareView(result) {
@@ -2026,6 +2061,125 @@ async function commandCallbackV06(args) {
       now: commandNow(request, "observed_at"),
     });
     if (result.receipt) assertRunIdentity(result.receipt, runId, "terminal callback");
+  }
+  v06Output(result);
+}
+
+function urgentAttemptView(result) {
+  const base = {
+    status: result.status,
+    urgent_id: result.urgent_id,
+    delivery_attempt_id: result.delivery_attempt_id,
+    dispatch_permitted: result.dispatch_permitted === true,
+  };
+  return result.dispatch_permitted === true
+    ? { ...base, host_prompt: result.host_prompt }
+    : base;
+}
+
+async function commandUrgentV06(args) {
+  const [subcommand, ...rest] = args;
+  const values = parseV06Options(rest);
+  const git = v06Repository();
+  if (subcommand === "status") {
+    const runId = explicitRunId(values);
+    await readRun({ gitCommonDirectory: git.commonDir, runId });
+    v06Output(await urgentSignalStatus(git.stateRoot, { runId }));
+    return;
+  }
+  const shapes = {
+    persist: {
+      required: ["release_id", "signal"],
+      optional: ["persisted_at"],
+    },
+    attempt: {
+      required: ["urgent_id"],
+      optional: ["prepared_at"],
+    },
+    reconcile: {
+      required: ["urgent_id", "delivery_attempt_id", "host_call_result"],
+      optional: ["reconciled_at"],
+    },
+    observe: {
+      required: ["urgent_id", "delivery_attempt_id", "recipient"],
+      optional: ["observed_at"],
+    },
+    consume: {
+      required: ["urgent_id", "recipient", "sender_executor_id"],
+      optional: ["consumed_at"],
+    },
+    expire: {
+      required: ["urgent_id"],
+      optional: ["expired_at"],
+    },
+  };
+  if (!shapes[subcommand]) {
+    throw new CliError("urgent requires persist, attempt, reconcile, observe, consume, expire, or status");
+  }
+  const { runId, request } = await runScopedRequest(
+    values,
+    `urgent ${subcommand}`,
+    shapes[subcommand],
+  );
+  let result;
+  if (subcommand === "persist") {
+    const release = await releaseAuthority(git, request.release_id, runId);
+    if (
+      release.status !== "accepted"
+      || request.signal.run_id !== runId
+      || request.signal.executor_id !== release.ready_thread_id
+      || request.signal.recipient?.lineage_id !== release.coordinator_binding.lineage_id
+    ) {
+      throw new CliError(
+        "Urgent signal requires the exact accepted release executor and coordinator lineage",
+        73,
+      );
+    }
+    result = await persistUrgentSignal({
+      stateRoot: git.stateRoot,
+      signal: request.signal,
+      now: commandNow(request, "persisted_at"),
+    });
+  } else {
+    await urgentAuthority(git, request.urgent_id, runId);
+    if (subcommand === "attempt") {
+      result = urgentAttemptView(await prepareUrgentAttempt({
+        stateRoot: git.stateRoot,
+        urgentId: request.urgent_id,
+        attemptSequence: 1,
+        now: commandNow(request, "prepared_at"),
+      }));
+    } else if (subcommand === "reconcile") {
+      result = await reconcileUrgentAttempt({
+        stateRoot: git.stateRoot,
+        urgentId: request.urgent_id,
+        deliveryAttemptId: request.delivery_attempt_id,
+        hostCallResult: request.host_call_result,
+        now: commandNow(request, "reconciled_at"),
+      });
+    } else if (subcommand === "observe") {
+      result = await observeUrgentSignal({
+        stateRoot: git.stateRoot,
+        urgentId: request.urgent_id,
+        deliveryAttemptId: request.delivery_attempt_id,
+        recipient: request.recipient,
+        now: commandNow(request, "observed_at"),
+      });
+    } else if (subcommand === "consume") {
+      result = await consumeUrgentSignal({
+        stateRoot: git.stateRoot,
+        urgentId: request.urgent_id,
+        recipient: request.recipient,
+        senderExecutorId: request.sender_executor_id,
+        now: commandNow(request, "consumed_at"),
+      });
+    } else {
+      result = await expireUrgentSignal({
+        stateRoot: git.stateRoot,
+        urgentId: request.urgent_id,
+        now: commandNow(request, "expired_at"),
+      });
+    }
   }
   v06Output(result);
 }
@@ -2203,7 +2357,7 @@ async function commandArchiveV06(args) {
   }
   const shapes = {
     prepare: {
-      required: ["disposition_id", "task_observation", "worktree"],
+      required: ["disposition_id", "task_observation"],
       optional: ["host_id", "prepared_at"],
     },
     reconcile: {
@@ -2221,7 +2375,6 @@ async function commandArchiveV06(args) {
       dispositionId: request.disposition_id,
       taskObservation: request.task_observation,
       hostId: request.host_id ?? null,
-      worktree: request.worktree,
       now: commandNow(request, "prepared_at"),
       });
     })()
@@ -2360,9 +2513,14 @@ function isV06RunBoundMutation(command, args) {
   if (command === "task") {
     return subcommand === "create" && ["prepare", "attempt", "reconcile"].includes(args[1]);
   }
-  if (command === "subagent") return ["prepare", "created", "complete", "dispose"].includes(subcommand);
+  if (command === "subagent") {
+    return ["prepare", "attempt", "reconcile", "complete", "dispose"].includes(subcommand);
+  }
   if (command === "release") return ["prepare", "reconcile", "accept"].includes(subcommand);
   if (command === "callback") return ["deliver", "observe"].includes(subcommand);
+  if (command === "urgent") return [
+    "persist", "attempt", "reconcile", "observe", "consume", "expire",
+  ].includes(subcommand);
   if (command === "disposition") return ["prepare", "finalize", "cancel"].includes(subcommand);
   if (command === "verification") return subcommand === "run";
   if (command === "integration") return ["prepare", "reconcile"].includes(subcommand);
@@ -2406,6 +2564,7 @@ async function main() {
   if (command === "subagent") return dispatchV06Command(command, args, commandSubagentV06);
   if (command === "release") return dispatchV06Command(command, args, commandReleaseV06);
   if (command === "callback") return dispatchV06Command(command, args, commandCallbackV06);
+  if (command === "urgent") return dispatchV06Command(command, args, commandUrgentV06);
   if (command === "disposition") return dispatchV06Command(command, args, commandDispositionV06);
   if (command === "verification") return dispatchV06Command(command, args, commandVerificationV06);
   if (command === "integration") return dispatchV06Command(command, args, commandIntegrationV06);

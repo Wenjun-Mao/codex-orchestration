@@ -4,12 +4,14 @@ import { mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import test from "node:test";
+import { sha256 } from "../lib/core.mjs";
 import {
+  beginSubagentOperationAttempt,
   completeSubagentOperation,
   prepareSubagentOperation,
-  reconcileCreatedSubagent,
+  reconcileSubagentOperationAttempt,
   recordSubagentCoordinatorDisposition,
-} from "../lib/subagent-lifecycle.mjs";
+} from "../lib/subagent-operations-v06.mjs";
 import { prepareVisibleTaskCreation } from "../lib/task-creation-v06.mjs";
 import { createWorkflowPlanRevision } from "../lib/workflow-plan.mjs";
 import {
@@ -29,6 +31,7 @@ import {
 } from "./helpers.mjs";
 
 const START = Date.parse("2026-08-29T22:00:00.000Z");
+const SUBAGENT_PROMPT = "Inspect the bounded source and return the exact generated contract result.";
 
 function visibleTask(overrides = {}) {
   return {
@@ -401,15 +404,23 @@ test("dependent contracts resolve exact persisted accepted authority instead of 
     reasoning_effort: review.task.reasoning_effort,
     fork_turns: review.task.fork_turns,
     mode: "read",
-    prompt_digest: "2".repeat(64),
+    prompt_digest: sha256(SUBAGENT_PROMPT),
     worktree_path: context.root,
     now: START + 2_000,
   });
-  const created = await reconcileCreatedSubagent({
+  await beginSubagentOperationAttempt({
     stateRoot: context.stateRoot,
     operationId: prepared.operation_id,
-    agent_id: "dependency-authority-agent",
+    prompt: SUBAGENT_PROMPT,
+    timeoutSeconds: 300,
     now: START + 3_000,
+  });
+  const created = await reconcileSubagentOperationAttempt({
+    stateRoot: context.stateRoot,
+    operationId: prepared.operation_id,
+    outcome: "accepted",
+    agent_id: "dependency-authority-agent",
+    now: START + 3_001,
   });
   const completed = await completeSubagentOperation({
     stateRoot: context.stateRoot,

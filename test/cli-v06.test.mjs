@@ -10,6 +10,7 @@ import {
   removeFixture,
   runCli,
 } from "./helpers.mjs";
+import { persistUrgentSignal } from "../lib/urgent-signals.mjs";
 
 const ACTIVATED_AT = "2026-08-29T20:00:00.000Z";
 
@@ -104,6 +105,7 @@ test("v0.6 help exposes no bare callback consume and direct v0.5 paths fail clos
   const help = runCli(["--help"]);
   assertSuccess(help, "v0.6 help");
   assert.match(help.stdout, /callback deliver\|observe --run-id/);
+  assert.match(help.stdout, /urgent persist\|attempt\|reconcile\|observe\|consume\|expire --run-id/);
   assert.doesNotMatch(help.stdout, /callback consume/);
   assert.match(help.stdout, /legacy-v05/);
 
@@ -114,6 +116,92 @@ test("v0.6 help exposes no bare callback consume and direct v0.5 paths fail clos
   const oldInit = runCli(["init", "--check"]);
   assert.notEqual(oldInit.status, 0);
   assert.match(oldInit.stderr, /quarantined v0\.5 command/);
+});
+
+test("v0.6 urgent delivery is journal-first, one-shot, and separate from quiet callbacks", async (t) => {
+  const context = await activatedFixture(t, "urgent-one-shot");
+  const signal = {
+    schema_version: 1,
+    recipient: context.activation.runtime.lineage,
+    executor_id: "urgent-executor-v06",
+    run_id: context.runId,
+    sequence: 1,
+    supersedes_urgent_ids: [],
+    expires_at: "2026-08-30T20:00:00.000Z",
+    classification: "high-risk-drift",
+    summary: "A bounded ownership conflict requires coordinator attention.",
+    requested_action: "Reconcile the exact ownership conflict before execution resumes.",
+  };
+  const persisted = await persistUrgentSignal({
+    stateRoot: context.result.state_authority.state_root,
+    signal,
+    now: Date.parse("2026-08-29T20:00:01.000Z"),
+  });
+  const attemptPath = await requestFile(context.requests, "urgent-attempt", {
+    run_id: context.runId,
+    urgent_id: persisted.urgent_id,
+    prepared_at: "2026-08-29T20:00:02.000Z",
+  });
+  const attempted = runCli([
+    "urgent", "attempt", "--run-id", context.runId, "--file", attemptPath, "--json",
+  ], { cwd: context.root });
+  assertSuccess(attempted, "v0.6 urgent attempt");
+  const attempt = JSON.parse(attempted.stdout);
+  assert.equal(attempt.dispatch_permitted, true);
+  const hostPrompt = JSON.parse(attempt.host_prompt);
+  assert.equal(hostPrompt.kind, "codex-flow-urgent-direct");
+  assert.equal(hostPrompt.urgent_id, persisted.urgent_id);
+
+  const replay = runCli([
+    "urgent", "attempt", "--run-id", context.runId, "--file", attemptPath, "--json",
+  ], { cwd: context.root });
+  assertSuccess(replay, "v0.6 urgent attempt replay");
+  assert.equal(JSON.parse(replay.stdout).dispatch_permitted, false);
+  assert.equal(Object.hasOwn(JSON.parse(replay.stdout), "host_prompt"), false);
+
+  const reconcilePath = await requestFile(context.requests, "urgent-reconcile", {
+    run_id: context.runId,
+    urgent_id: persisted.urgent_id,
+    delivery_attempt_id: attempt.delivery_attempt_id,
+    host_call_result: "sent",
+    reconciled_at: "2026-08-29T20:00:03.000Z",
+  });
+  assertSuccess(runCli([
+    "urgent", "reconcile", "--run-id", context.runId,
+    "--file", reconcilePath, "--json",
+  ], { cwd: context.root }), "v0.6 urgent reconciliation");
+
+  const observePath = await requestFile(context.requests, "urgent-observe", {
+    run_id: context.runId,
+    urgent_id: persisted.urgent_id,
+    delivery_attempt_id: attempt.delivery_attempt_id,
+    recipient: context.activation.runtime.lineage,
+    observed_at: "2026-08-29T20:00:04.000Z",
+  });
+  const observed = runCli([
+    "urgent", "observe", "--run-id", context.runId, "--file", observePath, "--json",
+  ], { cwd: context.root });
+  assertSuccess(observed, "v0.6 urgent observation");
+  assert.equal(JSON.parse(observed.stdout).disposition, "process");
+
+  const consumePath = await requestFile(context.requests, "urgent-consume", {
+    run_id: context.runId,
+    urgent_id: persisted.urgent_id,
+    recipient: context.activation.runtime.lineage,
+    sender_executor_id: signal.executor_id,
+    consumed_at: "2026-08-29T20:00:05.000Z",
+  });
+  const consumed = runCli([
+    "urgent", "consume", "--run-id", context.runId, "--file", consumePath, "--json",
+  ], { cwd: context.root });
+  assertSuccess(consumed, "v0.6 urgent consumption");
+  assert.equal(JSON.parse(consumed.stdout).status, "consumed");
+
+  const status = runCli(["urgent", "status", "--run-id", context.runId, "--json"], {
+    cwd: context.root,
+  });
+  assertSuccess(status, "v0.6 urgent status");
+  assert.equal(JSON.parse(status.stdout).consumed_count, 1);
 });
 
 test("legacy-v05 exposes read-only verification and refuses every mutation family", async (t) => {
