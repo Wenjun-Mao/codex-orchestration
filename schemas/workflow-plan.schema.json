@@ -1,15 +1,20 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://private.local/codex-flow/workflow-plan.schema.json",
-  "oneOf": [
-    { "$ref": "#/$defs/planRevision" },
-    { "$ref": "#/$defs/generatedTaskContract" },
-    { "$ref": "#/$defs/generatedTaskResult" }
-  ],
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "plan_id", "revision", "parent_revision_digest", "tasks", "revision_digest"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "plan_id": { "$ref": "#/$defs/safeId" },
+    "revision": { "type": "integer", "minimum": 1, "maximum": 2147483647 },
+    "parent_revision_digest": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/digest" }] },
+    "tasks": { "type": "array", "minItems": 1, "maxItems": 256, "items": { "$ref": "#/$defs/task" } },
+    "revision_digest": { "$ref": "#/$defs/digest" }
+  },
   "$defs": {
     "safeId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9_.-]+$" },
     "digest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
-    "gitRevision": { "type": "string", "pattern": "^[a-f0-9]{40,64}$" },
     "paths": {
       "type": "array", "maxItems": 128, "uniqueItems": true,
       "items": { "type": "string", "minLength": 1, "maxLength": 512 }
@@ -72,7 +77,21 @@
         "instrument_role": { "enum": ["none", "supporting", "primary-deliverable"] },
         "supporting_follow_up": { "$ref": "#/$defs/supportingFollowUp" },
         "supporting_authorization": { "$ref": "#/$defs/supportingAuthorization" }
-      }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "execution_kind": { "const": "subagent" } }, "required": ["execution_kind"] },
+          "then": {
+            "properties": {
+              "mode": { "const": "read" },
+              "reasoning_effort": { "enum": ["none", "minimal", "low", "medium", "high", "xhigh", "max"] },
+              "write_paths": { "maxItems": 0 },
+              "fork_turns": { "$ref": "#/$defs/forkTurns" }
+            }
+          },
+          "else": { "properties": { "fork_turns": { "type": "null" } } }
+        }
+      ]
     },
     "planRevision": {
       "type": "object", "additionalProperties": false,
@@ -84,38 +103,6 @@
         "parent_revision_digest": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/digest" }] },
         "tasks": { "type": "array", "minItems": 1, "maxItems": 256, "items": { "$ref": "#/$defs/task" } },
         "revision_digest": { "$ref": "#/$defs/digest" }
-      }
-    },
-    "generatedTaskContract": {
-      "type": "object", "additionalProperties": false,
-      "required": ["schema_version", "kind", "contract_id", "plan_id", "revision_digest", "task_id", "task_digest", "current_baseline", "accepted_dependencies", "task"],
-      "properties": {
-        "schema_version": { "const": 1 }, "kind": { "const": "codex-flow-generated-task-contract" },
-        "contract_id": { "$ref": "#/$defs/digest" }, "plan_id": { "$ref": "#/$defs/safeId" },
-        "revision_digest": { "$ref": "#/$defs/digest" }, "task_id": { "$ref": "#/$defs/safeId" }, "task_digest": { "$ref": "#/$defs/digest" },
-        "current_baseline": {
-          "type": "object", "additionalProperties": false, "required": ["revision"],
-          "properties": { "revision": { "$ref": "#/$defs/gitRevision" } }
-        },
-        "accepted_dependencies": {
-          "type": "array", "maxItems": 128, "uniqueItems": true,
-          "items": {
-            "type": "object", "additionalProperties": false, "required": ["task_id", "result_digest"],
-            "properties": { "task_id": { "$ref": "#/$defs/safeId" }, "result_digest": { "$ref": "#/$defs/digest" } }
-          }
-        },
-        "task": { "$ref": "#/$defs/task" }
-      }
-    },
-    "generatedTaskResult": {
-      "type": "object", "additionalProperties": false,
-      "required": ["schema_version", "kind", "contract_id", "task_id", "outcome", "evidence_digests", "result_digest"],
-      "properties": {
-        "schema_version": { "const": 1 }, "kind": { "const": "codex-flow-generated-task-result" },
-        "contract_id": { "$ref": "#/$defs/digest" }, "task_id": { "$ref": "#/$defs/safeId" },
-        "outcome": { "type": "string", "minLength": 1, "maxLength": 4000 },
-        "evidence_digests": { "type": "array", "maxItems": 128, "uniqueItems": true, "items": { "$ref": "#/$defs/digest" } },
-        "result_digest": { "$ref": "#/$defs/digest" }
       }
     }
   }

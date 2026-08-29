@@ -3,18 +3,37 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import test from "node:test";
 import {
-  createGeneratedTaskResult,
+  coordinatorBindingDigest,
   createNextWorkflowPlanRevision,
   createWorkflowPlanRevision,
   generateTaskContract,
   validateGeneratedTaskContract,
-  validateGeneratedTaskResult,
   validateWorkflowPlanRevision,
 } from "../lib/workflow-plan.mjs";
 import { packageRoot } from "./helpers.mjs";
 
 const BASELINE = { revision: "a".repeat(40) };
-const RESULT_A = "1".repeat(64);
+const RUNTIME_DIGEST = "1".repeat(64);
+const CONFIGURATION_DIGEST = "2".repeat(64);
+
+function authority(commonDir = "/tmp/codex-flow-authority/.git") {
+  const coordinator = {
+    lineage_id: "coordinator-lineage",
+    thread_id: "coordinator-thread",
+    generation: 1,
+  };
+  return {
+    run_id: "run-workflow-v06",
+    runtime_context_digest: RUNTIME_DIGEST,
+    configuration_digest: CONFIGURATION_DIGEST,
+    repository_id: "repository-workflow-v06",
+    common_dir: commonDir,
+    coordinator_binding: {
+      ...coordinator,
+      binding_digest: coordinatorBindingDigest(coordinator),
+    },
+  };
+}
 
 function workflowTask(overrides = {}) {
   return {
@@ -81,6 +100,40 @@ function nextDraft(previous, tasks) {
   };
 }
 
+function contractFor(plan, taskId, dependencyRecords = []) {
+  return generateTaskContract({
+    plan_revision: plan,
+    task_id: taskId,
+    current_baseline: BASELINE,
+    dependency_records: dependencyRecords,
+    authority: authority(),
+  });
+}
+
+function acceptedDisposition(plan) {
+  return {
+    schema_version: 1,
+    kind: "codex-flow-v06-task-disposition",
+    disposition_id: "disposition-research",
+    run_id: authority().run_id,
+    plan_id: plan.plan_id,
+    revision_id: plan.revision_digest,
+    task_id: "research",
+    task_contract_digest: "3".repeat(64),
+    callback_id: "callback-research",
+    receipt_digest: "4".repeat(64),
+    decision: "accepted-no-change",
+    reason: "Read-only evidence accepted.",
+    integration_id: null,
+    verification_id: `verification-v1-${"5".repeat(64)}`,
+    verification_digest: "5".repeat(64),
+    state: "completed",
+    prepared_at: "2026-08-29T12:00:00Z",
+    finalized_at: "2026-08-29T12:01:00Z",
+    callback_consumed_at: "2026-08-29T12:02:00Z",
+  };
+}
+
 test("workflow revisions canonicalize task order and bind a stable logical plan ID", () => {
   const first = createWorkflowPlanRevision(rootDraft());
   const reordered = createWorkflowPlanRevision(rootDraft({ tasks: [workflowTask(), implementationTask()] }));
@@ -94,89 +147,126 @@ test("workflow revisions canonicalize task order and bind a stable logical plan 
   );
 });
 
-test("later revisions can change only unstarted task contracts and their edges", () => {
+test("later revisions derive immutable started tasks from generated contracts", () => {
   const report = implementationTask({
     task_id: "report",
     title: "Document the result",
     dependencies: [],
+    read_paths: ["docs"],
     write_paths: ["docs/result.md"],
   });
   const first = createWorkflowPlanRevision(rootDraft({
     tasks: [workflowTask(), implementationTask(), report],
   }));
-  const revisedImplementation = implementationTask({
-    primary_outcome: "An implementation revised before launch.",
-  });
+  const startedResearch = contractFor(first, "research");
   const second = createNextWorkflowPlanRevision({
     previous_revision: first,
-    task_states: { research: "started", implementation: "unstarted", report: "unstarted" },
+    started_task_contracts: [startedResearch],
     draft: nextDraft(first, [
       workflowTask(),
-      revisedImplementation,
-      implementationTask({
-        task_id: "report",
-        title: "Document the result",
-        dependencies: ["implementation"],
-        write_paths: ["docs/result.md"],
-      }),
+      implementationTask({ primary_outcome: "An implementation revised before launch." }),
+      { ...report, dependencies: ["implementation"] },
     ]),
   });
   assert.equal(second.revision, 2);
-  assert.equal(second.parent_revision_digest, first.revision_digest);
   assert.throws(
     () => createNextWorkflowPlanRevision({
       previous_revision: first,
-      task_states: { research: "accepted", implementation: "unstarted", report: "unstarted" },
+      started_task_contracts: [startedResearch],
       draft: nextDraft(first, [
-        workflowTask({ primary_outcome: "Mutated after start." }),
+        workflowTask({ primary_outcome: "Mutated after contract generation." }),
         implementationTask(),
         report,
       ]),
     }),
     /Started task research.*immutable/,
   );
+  assert.throws(
+    () => createNextWorkflowPlanRevision({
+      previous_revision: first,
+      started_task_contracts: [{ ...startedResearch, revision_digest: "9".repeat(64) }],
+      draft: nextDraft(first, first.tasks),
+    }),
+    /task_digest does not match|contract_id does not match|different workflow revision/,
+  );
 });
 
-test("generated contracts require a concrete baseline and accepted dependency result identities", () => {
+test("generated contracts bind run, runtime, repository, coordinator, and durable dependency authority", () => {
   const plan = createWorkflowPlanRevision(rootDraft());
-  const research = generateTaskContract({
-    plan_revision: plan,
-    task_id: "research",
-    current_baseline: BASELINE,
-    dependency_dispositions: [],
-  });
+  const research = contractFor(plan, "research");
   assert.equal(validateGeneratedTaskContract(research).contract_id, research.contract_id);
+  assert.equal(research.run_id, authority().run_id);
+  assert.equal(research.runtime_context_digest, RUNTIME_DIGEST);
+  assert.equal(research.coordinator_binding.binding_digest, authority().coordinator_binding.binding_digest);
   assert.throws(
     () => generateTaskContract({
       plan_revision: plan,
       task_id: "implementation",
       current_baseline: BASELINE,
-      dependency_dispositions: [{ task_id: "research", disposition: "rejected", result_digest: null }],
+      dependency_records: [{ task_id: "research", disposition: "accepted", result_digest: "4".repeat(64) }],
+      authority: authority(),
     }),
-    /remains blocked/,
+    /durable task disposition or subagent operation/,
   );
-  const implementation = generateTaskContract({
-    plan_revision: plan,
-    task_id: "implementation",
-    current_baseline: BASELINE,
-    dependency_dispositions: [{ task_id: "research", disposition: "accepted", result_digest: RESULT_A }],
-  });
-  assert.equal(implementation.accepted_dependencies[0].result_digest, RESULT_A);
+  assert.throws(
+    () => contractFor(plan, "implementation", [{ ...acceptedDisposition(plan), state: "finalized" }]),
+    /completed accepted task disposition/,
+  );
+  const implementation = contractFor(plan, "implementation", [acceptedDisposition(plan)]);
+  assert.deepEqual(implementation.accepted_dependencies.map((entry) => entry.authority_kind), ["task-disposition"]);
+  assert.equal(implementation.accepted_dependencies[0].result_digest, "4".repeat(64));
+  assert.throws(
+    () => validateGeneratedTaskContract({
+      ...implementation,
+      coordinator_binding: { ...implementation.coordinator_binding, generation: 2 },
+    }),
+    /binding_digest does not match/,
+  );
   assert.throws(
     () => generateTaskContract({
       plan_revision: plan,
       task_id: "research",
       current_baseline: { revision: "not-a-concrete-baseline" },
-      dependency_dispositions: [],
+      dependency_records: [],
+      authority: authority(),
     }),
     /concrete lowercase Git revision/,
   );
-  const result = createGeneratedTaskResult({
-    task_contract: implementation,
-    outcome: "Implemented the bounded change.",
-    evidence_digests: ["2".repeat(64)],
+});
+
+test("DAG ordering uses transitive closure and rejects unordered write/read overlap", () => {
+  const direct = implementationTask({
+    task_id: "direct",
+    title: "Write shared source",
+    dependencies: [],
+    read_paths: [],
+    write_paths: ["src/shared"],
   });
-  assert.equal(validateGeneratedTaskResult(result).result_digest, result.result_digest);
+  const bridge = implementationTask({
+    task_id: "bridge",
+    title: "Ordered bridge",
+    mode: "read",
+    dependencies: ["direct"],
+    read_paths: ["docs"],
+    write_paths: [],
+  });
+  const transitiveReader = implementationTask({
+    task_id: "reader",
+    title: "Read shared source after bridge",
+    mode: "read",
+    dependencies: ["bridge"],
+    read_paths: ["src/shared/file.mjs"],
+    write_paths: [],
+  });
+  assert.doesNotThrow(() => createWorkflowPlanRevision(rootDraft({
+    tasks: [direct, bridge, transitiveReader],
+  })));
+  assert.throws(
+    () => createWorkflowPlanRevision(rootDraft({
+      tasks: [direct, { ...transitiveReader, dependencies: [] }],
+    })),
+    /Unordered tasks.*write\/read/,
+  );
 });
 
 test("goal-proximate supporting instrumentation has a direct follow-up and later authorization", () => {
@@ -190,16 +280,15 @@ test("goal-proximate supporting instrumentation has a direct follow-up and later
     })),
     /Additional supporting instrumentation.*later revision/,
   );
-
   const first = createWorkflowPlanRevision(rootDraft());
   const audit = workflowTask({
     task_id: "audit",
     title: "Audit the evidence boundary",
-    supporting_authorization: { authorized_revision: 2, reason: "The first evidence pass exposed a named uncertainty." },
+    supporting_authorization: { authorized_revision: 2, reason: "A named uncertainty needs one bounded check." },
   });
   const second = createNextWorkflowPlanRevision({
     previous_revision: first,
-    task_states: { research: "unstarted", implementation: "unstarted" },
+    started_task_contracts: [],
     draft: nextDraft(first, [
       workflowTask(),
       audit,
@@ -207,20 +296,15 @@ test("goal-proximate supporting instrumentation has a direct follow-up and later
     ]),
   });
   assert.equal(second.tasks.filter((task) => task.instrument_role === "supporting").length, 2);
-  assert.throws(
-    () => createWorkflowPlanRevision(rootDraft({
-      tasks: [
-        workflowTask({ supporting_follow_up: { kind: "direct-attempt", task_id: "missing" } }),
-        implementationTask(),
-      ],
-    })),
-    /unknown direct follow-up/,
-  );
 });
 
-test("v0.6 workflow schemas describe persisted revisions and generated identities", async () => {
-  const schema = JSON.parse(await readFile(resolve(packageRoot, "schemas/workflow-plan.schema.json"), "utf8"));
-  assert.equal(schema.$defs.planRevision.properties.revision_digest.$ref, "#/$defs/digest");
-  assert.equal(schema.$defs.generatedTaskContract.properties.kind.const, "codex-flow-generated-task-contract");
-  assert.equal(schema.$defs.task.properties.instrument_role.enum.includes("supporting"), true);
+test("v0.6 workflow and generated-contract schemas have one closed root authority each", async () => {
+  const workflowSchema = JSON.parse(await readFile(resolve(packageRoot, "schemas/workflow-plan.schema.json"), "utf8"));
+  const contractSchema = JSON.parse(await readFile(resolve(packageRoot, "schemas/generated-task-contract.schema.json"), "utf8"));
+  assert.equal(workflowSchema.oneOf, undefined);
+  assert.equal(workflowSchema.properties.revision_digest.$ref, "#/$defs/digest");
+  assert.equal(contractSchema.properties.kind.const, "codex-flow-generated-task-contract");
+  assert.equal(contractSchema.required.includes("runtime_context_digest"), true);
+  assert.equal(contractSchema.required.includes("coordinator_binding"), true);
+  assert.equal(contractSchema.properties.accepted_dependencies.items.required.includes("authority_digest"), true);
 });

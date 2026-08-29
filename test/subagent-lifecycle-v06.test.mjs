@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { execFileSync } from "node:child_process";
+import { readFile, realpath, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import test from "node:test";
 import {
@@ -9,14 +10,29 @@ import {
   prepareSubagentOperation,
   reconcileCreatedSubagent,
   recordSubagentCoordinatorDisposition,
+  subagentOperationStatus,
   validateSubagentOperation,
 } from "../lib/subagent-lifecycle.mjs";
-import { createWorkflowPlanRevision, generateTaskContract } from "../lib/workflow-plan.mjs";
-import { packageRoot } from "./helpers.mjs";
+import {
+  coordinatorBindingDigest,
+  createWorkflowPlanRevision,
+  generateTaskContract,
+} from "../lib/workflow-plan.mjs";
+import { createGitFixture, packageRoot, removeFixture } from "./helpers.mjs";
 
 const DIGEST = "3".repeat(64);
 
-function subagentContract() {
+async function fixture(t) {
+  const root = await createGitFixture("codex-flow-v06-subagent-");
+  t.after(() => removeFixture(root));
+  const commonDir = await realpath(resolve(root, ".git"));
+  const revision = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+  const stateRoot = resolve(commonDir, "codex-flow", "v0.6.0");
+  const coordinator = {
+    lineage_id: "coordinator-lineage",
+    thread_id: "coordinator-thread",
+    generation: 1,
+  };
   const plan = createWorkflowPlanRevision({
     schema_version: 1,
     plan_id: "subagent-foundation",
@@ -41,87 +57,183 @@ function subagentContract() {
       supporting_authorization: null,
     }],
   });
-  return generateTaskContract({
+  const contract = generateTaskContract({
     plan_revision: plan,
     task_id: "evidence",
-    current_baseline: { revision: "b".repeat(40) },
-    dependency_dispositions: [],
+    current_baseline: { revision },
+    dependency_records: [],
+    authority: {
+      run_id: "run-subagent-v06",
+      runtime_context_digest: "1".repeat(64),
+      configuration_digest: "2".repeat(64),
+      repository_id: "repository-subagent-v06",
+      common_dir: commonDir,
+      coordinator_binding: {
+        ...coordinator,
+        binding_digest: coordinatorBindingDigest(coordinator),
+      },
+    },
   });
+  return { root, commonDir, stateRoot, contract };
 }
 
-function preparedOperation() {
-  return prepareSubagentOperation({
-    task_contract: subagentContract(),
+async function preparedOperation(t, overrides = {}) {
+  const context = await fixture(t);
+  const operation = await prepareSubagentOperation({
+    stateRoot: context.stateRoot,
+    task_contract: context.contract,
     model: "gpt-5.6-terra",
     reasoning_effort: "high",
     fork_turns: "3",
     mode: "read",
     prompt_digest: DIGEST,
+    worktree_path: context.root,
+    now: Date.parse("2026-08-29T12:00:00Z"),
+    ...overrides,
   });
+  return { ...context, operation };
 }
 
-test("native subagent lifecycle binds exact selection and read-only task identity", () => {
-  const prepared = preparedOperation();
-  assert.equal(prepared.state, "prepared");
-  assert.match(prepared.operation_id, /^subagent-operation-v1-[a-f0-9]{64}$/);
-  assert.deepEqual(validateSubagentOperation(prepared), prepared);
-  assert.throws(
+test("native subagent preparation is durable and binds exact run, selection, coordinator, and Git authority", async (t) => {
+  const { stateRoot, contract, operation } = await preparedOperation(t);
+  assert.equal(operation.state, "prepared");
+  assert.match(operation.operation_id, /^subagent-operation-v1-[a-f0-9]{64}$/);
+  assert.equal(operation.run_id, contract.run_id);
+  assert.equal(operation.runtime_context_digest, contract.runtime_context_digest);
+  assert.equal(operation.initial_git_proof.cleanliness, "clean");
+  assert.deepEqual(validateSubagentOperation(operation), operation);
+  assert.deepEqual(await subagentOperationStatus({ stateRoot, operationId: operation.operation_id }), operation);
+  await assert.rejects(
     () => prepareSubagentOperation({
-      task_contract: subagentContract(),
+      stateRoot,
+      task_contract: contract,
       model: "gpt-5.6-terra",
       reasoning_effort: "high",
       fork_turns: "3",
       mode: "write",
       prompt_digest: DIGEST,
+      worktree_path: operation.initial_git_proof.root,
     }),
     /mode must be read/,
   );
-  assert.throws(
+  await assert.rejects(
     () => prepareSubagentOperation({
-      task_contract: subagentContract(),
+      stateRoot,
+      task_contract: contract,
       model: "gpt-5.6-terra",
       reasoning_effort: "ultra",
       fork_turns: "3",
       mode: "read",
       prompt_digest: DIGEST,
+      worktree_path: operation.initial_git_proof.root,
     }),
     /reasoning_effort must be one of/,
   );
 });
 
-test("only accepted coordinator dispositions unblock dependent contracts", () => {
-  const prepared = preparedOperation();
-  const created = reconcileCreatedSubagent(prepared, "native-agent-42");
-  const completed = completeSubagentOperation(created, {
+test("classified completion and accepted disposition persist and unblock dependency generation", async (t) => {
+  const { stateRoot, operation } = await preparedOperation(t);
+  const created = await reconcileCreatedSubagent({
+    stateRoot,
+    operationId: operation.operation_id,
+    agent_id: "native-agent-42",
+    now: Date.parse("2026-08-29T12:01:00Z"),
+  });
+  const completed = await completeSubagentOperation({
+    stateRoot,
+    operationId: created.operation_id,
+    classification: "PASS",
     summary: "The source establishes the required boundary.",
     evidence_digests: ["4".repeat(64)],
+    now: Date.parse("2026-08-29T12:02:00Z"),
   });
+  assert.equal(completed.result.classification, "PASS");
+  assert.deepEqual(completed.result.final_git_proof, completed.initial_git_proof);
   assert.equal(isSubagentDependencyUnblocked(completed), false);
   assert.throws(() => acceptedSubagentDependency(completed), /Only an accepted/);
-
-  const rejected = recordSubagentCoordinatorDisposition(completed, "rejected");
-  assert.equal(isSubagentDependencyUnblocked(rejected), false);
-  assert.throws(() => acceptedSubagentDependency(rejected), /Only an accepted/);
-
-  const accepted = recordSubagentCoordinatorDisposition(completed, "accepted");
-  assert.equal(isSubagentDependencyUnblocked(accepted), true);
-  assert.deepEqual(acceptedSubagentDependency(accepted), {
-    task_id: "evidence",
+  const accepted = await recordSubagentCoordinatorDisposition({
+    stateRoot,
+    operationId: completed.operation_id,
     disposition: "accepted",
-    result_digest: accepted.result.result_digest,
+    now: Date.parse("2026-08-29T12:03:00Z"),
   });
-  assert.throws(() => reconcileCreatedSubagent(accepted, "other-agent"), /Only a prepared/);
+  assert.equal(isSubagentDependencyUnblocked(accepted), true);
+  assert.deepEqual(acceptedSubagentDependency(accepted), accepted);
+  assert.deepEqual(await subagentOperationStatus({ stateRoot, operationId: accepted.operation_id }), accepted);
+  await assert.rejects(
+    () => reconcileCreatedSubagent({ stateRoot, operationId: accepted.operation_id, agent_id: "other-agent" }),
+    /Only a prepared/,
+  );
 });
 
-test("subagent operations reject mutable task-final authority and malformed evidence", () => {
-  const prepared = preparedOperation();
+test("non-PASS subagent evidence cannot be accepted but can be durably rejected", async (t) => {
+  const { stateRoot, operation } = await preparedOperation(t);
+  const created = await reconcileCreatedSubagent({
+    stateRoot,
+    operationId: operation.operation_id,
+    agent_id: "native-agent-blocked",
+  });
+  const completed = await completeSubagentOperation({
+    stateRoot,
+    operationId: created.operation_id,
+    classification: "BLOCKED",
+    summary: "The bounded source was unavailable.",
+    evidence_digests: [],
+  });
+  await assert.rejects(
+    () => recordSubagentCoordinatorDisposition({
+      stateRoot,
+      operationId: completed.operation_id,
+      disposition: "accepted",
+    }),
+    /Only a PASS/,
+  );
+  const rejected = await recordSubagentCoordinatorDisposition({
+    stateRoot,
+    operationId: completed.operation_id,
+    disposition: "rejected",
+  });
+  assert.equal(rejected.state, "rejected");
+  assert.equal(isSubagentDependencyUnblocked(rejected), false);
+});
+
+test("subagent completion fails closed when HEAD, branch ref, or worktree status changes", async (t) => {
+  const { root, stateRoot, operation } = await preparedOperation(t);
+  const created = await reconcileCreatedSubagent({
+    stateRoot,
+    operationId: operation.operation_id,
+    agent_id: "native-agent-dirty",
+  });
+  await writeFile(resolve(root, "unexpected.txt"), "write violation\n", "utf8");
+  await assert.rejects(
+    () => completeSubagentOperation({
+      stateRoot,
+      operationId: created.operation_id,
+      classification: "FAIL",
+      summary: "Write violation.",
+      evidence_digests: [],
+    }),
+    /changed Git HEAD.*worktree status/,
+  );
+  assert.equal((await subagentOperationStatus({ stateRoot, operationId: created.operation_id })).state, "created");
+});
+
+test("subagent operations reject mutable task-thread lifecycle fields and malformed evidence", async (t) => {
+  const { stateRoot, operation } = await preparedOperation(t);
   assert.throws(
-    () => validateSubagentOperation({ ...prepared, callback: { thread_id: "forbidden" } }),
+    () => validateSubagentOperation({ ...operation, callback: { thread_id: "forbidden" } }),
     /field is not allowed/,
   );
-  const created = reconcileCreatedSubagent(prepared, "native-agent-42");
-  assert.throws(
-    () => completeSubagentOperation(created, {
+  const created = await reconcileCreatedSubagent({
+    stateRoot,
+    operationId: operation.operation_id,
+    agent_id: "native-agent-42",
+  });
+  await assert.rejects(
+    () => completeSubagentOperation({
+      stateRoot,
+      operationId: created.operation_id,
+      classification: "PASS",
       summary: "Evidence",
       evidence_digests: ["not-a-digest"],
     }),
@@ -129,9 +241,11 @@ test("subagent operations reject mutable task-final authority and malformed evid
   );
 });
 
-test("v0.6 subagent schema makes native operations read-only and forbids Ultra", async () => {
+test("v0.6 subagent schema makes operations read-only, classified, Git-proven, and non-Ultra", async () => {
   const schema = JSON.parse(await readFile(resolve(packageRoot, "schemas/subagent-operation.schema.json"), "utf8"));
   assert.equal(schema.properties.mode.const, "read");
   assert.equal(schema.properties.reasoning_effort.enum.includes("ultra"), false);
-  assert.equal(schema.required.includes("coordinator_disposition"), true);
+  assert.equal(schema.required.includes("coordinator_binding"), true);
+  assert.equal(schema.required.includes("initial_git_proof"), true);
+  assert.deepEqual(schema.$defs.result.properties.classification.enum, ["PASS", "BLOCKED", "FAIL"]);
 });

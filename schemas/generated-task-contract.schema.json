@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://private.local/codex-flow/generated-task-contract.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "kind", "contract_id", "run_id", "runtime_context_digest",
+    "configuration_digest", "repository_id", "common_dir", "coordinator_binding",
+    "plan_id", "revision_digest", "task_id", "task_digest", "current_baseline",
+    "accepted_dependencies", "task"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "kind": { "const": "codex-flow-generated-task-contract" },
+    "contract_id": { "$ref": "#/$defs/digest" },
+    "run_id": { "$ref": "#/$defs/safeId" },
+    "runtime_context_digest": { "$ref": "#/$defs/digest" },
+    "configuration_digest": { "$ref": "#/$defs/digest" },
+    "repository_id": { "$ref": "#/$defs/safeId" },
+    "common_dir": { "type": "string", "minLength": 1, "maxLength": 2048 },
+    "coordinator_binding": { "$ref": "#/$defs/coordinatorBinding" },
+    "plan_id": { "$ref": "#/$defs/safeId" },
+    "revision_digest": { "$ref": "#/$defs/digest" },
+    "task_id": { "$ref": "#/$defs/safeId" },
+    "task_digest": { "$ref": "#/$defs/digest" },
+    "current_baseline": {
+      "type": "object", "additionalProperties": false, "required": ["revision"],
+      "properties": { "revision": { "$ref": "#/$defs/gitRevision" } }
+    },
+    "accepted_dependencies": {
+      "type": "array", "maxItems": 128,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["task_id", "authority_kind", "authority_id", "authority_digest", "result_digest"],
+        "properties": {
+          "task_id": { "$ref": "#/$defs/safeId" },
+          "authority_kind": { "enum": ["task-disposition", "subagent-operation"] },
+          "authority_id": { "$ref": "#/$defs/safeId" },
+          "authority_digest": { "$ref": "#/$defs/digest" },
+          "result_digest": { "$ref": "#/$defs/digest" }
+        }
+      }
+    },
+    "task": { "$ref": "workflow-plan.schema.json#/$defs/task" }
+  },
+  "$defs": {
+    "safeId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9_.-]+$" },
+    "digest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "gitRevision": { "type": "string", "pattern": "^[a-f0-9]{40,64}$" },
+    "coordinatorBinding": {
+      "type": "object", "additionalProperties": false,
+      "required": ["lineage_id", "thread_id", "generation", "binding_digest"],
+      "properties": {
+        "lineage_id": { "$ref": "#/$defs/safeId" },
+        "thread_id": { "type": "string", "minLength": 1, "maxLength": 256, "pattern": "^[A-Za-z0-9_.-]+$" },
+        "generation": { "type": "integer", "minimum": 1, "maximum": 2147483647 },
+        "binding_digest": { "$ref": "#/$defs/digest" }
+      }
+    }
+  }
+}
