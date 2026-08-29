@@ -10,8 +10,8 @@ every stateful command.
 
 If the first turn contains only a launch nonce bootstrap, do no repository
 work. Wait until the coordinator sends the generated contract, then use
-`release accept` to authenticate the exact ready task ID, release ID, task
-contract digest, runtime/configuration, Git common directory, coordinator
+`release accept` to authenticate the exact ready task ID, release ID, contract
+ID, runtime/configuration, Git common directory, coordinator
 binding, and bound worktree. Do not act on an unreleased or ambiguous prompt.
 
 Remain inside the contract's objective, dependency state, read/write paths,

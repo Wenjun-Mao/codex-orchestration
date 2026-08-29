@@ -75,8 +75,9 @@ run after disclosing:
 
 Run activation writes no tracked setup. Every stateful operation names its
 exact run ID; no command infers the newest run. One coordinator run may be
-active per clone/Git common directory. A normal close requires terminal
-reconciled state. Explicit abandonment releases the active slot but retains
+active per clone/Git common directory. A normal close requires a current,
+content-addressed terminal run audit over all reconciled state. Explicit
+abandonment releases the active slot but retains
 unresolved path, resource, branch, operation, callback, urgent, recipient, and
 lease fences.
 
@@ -198,7 +199,7 @@ The v0.6 CLI is pre-release; use `codex-flow --help` for exact flags. Its public
 lifecycle is organized around these command families:
 
 ```text
-run activate|status|resume|rebind|close|abandon
+run activate|status|resume|rebind|audit|close|abandon
 workflow create|revise|status|contract
 task create prepare|attempt|reconcile|status
 subagent prepare|created|complete|dispose|status
@@ -213,6 +214,9 @@ adopt plan|apply|status|retire-plan|retire-apply
 
 There is no public bare callback-consume command. Consumption is an internal
 exactly-once consequence of finalizing an authoritative disposition.
+`run audit` derives and persists the complete terminal closure proof;
+`run close` accepts only that exact audit while its source records remain
+unchanged.
 
 ## Permanent adoption and headless use
 

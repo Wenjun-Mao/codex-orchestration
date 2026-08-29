@@ -22,7 +22,8 @@ partial apply invalidates its plan; audit the remaining state and make a fresh
 one. Never delete by branch-name pattern or remove repository/product/user
 files through this workflow.
 
-Closing a run requires no unresolved fences. Explicit abandonment keeps every
-unresolved fence and lease durable; a later run may proceed only when its plan
-is disjoint. v0.6 does not prune runtime snapshots or import/remove retained
-v0.5 evidence.
+Closing a run requires a current passing `run audit`, which re-derives every
+source record and proves that no unresolved fence remains. A prior audit cannot
+authorize close after state drift. Explicit abandonment keeps every unresolved
+fence and lease durable; a later run may proceed only when its plan is disjoint.
+v0.6 does not prune runtime snapshots or import/remove retained v0.5 evidence.

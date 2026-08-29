@@ -29,8 +29,10 @@
    once.
 10. **Archive and clean:** reconcile native archive only after the full proof
     chain and managed-worktree reconciliation. Apply Git cleanup separately
-    from a reviewed exact-state plan, release leases/fences, then close the run.
-    Abandonment preserves unresolved fences.
+    from a reviewed exact-state plan and release eligible leases/fences.
+11. **Audit and close:** persist a content-addressed `run audit` over every
+    current lifecycle record, then close only while that exact terminal proof
+    remains current. Abandonment preserves unresolved fences.
 
 Every stateful command names the run explicitly. No phase infers the newest
 run, trusts a raw digest, or treats a task final as durable authority.

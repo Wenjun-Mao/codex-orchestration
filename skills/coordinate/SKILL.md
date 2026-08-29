@@ -24,7 +24,8 @@ operational state or creates a native task, disclose:
   or unavailable.
 
 An explicit orchestration request permits progressive run activation, not
-unmentioned external actions. Use `run activate|status|resume|rebind|close|abandon`.
+unmentioned external actions. Use
+`run activate|status|resume|rebind|audit|close|abandon`.
 There is no requirement for tracked `.codex/orchestration/`. Activation must
 snapshot the exact runtime under the exact-version Git-common namespace and
 fail closed on v0.5 tracked authority, runtime drift, a second active run, or
@@ -33,7 +34,8 @@ conflicting retained fences.
 ## Persist one workflow
 
 Use `workflow create|revise|status|contract` to persist one content-addressed
-plan and generate contracts; never hand-author packets beside the plan. Name:
+plan and generate contracts; never hand-author a parallel instruction or
+contract beside the plan. Name:
 
 - the primary outcome, nullable causal question, cheapest safe direct attempt,
   and instrument role for every task;
@@ -81,6 +83,9 @@ quiet and journal-only. A direct message or Steer is reserved for a persisted
 blocker, approval request, or high-risk drift with one identified attempt.
 
 Follow [Communication loop](../../templates/references/communication-loop.md)
-and hand terminal work to `codex-orchestration:integrate`. A normal run close
-requires reconciled terminal state. Abandonment releases the active slot but
-retains every unresolved fence and lease for later review.
+and hand terminal work to `codex-orchestration:integrate`. Before normal close,
+use `run audit` to persist the content-addressed terminal proof across every
+workflow claim, native operation, result, disposition, integration,
+verification, archive, fence, and lease. `run close` accepts only a current
+passing audit. Abandonment releases the active slot but retains every
+unresolved fence and lease for later review.
