@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { writeFile } from "node:fs/promises";
+import { readFile, realpath, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import test from "node:test";
 import {
@@ -10,9 +10,10 @@ import {
   verificationRecordDigest,
   verificationStatus,
 } from "../lib/verifications-v06.mjs";
-import { sha256 } from "../lib/core.mjs";
+import { sha256, stableStringify } from "../lib/core.mjs";
 import {
   recipientBindingDigest,
+  terminalCallbackIdForV3,
   validateTerminalReceiptV3,
 } from "../lib/task-results.mjs";
 import { createGitFixture, removeFixture } from "./helpers.mjs";
@@ -20,7 +21,7 @@ import { createGitFixture, removeFixture } from "./helpers.mjs";
 const digest = (character) => character.repeat(64);
 const NOW = Date.parse("2026-08-29T20:00:00Z");
 
-function receipt({ baseline, final = baseline, kind = "unchanged" }) {
+function receipt({ baseline, commonDir, final = baseline, kind = "unchanged" }) {
   const recipient = {
     lineage_id: "verification-lineage-v06",
     thread_id: "verification-coordinator-v06",
@@ -32,14 +33,17 @@ function receipt({ baseline, final = baseline, kind = "unchanged" }) {
       ...recipient,
       binding_digest: recipientBindingDigest(recipient),
     },
-    executor_id: "verification-executor-v06",
+    executor_thread_id: "verification-executor-v06",
     run_id: "verification-run-v06",
-    runtime_digest: digest("b"),
-    config_digest: digest("c"),
+    runtime_context_digest: digest("b"),
+    configuration_digest: digest("c"),
+    repository_id: "verification-repository-v06",
+    common_dir: commonDir,
     plan_id: "verification-plan-v06",
-    revision_id: "verification-revision-v06",
+    revision_digest: digest("d"),
     task_id: "verification-task-v06",
-    task_contract_digest: digest("d"),
+    task_digest: digest("e"),
+    contract_id: digest("f"),
     operation_id: "verification-operation-v06",
     release_id: "verification-release-v06",
     classification: "PASS",
@@ -82,6 +86,36 @@ function stateRoot(root) {
   return resolve(root, ".git", "codex-flow", "v0.6.0");
 }
 
+async function terminalReceipt({ root, baseline, final = baseline, kind = "unchanged" }) {
+  return receipt({
+    baseline,
+    final,
+    kind,
+    commonDir: await realpath(resolve(root, ".git")),
+  });
+}
+
+function canonicalIdentity(terminal) {
+  return {
+    callback_id: terminalCallbackIdForV3(terminal),
+    receipt_digest: sha256(stableStringify(terminal)),
+    recipient_binding_digest: terminal.recipient.binding_digest,
+    executor_thread_id: terminal.executor_thread_id,
+    run_id: terminal.run_id,
+    runtime_context_digest: terminal.runtime_context_digest,
+    configuration_digest: terminal.configuration_digest,
+    repository_id: terminal.repository_id,
+    common_dir: terminal.common_dir,
+    plan_id: terminal.plan_id,
+    revision_digest: terminal.revision_digest,
+    task_id: terminal.task_id,
+    task_digest: terminal.task_digest,
+    contract_id: terminal.contract_id,
+    operation_id: terminal.operation_id,
+    release_id: terminal.release_id,
+  };
+}
+
 test("combined verification persists content-addressed PASS and FAIL evidence idempotently", async () => {
   const root = await createGitFixture("codex-flow-v06-verification-");
   try {
@@ -89,7 +123,7 @@ test("combined verification persists content-addressed PASS and FAIL evidence id
       cwd: root,
       encoding: "utf8",
     }).trim();
-    const terminal = receipt({ baseline });
+    const terminal = await terminalReceipt({ root, baseline });
     const passInput = {
       stateRoot: stateRoot(root),
       repositoryPath: root,
@@ -136,13 +170,27 @@ test("combined verification persists content-addressed PASS and FAIL evidence id
     assert.equal(failed.checks[0].stdout_digest, sha256("out"));
     assert.equal(failed.checks[0].stderr_digest, sha256("err"));
 
+    const unavailableSource = await runCombinedVerification({
+      stateRoot: stateRoot(root),
+      repositoryPath: root,
+      receipt: terminal,
+      checks: [{
+        check_id: "source-disappeared",
+        argv: [resolve(root, "verification-source-that-does-not-exist")],
+      }],
+      now: NOW + 180_000,
+    });
+    assert.equal(unavailableSource.classification, "FAIL");
+    assert.equal(unavailableSource.checks[0].exit_code, 127);
+    assert.notEqual(unavailableSource.checks[0].stderr_digest, sha256(""));
+
     const status = await verificationStatus({
       stateRoot: stateRoot(root),
       runId: terminal.run_id,
     });
     assert.deepEqual(
       { total: status.total, pass: status.pass, fail: status.fail },
-      { total: 2, pass: 1, fail: 1 },
+      { total: 3, pass: 1, fail: 2 },
     );
     assert.throws(
       () => validateVerificationRecordV06({ ...passed, classification: "FAIL" }),
@@ -178,17 +226,16 @@ test("integration-scoped verification binds callback identity and reconciled mai
       cwd: root,
       encoding: "utf8",
     }).trim();
-    const terminal = receipt({ baseline, final: integrated, kind: "clean-commit" });
+    const terminal = await terminalReceipt({
+      root,
+      baseline,
+      final: integrated,
+      kind: "clean-commit",
+    });
     const scope = {
       integration_id: `integration-v1-${digest("e")}`,
       integration_record_digest: digest("f"),
-      run_id: terminal.run_id,
-      runtime_digest: terminal.runtime_digest,
-      config_digest: terminal.config_digest,
-      plan_id: terminal.plan_id,
-      revision_id: terminal.revision_id,
-      task_id: terminal.task_id,
-      task_contract_digest: terminal.task_contract_digest,
+      ...canonicalIdentity(terminal),
       main_branch: "main",
       reconciled_main_tip: integrated,
       outcome: "ancestor",
@@ -228,7 +275,7 @@ test("combined verification rejects repository authority and exact-state drift",
       cwd: root,
       encoding: "utf8",
     }).trim();
-    const terminal = receipt({ baseline });
+    const terminal = await terminalReceipt({ root, baseline });
     await assert.rejects(
       runCombinedVerification({
         stateRoot: stateRoot(other),
@@ -237,6 +284,23 @@ test("combined verification rejects repository authority and exact-state drift",
         checks: [{ check_id: "wrong-common-dir", argv: [process.execPath, "-e", "process.exit(0)"] }],
       }),
       /does not match the journal Git common directory/,
+    );
+
+    const wrongReceiptCommonDir = receipt({
+      baseline,
+      commonDir: await realpath(resolve(other, ".git")),
+    });
+    await assert.rejects(
+      runCombinedVerification({
+        stateRoot: stateRoot(root),
+        repositoryPath: root,
+        receipt: wrongReceiptCommonDir,
+        checks: [{
+          check_id: "wrong-receipt-common-dir",
+          argv: [process.execPath, "-e", "process.exit(0)"],
+        }],
+      }),
+      /does not match the terminal receipt common directory/,
     );
 
     await writeFile(resolve(root, "dirty.txt"), "dirty\n", "utf8");
@@ -252,5 +316,34 @@ test("combined verification rejects repository authority and exact-state drift",
   } finally {
     await removeFixture(root);
     await removeFixture(other);
+  }
+});
+
+test("verification schema exposes only canonical terminal and integration identities", async () => {
+  const schema = JSON.parse(await readFile(
+    resolve(import.meta.dirname, "..", "schemas", "verification-record.schema.json"),
+    "utf8",
+  ));
+  const identityFields = [
+    "callback_id", "receipt_digest", "recipient_binding_digest", "executor_thread_id",
+    "run_id", "runtime_context_digest", "configuration_digest", "repository_id",
+    "common_dir", "plan_id", "revision_digest", "task_id", "task_digest",
+    "contract_id", "operation_id", "release_id",
+  ];
+  assert.deepEqual(schema.properties.identity.required, identityFields);
+  const integration = schema.properties.integration_scope.oneOf[1];
+  assert.deepEqual(
+    integration.required,
+    [
+      "integration_id", "integration_record_digest", ...identityFields,
+      "main_branch", "reconciled_main_tip", "outcome",
+    ],
+  );
+  for (const alias of [
+    "executor_id", "runtime_digest", "config_digest", "revision_id",
+    "task_contract_digest",
+  ]) {
+    assert.equal(Object.hasOwn(schema.properties.identity.properties, alias), false);
+    assert.equal(Object.hasOwn(integration.properties, alias), false);
   }
 });
