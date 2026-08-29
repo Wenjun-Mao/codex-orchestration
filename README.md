@@ -12,11 +12,15 @@ The project has two deliberately separate layers:
   using only Node.js built-ins.
 
 This is not a daemon, secretary task, or MCP server. Each repository pins a
-reviewable runtime under `.codex/orchestration/`. Mutable recipient bindings,
-task-operation attempts, urgent-signal and callback journals, and leases live under that
-repository's Git common directory in an exact-release namespace such as
-`.git/codex-flow/v0.5.2-dev.0/`, so linked worktrees on the same release share the
-same coordination state.
+reviewable runtime under `.codex/orchestration/`. This repository's active
+pinned runtime remains the accepted `v0.5.1` release. Mutable recipient
+bindings, task-operation attempts, urgent-signal and callback journals live
+under a repository's Git common directory in that installed runtime's exact
+release namespace, so linked worktrees on the same release share coordination
+state. The editable `v0.5.2-dev.0` source owns
+`.git/codex-flow/v0.5.2-dev.0/` only after an explicit retirement and fresh
+installation; editing this checkout does not change the active v0.5.1 runtime
+or its namespace.
 
 ## Requirements
 
@@ -42,8 +46,10 @@ Replacing any earlier pinned runtime is a fresh installation on a dedicated
 branch: retain the old `.git/codex-flow/` evidence, explicitly remove the old
 tracked `.codex/orchestration/` runtime and configuration from that branch,
 then plan and apply the selected release. New operational records live only in
-that exact release's namespace, currently `.git/codex-flow/v0.5.2-dev.0/`; the
-current release neither reads nor deletes retained namespaces.
+the newly installed exact release's namespace. For example, an explicitly
+installed `v0.5.2-dev.0` runtime uses `.git/codex-flow/v0.5.2-dev.0/`; until
+then this repository continues to use its pinned v0.5.1 runtime and that
+runtime neither reads nor deletes retained namespaces.
 
 ## Source and private distribution
 
@@ -55,10 +61,12 @@ consumer runtime. See
 [ADR 0012](docs/adr/0012-public-source-private-distribution-and-release-tags.md).
 
 The editable source currently has the unreleased identity `0.5.2-dev.0`; the
-accepted marketplace artifact and repository-pinned consumer runtime remain
-`0.5.1`. During `npm run validate`, a matching annotated `v<version>` tag
-requires every packaged path to still match that tag. This prevents source
-changes from being packaged under an already accepted version; see
+accepted marketplace artifact and this repository's pinned consumer runtime
+remain `0.5.1`. An exact namespace for `0.5.2-dev.0` exists only if that
+development runtime is explicitly installed. During `npm run validate` and
+the `prepack` lifecycle, a matching annotated `v<version>` tag requires every
+relevant package path to still match that tag. This prevents source changes
+from being packaged under an already accepted version; see
 [ADR 0014](docs/adr/0014-post-release-development-identity.md).
 
 Install `codex-orchestration` from the personal Codex plugin marketplace. The

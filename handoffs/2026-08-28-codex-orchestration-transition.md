@@ -13,8 +13,7 @@ Before changing anything:
 
 1. Authenticate this repository, current branch, exact revision, cleanliness,
    remotes, and installed plugin version.
-2. Read `README.md`, `docs/coverage-v0.5.1.md`, ADRs 0007 through 0011 and
-   0014, and the
+2. Read `README.md`, `docs/coverage-v0.5.1.md`, ADRs 0007 through 0014, and the
    two latest field-test records named below.
 3. Preserve the accepted v0.5.1 package and private plugin installation until a
    newly scoped checkpoint is agreed.
@@ -39,14 +38,17 @@ Before changing anything:
 - Local `main` tracks `origin/main`. Release tag `v0.5.1` identifies the exact
   accepted source tip above; later handoff and governance commits are not part
   of that accepted package.
-- Local `main` was fast-forwarded through the accepted source and handoff-only
-  commits. It is the sole local branch and the sole registered worktree is this
-  repository path.
-- Eleven merged historical `codex/*` branches were deleted only after Git
-  proved each was an ancestor of the handoff tip. There were no unmerged or
-  remote branches and no stale worktree registrations.
-- The disposable `/Users/wjmao/projects/utility_projects/codex-flow-v05-heldout`
-  fixture root was confirmed absent during the final cleanup audit.
+### Historical acceptance topology
+
+At the final 2026-08-28 cleanup, local `main` had been fast-forwarded through
+the accepted source and handoff-only commits. That historical checkout then had
+one local branch and one registered worktree. Eleven merged historical
+`codex/*` branches were deleted only after Git proved each was an ancestor of
+the handoff tip; no unmerged or remote branches or stale worktree registrations
+were found. The disposable
+`/Users/wjmao/projects/utility_projects/codex-flow-v05-heldout` fixture root
+was also absent. This is acceptance evidence, not a claim about any later
+executor branch or worktree; authenticate current Git state before cleanup.
 
 The handoff-only commits at acceptance changed no packaged path. Accepted
 v0.5.1 package bytes remain exactly those at `d03cabf`. ADR 0014 records the
@@ -74,7 +76,9 @@ Because v0.5.1 is accepted, do not silently replace its behavior under the
 same version. The editable source now uses the unreleased `0.5.2-dev.0`
 identity and, if explicitly installed, its exact-release state namespace is
 `.git/codex-flow/v0.5.2-dev.0/`. Marketplace and UK Dev adoption remain
-separate explicit decisions.
+separate explicit decisions. The active repository-pinned runtime remains
+v0.5.1 and retains `.git/codex-flow/v0.5.1/` unless explicit retirement and
+fresh installation occur.
 
 ## Product intent
 
@@ -291,6 +295,9 @@ PASS does not automatically replace active runtimes elsewhere.
    stable project ID `codex-orchestration`, managed instructions, and a clean
    dedicated adoption worktree. Editable source remains distinct from the
    pinned consumer runtime.
+3. **Workflow record.** ADRs 0007 through 0014 are the durable workflow and
+   release-contract record. This handoff summarizes their transition context;
+   it does not supersede them.
 
 ## Open decisions and useful next work
 

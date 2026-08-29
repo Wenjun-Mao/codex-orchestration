@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 import {
   cp,
   lstat,
+  mkdir,
   mkdtemp,
   readFile,
   readdir,
@@ -170,7 +171,7 @@ for (const mismatch of ["package", "plugin", "runtime"]) {
   });
 }
 
-test("a different installed Codex Flow version requires explicit retirement", async () => {
+test("an installed v0.5.1 runtime requires explicit retirement without mutation", async () => {
   const cacheRoot = await createCachedPlugin();
   const repositoryRoot = await createGitFixture("codex-flow-breaking-reinstall-");
   try {
@@ -188,16 +189,28 @@ test("a different installed Codex Flow version requires explicit retirement", as
 
     const manifestPath = resolve(repositoryRoot, ".codex/orchestration/version.json");
     const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
-    manifest.package_version = "0.4.4";
+    manifest.package_version = "0.5.1";
     const retainedBytes = `${JSON.stringify(manifest, null, 2)}\n`;
     await writeFile(manifestPath, retainedBytes, "utf8");
+    const runtimeRoot = resolve(repositoryRoot, ".codex", "orchestration");
+    await writeFile(resolve(runtimeRoot, "v0.5.1-runtime-fixture.txt"), "accepted v0.5.1 runtime bytes\n", "utf8");
+    const retainedRuntime = await snapshotFiles(runtimeRoot);
+    const v051StateRoot = resolve(repositoryRoot, ".git", "codex-flow", "v0.5.1");
+    await mkdir(resolve(v051StateRoot, "callbacks"), { recursive: true });
+    await writeFile(
+      resolve(v051StateRoot, "callbacks", "retained-v0.5.1.json"),
+      "{\"schema_version\":2,\"retained\":true}\n",
+      "utf8",
+    );
+    const retainedState = await snapshotFiles(v051StateRoot);
 
     const planResult = runCachedCli(cacheRoot, ["init", "--plan", "--json"], repositoryRoot);
     assert.notEqual(planResult.status, 0);
     const plan = JSON.parse(planResult.stdout || planResult.stderr);
     assert.equal(plan.applicable, false);
     assert.ok(plan.conflicts.some((item) => item.code === "installed-package-version"));
-    assert.equal(await readFile(manifestPath, "utf8"), retainedBytes);
+    assert.deepEqual(await snapshotFiles(runtimeRoot), retainedRuntime);
+    assert.deepEqual(await snapshotFiles(v051StateRoot), retainedState);
     for (const bypassArgs of [
       ["--force"],
       [
@@ -218,7 +231,8 @@ test("a different installed Codex Flow version requires explicit retirement", as
       assert.ok(bypassPlan.conflicts.some(
         (item) => item.code === "installed-package-version",
       ));
-      assert.equal(await readFile(manifestPath, "utf8"), retainedBytes);
+      assert.deepEqual(await snapshotFiles(runtimeRoot), retainedRuntime);
+      assert.deepEqual(await snapshotFiles(v051StateRoot), retainedState);
     }
     const stateRoot = resolve(repositoryRoot, ".git", "codex-flow", `v${PACKAGE_VERSION}`);
     const stateBefore = await snapshotFiles(stateRoot);
@@ -249,7 +263,8 @@ test("a different installed Codex Flow version requires explicit retirement", as
     );
     assert.notEqual(apply.status, 0);
     assert.match(apply.stderr, /unresolved conflict/);
-    assert.equal(await readFile(manifestPath, "utf8"), retainedBytes);
+    assert.deepEqual(await snapshotFiles(runtimeRoot), retainedRuntime);
+    assert.deepEqual(await snapshotFiles(v051StateRoot), retainedState);
   } finally {
     await removeFixture(repositoryRoot);
     await rm(cacheRoot, { recursive: true, force: true });

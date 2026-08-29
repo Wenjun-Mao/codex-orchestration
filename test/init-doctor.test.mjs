@@ -139,7 +139,7 @@ test("v0.5 rejects older project configuration instead of migrating it", async (
   }
 });
 
-test("the current package version uses an exact-release state namespace and ignores retained earlier evidence", async () => {
+test("v0.5.2-dev.0 preserves retained v0.5.1 state in its exact-release namespace", async () => {
   const root = await createGitFixture("codex-flow-state-v05-");
   try {
     const v04Record = resolve(
@@ -160,19 +160,34 @@ test("the current package version uses an exact-release state namespace and igno
       "records",
       "pre-observation-policy.json",
     );
+    const v051Record = resolve(
+      root,
+      ".git",
+      "codex-flow",
+      "v0.5.1",
+      "callbacks",
+      "records",
+      "accepted-runtime-state.json",
+    );
     await mkdir(resolve(v04Record, ".."), { recursive: true });
     await mkdir(resolve(v05Record, ".."), { recursive: true });
+    await mkdir(resolve(v051Record, ".."), { recursive: true });
     await writeFile(v04Record, "{\"schema_version\":2}\n", "utf8");
     await writeFile(v05Record, "{\"schema_version\":8}\n", "utf8");
+    await writeFile(v051Record, "{\"schema_version\":2,\"accepted\":\"v0.5.1\"}\n", "utf8");
+    const v051StateRoot = resolve(root, ".git", "codex-flow", "v0.5.1");
+    const retainedV051State = await snapshotFiles(v051StateRoot);
 
     initializeFixture([], { cwd: root });
     const context = discoverGit(root);
     assert.equal(context.stateRoot, resolve(context.commonDir, "codex-flow", `v${PACKAGE_VERSION}`));
     assert.equal(await readFile(v04Record, "utf8"), "{\"schema_version\":2}\n");
     assert.equal(await readFile(v05Record, "utf8"), "{\"schema_version\":8}\n");
+    assert.deepEqual(await snapshotFiles(v051StateRoot), retainedV051State);
     const doctor = runCli(["doctor", "--json"], { cwd: root });
     assertSuccess(doctor, "current-version namespaced doctor");
     assert.equal(JSON.parse(doctor.stdout).ok, true);
+    assert.deepEqual(await snapshotFiles(v051StateRoot), retainedV051State);
   } finally {
     await removeFixture(root);
   }
