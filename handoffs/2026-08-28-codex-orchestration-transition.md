@@ -256,6 +256,27 @@ UK Dev `main` has not adopted v0.5.1. The successful disposable adoption pilot
 was deliberately left unmerged for a separate user decision. Do not infer that
 active pre-v0.5 tasks should be migrated.
 
+## Pilot-user model
+
+This repository is the sole authority for generic Codex Flow behavior.
+`TikTok mini games - consultant` is the primary reference pilot: it supplies a
+demanding real-world UK Dev workload and regularly tests candidate releases,
+but it is a consumer rather than a co-owner of the package.
+
+Use unrelated Python, utility, research, and other repositories as held-out
+users. Together, package fixtures, the reference pilot, and unrelated users
+form three validation rings. A lesson observed only in UK Dev is a candidate
+guardrail, not automatically a generic contract; review its transferability or
+confirm it with an unrelated fixture or user before broadening the package.
+
+Consumer projects must not patch generic Codex Flow locally. They should send
+identified field findings containing the exact package revision, pinned
+runtime, observed behavior, evidence boundary, absence or presence of a local
+workaround, and smallest requested generic decision. The package-owner task
+discusses and implements accepted generic corrections, then returns a new exact
+authority for another pilot. Adoption remains explicit per consumer; a pilot
+PASS does not automatically replace active runtimes elsewhere.
+
 ## Open decisions and useful next work
 
 1. **Repository branch and remote hygiene.** Decide whether to fast-forward
