@@ -56,7 +56,7 @@ async function fixture(t) {
       mode: "read",
       model: "gpt-5.6-terra",
       reasoning_effort: "high",
-      fork_turns: "all",
+      fork_turns: "3",
       dependencies: [],
       read_paths: ["docs/mission.md"],
       write_paths: [],
@@ -102,7 +102,7 @@ async function prepared(t, overrides = {}) {
     task_contract: context.contract,
     model: "gpt-5.6-terra",
     reasoning_effort: "high",
-    fork_turns: "all",
+    fork_turns: "3",
     mode: "read",
     prompt_digest: sha256(PROMPT),
     worktree_path: context.root,
@@ -123,7 +123,7 @@ test("one generated contract claims one prepared subagent operation and one disp
     task_contract: context.contract,
     model: "gpt-5.6-terra",
     reasoning_effort: "high",
-    fork_turns: "all",
+    fork_turns: "3",
     mode: "read",
     prompt_digest: sha256(PROMPT),
     worktree_path: context.root,
@@ -136,13 +136,27 @@ test("one generated contract claims one prepared subagent operation and one disp
       task_contract: context.contract,
       model: "gpt-5.6-terra",
       reasoning_effort: "high",
-      fork_turns: "all",
+      fork_turns: "3",
       mode: "read",
       prompt_digest: "f".repeat(64),
       worktree_path: context.root,
       now: START + 1_000,
     }),
     /already claimed by a different operation/,
+  );
+  await assert.rejects(
+    () => prepareSubagentOperation({
+      stateRoot: context.stateRoot,
+      task_contract: context.contract,
+      model: "gpt-5.6-terra",
+      reasoning_effort: "high",
+      fork_turns: "all",
+      mode: "read",
+      prompt_digest: sha256(PROMPT),
+      worktree_path: context.root,
+      now: START + 1_000,
+    }),
+    /full-history forks cannot override model routing/,
   );
 
   const attempt = await beginSubagentOperationAttempt({
@@ -158,11 +172,11 @@ test("one generated contract claims one prepared subagent operation and one disp
   assert.match(attempt.attempt.attempt_id, /^subagent-attempt-v1-[a-f0-9]{64}$/);
   assert.deepEqual(attempt.host_request, {
     kind: "spawn-native-subagent",
-    task_name: "bounded-review",
+    task_name: "flow_bounded_review_609add57253e",
     message: PROMPT,
     model: "gpt-5.6-terra",
     reasoning_effort: "high",
-    fork_turns: "all",
+    fork_turns: "3",
   });
   const {
     dispatch_permitted: ignoredDispatch,
