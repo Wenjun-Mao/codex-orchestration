@@ -9,6 +9,7 @@
     "audit_id",
     "evidence_digest",
     "authority",
+    "repository",
     "source_records",
     "blockers",
     "counts",
@@ -25,6 +26,7 @@
     },
     "evidence_digest": { "$ref": "#/$defs/digest" },
     "authority": { "$ref": "#/$defs/authority" },
+    "repository": { "$ref": "#/$defs/repositoryEvidence" },
     "source_records": {
       "type": "array",
       "maxItems": 100000,
@@ -68,6 +70,7 @@
         "bundle_digest",
         "configuration_digest",
         "policy_digest",
+        "repository_id",
         "repository_digest",
         "workflow_plan_id",
         "activated_revision_digest",
@@ -86,6 +89,7 @@
         "bundle_digest": { "$ref": "#/$defs/digest" },
         "configuration_digest": { "$ref": "#/$defs/digest" },
         "policy_digest": { "$ref": "#/$defs/digest" },
+        "repository_id": { "$ref": "#/$defs/safeId" },
         "repository_digest": { "$ref": "#/$defs/digest" },
         "workflow_plan_id": { "$ref": "#/$defs/safeId" },
         "activated_revision_digest": { "$ref": "#/$defs/digest" },
@@ -98,6 +102,66 @@
         },
         "run_binding_digest": { "$ref": "#/$defs/digest" },
         "run_activation_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "repositoryEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "root",
+        "common_dir",
+        "head_revision",
+        "branch",
+        "cleanliness",
+        "expected_source",
+        "expected_verification_id",
+        "expected_root",
+        "expected_common_dir",
+        "expected_head_revision",
+        "expected_branch"
+      ],
+      "properties": {
+        "root": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "common_dir": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "head_revision": {
+          "type": "string",
+          "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"
+        },
+        "branch": {
+          "oneOf": [
+            { "type": "null" },
+            { "type": "string", "minLength": 1, "maxLength": 256 }
+          ]
+        },
+        "cleanliness": { "enum": ["clean", "dirty"] },
+        "expected_source": {
+          "enum": ["activation-baseline", "combined-verification"]
+        },
+        "expected_verification_id": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "string",
+              "pattern": "^verification-v1-[0-9a-f]{64}$"
+            }
+          ]
+        },
+        "expected_root": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "expected_common_dir": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "expected_head_revision": {
+          "type": "string",
+          "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"
+        },
+        "expected_branch": {
+          "oneOf": [
+            { "type": "null" },
+            { "type": "string", "minLength": 1, "maxLength": 256 }
+          ]
+        }
       }
     },
     "sourceRecord": {
@@ -155,6 +219,8 @@
             "verification-not-pass",
             "archive-missing",
             "archive-incomplete",
+            "repository-dirty",
+            "repository-drift",
             "orphaned-authority",
             "conflicting-authority"
           ]

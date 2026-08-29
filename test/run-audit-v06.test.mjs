@@ -13,6 +13,7 @@ import { resolve } from "node:path";
 import test from "node:test";
 import {
   auditRunClosure,
+  closeRunFromAudit,
   readRunClosureAudit,
   runClosureAuditStatus,
   validateRunClosureAudit,
@@ -22,7 +23,12 @@ import {
   buildRuntimeContext,
   loadRuntimeBundleSource,
 } from "../lib/runtime-context.mjs";
-import { admitRun, buildFencePlan } from "../lib/run-lifecycle.mjs";
+import {
+  admitRun,
+  buildFencePlan,
+  readRun,
+  withActiveRunMutation,
+} from "../lib/run-lifecycle.mjs";
 import {
   coordinatorBindingDigest,
   createWorkflowPlanRevision,
@@ -51,20 +57,23 @@ import {
 import { bindRecipient } from "../lib/recipients.mjs";
 import { deliverCallbackV06, observeCallbackV06 } from "../lib/callbacks-v06.mjs";
 import {
+  cancelTaskBeforeExecution,
   finalizeTaskDisposition,
   prepareTaskDisposition,
-  validateDispositionRecord,
 } from "../lib/dispositions.mjs";
 import { validateTerminalReceiptV3 } from "../lib/task-results.mjs";
 import { runCombinedVerification } from "../lib/verifications-v06.mjs";
 import {
+  archiveIdFor,
   prepareTaskArchive,
   reconcileTaskArchive,
 } from "../lib/archive-lifecycle.mjs";
 import {
+  integrationVerificationRequest,
   prepareSerialIntegration,
   reconcileSerialIntegration,
 } from "../lib/integration-v06.mjs";
+import { sha256, stableStringify } from "../lib/core.mjs";
 import { createGitFixture, removeFixture } from "./helpers.mjs";
 
 const START = Date.parse("2026-08-29T19:00:00.000Z");
@@ -210,24 +219,16 @@ async function runFixture(t, suffix, task) {
     ...coordinator,
     binding_digest: coordinatorBindingDigest(coordinator),
   };
-  const authority = {
-    run_id: admitted.run.run_id,
-    runtime_context_digest: admitted.run.runtime_context_hash,
-    configuration_digest: admitted.run.binding.config_hash,
-    repository_id: `audit-repository-${suffix}`,
-    common_dir: commonDir,
-    coordinator_binding: coordinatorBinding,
-  };
   const contract = await persistWorkflowTaskContract({
     stateRoot,
     runId: admitted.run.run_id,
     planId: plan.plan_id,
     taskId: task.task_id,
     currentBaseline: { revision: baseline },
-    dependencyRecords: [],
-    authority,
+    dependencyAuthorities: [],
     now: at(4_000),
   });
+  assert.equal(contract.repository_id, admitted.run.binding.repository_hash);
   return {
     root,
     commonDir,
@@ -237,7 +238,6 @@ async function runFixture(t, suffix, task) {
     coordinatorBinding,
     plan,
     admitted,
-    authority,
     contract,
   };
 }
@@ -252,6 +252,41 @@ async function audit(context, offset = 100_000) {
     runId: context.admitted.run.run_id,
     now: at(offset),
   });
+}
+
+async function completeRejectedSubagent(context, suffix, offset = 20_000) {
+  const operation = await prepareSubagentOperation({
+    stateRoot: context.stateRoot,
+    task_contract: context.contract,
+    model: context.contract.task.model,
+    reasoning_effort: context.contract.task.reasoning_effort,
+    fork_turns: context.contract.task.fork_turns,
+    mode: "read",
+    prompt_digest: digest("d"),
+    worktree_path: context.root,
+    now: at(offset),
+  });
+  await reconcileCreatedSubagent({
+    stateRoot: context.stateRoot,
+    operationId: operation.operation_id,
+    agent_id: `audit-agent-${suffix}`,
+    now: at(offset + 1_000),
+  });
+  await completeSubagentOperation({
+    stateRoot: context.stateRoot,
+    operationId: operation.operation_id,
+    classification: "FAIL",
+    summary: `The bounded ${suffix} operation reached a terminal rejected result.`,
+    evidence_digests: [],
+    now: at(offset + 2_000),
+  });
+  await recordSubagentCoordinatorDisposition({
+    stateRoot: context.stateRoot,
+    operationId: operation.operation_id,
+    disposition: "rejected",
+    now: at(offset + 3_000),
+  });
+  return operation;
 }
 
 async function prepareVisible(context, suffix, { ready = false } = {}) {
@@ -417,7 +452,7 @@ test("terminal subagent authority produces one idempotent closure proof and stal
     now: at(15_000),
   });
   const completed = await audit(context, 103_000);
-  assert.equal(completed.audit.terminal_ready, true);
+  assert.equal(completed.audit.terminal_ready, true, JSON.stringify(completed.audit.blockers));
   assert.deepEqual(validateRunClosureAudit(completed.audit), completed.audit);
   const replay = await audit(context, 104_000);
   assert.equal(replay.status, "existing");
@@ -457,8 +492,7 @@ test("terminal subagent authority produces one idempotent closure proof and stal
     planId: context.plan.plan_id,
     taskId: nextTask.task_id,
     currentBaseline: { revision: context.baseline },
-    dependencyRecords: [],
-    authority: context.authority,
+    dependencyAuthorities: [],
     now: at(17_000),
   });
   const stale = await runClosureAuditStatus({
@@ -474,6 +508,97 @@ test("terminal subagent authority produces one idempotent closure proof and stal
     runId: context.admitted.run.run_id,
     auditId: completed.audit.audit_id,
   })).audit, completed.audit);
+});
+
+test("active-run mutation authority serializes commands and closes only from a current audit", async (t) => {
+  const context = await runFixture(t, "atomic-close", subagentTask("atomic-close"));
+  await completeRejectedSubagent(context, "atomic-close");
+  const terminal = await audit(context, 120_000);
+  assert.equal(terminal.audit.terminal_ready, true);
+
+  let releaseMutation;
+  let mutationStarted;
+  const release = new Promise((resolvePromise) => { releaseMutation = resolvePromise; });
+  const started = new Promise((resolvePromise) => { mutationStarted = resolvePromise; });
+  const holding = withActiveRunMutation({
+    gitCommonDirectory: context.commonDir,
+    runId: context.admitted.run.run_id,
+  }, async ({ run, commonDir, path }) => {
+    assert.equal(run.run_id, context.admitted.run.run_id);
+    assert.equal(commonDir, context.commonDir);
+    assert.equal(path, resolve(context.stateRoot, "runs", "lifecycle.json"));
+    mutationStarted();
+    await release;
+    return run.run_id;
+  });
+  await started;
+  await assert.rejects(
+    withActiveRunMutation({
+      gitCommonDirectory: context.commonDir,
+      runId: context.admitted.run.run_id,
+    }, async () => null),
+    /active run mutation .* already in progress/,
+  );
+  releaseMutation();
+  assert.equal(await holding, context.admitted.run.run_id);
+
+  const closed = await closeRunFromAudit({
+    stateRoot: context.stateRoot,
+    gitCommonDirectory: context.commonDir,
+    runId: context.admitted.run.run_id,
+    resume: context.admitted.run.binding,
+    auditId: terminal.audit.audit_id,
+    closedAt: new Date(at(130_000)).toISOString(),
+  });
+  assert.equal(closed.run.status, "closed");
+  assert.equal((await readRun({
+    gitCommonDirectory: context.commonDir,
+    runId: context.admitted.run.run_id,
+  })).run.status, "closed");
+  await assert.rejects(
+    withActiveRunMutation({
+      gitCommonDirectory: context.commonDir,
+      runId: context.admitted.run.run_id,
+    }, async () => null),
+    /is not active/,
+  );
+});
+
+test("closure evidence binds live Git state and stales on dirt or baseline drift", async (t) => {
+  const context = await runFixture(t, "git-drift", subagentTask("git-drift"));
+  await completeRejectedSubagent(context, "git-drift");
+  const terminal = await audit(context, 120_000);
+  assert.equal(terminal.audit.terminal_ready, true);
+  assert.equal(terminal.audit.repository.expected_source, "activation-baseline");
+  assert.equal(terminal.audit.repository.head_revision, context.baseline);
+  assert.equal(terminal.audit.repository.branch, "main");
+  assert.equal(terminal.audit.repository.cleanliness, "clean");
+
+  const dirtyPath = resolve(context.root, "untracked-after-audit.txt");
+  await writeFile(dirtyPath, "dirty\n", "utf8");
+  const dirtyStatus = await runClosureAuditStatus({
+    stateRoot: context.stateRoot,
+    runId: context.admitted.run.run_id,
+    auditId: terminal.audit.audit_id,
+  });
+  assert.equal(dirtyStatus.current, false);
+  assert.equal(dirtyStatus.close_permitted, false);
+  assert(dirtyStatus.blockers.some((blocker) => blocker.code === "repository-dirty"));
+  await assert.rejects(closeRunFromAudit({
+    stateRoot: context.stateRoot,
+    runId: context.admitted.run.run_id,
+    resume: context.admitted.run.binding,
+    auditId: terminal.audit.audit_id,
+    closedAt: new Date(at(130_000)).toISOString(),
+  }), /current terminal-ready/);
+
+  git(context.root, ["add", "untracked-after-audit.txt"]);
+  git(context.root, ["commit", "--quiet", "-m", "post-audit drift"]);
+  const drifted = await audit(context, 131_000);
+  assert.equal(drifted.audit.repository.cleanliness, "clean");
+  assert.equal(drifted.audit.terminal_ready, false);
+  assert(blockerCodes(drifted).has("repository-drift"));
+  assert.notEqual(drifted.audit.audit_id, terminal.audit.audit_id);
 });
 
 test("audit fails closed on persisted audit tampering", async (t) => {
@@ -564,7 +689,12 @@ test("non-created, retained-blocked, and durably cancelled visible paths remain 
     reasonCode: "host-rejected-before-create",
     now: at(7_000),
   });
-  assert.equal((await audit(notCreated)).audit.terminal_ready, true);
+  const notCreatedAudit = await audit(notCreated);
+  assert.equal(
+    notCreatedAudit.audit.terminal_ready,
+    true,
+    JSON.stringify(notCreatedAudit.audit.blockers),
+  );
 
   const blocked = await runFixture(t, "retained-blocked", taskThread("retained-blocked"));
   const blockedVisible = await prepareVisible(blocked, "retained-blocked", { ready: true });
@@ -604,45 +734,24 @@ test("non-created, retained-blocked, and durably cancelled visible paths remain 
 
   const cancelled = await runFixture(t, "cancelled", taskThread("cancelled"));
   const cancelledVisible = await prepareVisible(cancelled, "cancelled", { ready: true });
-  const cancelledRelease = await acceptRelease(cancelled, cancelledVisible, "cancelled");
-  const dispositionId = "audit-cancelled-disposition";
-  const cancellation = validateDispositionRecord({
-    schema_version: 1,
-    kind: "codex-flow-v06-task-disposition",
-    disposition_id: dispositionId,
-    run_id: cancelled.contract.run_id,
-    runtime_context_digest: cancelled.contract.runtime_context_digest,
-    configuration_digest: cancelled.contract.configuration_digest,
-    repository_id: cancelled.contract.repository_id,
-    common_dir: cancelled.contract.common_dir,
-    coordinator_binding: cancelled.contract.coordinator_binding,
-    plan_id: cancelled.contract.plan_id,
-    revision_digest: cancelled.contract.revision_digest,
-    task_id: cancelled.contract.task_id,
-    task_digest: cancelled.contract.task_digest,
-    contract_id: cancelled.contract.contract_id,
-    operation_id: cancelledVisible.creation.operation_id,
-    release_id: cancelledRelease.prepared.release_id,
-    executor_thread_id: cancelledVisible.readyThreadId,
-    callback_id: null,
-    receipt_digest: null,
-    decision: "cancelled",
-    reason: "The coordinator durably cancelled the task and keeps it visible.",
-    integration_id: null,
-    verification_id: null,
-    verification_digest: null,
-    state: "completed",
-    prepared_at: new Date(at(12_000)).toISOString(),
-    finalized_at: new Date(at(13_000)).toISOString(),
-    callback_consumed_at: new Date(at(14_000)).toISOString(),
+  const cancelledRelease = await prepareTaskRelease({
+    stateRoot: cancelled.stateRoot,
+    taskContract: cancelled.contract,
+    operationId: cancelledVisible.creation.operation_id,
+    now: at(8_000),
   });
-  const dispositionRoot = resolve(cancelled.stateRoot, "dispositions", "records");
-  await mkdir(dispositionRoot, { recursive: true });
-  await writeFile(
-    resolve(dispositionRoot, `${dispositionId}.json`),
-    `${JSON.stringify(cancellation, null, 2)}\n`,
-    "utf8",
-  );
+  await reconcileTaskRelease({
+    stateRoot: cancelled.stateRoot,
+    releaseId: cancelledRelease.release_id,
+    outcome: "rejected-before-send",
+    now: at(9_000),
+  });
+  await cancelTaskBeforeExecution({
+    stateRoot: cancelled.stateRoot,
+    releaseId: cancelledRelease.release_id,
+    reason: "The coordinator durably cancelled before objective delivery.",
+    now: at(10_000),
+  });
   const cancelledAudit = await audit(cancelled, 102_000);
   assert.equal(cancelledAudit.audit.terminal_ready, true);
   assert.equal(cancelledAudit.audit.counts.archives, 0);
@@ -764,6 +873,43 @@ test("accepted no-change task advances through release, callback, proof, disposi
   assert.equal(terminal.audit.terminal_ready, true);
   assert.deepEqual(terminal.audit.blockers, []);
   assert.equal(terminal.audit.counts.archives, 1);
+  assert.equal(terminal.audit.repository.expected_source, "combined-verification");
+  assert.equal(
+    terminal.audit.repository.expected_verification_id,
+    verification.verification_id,
+  );
+
+  const archivePath = resolve(
+    context.stateRoot,
+    "archives",
+    "records",
+    `${archive.archive_id}.json`,
+  );
+  const tamperedArchive = {
+    ...JSON.parse(await readFile(archivePath, "utf8")),
+    archive_id: "pending",
+    callback_id: "mismatched-callback",
+  };
+  tamperedArchive.host_intent.attempt_id = "pending";
+  tamperedArchive.archive_id = archiveIdFor(tamperedArchive);
+  tamperedArchive.host_intent.attempt_id = `archive-attempt-v1-${sha256(
+    tamperedArchive.archive_id,
+  )}`;
+  await rm(archivePath);
+  await writeFile(
+    resolve(
+      context.stateRoot,
+      "archives",
+      "records",
+      `${tamperedArchive.archive_id}.json`,
+    ),
+    `${JSON.stringify(tamperedArchive, null, 2)}\n`,
+    "utf8",
+  );
+  await assert.rejects(
+    audit(context, 109_000),
+    /exact callback authority/,
+  );
 });
 
 test("prepared and unsafe integrations remain explicit closure blockers", async (t) => {
@@ -820,4 +966,97 @@ test("prepared and unsafe integrations remain explicit closure blockers", async 
   result = await audit(context, 102_000);
   assert(blockerCodes(result).has("integration-unsafe"));
   assert.equal(result.audit.terminal_ready, false);
+});
+
+test("safe integration must preserve its exact combined-verification digest", async (t) => {
+  const context = await runFixture(t, "integration-proof", taskThread("integration-proof", {
+    write_paths: ["audit-integration-proof.txt"],
+  }));
+  const visible = await prepareVisible(context, "integration-proof", { ready: true });
+  const release = await acceptRelease(context, visible, "integration-proof");
+  const executorBranch = "codex/run-audit-integration-proof";
+  git(context.root, ["checkout", "-q", "-b", executorBranch]);
+  await writeFile(
+    resolve(context.root, "audit-integration-proof.txt"),
+    "integration proof\n",
+    "utf8",
+  );
+  git(context.root, ["add", "audit-integration-proof.txt"]);
+  git(context.root, ["commit", "--quiet", "-m", "audit integration proof"]);
+  const executorTip = git(context.root, ["rev-parse", "HEAD"]);
+  git(context.root, ["checkout", "-q", "main"]);
+  const payload = receipt(context, visible, release, {
+    kind: "clean-commit",
+    baseline_revision: context.baseline,
+    commit: executorTip,
+    branch: executorBranch,
+    upstream: null,
+    cleanliness: "clean",
+  });
+  const delivered = await deliverCallbackV06({ stateRoot: context.stateRoot, receipt: payload });
+  await observeCallbackV06({
+    stateRoot: context.stateRoot,
+    callbackId: delivered.callback_id,
+    recipient: context.coordinator,
+  });
+  const disposition = await prepareTaskDisposition({
+    stateRoot: context.stateRoot,
+    callbackId: delivered.callback_id,
+    decision: "accepted-for-integration",
+    reason: "The exact clean commit is eligible for integration proof.",
+  });
+  const integration = await prepareSerialIntegration({
+    stateRoot: context.stateRoot,
+    repositoryPath: context.root,
+    dispositionId: disposition.disposition_id,
+    mainBranch: "main",
+  });
+  git(context.root, ["merge", "--quiet", "--ff-only", executorBranch]);
+  const verificationRequest = await integrationVerificationRequest({
+    stateRoot: context.stateRoot,
+    repositoryPath: context.root,
+    integrationId: integration.integration_id,
+  });
+  const verification = await runCombinedVerification({
+    stateRoot: context.stateRoot,
+    repositoryPath: context.root,
+    receipt: verificationRequest.receipt,
+    integrationScope: verificationRequest.integration_scope,
+    checks: [{
+      check_id: "run-audit-integration-proof",
+      argv: [process.execPath, "-e", "process.exit(0)"],
+    }],
+  });
+  const reconciled = await reconcileSerialIntegration({
+    stateRoot: context.stateRoot,
+    repositoryPath: context.root,
+    integrationId: integration.integration_id,
+    verificationId: verification.verification_id,
+  });
+  const beforeTamper = await audit(context, 110_000);
+  assert(blockerCodes(beforeTamper).has("disposition-unfinalized"));
+  assert.equal(beforeTamper.audit.repository.expected_verification_id, verification.verification_id);
+
+  const integrationPath = resolve(
+    context.stateRoot,
+    "integration-lifecycle",
+    "records",
+    `${integration.integration_id}.json`,
+  );
+  const tampered = JSON.parse(await readFile(integrationPath, "utf8"));
+  tampered.combined_verification_digest = digest("b");
+  tampered.reconciliation_digest = sha256(stableStringify({
+    integration_id: tampered.integration_id,
+    outcome: tampered.outcome,
+    reconciled_main_tip: tampered.reconciled_main_tip,
+    executor_tip: tampered.executor_tip,
+    verification_id: tampered.verification_id,
+    combined_verification_digest: tampered.combined_verification_digest,
+  }));
+  await writeFile(integrationPath, `${JSON.stringify(tampered, null, 2)}\n`, "utf8");
+  assert.equal(reconciled.safe_to_finalize, true);
+  await assert.rejects(
+    audit(context, 111_000),
+    /exact combined verification authority/,
+  );
 });
