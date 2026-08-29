@@ -14,10 +14,10 @@ The project has two deliberately separate layers:
 This is not a daemon, secretary task, or MCP server. Each repository pins a
 reviewable runtime under `.codex/orchestration/`. This repository's active
 pinned runtime remains the accepted `v0.5.1` release. Mutable recipient
-bindings, task-operation attempts, urgent-signal and callback journals live
-under a repository's Git common directory in that installed runtime's exact
-release namespace, so linked worktrees on the same release share coordination
-state. The editable `v0.5.2-dev.0` source owns
+bindings, task-operation attempts, urgent-signal and callback journals, and
+leases live under a repository's Git common directory in that installed
+runtime's exact release namespace, so linked worktrees on the same release
+share coordination state. The editable `v0.5.2-dev.0` source owns
 `.git/codex-flow/v0.5.2-dev.0/` only after an explicit retirement and fresh
 installation; editing this checkout does not change the active v0.5.1 runtime
 or its namespace.
