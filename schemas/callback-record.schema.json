@@ -27,7 +27,7 @@
       "additionalProperties": false,
       "required": ["persisted_at", "observed_at", "consumed_at"],
       "properties": {
-        "persisted_at": { "type": "string", "format": "date-time" },
+        "persisted_at": { "$ref": "#/$defs/timestamp" },
         "observed_at": { "$ref": "#/$defs/nullableTimestamp" },
         "consumed_at": { "$ref": "#/$defs/nullableTimestamp" }
       }
@@ -54,7 +54,12 @@
       "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/recipient" }]
     },
     "nullableTimestamp": {
-      "oneOf": [{ "type": "null" }, { "type": "string", "format": "date-time" }]
+      "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/timestamp" }]
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "maxLength": 64
     }
   }
 }

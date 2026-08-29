@@ -40,7 +40,7 @@
     "verification_id": { "$ref": "#/$defs/nullableVerificationId" },
     "verification_digest": { "$ref": "#/$defs/nullableDigest" },
     "state": { "enum": ["prepared", "finalized", "completed"] },
-    "prepared_at": { "type": "string", "format": "date-time" },
+    "prepared_at": { "$ref": "#/$defs/timestamp" },
     "finalized_at": { "$ref": "#/$defs/nullableTimestamp" },
     "callback_consumed_at": { "$ref": "#/$defs/nullableTimestamp" }
   },
@@ -85,7 +85,12 @@
       "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/verificationId" }]
     },
     "nullableTimestamp": {
-      "oneOf": [{ "type": "null" }, { "type": "string", "format": "date-time" }]
+      "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/timestamp" }]
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "maxLength": 64
     }
   }
 }

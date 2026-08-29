@@ -35,7 +35,7 @@
     "contract_id": { "$ref": "#/$defs/digest" },
     "operation_id": { "$ref": "#/$defs/safeId" },
     "release_id": { "$ref": "#/$defs/safeId" },
-    "executor_thread_id": { "$ref": "#/$defs/safeId" },
+    "executor_thread_id": { "$ref": "#/$defs/threadId" },
     "release_record_digest": { "$ref": "#/$defs/digest" },
     "callback_id": { "$ref": "#/$defs/safeId" },
     "receipt_digest": { "$ref": "#/$defs/digest" },
@@ -113,10 +113,16 @@
       "required": ["lineage_id", "thread_id", "generation", "binding_digest"],
       "properties": {
         "lineage_id": { "$ref": "#/$defs/safeId" },
-        "thread_id": { "$ref": "#/$defs/safeId" },
+        "thread_id": { "$ref": "#/$defs/threadId" },
         "generation": { "type": "integer", "minimum": 1, "maximum": 2147483647 },
         "binding_digest": { "$ref": "#/$defs/digest" }
       }
+    },
+    "threadId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9_.-]+$"
     },
     "verificationId": {
       "type": "string",

@@ -96,7 +96,7 @@
         "PROOF_HARNESS": { "type": "number", "minimum": 0 }
       }
     },
-    "completed_at": { "type": "string", "format": "date-time" }
+    "completed_at": { "$ref": "#/$defs/timestamp" }
   },
   "allOf": [
     {
@@ -128,6 +128,11 @@
       "minLength": 1,
       "maxLength": 256,
       "pattern": "^[A-Za-z0-9_.-]+$"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "maxLength": 64
     },
     "nullableRef": {
       "oneOf": [
