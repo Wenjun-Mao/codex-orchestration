@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://private.local/codex-flow/subagent-operation.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "kind", "operation_id", "task_contract_id", "plan_id", "revision_digest", "task_id", "task_digest",
+    "mode", "model", "reasoning_effort", "fork_turns", "prompt_digest", "state", "agent_id", "result", "coordinator_disposition"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "kind": { "const": "codex-flow-native-subagent-operation" },
+    "operation_id": { "type": "string", "pattern": "^subagent-operation-v1-[a-f0-9]{64}$" },
+    "task_contract_id": { "$ref": "#/$defs/digest" }, "plan_id": { "$ref": "#/$defs/safeId" },
+    "revision_digest": { "$ref": "#/$defs/digest" }, "task_id": { "$ref": "#/$defs/safeId" }, "task_digest": { "$ref": "#/$defs/digest" },
+    "mode": { "const": "read" }, "model": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "reasoning_effort": { "enum": ["none", "minimal", "low", "medium", "high", "xhigh", "max"] },
+    "fork_turns": { "$ref": "#/$defs/forkTurns" }, "prompt_digest": { "$ref": "#/$defs/digest" },
+    "state": { "enum": ["prepared", "created", "completed", "accepted", "rejected"] },
+    "agent_id": { "oneOf": [{ "type": "null" }, { "type": "string", "minLength": 1, "maxLength": 256 }] },
+    "result": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/result" }] },
+    "coordinator_disposition": { "enum": [null, "accepted", "rejected"] }
+  },
+  "$defs": {
+    "safeId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9_.-]+$" },
+    "digest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "forkTurns": { "oneOf": [{ "const": "none" }, { "const": "all" }, { "type": "string", "pattern": "^[1-9][0-9]{0,5}$" }] },
+    "result": {
+      "type": "object", "additionalProperties": false,
+      "required": ["summary", "evidence_digests", "result_digest"],
+      "properties": {
+        "summary": { "type": "string", "minLength": 1, "maxLength": 4000 },
+        "evidence_digests": { "type": "array", "maxItems": 128, "uniqueItems": true, "items": { "$ref": "#/$defs/digest" } },
+        "result_digest": { "$ref": "#/$defs/digest" }
+      }
+    }
+  }
+}
