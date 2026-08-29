@@ -408,6 +408,9 @@ defines the v0.5.1 placement-evidence and terminal-bootstrap contract.
 tags](docs/adr/0012-public-source-private-distribution-and-release-tags.md)
 defines repository visibility, licensing, distribution, and immutable release
 identity.
+[Source repository self-hosting](docs/adr/0013-source-repository-self-hosting.md)
+defines how this project consumes its own accepted plugin without making the
+editable source tree its runtime authority.
 The current covered boundary is listed in
 [v0.5.1 orchestration coverage](docs/coverage-v0.5.1.md), with the accepted
 [UK Dev exact-state replay](docs/field-tests/2026-08-28-uk-dev-v0.5.1-exact-state-replay.md).

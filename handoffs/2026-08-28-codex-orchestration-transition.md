@@ -281,21 +281,22 @@ PASS does not automatically replace active runtimes elsewhere.
    the canonical shared history, while the personal marketplace remains the
    supported private distribution channel. Immutable annotated release tags
    bind exact accepted source tips. ADR 0012 records the full decision.
+2. **Self-hosting.** The user chose this source repository as a first-party
+   consumer. ADR 0013 requires adoption through the exact installed plugin,
+   stable project ID `codex-orchestration`, managed instructions, and a clean
+   dedicated adoption worktree. Editable source remains distinct from the
+   pinned consumer runtime.
 
 ## Open decisions and useful next work
 
-1. **Self-hosting.** This repository has no `AGENTS.md` and is not itself pinned
-   as a Codex Flow target. Decide whether the package source should self-host
-   its own runtime or remain the canonical external authority. Do not bootstrap
-   it automatically; avoid a circular or duplicate authority model.
-2. **wait_threads multi-wave field proof.** v0.4.3 guidance is source-tested,
+1. **wait_threads multi-wave field proof.** v0.4.3 guidance is source-tested,
    and later single-task pilots used the waiter, but a natural path-disjoint
    multi-task wave has not yet provided the intended held-out proof. Use the
    next genuine parallel wave rather than manufacturing work.
-3. **UK Dev adoption.** v0.5.1 is suitable for newly launched UK Dev executors,
+2. **UK Dev adoption.** v0.5.1 is suitable for newly launched UK Dev executors,
    but merging its disposable pilot or updating UK Dev `main` is a separate
    explicit choice owned with the consultant task.
-4. **Future versioning.** Keep exact-release state isolation and the breaking
+3. **Future versioning.** Keep exact-release state isolation and the breaking
    pre-stable policy. Revisit migration/compatibility only if the user later
    declares a stable supported compatibility boundary.
 
