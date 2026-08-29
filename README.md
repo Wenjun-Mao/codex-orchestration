@@ -4,6 +4,24 @@ Codex Orchestration is publicly readable source for privately distributed,
 repository-portable Codex coordination. Public visibility does not grant an
 open-source license: the source and package remain `UNLICENSED`.
 
+## Mission
+
+Codex Orchestration enables a lead Codex task, often using a stronger model,
+to coordinate multiple separate, user-visible Codex tasks, often using cheaper
+or specialized models, as one safe and accountable repository workflow. It
+preserves delegation intent, dependencies, ownership, task and Git identity,
+non-disruptive result delivery, and exactly-once integration across task
+boundaries while leaving native task execution, model selection, and any
+host-managed worktree lifecycle to the Codex host.
+
+The plugin consumes native Codex capabilities instead of recreating them. Its
+product boundary is the cross-task governance that must remain durable while
+the coordinator and executor tasks work independently. See
+[Mission and product boundary](docs/mission.md) for the promises, responsibility
+boundary, non-goals, and feature-admission test.
+
+## Architecture and runtime authority
+
 The project has two deliberately separate layers:
 
 - `codex-orchestration` is a Codex plugin that teaches coordinator, executor,
