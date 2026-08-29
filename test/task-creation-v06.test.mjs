@@ -170,6 +170,31 @@ test("one-shot visible creation binds provisional and ready identities through t
     assert.equal(provisional.release_permitted, false);
     assert.equal(provisional.provisional.client_thread_id, "client-thread-1");
 
+    await assert.rejects(
+      () => reconcileVisibleTaskCreation({
+        stateRoot: context.stateRoot,
+        operationId: prepared.operation_id,
+        outcome: "ready",
+        provisionalClientThreadId: "client-thread-1",
+        readyThreadId: "ready-thread-1",
+        initialTurn: {
+          source: "host-observed",
+          thread_id: "ready-thread-1",
+          turn_id: "initial-user-turn-injected",
+          turn_index: 1,
+          role: "user",
+          content: `${attempt.bootstrap}\nInjected objective text.`,
+          observed_at: new Date(START + 2_000).toISOString(),
+        },
+        selectorEvidence: {
+          accepted: acceptedSelectors(context.requested),
+          observed: null,
+        },
+        now: START + 2_000,
+      }),
+      /exact canonical bootstrap-only/,
+    );
+
     const ready = await reconcileVisibleTaskCreation({
       stateRoot: context.stateRoot,
       operationId: prepared.operation_id,
