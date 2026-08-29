@@ -19,15 +19,21 @@ import {
   persistWorkflowTaskContract,
 } from "../lib/workflow-journal-v06.mjs";
 import {
-  activateV06FixtureRun,
   createGitFixture,
   packageRoot,
   removeFixture,
 } from "./helpers.mjs";
+import {
+  acquireRuntimeContext,
+  buildRuntimeContext,
+  loadRuntimeBundleSource,
+} from "../lib/runtime-context.mjs";
+import { admitRun, buildFencePlan } from "../lib/run-lifecycle.mjs";
+import { gitSnapshot } from "../lib/git.mjs";
 
 const START = Date.parse("2026-08-29T20:00:00.000Z");
 
-function visibleTask() {
+function visibleTask(overrides = {}) {
   return {
     task_id: "visible-implementation",
     title: "Implement the bounded visible task",
@@ -39,16 +45,21 @@ function visibleTask() {
     dependencies: [],
     read_paths: ["lib"],
     write_paths: ["lib/bounded-visible-task.mjs"],
+    shared_resources: [],
     primary_outcome: "Complete one bounded implementation in a visible task.",
     causal_question: null,
     cheapest_safe_direct_attempt: "Create the exact task once and execute its generated contract.",
     instrument_role: "none",
     supporting_follow_up: null,
     supporting_authorization: null,
+    ...overrides,
   };
 }
 
-async function fixture() {
+async function fixture({
+  tasks = [visibleTask()],
+  branchFences = ["codex/visible-implementation"],
+} = {}) {
   const root = await createGitFixture("codex-flow-visible-create-");
   const commonDir = await realpath(resolve(root, ".git"));
   const revision = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
@@ -57,7 +68,7 @@ async function fixture() {
     plan_id: "visible-task-creation",
     revision: 1,
     parent_revision_digest: null,
-    tasks: [visibleTask()],
+    tasks,
   });
   const coordinator = {
     lineage_id: "coordinator-lineage",
@@ -67,16 +78,42 @@ async function fixture() {
   coordinator.binding_digest = coordinatorBindingDigest(coordinator);
   const stateRoot = resolve(commonDir, "codex-flow", "v0.6.0");
   const runId = "run-visible-task";
-  await activateV06FixtureRun({
-    root,
-    runId,
-    plan,
+  const snapshot = gitSnapshot(root);
+  const bundleSource = await loadRuntimeBundleSource({ packageRoot });
+  const runtime = buildRuntimeContext({
+    bundle: bundleSource.bundle,
+    createdAt: new Date(START - 3_000).toISOString(),
+    config: { config_id: "visible-create-config", snapshot: {} },
+    policy: { policy_id: "visible-create-policy", snapshot: {} },
+    repository: {
+      common_dir: snapshot.commonDir,
+      root: snapshot.root,
+      branch: snapshot.branch,
+      revision: snapshot.revision,
+    },
+    host: { host_id: "visible-create-host", session_id: "visible-create-session" },
     lineage: {
       lineage_id: coordinator.lineage_id,
       thread_id: coordinator.thread_id,
       generation: coordinator.generation,
     },
-    now: START - 3_000,
+  });
+  await acquireRuntimeContext({
+    gitCommonDirectory: commonDir,
+    context: runtime,
+    bundleSource,
+  });
+  await admitRun({
+    gitCommonDirectory: commonDir,
+    runId,
+    runtimeId: runtime.runtime_id,
+    workflowPlanId: plan.plan_id,
+    workflowRevisionDigest: plan.revision_digest,
+    plan: buildFencePlan({
+      pathFences: tasks.flatMap((task) => task.write_paths),
+      branchFences,
+    }),
+    admittedAt: new Date(START - 3_000).toISOString(),
   });
   await createWorkflowJournal({
     stateRoot,
@@ -111,6 +148,10 @@ async function fixture() {
     stateRoot,
     contract,
     requested,
+    commonDir,
+    revision,
+    runId,
+    plan,
   };
 }
 
@@ -398,6 +439,66 @@ test("a generated visible-task contract authorizes exactly one native creation a
     assert.equal(expired.status, "ambiguous");
     assert.equal(expired.resolution.reason_code, "reconciliation-window-expired");
     assert.equal(expired.attempt_permitted, false);
+  } finally {
+    await removeFixture(context.root);
+  }
+});
+
+test("host-worktree creation requires an exact admitted branch fence", async () => {
+  const context = await fixture({ branchFences: [] });
+  try {
+    await assert.rejects(
+      prepareVisibleTaskCreation({
+        stateRoot: context.stateRoot,
+        taskContract: context.contract,
+        requestedSelectors: context.requested,
+        now: START,
+      }),
+      /not an exact admitted run branch fence/,
+    );
+  } finally {
+    await removeFixture(context.root);
+  }
+});
+
+test("one admitted executor branch cannot be claimed by two task contracts", async () => {
+  const secondTask = visibleTask({
+    task_id: "visible-review",
+    title: "Review the bounded visible task",
+    read_paths: ["README.md"],
+    write_paths: ["audit-sentinel/bounded-visible-review.txt"],
+    primary_outcome: "Complete one bounded visible review.",
+  });
+  const context = await fixture({ tasks: [visibleTask(), secondTask] });
+  try {
+    await prepareVisibleTaskCreation({
+      stateRoot: context.stateRoot,
+      taskContract: context.contract,
+      requestedSelectors: context.requested,
+      now: START,
+    });
+    const secondContract = await persistWorkflowTaskContract({
+      stateRoot: context.stateRoot,
+      runId: context.runId,
+      planId: context.plan.plan_id,
+      taskId: secondTask.task_id,
+      currentBaseline: { revision: context.revision },
+      dependencyAuthorities: [],
+      now: START + 1_000,
+    });
+    await assert.rejects(
+      prepareVisibleTaskCreation({
+        stateRoot: context.stateRoot,
+        taskContract: secondContract,
+        requestedSelectors: {
+          ...context.requested,
+          model: secondContract.task.model,
+          reasoning_effort: secondContract.task.reasoning_effort,
+        },
+        now: START + 2_000,
+      }),
+      /already claimed by another task contract/,
+    );
   } finally {
     await removeFixture(context.root);
   }

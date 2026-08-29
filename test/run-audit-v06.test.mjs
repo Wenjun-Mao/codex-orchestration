@@ -123,6 +123,7 @@ function taskThread(suffix, overrides = {}) {
     dependencies: [],
     read_paths: ["lib"],
     write_paths: [`audit-sentinel/${suffix}.txt`],
+    shared_resources: [],
     primary_outcome: `Complete visible audit task ${suffix}.`,
     causal_question: null,
     cheapest_safe_direct_attempt: `Attempt visible audit task ${suffix} once.`,
@@ -141,10 +142,11 @@ function subagentTask(suffix) {
     mode: "read",
     model: "gpt-5.6-terra",
     reasoning_effort: "high",
-    fork_turns: "all",
+    fork_turns: "3",
     dependencies: [],
     read_paths: ["README.md"],
     write_paths: [],
+    shared_resources: [],
     primary_outcome: `Inspect bounded source for ${suffix}.`,
     causal_question: null,
     cheapest_safe_direct_attempt: `Read the bounded source for ${suffix}.`,
@@ -172,7 +174,7 @@ async function runtimeBundle(t, suffix) {
   return loadRuntimeBundleSource({ packageRoot });
 }
 
-async function runFixture(t, suffix, task) {
+async function runFixture(t, suffix, task, { branchFences = [] } = {}) {
   const root = await createGitFixture(`codex-flow-v06-run-audit-${suffix}-`);
   t.after(() => removeFixture(root));
   const commonDir = await realpath(resolve(root, ".git"));
@@ -234,7 +236,8 @@ async function runFixture(t, suffix, task) {
     workflowRevisionDigest: plan.revision_digest,
     plan: buildFencePlan({
       pathFences: task.write_paths,
-      operationFences: [task.task_id],
+      resourceFences: task.shared_resources,
+      branchFences,
     }),
     admittedAt: new Date(at(3_000)).toISOString(),
   });
@@ -369,6 +372,67 @@ async function prepareVisible(context, suffix, { ready = false } = {}) {
     now: at(7_000),
   });
   return { creation, requested, attempt, readyThreadId };
+}
+
+async function prepareHostVisible(context, suffix, { executorBranch, worktreePath }) {
+  const requested = {
+    project_id: `audit-project-${suffix}`,
+    model: context.contract.task.model,
+    reasoning_effort: context.contract.task.reasoning_effort,
+    worktree: {
+      mode: "host-worktree",
+      starting_revision: context.baseline,
+      starting_branch: "main",
+      executor_branch: executorBranch,
+      path: null,
+    },
+  };
+  const creation = await prepareVisibleTaskCreation({
+    stateRoot: context.stateRoot,
+    taskContract: context.contract,
+    requestedSelectors: requested,
+    now: at(5_000),
+  });
+  const attempt = await recordVisibleTaskCreationAttempt({
+    stateRoot: context.stateRoot,
+    operationId: creation.operation_id,
+    hostSessionId: `visible-host-session-${suffix}`,
+    timeoutSeconds: 300,
+    now: at(6_000),
+  });
+  git(context.root, ["worktree", "add", "-q", "-b", executorBranch, worktreePath, "main"]);
+  const observedPath = await realpath(worktreePath);
+  const readyThreadId = `audit-executor-${suffix}`;
+  await reconcileVisibleTaskCreation({
+    stateRoot: context.stateRoot,
+    operationId: creation.operation_id,
+    outcome: "ready",
+    readyThreadId,
+    initialTurn: {
+      source: "host-observed",
+      thread_id: readyThreadId,
+      turn_id: `audit-turn-${suffix}`,
+      turn_index: 1,
+      role: "user",
+      content: attempt.bootstrap,
+      observed_at: new Date(at(7_000)).toISOString(),
+    },
+    selectorEvidence: {
+      accepted: {
+        ...requested,
+        accepted_at: new Date(at(6_500)).toISOString(),
+      },
+      observed: {
+        project_id: requested.project_id,
+        model: requested.model,
+        reasoning_effort: requested.reasoning_effort,
+        worktree: { ...requested.worktree, path: observedPath },
+        observed_at: new Date(at(7_000)).toISOString(),
+      },
+    },
+    now: at(7_000),
+  });
+  return { creation, requested, attempt, readyThreadId, observedPath };
 }
 
 async function acceptRelease(context, visible, suffix) {
@@ -757,7 +821,7 @@ test("visible creation reports in-flight, ambiguous, and session-blocked host au
   }
 });
 
-test("non-created, retained-blocked, and durably cancelled visible paths remain visible without archive", async (t) => {
+test("non-created closes while rejected, blocked, and cancelled visible paths retain closure fences", async (t) => {
   const notCreated = await runFixture(t, "not-created", taskThread("not-created"));
   const notCreatedVisible = await prepareVisible(notCreated, "not-created");
   await recordVisibleTaskCreationAttempt({
@@ -814,8 +878,46 @@ test("non-created, retained-blocked, and durably cancelled visible paths remain 
     executorThreadId: blockedVisible.readyThreadId,
   });
   const blockedAudit = await audit(blocked, 101_000);
-  assert.equal(blockedAudit.audit.terminal_ready, true);
+  assert.equal(blockedAudit.audit.terminal_ready, false);
+  assert(blockerCodes(blockedAudit).has("retained-visible-task"));
   assert.equal(blockedAudit.audit.counts.archives, 0);
+
+  const rejected = await runFixture(t, "rejected", taskThread("rejected"));
+  const rejectedVisible = await prepareVisible(rejected, "rejected", { ready: true });
+  const rejectedRelease = await acceptRelease(rejected, rejectedVisible, "rejected");
+  const rejectedReceipt = receipt(rejected, rejectedVisible, rejectedRelease, {
+    kind: "unchanged",
+    baseline_revision: rejected.baseline,
+    final_revision: rejected.baseline,
+    branch: "main",
+    upstream: null,
+    cleanliness: "clean",
+  });
+  const rejectedCallback = await deliverCallbackV06({
+    stateRoot: rejected.stateRoot,
+    receipt: rejectedReceipt,
+  });
+  await observeCallbackV06({
+    stateRoot: rejected.stateRoot,
+    callbackId: rejectedCallback.callback_id,
+    recipient: rejected.coordinator,
+  });
+  const rejectedDisposition = await prepareTaskDisposition({
+    stateRoot: rejected.stateRoot,
+    callbackId: rejectedCallback.callback_id,
+    decision: "rejected",
+    reason: "The coordinator rejected the otherwise clean result.",
+  });
+  await finalizeTaskDisposition({
+    stateRoot: rejected.stateRoot,
+    dispositionId: rejectedDisposition.disposition_id,
+    recipient: rejected.coordinator,
+    executorThreadId: rejectedVisible.readyThreadId,
+  });
+  const rejectedAudit = await audit(rejected, 101_500);
+  assert.equal(rejectedAudit.audit.terminal_ready, false);
+  assert(blockerCodes(rejectedAudit).has("retained-visible-task"));
+  assert.equal(rejectedAudit.audit.counts.archives, 0);
 
   const cancelled = await runFixture(t, "cancelled", taskThread("cancelled"));
   const cancelledVisible = await prepareVisible(cancelled, "cancelled", { ready: true });
@@ -838,7 +940,8 @@ test("non-created, retained-blocked, and durably cancelled visible paths remain 
     now: at(10_000),
   });
   const cancelledAudit = await audit(cancelled, 102_000);
-  assert.equal(cancelledAudit.audit.terminal_ready, true);
+  assert.equal(cancelledAudit.audit.terminal_ready, false);
+  assert(blockerCodes(cancelledAudit).has("retained-visible-task"));
   assert.equal(cancelledAudit.audit.counts.archives, 0);
 });
 
@@ -994,6 +1097,137 @@ test("accepted no-change task advances through release, callback, proof, disposi
     audit(context, 109_000),
     /exact callback authority/,
   );
+});
+
+test("archived host-worktree integration cannot close until its exact executor branch is absent", async (t) => {
+  const executorBranch = "codex/run-audit-cleanup-guard";
+  const context = await runFixture(
+    t,
+    "cleanup-guard",
+    taskThread("cleanup-guard", { write_paths: ["cleanup-guard.txt"] }),
+    { branchFences: [executorBranch] },
+  );
+  const worktreeParent = await mkdtemp(resolve(tmpdir(), "codex-flow-run-audit-cleanup-"));
+  const worktreePath = resolve(worktreeParent, "executor");
+  t.after(async () => {
+    if (await realpath(worktreePath).catch(() => null)) {
+      try {
+        git(context.root, ["worktree", "remove", "--force", worktreePath]);
+      } catch {
+        // Fixture teardown only; assertions below cover the authoritative path.
+      }
+    }
+    await rm(worktreeParent, { recursive: true, force: true });
+  });
+
+  const visible = await prepareHostVisible(context, "cleanup-guard", {
+    executorBranch,
+    worktreePath,
+  });
+  const release = await acceptRelease(context, visible, "cleanup-guard");
+  await writeFile(resolve(worktreePath, "cleanup-guard.txt"), "cleanup guard\n", "utf8");
+  git(worktreePath, ["add", "cleanup-guard.txt"]);
+  git(worktreePath, ["commit", "--quiet", "-m", "cleanup guard result"]);
+  const executorTip = git(worktreePath, ["rev-parse", "HEAD"]);
+  const payload = receipt(context, visible, release, {
+    kind: "clean-commit",
+    baseline_revision: context.baseline,
+    commit: executorTip,
+    branch: executorBranch,
+    upstream: null,
+    cleanliness: "clean",
+  });
+  payload.model_evidence.observed = {
+    model: context.contract.task.model,
+    reasoning_effort: context.contract.task.reasoning_effort,
+  };
+  const delivered = await deliverCallbackV06({ stateRoot: context.stateRoot, receipt: payload });
+  await observeCallbackV06({
+    stateRoot: context.stateRoot,
+    callbackId: delivered.callback_id,
+    recipient: context.coordinator,
+  });
+  const disposition = await prepareTaskDisposition({
+    stateRoot: context.stateRoot,
+    callbackId: delivered.callback_id,
+    decision: "accepted-for-integration",
+    reason: "The exact clean executor commit is accepted for integration.",
+  });
+  const integration = await prepareSerialIntegration({
+    stateRoot: context.stateRoot,
+    repositoryPath: context.root,
+    dispositionId: disposition.disposition_id,
+    mainBranch: "main",
+  });
+  git(context.root, ["merge", "--quiet", "--ff-only", executorBranch]);
+  const verificationRequest = await integrationVerificationRequest({
+    stateRoot: context.stateRoot,
+    repositoryPath: context.root,
+    integrationId: integration.integration_id,
+  });
+  const verification = await runCombinedVerification({
+    stateRoot: context.stateRoot,
+    repositoryPath: context.root,
+    receipt: verificationRequest.receipt,
+    integrationScope: verificationRequest.integration_scope,
+    checks: [{
+      check_id: "run-audit-cleanup-guard",
+      argv: [process.execPath, "-e", "process.exit(0)"],
+    }],
+  });
+  await reconcileSerialIntegration({
+    stateRoot: context.stateRoot,
+    repositoryPath: context.root,
+    integrationId: integration.integration_id,
+    verificationId: verification.verification_id,
+  });
+  const completedDisposition = await finalizeTaskDisposition({
+    stateRoot: context.stateRoot,
+    dispositionId: disposition.disposition_id,
+    recipient: context.coordinator,
+    executorThreadId: visible.readyThreadId,
+    integrationId: integration.integration_id,
+    verificationId: verification.verification_id,
+  });
+  git(context.root, ["worktree", "remove", worktreePath]);
+  const archive = await prepareTaskArchive({
+    stateRoot: context.stateRoot,
+    dispositionId: completedDisposition.disposition_id,
+    taskObservation: {
+      execution_kind: "task-thread",
+      thread_id: visible.readyThreadId,
+      source: "host-observed",
+      active_visible: true,
+      archived_visible: false,
+    },
+    hostId: "local",
+  });
+  await reconcileTaskArchive({
+    stateRoot: context.stateRoot,
+    archiveId: archive.archive_id,
+    attemptId: archive.host_intent.attempt_id,
+    outcome: "accepted",
+    observation: {
+      execution_kind: "task-thread",
+      thread_id: visible.readyThreadId,
+      source: "host-observed",
+      active_visible: false,
+      archived_visible: true,
+    },
+  });
+
+  const retained = await audit(context, 120_000);
+  assert.equal(retained.audit.terminal_ready, false);
+  assert(blockerCodes(retained).has("cleanup-unresolved"));
+  assert.equal(retained.audit.cleanup.counts.cleanup_candidates, 1);
+  assert.equal(retained.audit.cleanup.counts.close_blocked, 1);
+  const retainedPlanId = retained.audit.cleanup.plan_id;
+
+  git(context.root, ["branch", "-d", executorBranch]);
+  const cleaned = await audit(context, 121_000);
+  assert.equal(cleaned.audit.terminal_ready, true, JSON.stringify(cleaned.audit.blockers));
+  assert.equal(cleaned.audit.cleanup.counts.close_blocked, 0);
+  assert.notEqual(cleaned.audit.cleanup.plan_id, retainedPlanId);
 });
 
 test("prepared and unsafe integrations remain explicit closure blockers", async (t) => {

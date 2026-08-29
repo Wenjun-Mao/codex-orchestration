@@ -10,6 +10,7 @@
     "evidence_digest",
     "authority",
     "repository",
+    "cleanup",
     "source_records",
     "blockers",
     "counts",
@@ -27,6 +28,7 @@
     "evidence_digest": { "$ref": "#/$defs/digest" },
     "authority": { "$ref": "#/$defs/authority" },
     "repository": { "$ref": "#/$defs/repositoryEvidence" },
+    "cleanup": { "$ref": "#/$defs/cleanupEvidence" },
     "source_records": {
       "type": "array",
       "maxItems": 100000,
@@ -164,6 +166,34 @@
         }
       }
     },
+    "cleanupEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["plan_id", "mutation_performed", "counts"],
+      "properties": {
+        "plan_id": {
+          "type": "string",
+          "pattern": "^cleanup-plan-v1-[0-9a-f]{64}$"
+        },
+        "mutation_performed": { "const": false },
+        "counts": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "host_worktree_tasks",
+            "cleanup_required",
+            "cleanup_candidates",
+            "close_blocked"
+          ],
+          "properties": {
+            "host_worktree_tasks": { "$ref": "#/$defs/count" },
+            "cleanup_required": { "$ref": "#/$defs/count" },
+            "cleanup_candidates": { "$ref": "#/$defs/count" },
+            "close_blocked": { "$ref": "#/$defs/count" }
+          }
+        }
+      }
+    },
     "sourceRecord": {
       "type": "object",
       "additionalProperties": false,
@@ -221,6 +251,8 @@
             "verification-not-pass",
             "archive-missing",
             "archive-incomplete",
+            "retained-visible-task",
+            "cleanup-unresolved",
             "urgent-unresolved",
             "recipient-binding-drift",
             "worktree-retained",
@@ -243,6 +275,7 @@
             "integration",
             "verification",
             "archive",
+            "cleanup-plan",
             "urgent-signal",
             "recipient-binding"
           ]
