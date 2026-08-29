@@ -8,7 +8,7 @@
     "runtime_context_digest", "configuration_digest", "repository_id", "common_dir",
     "coordinator_binding", "plan_id", "revision_digest", "task_id", "task_digest",
     "mode", "model", "reasoning_effort", "fork_turns", "prompt_digest",
-    "initial_git_proof", "state", "agent_id", "result", "coordinator_disposition",
+    "initial_git_proof", "state", "attempt", "agent_id", "result", "coordinator_disposition",
     "prepared_at", "created_at", "completed_at", "disposed_at"
   ],
   "properties": {
@@ -32,8 +32,19 @@
     "fork_turns": { "$ref": "#/$defs/forkTurns" },
     "prompt_digest": { "$ref": "#/$defs/digest" },
     "initial_git_proof": { "$ref": "#/$defs/gitProof" },
-    "state": { "enum": ["prepared", "created", "completed", "accepted", "rejected"] },
-    "agent_id": { "oneOf": [{ "type": "null" }, { "type": "string", "minLength": 1, "maxLength": 256 }] },
+    "state": {
+      "enum": [
+        "prepared", "attempting", "created", "rejected-before-send",
+        "ambiguous", "completed", "accepted", "rejected"
+      ]
+    },
+    "attempt": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/attempt" }] },
+    "agent_id": {
+      "oneOf": [
+        { "type": "null" },
+        { "type": "string", "minLength": 1, "maxLength": 256, "pattern": "^[A-Za-z0-9_.-]+$" }
+      ]
+    },
     "result": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/result" }] },
     "coordinator_disposition": { "enum": [null, "accepted", "rejected"] },
     "prepared_at": { "$ref": "#/$defs/timestamp" },
@@ -52,6 +63,29 @@
         { "const": "none" }, { "const": "all" },
         { "type": "string", "pattern": "^[1-9][0-9]{0,5}$" }
       ]
+    },
+    "attempt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "attempt_id", "started_at", "reconcile_by", "outcome",
+        "ambiguity_reason", "reconciled_at"
+      ],
+      "properties": {
+        "attempt_id": {
+          "type": "string",
+          "pattern": "^subagent-attempt-v1-[a-f0-9]{64}$"
+        },
+        "started_at": { "$ref": "#/$defs/timestamp" },
+        "reconcile_by": { "$ref": "#/$defs/timestamp" },
+        "outcome": {
+          "enum": [null, "accepted", "rejected-before-send", "ambiguous"]
+        },
+        "ambiguity_reason": {
+          "enum": [null, "host-result-ambiguous", "reconciliation-window-expired"]
+        },
+        "reconciled_at": { "$ref": "#/$defs/nullableTimestamp" }
+      }
     },
     "coordinatorBinding": {
       "type": "object", "additionalProperties": false,
