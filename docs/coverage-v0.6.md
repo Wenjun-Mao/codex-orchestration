@@ -5,7 +5,7 @@ separate checkpoint.
 
 This document summarizes the v0.6 contract established by
 [ADR 0015](adr/0015-progressive-run-activation-authority.md) through
-[ADR 0020](adr/0020-active-run-adoption-and-deferred-v05-transition.md).
+[ADR 0021](adr/0021-one-shot-v06-urgent-record-authority.md).
 It does not claim that the installed marketplace package has moved beyond
 v0.5.1.
 

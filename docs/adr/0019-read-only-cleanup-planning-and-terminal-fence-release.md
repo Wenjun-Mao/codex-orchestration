@@ -21,7 +21,9 @@ create dual cleanup authority and make the breaking boundary harder to audit.
 
 - A visible `host-worktree` task may be created only when its exact executor
   branch is already present in the active run's admitted branch envelope. One
-  admitted executor branch may be claimed by only one task-creation contract.
+  admitted executor branch may be claimed by only one task-creation contract
+  across retained v0.6 state. Activation preflights retained claims before
+  acquiring runtime/workflow state, while exact same-run replay remains valid.
 - v0.6 exposes `cleanup plan --run-id ...` as a deterministic, read-only
   operation. The plan binds the exact run/runtime/repository identity,
   lifecycle records, terminal Git receipt, local branch ref, configured and
@@ -65,5 +67,8 @@ create dual cleanup authority and make the breaking boundary harder to audit.
   user or native host resolves eligible Git state outside this v0.6 workflow.
 - Cleanup plans are evidence views, not durable mutation tokens. Re-run the
   plan after any lifecycle or Git change.
+- Executor branch names are lifetime-unique while their v0.6 claim records are
+  retained. A later run must choose a fresh branch rather than reusing closed
+  provenance.
 - Tests prove deterministic output, zero state/ref/worktree mutation, unique
   branch claims, live-state blockers, and closure staleness.
