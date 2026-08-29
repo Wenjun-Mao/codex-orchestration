@@ -1,0 +1,188 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://private.local/codex-flow/verification-record.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "kind",
+    "verification_id",
+    "request_digest",
+    "identity",
+    "integration_scope",
+    "repository",
+    "classification",
+    "checks",
+    "started_at",
+    "completed_at"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "kind": { "const": "codex-flow-v06-combined-verification" },
+    "verification_id": {
+      "type": "string",
+      "pattern": "^verification-v1-[0-9a-f]{64}$"
+    },
+    "request_digest": { "$ref": "#/$defs/digest" },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "callback_id",
+        "receipt_digest",
+        "recipient_binding_digest",
+        "executor_id",
+        "run_id",
+        "runtime_digest",
+        "config_digest",
+        "plan_id",
+        "revision_id",
+        "task_id",
+        "task_contract_digest",
+        "operation_id",
+        "release_id"
+      ],
+      "properties": {
+        "callback_id": { "$ref": "#/$defs/safeId" },
+        "receipt_digest": { "$ref": "#/$defs/digest" },
+        "recipient_binding_digest": { "$ref": "#/$defs/digest" },
+        "executor_id": { "$ref": "#/$defs/safeId" },
+        "run_id": { "$ref": "#/$defs/safeId" },
+        "runtime_digest": { "$ref": "#/$defs/digest" },
+        "config_digest": { "$ref": "#/$defs/digest" },
+        "plan_id": { "$ref": "#/$defs/safeId" },
+        "revision_id": { "$ref": "#/$defs/safeId" },
+        "task_id": { "$ref": "#/$defs/safeId" },
+        "task_contract_digest": { "$ref": "#/$defs/digest" },
+        "operation_id": { "$ref": "#/$defs/safeId" },
+        "release_id": { "$ref": "#/$defs/safeId" }
+      }
+    },
+    "integration_scope": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "integration_id",
+            "integration_record_digest",
+            "run_id",
+            "runtime_digest",
+            "config_digest",
+            "plan_id",
+            "revision_id",
+            "task_id",
+            "task_contract_digest",
+            "main_branch",
+            "reconciled_main_tip",
+            "outcome"
+          ],
+          "properties": {
+            "integration_id": { "$ref": "#/$defs/safeId" },
+            "integration_record_digest": { "$ref": "#/$defs/digest" },
+            "run_id": { "$ref": "#/$defs/safeId" },
+            "runtime_digest": { "$ref": "#/$defs/digest" },
+            "config_digest": { "$ref": "#/$defs/digest" },
+            "plan_id": { "$ref": "#/$defs/safeId" },
+            "revision_id": { "$ref": "#/$defs/safeId" },
+            "task_id": { "$ref": "#/$defs/safeId" },
+            "task_contract_digest": { "$ref": "#/$defs/digest" },
+            "main_branch": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "reconciled_main_tip": { "$ref": "#/$defs/commit" },
+            "outcome": { "enum": ["ancestor", "patch-equivalent"] }
+          }
+        }
+      ]
+    },
+    "repository": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "root",
+        "common_dir",
+        "requested_revision",
+        "requested_branch",
+        "started_revision",
+        "started_branch",
+        "started_cleanliness",
+        "completed_revision",
+        "completed_branch",
+        "completed_cleanliness"
+      ],
+      "properties": {
+        "root": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "common_dir": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "requested_revision": { "$ref": "#/$defs/commit" },
+        "requested_branch": { "$ref": "#/$defs/nullableBranch" },
+        "started_revision": { "$ref": "#/$defs/commit" },
+        "started_branch": { "$ref": "#/$defs/nullableBranch" },
+        "started_cleanliness": { "$ref": "#/$defs/cleanliness" },
+        "completed_revision": { "$ref": "#/$defs/commit" },
+        "completed_branch": { "$ref": "#/$defs/nullableBranch" },
+        "completed_cleanliness": { "$ref": "#/$defs/cleanliness" }
+      }
+    },
+    "classification": { "enum": ["PASS", "FAIL"] },
+    "checks": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 32,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "check_id",
+          "argv",
+          "timeout_ms",
+          "exit_code",
+          "stdout_digest",
+          "stderr_digest"
+        ],
+        "properties": {
+          "check_id": { "$ref": "#/$defs/safeId" },
+          "argv": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 128,
+            "items": { "type": "string", "maxLength": 16384 }
+          },
+          "timeout_ms": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1800000
+          },
+          "exit_code": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          },
+          "stdout_digest": { "$ref": "#/$defs/digest" },
+          "stderr_digest": { "$ref": "#/$defs/digest" }
+        }
+      }
+    },
+    "started_at": { "$ref": "#/$defs/timestamp" },
+    "completed_at": { "$ref": "#/$defs/timestamp" }
+  },
+  "$defs": {
+    "safeId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9_.-]+$"
+    },
+    "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "commit": { "type": "string", "pattern": "^[0-9a-f]{40,64}$" },
+    "branch": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "nullableBranch": {
+      "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/branch" }]
+    },
+    "cleanliness": { "enum": ["clean", "dirty"] },
+    "timestamp": { "type": "string", "format": "date-time", "maxLength": 64 }
+  }
+}

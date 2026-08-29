@@ -96,6 +96,7 @@ for (const name of [
   "task-disposition",
   "integration-record",
   "archive-operation",
+  "verification-record",
 ]) {
   const schema = JSON.parse(await readFile(resolve(root, "schemas", `${name}.schema.json`), "utf8"));
   schemas.set(name, schema);
