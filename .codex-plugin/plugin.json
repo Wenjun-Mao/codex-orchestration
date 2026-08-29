@@ -1,7 +1,7 @@
 {
   "name": "codex-orchestration",
-  "version": "0.5.2-dev.0",
-  "description": "Coordinate independent Codex tasks with explicit ownership, idempotent urgent signals, durable callbacks, and serial integration.",
+  "version": "0.6.0-dev.0",
+  "description": "Coordinate native Codex tasks with explicit ownership, model routing, quiet durable results, and serial integration.",
   "author": {
     "name": "Wenjun Mao"
   },

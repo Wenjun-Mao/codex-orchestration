@@ -35,10 +35,11 @@ pinned runtime remains the accepted `v0.5.1` release. Mutable recipient
 bindings, task-operation attempts, urgent-signal and callback journals, and
 leases live under a repository's Git common directory in that installed
 runtime's exact release namespace, so linked worktrees on the same release
-share coordination state. The editable `v0.5.2-dev.0` source owns
-`.git/codex-flow/v0.5.2-dev.0/` only after an explicit retirement and fresh
-installation; editing this checkout does not change the active v0.5.1 runtime
-or its namespace.
+share coordination state. The editable `v0.6.0-dev.0` source uses a fresh
+`.git/codex-flow/v0.6.0/` authority only when explicitly activated or adopted;
+editing this checkout does not change the active v0.5.1 runtime or its
+namespace. The former `0.5.2-dev.0` work rolls into v0.6 and will not be
+released separately.
 
 ## Requirements
 
@@ -65,9 +66,10 @@ branch: retain the old `.git/codex-flow/` evidence, explicitly remove the old
 tracked `.codex/orchestration/` runtime and configuration from that branch,
 then plan and apply the selected release. New operational records live only in
 the newly installed exact release's namespace. For example, an explicitly
-installed `v0.5.2-dev.0` runtime uses `.git/codex-flow/v0.5.2-dev.0/`; until
-then this repository continues to use its pinned v0.5.1 runtime and that
-runtime neither reads nor deletes retained namespaces.
+activated or adopted `v0.6.0-dev.0` runtime uses
+`.git/codex-flow/v0.6.0/`; until then this repository continues to use its
+pinned v0.5.1 runtime and that runtime neither reads nor deletes retained
+namespaces.
 
 ## Source and private distribution
 
@@ -78,10 +80,10 @@ personal-marketplace plugin, alter installed caches, or upgrade a pinned
 consumer runtime. See
 [ADR 0012](docs/adr/0012-public-source-private-distribution-and-release-tags.md).
 
-The editable source currently has the unreleased identity `0.5.2-dev.0`; the
+The editable source currently has the unreleased identity `0.6.0-dev.0`; the
 accepted marketplace artifact and this repository's pinned consumer runtime
-remain `0.5.1`. An exact namespace for `0.5.2-dev.0` exists only if that
-development runtime is explicitly installed. During `npm run validate` and
+remain `0.5.1`. An exact namespace for `0.6.0-dev.0` exists only if that
+development runtime is explicitly activated or adopted. During `npm run validate` and
 the `prepack` lifecycle, a matching annotated `v<version>` tag requires every
 relevant package path to still match that tag. This prevents source changes
 from being packaged under an already accepted version; see
