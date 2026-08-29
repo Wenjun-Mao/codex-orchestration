@@ -6,6 +6,7 @@ import test from "node:test";
 import { bindRecipient } from "../lib/recipients.mjs";
 import { deliverCallbackV06, observeCallbackV06 } from "../lib/callbacks-v06.mjs";
 import {
+  cancelTaskBeforeExecution,
   finalizeTaskDisposition,
   prepareTaskDisposition,
   taskDispositionStatus,
@@ -66,7 +67,10 @@ function task() {
   };
 }
 
-async function acceptedAuthority() {
+async function acceptedAuthority({
+  releaseOutcome = "sent",
+  acceptRelease = true,
+} = {}) {
   const root = await createGitFixture("codex-flow-v06-disposition-");
   const commonDir = await realpath(resolve(root, ".git"));
   const baseline = execFileSync("git", ["rev-parse", "HEAD"], {
@@ -84,7 +88,7 @@ async function acceptedAuthority() {
   });
   const stateRoot = resolve(commonDir, "codex-flow", "v0.6.0");
   const runId = "disposition-run-v06";
-  const { authority } = await activateV06FixtureRun({
+  const { run } = await activateV06FixtureRun({
     root,
     runId,
     plan,
@@ -164,19 +168,25 @@ async function acceptedAuthority() {
   await reconcileTaskRelease({
     stateRoot,
     releaseId: preparedRelease.release_id,
-    outcome: "sent",
+    outcome: releaseOutcome,
     now: START + 4_000,
   });
-  await acceptTaskRelease({
+  if (acceptRelease) {
+    await acceptTaskRelease({
+      stateRoot,
+      releaseId: preparedRelease.release_id,
+      readyThreadId: "disposition-executor-v06",
+      contractId: contract.contract_id,
+      runtimeContextDigest: contract.runtime_context_digest,
+      commonDir,
+      now: START + 5_000,
+    });
+  }
+  await bindRecipient({
     stateRoot,
-    releaseId: preparedRelease.release_id,
-    readyThreadId: "disposition-executor-v06",
-    contractId: contract.contract_id,
-    runtimeContextDigest: contract.runtime_context_digest,
-    commonDir,
-    now: START + 5_000,
+    recipient,
+    fenceToken: run.binding.fence_token,
   });
-  await bindRecipient({ stateRoot, recipient });
   return {
     root,
     commonDir,
@@ -441,5 +451,47 @@ test("disposition mechanically matches Git outcome and exposes only canonical sc
     ]) assert.equal(Object.hasOwn(schema.properties, retired), false);
   } finally {
     await removeFixture(context.root);
+  }
+});
+
+test("callback-less cancellation is reachable only after release rejection before send", async () => {
+  const context = await acceptedAuthority({
+    releaseOutcome: "rejected-before-send",
+    acceptRelease: false,
+  });
+  try {
+    const cancelled = await cancelTaskBeforeExecution({
+      stateRoot: context.stateRoot,
+      releaseId: context.releaseId,
+      reason: "The coordinator cancelled before any objective was delivered.",
+      now: START + 6_000,
+    });
+    assert.equal(cancelled.decision, "cancelled");
+    assert.equal(cancelled.state, "completed");
+    assert.equal(cancelled.callback_id, null);
+    assert.equal(cancelled.callback_consumed_at, null);
+    assert.match(cancelled.disposition_id, /^disposition-cancel-v1-[0-9a-f]{64}$/);
+    assert.equal((await cancelTaskBeforeExecution({
+      stateRoot: context.stateRoot,
+      releaseId: context.releaseId,
+      reason: "The coordinator cancelled before any objective was delivered.",
+      now: START + 7_000,
+    })).disposition_id, cancelled.disposition_id);
+  } finally {
+    await removeFixture(context.root);
+  }
+
+  const sent = await acceptedAuthority({ releaseOutcome: "sent", acceptRelease: false });
+  try {
+    await assert.rejects(
+      () => cancelTaskBeforeExecution({
+        stateRoot: sent.stateRoot,
+        releaseId: sent.releaseId,
+        reason: "An unresolved send cannot be called cancelled.",
+      }),
+      /rejected before any objective send/,
+    );
+  } finally {
+    await removeFixture(sent.root);
   }
 });
