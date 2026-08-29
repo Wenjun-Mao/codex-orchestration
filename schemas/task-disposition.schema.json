@@ -7,7 +7,7 @@
     "schema_version", "kind", "disposition_id", "run_id", "plan_id",
     "revision_id", "task_id", "task_contract_digest", "callback_id",
     "receipt_digest", "decision", "reason", "integration_id",
-    "verification_digest", "state", "prepared_at", "finalized_at",
+    "verification_id", "verification_digest", "state", "prepared_at", "finalized_at",
     "callback_consumed_at"
   ],
   "properties": {
@@ -26,6 +26,7 @@
     },
     "reason": { "type": "string", "minLength": 1, "maxLength": 512 },
     "integration_id": { "$ref": "#/$defs/nullableId" },
+    "verification_id": { "$ref": "#/$defs/nullableVerificationId" },
     "verification_digest": { "$ref": "#/$defs/nullableDigest" },
     "state": { "enum": ["prepared", "finalized", "completed"] },
     "prepared_at": { "type": "string", "format": "date-time" },
@@ -40,8 +41,15 @@
       "pattern": "^[A-Za-z0-9_.-]+$"
     },
     "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "verificationId": {
+      "type": "string",
+      "pattern": "^verification-v1-[0-9a-f]{64}$"
+    },
     "nullableId": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/safeId" }] },
     "nullableDigest": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/digest" }] },
+    "nullableVerificationId": {
+      "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/verificationId" }]
+    },
     "nullableTimestamp": {
       "oneOf": [{ "type": "null" }, { "type": "string", "format": "date-time" }]
     }

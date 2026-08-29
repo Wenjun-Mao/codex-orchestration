@@ -11,7 +11,7 @@
     "config_digest", "repository_id", "common_dir", "main_branch",
     "executor_branch", "prepared_main_tip", "executor_tip",
     "state", "outcome",
-    "reconciled_main_tip", "combined_verification_digest",
+    "reconciled_main_tip", "verification_id", "combined_verification_digest",
     "reconciliation_digest", "prepared_at", "reconciled_at"
   ],
   "properties": {
@@ -44,6 +44,7 @@
     "state": { "enum": ["prepared", "reconciled"] },
     "outcome": { "$ref": "#/$defs/nullableOutcome" },
     "reconciled_main_tip": { "$ref": "#/$defs/nullableCommit" },
+    "verification_id": { "$ref": "#/$defs/nullableVerificationId" },
     "combined_verification_digest": { "$ref": "#/$defs/nullableDigest" },
     "reconciliation_digest": { "$ref": "#/$defs/nullableDigest" },
     "prepared_at": { "$ref": "#/$defs/timestamp" },
@@ -56,19 +57,41 @@
         "properties": {
           "outcome": { "type": "null" },
           "reconciled_main_tip": { "type": "null" },
+          "verification_id": { "type": "null" },
           "combined_verification_digest": { "type": "null" },
           "reconciliation_digest": { "type": "null" },
           "reconciled_at": { "type": "null" }
         }
       },
       "else": {
+        "required": ["outcome", "reconciled_main_tip", "reconciliation_digest", "reconciled_at"],
         "properties": {
           "outcome": { "$ref": "#/$defs/outcome" },
           "reconciled_main_tip": { "$ref": "#/$defs/commit" },
-          "combined_verification_digest": { "$ref": "#/$defs/digest" },
           "reconciliation_digest": { "$ref": "#/$defs/digest" },
           "reconciled_at": { "$ref": "#/$defs/timestamp" }
-        }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "outcome": { "enum": ["ancestor", "patch-equivalent"] }
+              }
+            },
+            "then": {
+              "properties": {
+                "verification_id": { "$ref": "#/$defs/verificationId" },
+                "combined_verification_digest": { "$ref": "#/$defs/digest" }
+              }
+            },
+            "else": {
+              "properties": {
+                "verification_id": { "type": "null" },
+                "combined_verification_digest": { "type": "null" }
+              }
+            }
+          }
+        ]
       }
     }
   ],
@@ -80,6 +103,10 @@
       "pattern": "^[A-Za-z0-9_.-]+$"
     },
     "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "verificationId": {
+      "type": "string",
+      "pattern": "^verification-v1-[0-9a-f]{64}$"
+    },
     "commit": { "type": "string", "pattern": "^[0-9a-f]{40,64}$" },
     "outcome": {
       "enum": ["ancestor", "patch-equivalent", "unmerged"]
@@ -89,6 +116,9 @@
     },
     "nullableDigest": {
       "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/digest" }]
+    },
+    "nullableVerificationId": {
+      "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/verificationId" }]
     },
     "nullableOutcome": {
       "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/outcome" }]

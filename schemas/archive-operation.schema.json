@@ -43,11 +43,15 @@
     "git_resolution": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["kind", "integration_id", "verification_digest"],
+      "required": ["kind", "integration_id", "verification_id", "verification_digest"],
       "properties": {
         "kind": { "enum": ["unchanged", "integrated"] },
         "integration_id": {
           "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/safeId" }]
+        },
+        "verification_id": {
+          "type": "string",
+          "pattern": "^verification-v1-[0-9a-f]{64}$"
         },
         "verification_digest": { "$ref": "#/$defs/digest" }
       }

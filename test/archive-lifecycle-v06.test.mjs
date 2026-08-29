@@ -15,6 +15,7 @@ import {
   prepareTaskDisposition,
 } from "../lib/dispositions.mjs";
 import {
+  integrationVerificationRequest,
   prepareSerialIntegration,
   reconcileSerialIntegration,
 } from "../lib/integration-v06.mjs";
@@ -28,6 +29,7 @@ import {
   recipientBindingDigest,
   validateTerminalReceiptV3,
 } from "../lib/task-results.mjs";
+import { runCombinedVerification } from "../lib/verifications-v06.mjs";
 import { createGitFixture, removeFixture } from "./helpers.mjs";
 
 const digest = (character) => character.repeat(64);
@@ -139,7 +141,7 @@ async function observedDisposition({
   payload,
   decision,
   integrationId = null,
-  verificationDigest = null,
+  verificationId = null,
 }) {
   const delivered = await deliverCallbackV06({ stateRoot, receipt: payload });
   await observeCallbackV06({ stateRoot, callbackId: delivered.callback_id, recipient });
@@ -158,7 +160,7 @@ async function observedDisposition({
     recipient,
     executorId: payload.executor_id,
     integrationId,
-    verificationDigest,
+    verificationId,
   });
   return { delivered, disposition: completed };
 }
@@ -176,11 +178,20 @@ async function noChangeAuthority(root, suffix) {
     upstream: null,
     cleanliness: "clean",
   });
+  const verification = await runCombinedVerification({
+    stateRoot,
+    repositoryPath: root,
+    receipt: payload,
+    checks: [{
+      check_id: "archive-no-change-pass",
+      argv: [process.execPath, "-e", "process.exit(0)"],
+    }],
+  });
   const { disposition } = await observedDisposition({
     stateRoot,
     payload,
     decision: "accepted-no-change",
-    verificationDigest: digest("d"),
+    verificationId: verification.verification_id,
   });
   return { stateRoot, release, payload, disposition };
 }
@@ -298,12 +309,26 @@ test("integrated host-worktree task remains visible until the clean worktree is 
       mainBranch: "main",
     });
     git(root, ["merge", "--ff-only", executorBranch]);
-    const verificationDigest = digest("e");
+    const verificationRequest = await integrationVerificationRequest({
+      stateRoot,
+      repositoryPath: root,
+      integrationId: integration.integration_id,
+    });
+    const verification = await runCombinedVerification({
+      stateRoot,
+      repositoryPath: root,
+      receipt: verificationRequest.receipt,
+      integrationScope: verificationRequest.integration_scope,
+      checks: [{
+        check_id: "archive-integrated-pass",
+        argv: [process.execPath, "-e", "process.exit(0)"],
+      }],
+    });
     const reconciled = await reconcileSerialIntegration({
       stateRoot,
       repositoryPath: root,
       integrationId: integration.integration_id,
-      combinedVerificationDigest: verificationDigest,
+      verificationId: verification.verification_id,
     });
     assert.equal(reconciled.safe_to_finalize, true);
     const disposition = await finalizeTaskDisposition({
@@ -312,7 +337,7 @@ test("integrated host-worktree task remains visible until the clean worktree is 
       recipient,
       executorId: payload.executor_id,
       integrationId: integration.integration_id,
-      verificationDigest,
+      verificationId: verification.verification_id,
     });
     const driftPath = resolve(worktreePath, "untracked-drift.txt");
     await writeFile(driftPath, "dirty\n", "utf8");

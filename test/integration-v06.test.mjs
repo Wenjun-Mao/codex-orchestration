@@ -7,6 +7,7 @@ import { bindRecipient } from "../lib/recipients.mjs";
 import { deliverCallbackV06, observeCallbackV06 } from "../lib/callbacks-v06.mjs";
 import { prepareTaskDisposition } from "../lib/dispositions.mjs";
 import {
+  integrationVerificationRequest,
   prepareSerialIntegration,
   reconcileSerialIntegration,
   serialIntegrationStatus,
@@ -20,6 +21,7 @@ import {
   recipientBindingDigest,
   validateTerminalReceiptV3,
 } from "../lib/task-results.mjs";
+import { runCombinedVerification } from "../lib/verifications-v06.mjs";
 import { createGitFixture, removeFixture } from "./helpers.mjs";
 
 const digest = (character) => character.repeat(64);
@@ -203,11 +205,51 @@ test("reconciliation classifies ancestor, patch-equivalent, and unmerged without
           mainBranch: "main",
         });
         await item.mutate(value);
+        let verificationId = null;
+        if (item.name !== "unmerged") {
+          const request = await integrationVerificationRequest({
+            stateRoot: value.stateRoot,
+            repositoryPath: value.root,
+            integrationId: prepared.integration_id,
+          });
+          if (item.name === "ancestor") {
+            const mismatched = await runCombinedVerification({
+              stateRoot: value.stateRoot,
+              repositoryPath: value.root,
+              receipt: request.receipt,
+              integrationScope: {
+                ...request.integration_scope,
+                integration_record_digest: digest("f"),
+              },
+              checks: [{
+                check_id: "mismatched-scope-pass",
+                argv: [process.execPath, "-e", "process.exit(0)"],
+              }],
+            });
+            await assert.rejects(reconcileSerialIntegration({
+              stateRoot: value.stateRoot,
+              repositoryPath: value.root,
+              integrationId: prepared.integration_id,
+              verificationId: mismatched.verification_id,
+            }), /scope does not match the independently reconciled integration/);
+          }
+          const verification = await runCombinedVerification({
+            stateRoot: value.stateRoot,
+            repositoryPath: value.root,
+            receipt: request.receipt,
+            integrationScope: request.integration_scope,
+            checks: [{
+              check_id: "integration-pass",
+              argv: [process.execPath, "-e", "process.exit(0)"],
+            }],
+          });
+          verificationId = verification.verification_id;
+        }
         const reconciled = await reconcileSerialIntegration({
           stateRoot: value.stateRoot,
           repositoryPath: value.root,
           integrationId: prepared.integration_id,
-          combinedVerificationDigest: digest("d"),
+          verificationId,
         });
         assert.equal(reconciled.outcome, item.name);
         assert.equal(reconciled.safe_to_finalize, item.name !== "unmerged");
@@ -220,7 +262,7 @@ test("reconciliation classifies ancestor, patch-equivalent, and unmerged without
           stateRoot: value.stateRoot,
           repositoryPath: value.root,
           integrationId: prepared.integration_id,
-          combinedVerificationDigest: digest("d"),
+          verificationId,
         })).reconciliation_digest, reconciled.reconciliation_digest);
       } finally {
         await removeFixture(value.root);
@@ -255,7 +297,6 @@ test("integration fails closed on coordinator decision and post-prepare executor
       stateRoot: drifted.stateRoot,
       repositoryPath: drifted.root,
       integrationId: prepared.integration_id,
-      combinedVerificationDigest: digest("e"),
     }), /Executor branch tip drifted/);
   } finally {
     await removeFixture(drifted.root);
