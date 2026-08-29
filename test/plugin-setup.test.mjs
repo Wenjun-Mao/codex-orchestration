@@ -41,7 +41,7 @@ async function createCachedPlugin() {
 function runCachedCli(cacheRoot, args, cwd) {
   return spawnSync(
     process.execPath,
-    [resolve(cacheRoot, "bin", "codex-flow.mjs"), ...args],
+    [resolve(cacheRoot, "bin", "codex-flow.mjs"), "legacy-v05", ...args],
     { cwd, encoding: "utf8" },
   );
 }
@@ -129,7 +129,7 @@ test("cached plugin initializes a Python repository without a source checkout", 
     );
     const pinnedDoctor = spawnSync(
       process.execPath,
-      [resolve(repositoryRoot, ".codex/orchestration/bin/codex-flow.mjs"), "doctor", "--json"],
+      [resolve(repositoryRoot, ".codex/orchestration/bin/codex-flow.mjs"), "legacy-v05", "doctor", "--json"],
       { cwd: repositoryRoot, encoding: "utf8" },
     );
     assertSuccess(pinnedDoctor, "pinned doctor");

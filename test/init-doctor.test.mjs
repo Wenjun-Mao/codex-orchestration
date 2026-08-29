@@ -8,7 +8,7 @@ import {
   createGitFixture,
   initializeFixture,
   removeFixture,
-  runCli,
+  runLegacyCli,
 } from "./helpers.mjs";
 import { PACKAGE_VERSION } from "../lib/core.mjs";
 import { CODEX_FLOW_STATE_NAMESPACE, discoverGit } from "../lib/git.mjs";
@@ -57,12 +57,12 @@ test("init preserves a Python repository and installs a pinned runtime idempoten
     await assert.rejects(readFile(resolve(root, "package.json")), { code: "ENOENT" });
 
     const beforeCheck = await snapshotFiles(root);
-    assertSuccess(runCli(["init", "--check"], { cwd: root }), "init check");
+    assertSuccess(runLegacyCli(["init", "--check"], { cwd: root }), "init check");
     assert.deepEqual(await snapshotFiles(root), beforeCheck);
     const second = initializeFixture([], { cwd: root }).applied;
     assert.equal(JSON.parse(second.stdout).changed, false);
 
-    const doctor = runCli(["doctor", "--json"], {
+    const doctor = runLegacyCli(["doctor", "--json"], {
       cwd: root,
       env: { CODEX_FLOW_CODEX_BIN: resolve(root, "missing-codex") },
     });
@@ -92,10 +92,10 @@ test("sync removes obsolete manifest-owned files and preserves project configura
     await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
     const configBefore = await readFile(resolve(runtimeRoot, "project.json"), "utf8");
 
-    assertSuccess(runCli(["sync"], { cwd: root }), "obsolete-file sync");
+    assertSuccess(runLegacyCli(["sync"], { cwd: root }), "obsolete-file sync");
     await assert.rejects(readFile(obsoletePath), { code: "ENOENT" });
     assert.equal(await readFile(resolve(runtimeRoot, "project.json"), "utf8"), configBefore);
-    assertSuccess(runCli(["sync", "--check"], { cwd: root }), "post-upgrade check");
+    assertSuccess(runLegacyCli(["sync", "--check"], { cwd: root }), "post-upgrade check");
   } finally {
     await removeFixture(root);
   }
@@ -107,10 +107,10 @@ test("sync refuses locally modified managed runtime files", async () => {
     initializeFixture([], { cwd: root });
     const managed = resolve(root, ".codex/orchestration/lib/core.mjs");
     await writeFile(managed, "// local drift\n", "utf8");
-    const refused = runCli(["sync"], { cwd: root });
+    const refused = runLegacyCli(["sync"], { cwd: root });
     assert.notEqual(refused.status, 0);
     assert.match(refused.stderr, /local drift/);
-    assertSuccess(runCli(["sync", "--force"], { cwd: root }), "forced reviewed sync");
+    assertSuccess(runLegacyCli(["sync", "--force"], { cwd: root }), "forced reviewed sync");
     assert.doesNotMatch(await readFile(managed, "utf8"), /local drift/);
   } finally {
     await removeFixture(root);
@@ -127,10 +127,10 @@ test("v0.5 rejects older project configuration instead of migrating it", async (
     delete old.git_lifecycle;
     const oldBytes = `${JSON.stringify(old, null, 2)}\n`;
     await writeFile(configPath, oldBytes, "utf8");
-    const sync = runCli(["sync"], { cwd: root });
+    const sync = runLegacyCli(["sync"], { cwd: root });
     assert.notEqual(sync.status, 0);
     assert.match(sync.stderr, /fresh schema 4 initialization/);
-    const plan = runCli(["init", "--plan", "--json"], { cwd: root });
+    const plan = runLegacyCli(["init", "--plan", "--json"], { cwd: root });
     assert.notEqual(plan.status, 0);
     assert.match(plan.stderr, /fresh schema 4 initialization/);
     assert.equal(await readFile(configPath, "utf8"), oldBytes);
@@ -184,7 +184,7 @@ test("v0.5.2-dev.0 preserves retained v0.5.1 state in its exact-release namespac
     assert.equal(await readFile(v04Record, "utf8"), "{\"schema_version\":2}\n");
     assert.equal(await readFile(v05Record, "utf8"), "{\"schema_version\":8}\n");
     assert.deepEqual(await snapshotFiles(v051StateRoot), retainedV051State);
-    const doctor = runCli(["doctor", "--json"], { cwd: root });
+    const doctor = runLegacyCli(["doctor", "--json"], { cwd: root });
     assertSuccess(doctor, "current-version namespaced doctor");
     assert.equal(JSON.parse(doctor.stdout).ok, true);
     assert.deepEqual(await snapshotFiles(v051StateRoot), retainedV051State);
@@ -197,7 +197,7 @@ test("init fails closed on malformed AGENTS managed markers", async () => {
   const root = await createGitFixture();
   try {
     await writeFile(resolve(root, "AGENTS.md"), "<!-- codex-flow:start v0.0.1 -->\n", "utf8");
-    const result = runCli(["init", "--plan"], { cwd: root });
+    const result = runLegacyCli(["init", "--plan"], { cwd: root });
     assert.notEqual(result.status, 0);
     assert.match(result.stdout, /malformed or duplicate/);
   } finally {
@@ -216,7 +216,7 @@ test("init fails closed when AGENTS managed markers are reversed", async () => {
       "",
     ].join("\n"), "utf8");
     const before = await readFile(resolve(root, "AGENTS.md"), "utf8");
-    const result = runCli(["init", "--plan"], { cwd: root });
+    const result = runLegacyCli(["init", "--plan"], { cwd: root });
     assert.notEqual(result.status, 0);
     assert.match(result.stdout, /malformed or duplicate/);
     assert.equal(await readFile(resolve(root, "AGENTS.md"), "utf8"), before);
@@ -229,7 +229,7 @@ test("project defaults can be changed after initialization and resolved per task
   const root = await createGitFixture();
   try {
     initializeFixture([], { cwd: root });
-    const changed = runCli([
+    const changed = runLegacyCli([
       "config", "set",
       "--model", "gpt-5.6-luna",
       "--reasoning-effort", "medium",
@@ -256,11 +256,11 @@ test("project defaults can be changed after initialization and resolved per task
     packet.model = null;
     packet.reasoning_effort = null;
     await writeFile(packetPath, JSON.stringify(packet), "utf8");
-    const rendered = runCli(["task", "packet", "render", packetPath, "--json"], { cwd: root });
+    const rendered = runLegacyCli(["task", "packet", "render", packetPath, "--json"], { cwd: root });
     assertSuccess(rendered, "resolved task packet");
     assert.equal(JSON.parse(rendered.stdout).model, "gpt-5.6-luna");
     assert.equal(JSON.parse(rendered.stdout).reasoning_effort, "medium");
-    const perTaskHostDefault = runCli([
+    const perTaskHostDefault = runLegacyCli([
       "task", "packet", "render", packetPath,
       "--model", "host-default",
       "--reasoning-effort", "host-default",
@@ -270,10 +270,10 @@ test("project defaults can be changed after initialization and resolved per task
     assert.equal(JSON.parse(perTaskHostDefault.stdout).model, null);
     assert.equal(JSON.parse(perTaskHostDefault.stdout).reasoning_effort, null);
 
-    assertSuccess(runCli([
+    assertSuccess(runLegacyCli([
       "config", "set", "--model", "host-default", "--reasoning-effort", "host-default",
     ], { cwd: root }), "host-default config");
-    const shown = runCli(["config", "show", "--json"], { cwd: root });
+    const shown = runLegacyCli(["config", "show", "--json"], { cwd: root });
     assertSuccess(shown, "config show");
     assert.equal(JSON.parse(shown.stdout).default_model, null);
     assert.equal(JSON.parse(shown.stdout).default_reasoning_effort, null);

@@ -5,7 +5,7 @@ import {
   createGitFixture,
   initializeFixture,
   removeFixture,
-  runCli,
+  runLegacyCli,
 } from "./helpers.mjs";
 
 function signal() {
@@ -31,7 +31,7 @@ test("CLI persists, identifies, suppresses, and reports urgent direct delivery",
   const root = await createGitFixture("codex-flow-urgent-cli-");
   try {
     initializeFixture([], { cwd: root });
-    const bound = runCli([
+    const bound = runLegacyCli([
       "recipient", "bind",
       "--lineage-id", "cli-urgent-lineage",
       "--thread-id", "cli-urgent-coordinator",
@@ -39,7 +39,7 @@ test("CLI persists, identifies, suppresses, and reports urgent direct delivery",
     ], { cwd: root });
     assertSuccess(bound, "recipient bind");
 
-    const persistedResult = runCli(["urgent", "persist", "--json"], {
+    const persistedResult = runLegacyCli(["urgent", "persist", "--json"], {
       cwd: root,
       input: signal(),
     });
@@ -47,14 +47,14 @@ test("CLI persists, identifies, suppresses, and reports urgent direct delivery",
     const persisted = JSON.parse(persistedResult.stdout);
     assert.equal(persisted.status, "persisted");
 
-    const pendingDoctorResult = runCli(["doctor", "--json"], { cwd: root });
+    const pendingDoctorResult = runLegacyCli(["doctor", "--json"], { cwd: root });
     assert.equal(pendingDoctorResult.status, 1);
     const pendingDoctor = JSON.parse(pendingDoctorResult.stdout);
     assert.equal(pendingDoctor.ok, false);
     assert.equal(pendingDoctor.urgent_signals.pending_count, 1);
     assert.match(pendingDoctor.errors.join("\n"), /require coordinator disposition/);
 
-    const prepareResult = runCli([
+    const prepareResult = runLegacyCli([
       "urgent", "attempt", "prepare",
       "--urgent-id", persisted.urgent_id,
       "--attempt-sequence", "1",
@@ -69,7 +69,7 @@ test("CLI persists, identifies, suppresses, and reports urgent direct delivery",
     assert.equal(hostPrompt.delivery_attempt_id, prepared.delivery_attempt_id);
     assert.equal("requested_action" in hostPrompt, false);
 
-    const legacyReconcile = runCli([
+    const legacyReconcile = runLegacyCli([
       "urgent", "attempt", "reconcile",
       "--urgent-id", persisted.urgent_id,
       "--delivery-attempt-id", prepared.delivery_attempt_id,
@@ -78,7 +78,7 @@ test("CLI persists, identifies, suppresses, and reports urgent direct delivery",
     ], { cwd: root });
     assert.notEqual(legacyReconcile.status, 0);
     assert.match(legacyReconcile.stderr, /Unknown option '--outcome'/);
-    const stillPrepared = runCli([
+    const stillPrepared = runLegacyCli([
       "urgent", "attempt", "prepare",
       "--urgent-id", persisted.urgent_id,
       "--attempt-sequence", "1",
@@ -87,7 +87,7 @@ test("CLI persists, identifies, suppresses, and reports urgent direct delivery",
     assertSuccess(stillPrepared, "urgent duplicate prepare after rejected legacy flag");
     assert.equal(JSON.parse(stillPrepared.stdout).status, "already-prepared");
 
-    const reconcileResult = runCli([
+    const reconcileResult = runLegacyCli([
       "urgent", "attempt", "reconcile",
       "--urgent-id", persisted.urgent_id,
       "--delivery-attempt-id", prepared.delivery_attempt_id,
@@ -106,7 +106,7 @@ test("CLI persists, identifies, suppresses, and reports urgent direct delivery",
       "--generation", "1",
       "--json",
     ];
-    const observedResult = runCli(observeArgs, { cwd: root });
+    const observedResult = runLegacyCli(observeArgs, { cwd: root });
     assertSuccess(observedResult, "urgent observe");
     const observed = JSON.parse(observedResult.stdout);
     assert.equal(observed.disposition, "process");
@@ -119,7 +119,7 @@ test("CLI persists, identifies, suppresses, and reports urgent direct delivery",
       sender_executor_id: "cli-urgent-executor",
     });
 
-    const replayResult = runCli(observeArgs, { cwd: root });
+    const replayResult = runLegacyCli(observeArgs, { cwd: root });
     assertSuccess(replayResult, "urgent replay observe");
     assert.deepEqual(JSON.parse(replayResult.stdout), {
       status: "duplicate-host-replay",
@@ -128,7 +128,7 @@ test("CLI persists, identifies, suppresses, and reports urgent direct delivery",
       delivery_attempt_id: prepared.delivery_attempt_id,
     });
 
-    const legacyConsumeResult = runCli([
+    const legacyConsumeResult = runLegacyCli([
       "urgent", "consume",
       "--urgent-id", persisted.urgent_id,
       "--lineage-id", "cli-urgent-lineage",
@@ -139,11 +139,11 @@ test("CLI persists, identifies, suppresses, and reports urgent direct delivery",
     ], { cwd: root });
     assert.notEqual(legacyConsumeResult.status, 0);
     assert.match(legacyConsumeResult.stderr, /Unknown option '--executor-id'/);
-    const pendingAfterLegacyConsume = runCli(["urgent", "status", "--json"], { cwd: root });
+    const pendingAfterLegacyConsume = runLegacyCli(["urgent", "status", "--json"], { cwd: root });
     assertSuccess(pendingAfterLegacyConsume, "urgent status after rejected legacy consume flag");
     assert.equal(JSON.parse(pendingAfterLegacyConsume.stdout).pending.length, 1);
 
-    const consumedResult = runCli([
+    const consumedResult = runLegacyCli([
       "urgent", "consume",
       "--urgent-id", persisted.urgent_id,
       "--lineage-id", "cli-urgent-lineage",
@@ -155,21 +155,21 @@ test("CLI persists, identifies, suppresses, and reports urgent direct delivery",
     assertSuccess(consumedResult, "urgent consume");
     assert.equal(JSON.parse(consumedResult.stdout).status, "consumed");
 
-    const statusResult = runCli(["urgent", "status", "--json"], { cwd: root });
+    const statusResult = runLegacyCli(["urgent", "status", "--json"], { cwd: root });
     assertSuccess(statusResult, "urgent status");
     const status = JSON.parse(statusResult.stdout);
     assert.equal(status.consumed_count, 1);
     assert.equal(status.host_replay_count, 1);
     assert.equal(status.sender_attempt_duplicate_count, 0);
 
-    const doctorResult = runCli(["doctor", "--json"], { cwd: root });
+    const doctorResult = runLegacyCli(["doctor", "--json"], { cwd: root });
     assertSuccess(doctorResult, "doctor");
     const doctor = JSON.parse(doctorResult.stdout);
     assert.equal(doctor.ok, true);
     assert.equal(doctor.urgent_signals.host_replay_count, 1);
     assert.match(doctor.warnings.join("\n"), /host replay/);
 
-    const cleanupResult = runCli(["cleanup", "audit", "--json"], { cwd: root });
+    const cleanupResult = runLegacyCli(["cleanup", "audit", "--json"], { cwd: root });
     assertSuccess(cleanupResult, "cleanup audit");
     const cleanup = JSON.parse(cleanupResult.stdout);
     assert.equal(cleanup.mutation_performed, false);
@@ -183,19 +183,19 @@ test("CLI human observe output prints the sender-explicit consume command", asyn
   const root = await createGitFixture("codex-flow-urgent-human-cli-");
   try {
     initializeFixture([], { cwd: root });
-    assertSuccess(runCli([
+    assertSuccess(runLegacyCli([
       "recipient", "bind",
       "--lineage-id", "cli-urgent-lineage",
       "--thread-id", "cli-urgent-coordinator",
       "--json",
     ], { cwd: root }), "recipient bind");
-    const persistedResult = runCli(["urgent", "persist", "--json"], {
+    const persistedResult = runLegacyCli(["urgent", "persist", "--json"], {
       cwd: root,
       input: signal(),
     });
     assertSuccess(persistedResult, "urgent persist");
     const persisted = JSON.parse(persistedResult.stdout);
-    const prepareResult = runCli([
+    const prepareResult = runLegacyCli([
       "urgent", "attempt", "prepare",
       "--urgent-id", persisted.urgent_id,
       "--attempt-sequence", "1",
@@ -203,7 +203,7 @@ test("CLI human observe output prints the sender-explicit consume command", asyn
     ], { cwd: root });
     assertSuccess(prepareResult, "urgent attempt prepare");
     const prepared = JSON.parse(prepareResult.stdout);
-    assertSuccess(runCli([
+    assertSuccess(runLegacyCli([
       "urgent", "attempt", "reconcile",
       "--urgent-id", persisted.urgent_id,
       "--delivery-attempt-id", prepared.delivery_attempt_id,
@@ -211,7 +211,7 @@ test("CLI human observe output prints the sender-explicit consume command", asyn
       "--json",
     ], { cwd: root }), "urgent attempt reconcile");
 
-    const observedResult = runCli([
+    const observedResult = runLegacyCli([
       "urgent", "observe",
       "--urgent-id", persisted.urgent_id,
       "--delivery-attempt-id", prepared.delivery_attempt_id,

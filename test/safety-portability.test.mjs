@@ -17,12 +17,13 @@ import {
   createGitFixture,
   initializeFixture,
   removeFixture,
-  runCli,
+  runLegacyCli,
 } from "./helpers.mjs";
 
 function runPinned(root, args, cwd = root) {
   return spawnSync(process.execPath, [
     resolve(root, ".codex", "orchestration", "bin", "codex-flow.mjs"),
+    "legacy-v05",
     ...args,
   ], { cwd, encoding: "utf8" });
 }
@@ -77,10 +78,10 @@ test("doctor and cleanup support an unborn repository whose path contains spaces
   const root = await createGitFixture("codex flow % unborn-", { commit: false });
   try {
     initializeFixture([], { cwd: root });
-    const doctor = runCli(["doctor", "--json"], { cwd: root });
+    const doctor = runLegacyCli(["doctor", "--json"], { cwd: root });
     assertSuccess(doctor, "unborn doctor");
     assert.equal(JSON.parse(doctor.stdout).git.revision, "unborn");
-    const audit = runCli(["cleanup", "audit", "--json"], { cwd: root });
+    const audit = runLegacyCli(["cleanup", "audit", "--json"], { cwd: root });
     assertSuccess(audit, "spaced-path cleanup audit");
     assert.equal(JSON.parse(audit.stdout).mutation_performed, false);
   } finally {
@@ -98,7 +99,7 @@ test("managed and Git-common state writes reject symlinked repository paths", {
   try {
     await mkdir(resolve(managedRoot, ".codex"));
     await symlink(managedExternal, resolve(managedRoot, ".codex", "orchestration"), "dir");
-    const managed = runCli(["init", "--plan"], { cwd: managedRoot });
+    const managed = runLegacyCli(["init", "--plan"], { cwd: managedRoot });
     assert.notEqual(managed.status, 0);
     assert.match(managed.stderr, /symbolic link|real directory/);
     assert.deepEqual(await readdir(managedExternal), []);
@@ -106,7 +107,7 @@ test("managed and Git-common state writes reject symlinked repository paths", {
     initializeFixture([], { cwd: stateRoot });
     await rm(resolve(stateRoot, ".git", "codex-flow"), { recursive: true, force: true });
     await symlink(stateExternal, resolve(stateRoot, ".git", "codex-flow"), "dir");
-    const state = runCli([
+    const state = runLegacyCli([
       "lease", "acquire", "--resource", "browser", "--owner", "executor-a", "--ttl-seconds", "60",
     ], { cwd: stateRoot });
     assert.notEqual(state.status, 0);
@@ -130,10 +131,10 @@ test("unsafe managed-manifest paths fail before any out-of-root read", async () 
     const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
     manifest.files["../outside"] = "0".repeat(64);
     await writeFile(manifestPath, JSON.stringify(manifest), "utf8");
-    const doctor = runCli(["doctor", "--json"], { cwd: root });
+    const doctor = runLegacyCli(["doctor", "--json"], { cwd: root });
     assert.notEqual(doctor.status, 0);
     assert.match(JSON.parse(doctor.stdout).errors.join("\n"), /unsafe path/);
-    const sync = runCli(["sync", "--force"], { cwd: root });
+    const sync = runLegacyCli(["sync", "--force"], { cwd: root });
     assert.notEqual(sync.status, 0);
     assert.match(sync.stderr, /unsafe path/);
   } finally {
@@ -150,28 +151,28 @@ test("linked Git worktrees share callback and exclusive-resource state", async (
     execFileSync("git", ["add", "AGENTS.md", ".codex/orchestration"], { cwd: root });
     execFileSync("git", ["commit", "--quiet", "-m", "initialize fixture"], { cwd: root });
     execFileSync("git", ["worktree", "add", "--quiet", "-b", "linked-fixture", linked], { cwd: root });
-    const acquired = runCli([
+    const acquired = runLegacyCli([
       "lease", "acquire", "--resource", "creator", "--owner", "executor-a", "--ttl-seconds", "60", "--json",
     ], { cwd: root });
     assertSuccess(acquired, "main-worktree lease acquire");
     const lease = JSON.parse(acquired.stdout).lease;
-    const status = runCli(["lease", "status", "--resource", "creator", "--json"], { cwd: linked });
+    const status = runLegacyCli(["lease", "status", "--resource", "creator", "--json"], { cwd: linked });
     assertSuccess(status, "linked-worktree lease status");
     assert.equal(JSON.parse(status.stdout)[0].owner, "executor-a");
     assert.equal(JSON.parse(status.stdout)[0].token, undefined);
 
-    assertSuccess(runCli([
+    assertSuccess(runLegacyCli([
       "recipient", "bind", "--lineage-id", "linked-lineage", "--thread-id", "linked-coordinator", "--json",
     ], { cwd: root }), "main-worktree recipient bind");
-    assertSuccess(runCli(["callback", "deliver"], {
+    assertSuccess(runLegacyCli(["callback", "deliver"], {
       cwd: root,
       input: receipt(),
     }), "main-worktree callback persist");
-    const callbacks = runCli(["callback", "status", "--json"], { cwd: linked });
+    const callbacks = runLegacyCli(["callback", "status", "--json"], { cwd: linked });
     assertSuccess(callbacks, "linked-worktree callback status");
     assert.equal(JSON.parse(callbacks.stdout).pending[0].executor_id, "linked-executor");
 
-    assertSuccess(runCli([
+    assertSuccess(runLegacyCli([
       "lease", "release", "--resource", "creator", "--owner", "executor-a", "--token", lease.token,
     ], { cwd: linked }), "linked-worktree lease release");
   } finally {

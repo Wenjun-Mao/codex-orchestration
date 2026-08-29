@@ -28,6 +28,10 @@ export function runCli(args, { cwd, env = {}, input } = {}) {
   });
 }
 
+export function runLegacyCli(args, options = {}) {
+  return runCli(["legacy-v05", ...args], options);
+}
+
 export function assertSuccess(result, label = "command") {
   if (result.status !== 0) {
     throw new Error(`${label} failed (${result.status}): ${result.stderr || result.stdout}`);
@@ -35,10 +39,10 @@ export function assertSuccess(result, label = "command") {
 }
 
 export function initializeFixture(args = [], { cwd, env = {} } = {}) {
-  const planned = runCli(["init", "--plan", "--json", ...args], { cwd, env });
+  const planned = runLegacyCli(["init", "--plan", "--json", ...args], { cwd, env });
   assertSuccess(planned, "initialization plan");
   const plan = JSON.parse(planned.stdout);
-  const applied = runCli(["init", "--apply-plan", plan.plan_id, "--json", ...args], { cwd, env });
+  const applied = runLegacyCli(["init", "--apply-plan", plan.plan_id, "--json", ...args], { cwd, env });
   assertSuccess(applied, "initialization apply");
   return { plan, applied, result: JSON.parse(applied.stdout) };
 }

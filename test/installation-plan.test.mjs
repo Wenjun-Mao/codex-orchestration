@@ -14,7 +14,7 @@ import {
   initializeFixture,
   packageRoot,
   removeFixture,
-  runCli,
+  runLegacyCli,
 } from "./helpers.mjs";
 
 function externalArgs() {
@@ -48,7 +48,7 @@ test("init plan is read-only, reports the full AGENTS delta, and direct unplanne
     const indexPath = resolve(root, ".git", "index");
     const indexBefore = await lstat(indexPath, { bigint: true });
 
-    const planned = runCli(["init", "--plan", "--json"], { cwd: root });
+    const planned = runLegacyCli(["init", "--plan", "--json"], { cwd: root });
     assertSuccess(planned, "read-only plan");
     const plan = JSON.parse(planned.stdout);
     assert.equal(plan.applicable, true);
@@ -61,7 +61,7 @@ test("init plan is read-only, reports the full AGENTS delta, and direct unplanne
     const indexAfter = await lstat(indexPath, { bigint: true });
     assert.equal(indexAfter.mtimeNs, indexBefore.mtimeNs);
 
-    const unplanned = runCli(["init"], { cwd: root });
+    const unplanned = runLegacyCli(["init"], { cwd: root });
     assert.notEqual(unplanned.status, 0);
     assert.match(unplanned.stderr, /requires exactly one/);
   } finally {
@@ -72,7 +72,7 @@ test("init plan is read-only, reports the full AGENTS delta, and direct unplanne
 test("setup mode binds installation to its clean dedicated branch", async () => {
   const root = await createGitFixture("codex-flow-setup-mode-");
   try {
-    const wrongBranch = runCli(["init", "--plan", "--setup-mode", "existing", "--json"], { cwd: root });
+    const wrongBranch = runLegacyCli(["init", "--plan", "--setup-mode", "existing", "--json"], { cwd: root });
     assert.notEqual(wrongBranch.status, 0);
     const wrongBranchPlan = JSON.parse(wrongBranch.stdout);
     assert.ok(wrongBranchPlan.conflicts.some((item) => item.code === "setup-branch"));
@@ -82,7 +82,7 @@ test("setup mode binds installation to its clean dedicated branch", async () => 
     );
 
     execFileSync("git", ["switch", "-c", "codex/codex-flow-v0.5-adoption"], { cwd: root });
-    const missingProjectId = runCli(
+    const missingProjectId = runLegacyCli(
       ["init", "--plan", "--setup-mode", "existing", "--json"],
       { cwd: root },
     );
@@ -90,7 +90,7 @@ test("setup mode binds installation to its clean dedicated branch", async () => 
     assert.ok(JSON.parse(missingProjectId.stdout).conflicts.some(
       (item) => item.code === "setup-project-id",
     ));
-    const cleanPlanResult = runCli(
+    const cleanPlanResult = runLegacyCli(
       [
         "init", "--plan", "--setup-mode", "existing",
         "--project-id", "stable-project", "--json",
@@ -103,7 +103,7 @@ test("setup mode binds installation to its clean dedicated branch", async () => 
 
     const dirtyPath = resolve(root, "ongoing.py");
     await writeFile(dirtyPath, "print('ongoing')\n", "utf8");
-    const dirtyPlan = runCli(
+    const dirtyPlan = runLegacyCli(
       [
         "init", "--plan", "--setup-mode", "existing",
         "--project-id", "stable-project", "--json",
@@ -116,7 +116,7 @@ test("setup mode binds installation to its clean dedicated branch", async () => 
     ));
     await rm(dirtyPath);
 
-    const omittedMode = runCli(
+    const omittedMode = runLegacyCli(
       ["init", "--apply-plan", cleanPlan.plan_id, "--json"],
       { cwd: root },
     );
@@ -128,7 +128,7 @@ test("setup mode binds installation to its clean dedicated branch", async () => 
     );
 
     assertSuccess(
-      runCli(
+      runLegacyCli(
         [
           "init",
           "--apply-plan",
@@ -154,12 +154,12 @@ test("stale install plan is rejected before any planned path changes", async () 
   const root = await createGitFixture();
   try {
     await writeFile(resolve(root, "AGENTS.md"), "# Initial policy\n", "utf8");
-    const planned = runCli(["init", "--plan", "--json"], { cwd: root });
+    const planned = runLegacyCli(["init", "--plan", "--json"], { cwd: root });
     assertSuccess(planned, "initial plan");
     const plan = JSON.parse(planned.stdout);
     await writeFile(resolve(root, "AGENTS.md"), "# Changed policy\n", "utf8");
 
-    const stale = runCli(["init", "--apply-plan", plan.plan_id], { cwd: root });
+    const stale = runLegacyCli(["init", "--apply-plan", plan.plan_id], { cwd: root });
     assert.equal(stale.status, 75);
     assert.match(stale.stderr, /Installation plan changed/);
     assert.equal(await readFile(resolve(root, "AGENTS.md"), "utf8"), "# Changed policy\n");
@@ -184,7 +184,7 @@ test("external AGENTS attestation preserves mature instructions and doctor fails
     assert.equal(config.agents_integration.path, "AGENTS.md");
     assert.equal(config.agents_integration.attested, true);
 
-    const doctor = runCli(["doctor", "--json"], { cwd: root });
+    const doctor = runLegacyCli(["doctor", "--json"], { cwd: root });
     assertSuccess(doctor, "external doctor");
     assert.deepEqual(JSON.parse(doctor.stdout).agents_contract, {
       mode: "external",
@@ -194,10 +194,10 @@ test("external AGENTS attestation preserves mature instructions and doctor fails
     });
 
     await writeFile(resolve(root, "AGENTS.md"), `${agents}\nNew policy.\n`, "utf8");
-    const drifted = runCli(["doctor", "--json"], { cwd: root });
+    const drifted = runLegacyCli(["doctor", "--json"], { cwd: root });
     assert.notEqual(drifted.status, 0);
     assert.match(JSON.parse(drifted.stdout).errors.join("\n"), /re-attestation is required/);
-    const unattested = runCli([
+    const unattested = runLegacyCli([
       "init", "--plan", "--json",
       "--agents-mode", "external",
       "--external-agents-path", "AGENTS.md",
@@ -206,7 +206,7 @@ test("external AGENTS attestation preserves mature instructions and doctor fails
     assert.ok(JSON.parse(unattested.stdout).conflicts.some((item) => item.code === "external-agents-attestation"));
 
     initializeFixture(externalArgs(), { cwd: root });
-    assertSuccess(runCli(["doctor", "--json"], { cwd: root }), "re-attested doctor");
+    assertSuccess(runLegacyCli(["doctor", "--json"], { cwd: root }), "re-attested doctor");
   } finally {
     await removeFixture(root);
   }
@@ -224,7 +224,7 @@ test("managed installation can transition transactionally to an external equival
     assert.equal(transitioned.plan.agents.mode, "external");
     assert.ok(transitioned.plan.operations.some((item) => item.path === "AGENTS.md" && item.action === "update"));
     assert.equal(await readFile(resolve(root, "AGENTS.md"), "utf8"), original);
-    assertSuccess(runCli(["doctor", "--json"], { cwd: root }), "transition doctor");
+    assertSuccess(runLegacyCli(["doctor", "--json"], { cwd: root }), "transition doctor");
   } finally {
     await removeFixture(root);
   }

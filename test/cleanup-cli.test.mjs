@@ -7,7 +7,7 @@ import {
   createGitFixture,
   initializeFixture,
   removeFixture,
-  runCli,
+  runLegacyCli,
 } from "./helpers.mjs";
 
 function operationPacket(root) {
@@ -86,7 +86,7 @@ test("cleanup CLI emits a structured nonempty failure result", async () => {
   const root = await createGitFixture("codex-flow-cleanup-cli-");
   try {
     initializeFixture([], { cwd: root });
-    const result = runCli([
+    const result = runLegacyCli([
       "cleanup", "apply",
       "--plan-id", "0".repeat(64),
       "--main-branch", "main",
@@ -112,23 +112,23 @@ test("CLI reconcile preserves a policy-rejected observation and exits fail-close
   try {
     initializeFixture([], { cwd: root });
     const packet = operationPacket(root);
-    const preparedResult = runCli([
+    const preparedResult = runLegacyCli([
       "task", "operation", "prepare", "--json",
     ], { cwd: root, input: packet });
     assert.equal(preparedResult.status, 0, preparedResult.stderr);
     const prepared = JSON.parse(preparedResult.stdout);
-    const preflight = runCli([
+    const preflight = runLegacyCli([
       "task", "operation", "preflight", "--operation-id", prepared.operation_id,
     ], { cwd: root, input: capabilityEvidence() });
     assert.equal(preflight.status, 0);
-    const attemptResult = runCli([
+    const attemptResult = runLegacyCli([
       "task", "operation", "attempt", "--operation-id", prepared.operation_id, "--json",
     ], { cwd: root });
     assert.equal(attemptResult.status, 0, attemptResult.stderr);
     const attempt = JSON.parse(attemptResult.stdout);
     const evidencePath = resolve(root, "policy-rejected-observation.json");
     await writeFile(evidencePath, `${JSON.stringify(observationEvidence(packet.title), null, 2)}\n`, "utf8");
-    const reconciled = runCli([
+    const reconciled = runLegacyCli([
       "task", "operation", "reconcile",
       "--operation-id", prepared.operation_id,
       "--attempt-id", attempt.attempt.attempt_id,
@@ -147,7 +147,7 @@ test("CLI reconcile preserves a policy-rejected observation and exits fail-close
       state: "rejected",
       reason_code: "project-placement-unavailable",
     });
-    const status = runCli([
+    const status = runLegacyCli([
       "task", "operation", "status", "--operation-id", prepared.operation_id, "--json",
     ], { cwd: root });
     assert.equal(status.status, 0);

@@ -4,7 +4,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import test from "node:test";
-import { assertSuccess, createGitFixture, initializeFixture, removeFixture, runCli } from "./helpers.mjs";
+import { assertSuccess, createGitFixture, initializeFixture, removeFixture, runLegacyCli } from "./helpers.mjs";
 
 function receipt() {
   return {
@@ -146,28 +146,28 @@ test("CLI binds a redacted recipient and enforces observe before consume", async
   try {
     initializeFixture([], { cwd: root });
 
-    const binding = runCli([
+    const binding = runLegacyCli([
       "recipient", "bind", "--lineage-id", "cli-lineage", "--thread-id", "cli-coordinator", "--json",
     ], { cwd: root });
     assertSuccess(binding, "recipient bind");
     assert.ok(JSON.parse(binding.stdout).recipient.fence_token);
-    const repeatedBinding = runCli([
+    const repeatedBinding = runLegacyCli([
       "recipient", "bind", "--lineage-id", "cli-lineage", "--thread-id", "cli-coordinator", "--json",
     ], { cwd: root });
     assertSuccess(repeatedBinding, "recipient bind replay");
     assert.equal(JSON.parse(repeatedBinding.stdout).recipient.fence_token, undefined);
-    const status = runCli(["recipient", "status", "--lineage-id", "cli-lineage", "--json"], { cwd: root });
+    const status = runLegacyCli(["recipient", "status", "--lineage-id", "cli-lineage", "--json"], { cwd: root });
     assertSuccess(status, "recipient status");
     assert.equal(JSON.parse(status.stdout).current.fence_token, undefined);
 
-    const delivered = runCli(["callback", "deliver", "--json"], {
+    const delivered = runLegacyCli(["callback", "deliver", "--json"], {
       cwd: root,
       input: receipt(),
     });
     assertSuccess(delivered, "callback deliver");
     const callbackId = JSON.parse(delivered.stdout).callback_id;
 
-    const premature = runCli([
+    const premature = runLegacyCli([
       "callback", "consume", "--callback-id", callbackId,
       "--lineage-id", "cli-lineage", "--thread-id", "cli-coordinator", "--generation", "1",
       "--executor-id", "cli-executor",
@@ -175,17 +175,17 @@ test("CLI binds a redacted recipient and enforces observe before consume", async
     assert.equal(premature.status, 73);
     assert.match(premature.stderr, /observed before it can be consumed/);
 
-    assertSuccess(runCli([
+    assertSuccess(runLegacyCli([
       "callback", "observe", "--callback-id", callbackId,
       "--lineage-id", "cli-lineage", "--thread-id", "cli-coordinator", "--generation", "1",
     ], { cwd: root }), "callback observe");
-    assertSuccess(runCli([
+    assertSuccess(runLegacyCli([
       "callback", "consume", "--callback-id", callbackId,
       "--lineage-id", "cli-lineage", "--thread-id", "cli-coordinator", "--generation", "1",
       "--executor-id", "cli-executor",
     ], { cwd: root }), "callback consume");
 
-    const callbacks = runCli(["callback", "status", "--json"], { cwd: root });
+    const callbacks = runLegacyCli(["callback", "status", "--json"], { cwd: root });
     assertSuccess(callbacks, "callback status");
     assert.equal(JSON.parse(callbacks.stdout).consumed_count, 1);
   } finally {
@@ -197,27 +197,27 @@ test("CLI requires preflight and records provenance-rich host reconciliation", a
   const root = await createGitFixture("codex-flow-cli-task-operation-");
   try {
     initializeFixture([], { cwd: root });
-    const preparedResult = runCli(["task", "operation", "prepare", "--json"], {
+    const preparedResult = runLegacyCli(["task", "operation", "prepare", "--json"], {
       cwd: root,
       input: operationPacket(root),
     });
     assertSuccess(preparedResult, "task operation prepare");
     const prepared = JSON.parse(preparedResult.stdout);
 
-    const premature = runCli([
+    const premature = runLegacyCli([
       "task", "operation", "attempt", "--operation-id", prepared.operation_id,
     ], { cwd: root });
     assert.equal(premature.status, 75);
     assert.match(premature.stderr, /requires host capability preflight/);
 
-    const preflightResult = runCli([
+    const preflightResult = runLegacyCli([
       "task", "operation", "preflight", "--operation-id", prepared.operation_id, "--json",
     ], { cwd: root, input: hostCapability() });
     assertSuccess(preflightResult, "task operation preflight");
     const preflight = JSON.parse(preflightResult.stdout);
     assert.equal(preflight.host_preflights.length, 1);
 
-    const attemptResult = runCli([
+    const attemptResult = runLegacyCli([
       "task", "operation", "attempt", "--operation-id", prepared.operation_id, "--json",
     ], { cwd: root });
     assertSuccess(attemptResult, "task operation attempt");
@@ -225,7 +225,7 @@ test("CLI requires preflight and records provenance-rich host reconciliation", a
 
     const evidencePath = resolve(root, "host-observation.json");
     await writeFile(evidencePath, `${JSON.stringify(hostObservation(), null, 2)}\n`, "utf8");
-    const observedResult = runCli([
+    const observedResult = runLegacyCli([
       "task", "operation", "reconcile",
       "--operation-id", prepared.operation_id,
       "--attempt-id", attempt.attempt.attempt_id,
@@ -240,13 +240,13 @@ test("CLI requires preflight and records provenance-rich host reconciliation", a
     assert.equal(observed.observed.evidence.title.normalization, "bounded-host-write");
     assert.equal(observed.observation_evidence.quality, "partial");
 
-    const boundResult = runCli([
+    const boundResult = runLegacyCli([
       "git", "bind", "--operation-id", prepared.operation_id, "--json",
     ], { cwd: root });
     assertSuccess(boundResult, "git ownership bind");
     assert.equal(JSON.parse(boundResult.stdout).executor_id, "cli-task-operation");
 
-    const gitStatus = runCli(["git", "status", "--json"], { cwd: root });
+    const gitStatus = runLegacyCli(["git", "status", "--json"], { cwd: root });
     assertSuccess(gitStatus, "git lifecycle status");
     assert.equal(JSON.parse(gitStatus.stdout).items.length, 1);
   } finally {
@@ -261,21 +261,21 @@ test("CLI gates a host-created worktree between bootstrap and Git-bound release"
   try {
     initializeFixture([], { cwd: root });
     const request = hostWorktreeOperationPacket(root);
-    const preparedResult = runCli(["task", "operation", "prepare", "--json"], {
+    const preparedResult = runLegacyCli(["task", "operation", "prepare", "--json"], {
       cwd: root,
       input: request,
     });
     assertSuccess(preparedResult, "host-worktree prepare");
     const prepared = JSON.parse(preparedResult.stdout);
-    assertSuccess(runCli([
+    assertSuccess(runLegacyCli([
       "task", "operation", "preflight", "--operation-id", prepared.operation_id, "--json",
     ], { cwd: root, input: hostCapability("host-worktree") }), "host-worktree preflight");
-    const attemptResult = runCli([
+    const attemptResult = runLegacyCli([
       "task", "operation", "attempt", "--operation-id", prepared.operation_id, "--json",
     ], { cwd: root });
     assertSuccess(attemptResult, "host-worktree attempt");
     const attempt = JSON.parse(attemptResult.stdout);
-    const bootstrap = runCli([
+    const bootstrap = runLegacyCli([
       "task", "operation", "bootstrap", "--operation-id", prepared.operation_id,
     ], { cwd: root, input: request });
     assertSuccess(bootstrap, "host-worktree bootstrap");
@@ -291,7 +291,7 @@ test("CLI gates a host-created worktree between bootstrap and Git-bound release"
       null,
       2,
     )}\n`, "utf8");
-    assertSuccess(runCli([
+    assertSuccess(runLegacyCli([
       "task", "operation", "reconcile",
       "--operation-id", prepared.operation_id,
       "--attempt-id", attempt.attempt.attempt_id,
@@ -301,19 +301,19 @@ test("CLI gates a host-created worktree between bootstrap and Git-bound release"
       "--evidence", evidencePath,
     ], { cwd: root }), "host-worktree reconcile");
 
-    const premature = runCli([
+    const premature = runLegacyCli([
       "task", "operation", "release", "--operation-id", prepared.operation_id,
     ], { cwd: root, input: request });
     assert.notEqual(premature.status, 0);
     assert.match(premature.stderr, /requires bound Git ownership/);
-    assertSuccess(runCli([
+    assertSuccess(runLegacyCli([
       "git", "bind", "--operation-id", prepared.operation_id,
     ], { cwd: root }), "host-worktree Git bind");
     assert.equal(execFileSync("git", ["branch", "--show-current"], {
       cwd: worktree,
       encoding: "utf8",
     }).trim(), "codex/cli-host-worktree");
-    const released = runCli([
+    const released = runLegacyCli([
       "task", "operation", "release", "--operation-id", prepared.operation_id,
     ], { cwd: root, input: request });
     assertSuccess(released, "host-worktree release");
