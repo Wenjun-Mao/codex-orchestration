@@ -1,0 +1,144 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://private.local/codex-flow/run-activation.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "kind",
+    "run_id",
+    "runtime_id",
+    "runtime_context_hash",
+    "status",
+    "plan",
+    "binding",
+    "rebind_history",
+    "admitted_at",
+    "updated_at",
+    "terminal"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "kind": { "const": "codex-flow-v06-run-activation" },
+    "run_id": { "$ref": "#/$defs/safeId" },
+    "runtime_id": { "$ref": "#/$defs/safeId" },
+    "runtime_context_hash": { "$ref": "#/$defs/digest" },
+    "status": { "enum": ["active", "closed", "abandoned"] },
+    "plan": { "$ref": "https://private.local/codex-flow/run-fence.schema.json" },
+    "binding": { "$ref": "#/$defs/binding" },
+    "rebind_history": {
+      "type": "array",
+      "maxItems": 128,
+      "items": { "$ref": "#/$defs/rebind" }
+    },
+    "admitted_at": { "$ref": "#/$defs/timestamp" },
+    "updated_at": { "$ref": "#/$defs/timestamp" },
+    "terminal": {
+      "oneOf": [
+        { "type": "null" },
+        { "$ref": "#/$defs/closed" },
+        { "$ref": "#/$defs/abandoned" }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "status": { "const": "active" } } },
+      "then": { "properties": { "terminal": { "type": "null" } } }
+    },
+    {
+      "if": { "properties": { "status": { "const": "closed" } } },
+      "then": { "properties": { "terminal": { "$ref": "#/$defs/closed" } } }
+    },
+    {
+      "if": { "properties": { "status": { "const": "abandoned" } } },
+      "then": { "properties": { "terminal": { "$ref": "#/$defs/abandoned" } } }
+    }
+  ],
+  "$defs": {
+    "safeId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9_.-]+$"
+    },
+    "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "timestamp": {
+      "type": "string",
+      "maxLength": 64,
+      "format": "date-time"
+    },
+    "host": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["host_id", "session_id"],
+      "properties": {
+        "host_id": { "$ref": "#/$defs/safeId" },
+        "session_id": { "$ref": "#/$defs/safeId" }
+      }
+    },
+    "lineage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["lineage_id", "thread_id", "generation"],
+      "properties": {
+        "lineage_id": { "$ref": "#/$defs/safeId" },
+        "thread_id": { "$ref": "#/$defs/safeId" },
+        "generation": { "type": "integer", "minimum": 1, "maximum": 2147483647 }
+      }
+    },
+    "binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "runtime_context_hash",
+        "config_hash",
+        "repository_hash",
+        "host",
+        "lineage",
+        "generation",
+        "fence_token"
+      ],
+      "properties": {
+        "runtime_context_hash": { "$ref": "#/$defs/digest" },
+        "config_hash": { "$ref": "#/$defs/digest" },
+        "repository_hash": { "$ref": "#/$defs/digest" },
+        "host": { "$ref": "#/$defs/host" },
+        "lineage": { "$ref": "#/$defs/lineage" },
+        "generation": { "type": "integer", "minimum": 1, "maximum": 2147483647 },
+        "fence_token": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "rebind": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["from", "to", "rebound_at"],
+      "properties": {
+        "from": { "$ref": "#/$defs/binding" },
+        "to": { "$ref": "#/$defs/binding" },
+        "rebound_at": { "$ref": "#/$defs/timestamp" }
+      }
+    },
+    "closed": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "closed_at", "unresolved_fences"],
+      "properties": {
+        "kind": { "const": "closed" },
+        "closed_at": { "$ref": "#/$defs/timestamp" },
+        "unresolved_fences": { "$ref": "https://private.local/codex-flow/run-fence.schema.json" }
+      }
+    },
+    "abandoned": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "abandoned_at", "reason", "unresolved_fences"],
+      "properties": {
+        "kind": { "const": "abandoned" },
+        "abandoned_at": { "$ref": "#/$defs/timestamp" },
+        "reason": { "type": "string", "minLength": 1, "maxLength": 512 },
+        "unresolved_fences": { "$ref": "https://private.local/codex-flow/run-fence.schema.json" }
+      }
+    }
+  }
+}
