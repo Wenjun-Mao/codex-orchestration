@@ -18,7 +18,12 @@ import {
   createWorkflowJournal,
   persistWorkflowTaskContract,
 } from "../lib/workflow-journal-v06.mjs";
-import { createGitFixture, packageRoot, removeFixture } from "./helpers.mjs";
+import {
+  activateV06FixtureRun,
+  createGitFixture,
+  packageRoot,
+  removeFixture,
+} from "./helpers.mjs";
 
 const START = Date.parse("2026-08-29T20:00:00.000Z");
 
@@ -61,29 +66,32 @@ async function fixture() {
   };
   coordinator.binding_digest = coordinatorBindingDigest(coordinator);
   const stateRoot = resolve(commonDir, "codex-flow", "v0.6.0");
-  const authority = {
-    run_id: "run-visible-task",
-    runtime_context_digest: "1".repeat(64),
-    configuration_digest: "2".repeat(64),
-    repository_id: "repository-visible-task",
-    common_dir: commonDir,
-    coordinator_binding: coordinator,
-  };
+  const runId = "run-visible-task";
+  await activateV06FixtureRun({
+    root,
+    runId,
+    plan,
+    lineage: {
+      lineage_id: coordinator.lineage_id,
+      thread_id: coordinator.thread_id,
+      generation: coordinator.generation,
+    },
+    now: START - 3_000,
+  });
   await createWorkflowJournal({
     stateRoot,
-    runId: authority.run_id,
+    runId,
     planId: plan.plan_id,
     planRevision: plan,
     now: START - 2_000,
   });
   const contract = await persistWorkflowTaskContract({
     stateRoot,
-    runId: authority.run_id,
+    runId,
     planId: plan.plan_id,
     taskId: "visible-implementation",
     currentBaseline: { revision },
-    dependencyRecords: [],
-    authority,
+    dependencyAuthorities: [],
     now: START - 1_000,
   });
   const requested = {

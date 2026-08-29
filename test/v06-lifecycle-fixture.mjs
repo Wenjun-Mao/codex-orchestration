@@ -24,6 +24,7 @@ import {
   recipientBindingDigest,
   validateTerminalReceiptV3,
 } from "../lib/task-results.mjs";
+import { activateV06FixtureRun } from "./helpers.mjs";
 
 const BASE_TIME = Date.parse("2026-08-29T20:00:00.000Z");
 
@@ -73,14 +74,6 @@ export async function createAcceptedVisibleTask(root, suffix, {
         generation: requestedCoordinator.generation,
   };
   coordinator.binding_digest = coordinatorBindingDigest(coordinator);
-  await bindRecipient({
-    stateRoot,
-    recipient: {
-      lineage_id: coordinator.lineage_id,
-      thread_id: coordinator.thread_id,
-      generation: coordinator.generation,
-    },
-  });
   const plan = createWorkflowPlanRevision({
     schema_version: 1,
     plan_id: `lifecycle-plan-${suffix}`,
@@ -88,29 +81,41 @@ export async function createAcceptedVisibleTask(root, suffix, {
     parent_revision_digest: null,
     tasks: [workflowTask(suffix, task)],
   });
-  const authority = {
-    run_id: `lifecycle-run-${suffix}`,
-    runtime_context_digest: "a".repeat(64),
-    configuration_digest: "b".repeat(64),
-    repository_id: `lifecycle-repository-${suffix}`,
-    common_dir: commonDir,
-    coordinator_binding: coordinator,
-  };
+  const runId = `lifecycle-run-${suffix}`;
+  const activated = await activateV06FixtureRun({
+    root,
+    runId,
+    plan,
+    lineage: {
+      lineage_id: coordinator.lineage_id,
+      thread_id: coordinator.thread_id,
+      generation: coordinator.generation,
+    },
+    now: BASE_TIME - 3_000,
+  });
+  await bindRecipient({
+    stateRoot,
+    recipient: {
+      lineage_id: coordinator.lineage_id,
+      thread_id: coordinator.thread_id,
+      generation: coordinator.generation,
+    },
+    fenceToken: activated.run.binding.fence_token,
+  });
   await createWorkflowJournal({
     stateRoot,
-    runId: authority.run_id,
+    runId,
     planId: plan.plan_id,
     planRevision: plan,
     now: BASE_TIME - 2_000,
   });
   const contract = await persistWorkflowTaskContract({
     stateRoot,
-    runId: authority.run_id,
+    runId,
     planId: plan.plan_id,
     taskId: plan.tasks[0].task_id,
     currentBaseline: { revision: baseline },
-    dependencyRecords: [],
-    authority,
+    dependencyAuthorities: [],
     now: BASE_TIME - 1_000,
   });
   const requestedSelectors = {

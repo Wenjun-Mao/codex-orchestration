@@ -13,15 +13,17 @@ import {
   subagentOperationStatus,
   validateSubagentOperation,
 } from "../lib/subagent-lifecycle.mjs";
-import {
-  coordinatorBindingDigest,
-  createWorkflowPlanRevision,
-} from "../lib/workflow-plan.mjs";
+import { createWorkflowPlanRevision } from "../lib/workflow-plan.mjs";
 import {
   createWorkflowJournal,
   persistWorkflowTaskContract,
 } from "../lib/workflow-journal-v06.mjs";
-import { createGitFixture, packageRoot, removeFixture } from "./helpers.mjs";
+import {
+  activateV06FixtureRun,
+  createGitFixture,
+  packageRoot,
+  removeFixture,
+} from "./helpers.mjs";
 
 const DIGEST = "3".repeat(64);
 
@@ -60,32 +62,28 @@ async function fixture(t) {
       supporting_authorization: null,
     }],
   });
-  const authority = {
-    run_id: "run-subagent-v06",
-    runtime_context_digest: "1".repeat(64),
-    configuration_digest: "2".repeat(64),
-    repository_id: "repository-subagent-v06",
-    common_dir: commonDir,
-    coordinator_binding: {
-      ...coordinator,
-      binding_digest: coordinatorBindingDigest(coordinator),
-    },
-  };
+  const runId = "run-subagent-v06";
+  await activateV06FixtureRun({
+    root,
+    runId,
+    plan,
+    lineage: coordinator,
+    now: Date.parse("2026-08-29T11:57:00Z"),
+  });
   await createWorkflowJournal({
     stateRoot,
-    runId: authority.run_id,
+    runId,
     planId: plan.plan_id,
     planRevision: plan,
     now: Date.parse("2026-08-29T11:58:00Z"),
   });
   const contract = await persistWorkflowTaskContract({
     stateRoot,
-    runId: authority.run_id,
+    runId,
     planId: plan.plan_id,
     taskId: "evidence",
     currentBaseline: { revision },
-    dependencyRecords: [],
-    authority,
+    dependencyAuthorities: [],
     now: Date.parse("2026-08-29T11:59:00Z"),
   });
   return { root, commonDir, stateRoot, contract };

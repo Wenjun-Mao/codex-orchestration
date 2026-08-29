@@ -1,10 +1,17 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { readFile, realpath, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import test from "node:test";
-import { prepareSubagentOperation } from "../lib/subagent-lifecycle.mjs";
+import {
+  completeSubagentOperation,
+  prepareSubagentOperation,
+  reconcileCreatedSubagent,
+  recordSubagentCoordinatorDisposition,
+} from "../lib/subagent-lifecycle.mjs";
 import { prepareVisibleTaskCreation } from "../lib/task-creation-v06.mjs";
+import { createWorkflowPlanRevision } from "../lib/workflow-plan.mjs";
 import {
   assertWorkflowTaskContractCurrent,
   createWorkflowJournal,
@@ -14,12 +21,14 @@ import {
   workflowJournalStatus,
   workflowTaskContractStatus,
 } from "../lib/workflow-journal-v06.mjs";
-import { coordinatorBindingDigest } from "../lib/workflow-plan.mjs";
-import { createGitFixture, packageRoot, removeFixture } from "./helpers.mjs";
+import {
+  activateV06FixtureRun,
+  createGitFixture,
+  packageRoot,
+  removeFixture,
+} from "./helpers.mjs";
 
 const START = Date.parse("2026-08-29T22:00:00.000Z");
-const RUNTIME_DIGEST = "1".repeat(64);
-const CONFIGURATION_DIGEST = "2".repeat(64);
 
 function visibleTask(overrides = {}) {
   return {
@@ -102,26 +111,24 @@ async function fixture(t, suffix) {
     stateRoot: resolve(commonDir, "codex-flow", "v0.6.0"),
     revision,
     runId,
-    authority: {
-      run_id: runId,
-      runtime_context_digest: RUNTIME_DIGEST,
-      configuration_digest: CONFIGURATION_DIGEST,
-      repository_id: `repository-${suffix}`,
-      common_dir: commonDir,
-      coordinator_binding: {
-        ...coordinator,
-        binding_digest: coordinatorBindingDigest(coordinator),
-      },
-    },
+    coordinator,
   };
 }
 
 async function createJournal(context, planId, tasks, now = START) {
+  const planRevision = revisionOne(planId, tasks);
+  await activateV06FixtureRun({
+    root: context.root,
+    runId: context.runId,
+    plan: createWorkflowPlanRevision(planRevision),
+    lineage: context.coordinator,
+    now: now - 1_000,
+  });
   return createWorkflowJournal({
     stateRoot: context.stateRoot,
     runId: context.runId,
     planId,
-    planRevision: revisionOne(planId, tasks),
+    planRevision,
     now,
   });
 }
@@ -133,8 +140,7 @@ async function contractFor(context, planId, taskId, now = START + 1_000) {
     planId,
     taskId,
     currentBaseline: { revision: context.revision },
-    dependencyRecords: [],
-    authority: context.authority,
+    dependencyAuthorities: [],
     now,
   });
 }
@@ -142,9 +148,18 @@ async function contractFor(context, planId, taskId, now = START + 1_000) {
 test("workflow create, contract, and revise are idempotent while revisions remain content-addressed", async (t) => {
   const context = await fixture(t, "idempotency");
   const planId = "persisted-plan";
-  const sourcePath = resolve(context.root, "temporary-plan-source.json");
+  const sourceRoot = await mkdtemp(resolve(tmpdir(), "codex-flow-workflow-source-"));
+  t.after(() => rm(sourceRoot, { recursive: true, force: true }));
+  const sourcePath = resolve(sourceRoot, "temporary-plan-source.json");
   await writeFile(sourcePath, `${JSON.stringify(revisionOne(planId, [visibleTask()]))}\n`, "utf8");
   const draft = JSON.parse(await readFile(sourcePath, "utf8"));
+  await activateV06FixtureRun({
+    root: context.root,
+    runId: context.runId,
+    plan: createWorkflowPlanRevision(draft),
+    lineage: context.coordinator,
+    now: START - 1_000,
+  });
   const created = await createWorkflowJournal({
     stateRoot: context.stateRoot,
     runId: context.runId,
@@ -339,6 +354,96 @@ test("revision admission also derives native-subagent starts without caller asse
   assert.equal(status.contracts[0].claim.state, "started");
   assert.equal(status.contracts[0].claim.operation_kind, "subagent-operation");
   assert.equal(status.contracts[0].operation_record_present, true);
+});
+
+test("dependent contracts resolve exact persisted accepted authority instead of caller lookalikes", async (t) => {
+  const context = await fixture(t, "dependency-authority");
+  const planId = "dependency-authority-plan";
+  await createJournal(context, planId, [
+    subagentTask(),
+    visibleTask({ dependencies: ["review"] }),
+  ]);
+  const review = await contractFor(context, planId, "review");
+  await assert.rejects(
+    () => persistWorkflowTaskContract({
+      stateRoot: context.stateRoot,
+      runId: context.runId,
+      planId,
+      taskId: "implementation",
+      currentBaseline: { revision: context.revision },
+      dependencyAuthorities: [{
+        authority_kind: "subagent-operation",
+        authority_id: `subagent-operation-v1-${"1".repeat(64)}`,
+        record: { state: "accepted" },
+      }],
+    }),
+    /field is not allowed/,
+  );
+  await assert.rejects(
+    () => persistWorkflowTaskContract({
+      stateRoot: context.stateRoot,
+      runId: context.runId,
+      planId,
+      taskId: "implementation",
+      currentBaseline: { revision: context.revision },
+      dependencyAuthorities: [{
+        authority_kind: "subagent-operation",
+        authority_id: `subagent-operation-v1-${"1".repeat(64)}`,
+      }],
+    }),
+    /does not exist/,
+  );
+
+  const prepared = await prepareSubagentOperation({
+    stateRoot: context.stateRoot,
+    task_contract: review,
+    model: review.task.model,
+    reasoning_effort: review.task.reasoning_effort,
+    fork_turns: review.task.fork_turns,
+    mode: "read",
+    prompt_digest: "2".repeat(64),
+    worktree_path: context.root,
+    now: START + 2_000,
+  });
+  const created = await reconcileCreatedSubagent({
+    stateRoot: context.stateRoot,
+    operationId: prepared.operation_id,
+    agent_id: "dependency-authority-agent",
+    now: START + 3_000,
+  });
+  const completed = await completeSubagentOperation({
+    stateRoot: context.stateRoot,
+    operationId: created.operation_id,
+    classification: "PASS",
+    summary: "The exact persisted dependency evidence is accepted.",
+    evidence_digests: ["3".repeat(64)],
+    now: START + 4_000,
+  });
+  const accepted = await recordSubagentCoordinatorDisposition({
+    stateRoot: context.stateRoot,
+    operationId: completed.operation_id,
+    disposition: "accepted",
+    now: START + 5_000,
+  });
+  const implementation = await persistWorkflowTaskContract({
+    stateRoot: context.stateRoot,
+    runId: context.runId,
+    planId,
+    taskId: "implementation",
+    currentBaseline: { revision: context.revision },
+    dependencyAuthorities: [{
+      authority_kind: "subagent-operation",
+      authority_id: accepted.operation_id,
+    }],
+    now: START + 6_000,
+  });
+  assert.deepEqual(implementation.accepted_dependencies, [{
+    task_id: "review",
+    authority_kind: "subagent-operation",
+    authority_id: accepted.operation_id,
+    authority_digest: implementation.accepted_dependencies[0].authority_digest,
+    result_digest: accepted.result.result_digest,
+  }]);
 });
 
 test("workflow journal schema closes both the journal and contract-claim records", async () => {
