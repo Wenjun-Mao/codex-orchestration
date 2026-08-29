@@ -58,6 +58,7 @@ function task() {
     dependencies: [],
     read_paths: ["lib"],
     write_paths: ["lib/disposition-result.mjs"],
+    shared_resources: [],
     primary_outcome: "Return one exact terminal result for disposition.",
     causal_question: null,
     cheapest_safe_direct_attempt: "Execute the generated task contract once.",

@@ -24,6 +24,8 @@ const ACTIVE_V06_SCHEMA_NAMES = Object.freeze([
   "run-fence",
   "run-activation",
   "run-audit-v06",
+  "urgent-signal",
+  "urgent-record-v06",
   "adoption-manifest",
   "adoption-plan",
   "adoption-retirement-plan",
@@ -39,6 +41,7 @@ const ACTIVE_V06_SCHEMA_NAMES = Object.freeze([
   "verification-record",
   "integration-record",
   "archive-operation",
+  "cleanup-plan-v06",
 ]);
 
 // These contracts are retained package history. They are syntax-checked as JSON
@@ -52,7 +55,6 @@ const HISTORICAL_V05_SCHEMA_NAMES = new Set([
   "host-capability-evidence",
   "host-observation-evidence",
   "terminal-receipt",
-  "urgent-signal",
   "git-branch-claim",
   "git-ownership",
   "git-integration",
@@ -277,8 +279,9 @@ assertMarkers(managedAgentsTemplate, [
   "progressively activate one explicit v0.6 run without tracked setup",
   "visible tasks for independently running or mutating work",
   "native subagents are a separate read-only supporting lane",
-  "Routine completion goes only to the quiet durable journal",
-  "result -> disposition -> integration/no-change -> combined verification -> archive/cleanup proof chain",
+  "Visible-task routine completion goes only to the quiet durable journal",
+  "result -> disposition -> integration/no-change -> combined verification -> archive -> read-only cleanup plan",
+  "v0.6 cleanup never deletes Git refs or worktrees",
 ], "templates/agents-block.md");
 
 const modules = (await walk(root)).filter((path) => (
@@ -375,7 +378,7 @@ const skillContracts = new Map([
     "include the explicit `run_id` in every stateful operation",
     "There is no requirement for tracked `.codex/orchestration/`",
     "Use `workflow create|revise|status|contract`",
-    "Routine completion must stay quiet and journal-only",
+    "Visible-task routine completion must stay quiet and journal-only",
   ]],
   ["execute", [
     "use `release accept`",
@@ -388,9 +391,10 @@ const skillContracts = new Map([
     "Finalization performs any internal result consumption exactly once",
   ]],
   ["cleanup", [
-    "name the exact `run_id`",
-    "Review a deterministic cleanup plan before applying it",
-    "Explicit abandonment keeps every unresolved fence and lease durable",
+    "Name the exact `run_id`",
+    "cleanup plan --run-id",
+    "v0.6 exposes no cleanup apply command",
+    "complete admitted path/resource/branch envelope durable",
   ]],
 ]);
 for (const [skillName, markers] of skillContracts) {
@@ -415,14 +419,15 @@ assertMarkers(setupResolver, [
 const setupReferences = new Map([
   ["new-repository.md", [
     ".codex/orchestration/v0.6/",
-    "Run `adopt plan`",
-    "Run `adopt apply` only for that exact unchanged plan",
-    "Adoption does not activate a coordinator run or authorize task creation",
+    "First activate a named v0.6 run",
+    "adoption promotes that run's runtime and cannot bootstrap one",
+    "Run `adopt apply --run-id ...` only for that exact unchanged plan",
+    "Adoption does not authorize additional task creation",
   ]],
   ["existing-repository.md", [
     "never retroactively assumes authority for earlier tasks",
-    "`adopt retire-plan` separately",
-    "preserve v0.5 package/cache identity, tags, exact-version Git-common state, and audit evidence",
+    "has no tracked-v0.5 retirement operation",
+    "`adopt retire-plan|retire-apply` retires only a tracked v0.6 adoption",
     "Pre-adoption tasks finish under their original contract",
   ]],
 ]);
@@ -472,7 +477,7 @@ const templateContracts = new Map([
   ]],
   ["templates/roles/coordinator.md", [
     "preserve provisional and ready identities separately",
-    "Routine executor results remain in the quiet journal",
+    "Visible-task routine results remain in the quiet journal",
     "Close only a fully reconciled run",
   ]],
   ["templates/roles/executor.md", [

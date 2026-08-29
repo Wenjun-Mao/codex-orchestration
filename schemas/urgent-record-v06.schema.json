@@ -132,6 +132,9 @@
         }
       }
     },
+    "nullableRecipient": {
+      "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/recipient" }]
+    },
     "signal": {
       "type": "object",
       "additionalProperties": false,

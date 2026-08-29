@@ -10,7 +10,7 @@ import {
   removeFixture,
   runCli,
 } from "./helpers.mjs";
-import { persistUrgentSignal } from "../lib/urgent-signals.mjs";
+import { createAcceptedVisibleTask } from "./v06-lifecycle-fixture.mjs";
 
 const ACTIVATED_AT = "2026-08-29T20:00:00.000Z";
 
@@ -26,6 +26,7 @@ function task() {
     dependencies: [],
     read_paths: ["lib"],
     write_paths: ["audit-sentinel/visible-implementation.txt"],
+    shared_resources: ["cli-v06-resource"],
     primary_outcome: "Complete one bounded implementation.",
     causal_question: null,
     cheapest_safe_direct_attempt: "Attempt the bounded source change and its focused verification.",
@@ -66,7 +67,6 @@ function activationRequest(runId = "run-cli-v06") {
       path_fences: ["audit-sentinel"],
       resource_fences: ["cli-v06-resource"],
       branch_fences: ["codex/cli-v06-visible"],
-      operation_fences: ["cli-v06-operation"],
     },
   };
 }
@@ -106,6 +106,7 @@ test("v0.6 help exposes no bare callback consume and direct v0.5 paths fail clos
   assertSuccess(help, "v0.6 help");
   assert.match(help.stdout, /callback deliver\|observe --run-id/);
   assert.match(help.stdout, /urgent persist\|attempt\|reconcile\|observe\|consume\|expire --run-id/);
+  assert.match(help.stdout, /cleanup plan --run-id/);
   assert.doesNotMatch(help.stdout, /callback consume/);
   assert.match(help.stdout, /legacy-v05/);
 
@@ -119,12 +120,22 @@ test("v0.6 help exposes no bare callback consume and direct v0.5 paths fail clos
 });
 
 test("v0.6 urgent delivery is journal-first, one-shot, and separate from quiet callbacks", async (t) => {
-  const context = await activatedFixture(t, "urgent-one-shot");
+  const root = await createGitFixture("codex-flow-cli-v06-urgent-one-shot-");
+  const requests = await mkdtemp(resolve(tmpdir(), "codex-flow-cli-v06-urgent-requests-"));
+  t.after(async () => {
+    await Promise.all([removeFixture(root), rm(requests, { recursive: true, force: true })]);
+  });
+  const context = await createAcceptedVisibleTask(root, "urgent-one-shot");
+  const runId = context.contract.run_id;
   const signal = {
     schema_version: 1,
-    recipient: context.activation.runtime.lineage,
-    executor_id: "urgent-executor-v06",
-    run_id: context.runId,
+    recipient: {
+      lineage_id: context.coordinator.lineage_id,
+      thread_id: context.coordinator.thread_id,
+      generation: context.coordinator.generation,
+    },
+    executor_id: context.readyThreadId,
+    run_id: runId,
     sequence: 1,
     supersedes_urgent_ids: [],
     expires_at: "2026-08-30T20:00:00.000Z",
@@ -132,19 +143,27 @@ test("v0.6 urgent delivery is journal-first, one-shot, and separate from quiet c
     summary: "A bounded ownership conflict requires coordinator attention.",
     requested_action: "Reconcile the exact ownership conflict before execution resumes.",
   };
-  const persisted = await persistUrgentSignal({
-    stateRoot: context.result.state_authority.state_root,
+  const persistPath = await requestFile(requests, "urgent-persist", {
+    run_id: runId,
+    release_id: context.release.release_id,
     signal,
-    now: Date.parse("2026-08-29T20:00:01.000Z"),
+    persisted_at: "2026-08-29T20:00:06.000Z",
   });
-  const attemptPath = await requestFile(context.requests, "urgent-attempt", {
-    run_id: context.runId,
+  const persistResult = runCli([
+    "urgent", "persist", "--run-id", runId, "--file", persistPath, "--json",
+  ], { cwd: root });
+  assertSuccess(persistResult, "v0.6 urgent persistence");
+  const persisted = JSON.parse(persistResult.stdout);
+  assert.equal(persisted.status, "persisted");
+
+  const attemptPath = await requestFile(requests, "urgent-attempt", {
+    run_id: runId,
     urgent_id: persisted.urgent_id,
-    prepared_at: "2026-08-29T20:00:02.000Z",
+    prepared_at: "2026-08-29T20:00:07.000Z",
   });
   const attempted = runCli([
-    "urgent", "attempt", "--run-id", context.runId, "--file", attemptPath, "--json",
-  ], { cwd: context.root });
+    "urgent", "attempt", "--run-id", runId, "--file", attemptPath, "--json",
+  ], { cwd: root });
   assertSuccess(attempted, "v0.6 urgent attempt");
   const attempt = JSON.parse(attempted.stdout);
   assert.equal(attempt.dispatch_permitted, true);
@@ -153,52 +172,52 @@ test("v0.6 urgent delivery is journal-first, one-shot, and separate from quiet c
   assert.equal(hostPrompt.urgent_id, persisted.urgent_id);
 
   const replay = runCli([
-    "urgent", "attempt", "--run-id", context.runId, "--file", attemptPath, "--json",
-  ], { cwd: context.root });
+    "urgent", "attempt", "--run-id", runId, "--file", attemptPath, "--json",
+  ], { cwd: root });
   assertSuccess(replay, "v0.6 urgent attempt replay");
   assert.equal(JSON.parse(replay.stdout).dispatch_permitted, false);
   assert.equal(Object.hasOwn(JSON.parse(replay.stdout), "host_prompt"), false);
 
-  const reconcilePath = await requestFile(context.requests, "urgent-reconcile", {
-    run_id: context.runId,
+  const reconcilePath = await requestFile(requests, "urgent-reconcile", {
+    run_id: runId,
     urgent_id: persisted.urgent_id,
     delivery_attempt_id: attempt.delivery_attempt_id,
     host_call_result: "sent",
-    reconciled_at: "2026-08-29T20:00:03.000Z",
+    reconciled_at: "2026-08-29T20:00:08.000Z",
   });
   assertSuccess(runCli([
-    "urgent", "reconcile", "--run-id", context.runId,
+    "urgent", "reconcile", "--run-id", runId,
     "--file", reconcilePath, "--json",
-  ], { cwd: context.root }), "v0.6 urgent reconciliation");
+  ], { cwd: root }), "v0.6 urgent reconciliation");
 
-  const observePath = await requestFile(context.requests, "urgent-observe", {
-    run_id: context.runId,
+  const observePath = await requestFile(requests, "urgent-observe", {
+    run_id: runId,
     urgent_id: persisted.urgent_id,
     delivery_attempt_id: attempt.delivery_attempt_id,
-    recipient: context.activation.runtime.lineage,
-    observed_at: "2026-08-29T20:00:04.000Z",
+    recipient: signal.recipient,
+    observed_at: "2026-08-29T20:00:09.000Z",
   });
   const observed = runCli([
-    "urgent", "observe", "--run-id", context.runId, "--file", observePath, "--json",
-  ], { cwd: context.root });
+    "urgent", "observe", "--run-id", runId, "--file", observePath, "--json",
+  ], { cwd: root });
   assertSuccess(observed, "v0.6 urgent observation");
   assert.equal(JSON.parse(observed.stdout).disposition, "process");
 
-  const consumePath = await requestFile(context.requests, "urgent-consume", {
-    run_id: context.runId,
+  const consumePath = await requestFile(requests, "urgent-consume", {
+    run_id: runId,
     urgent_id: persisted.urgent_id,
-    recipient: context.activation.runtime.lineage,
+    recipient: signal.recipient,
     sender_executor_id: signal.executor_id,
-    consumed_at: "2026-08-29T20:00:05.000Z",
+    consumed_at: "2026-08-29T20:00:10.000Z",
   });
   const consumed = runCli([
-    "urgent", "consume", "--run-id", context.runId, "--file", consumePath, "--json",
-  ], { cwd: context.root });
+    "urgent", "consume", "--run-id", runId, "--file", consumePath, "--json",
+  ], { cwd: root });
   assertSuccess(consumed, "v0.6 urgent consumption");
   assert.equal(JSON.parse(consumed.stdout).status, "consumed");
 
-  const status = runCli(["urgent", "status", "--run-id", context.runId, "--json"], {
-    cwd: context.root,
+  const status = runCli(["urgent", "status", "--run-id", runId, "--json"], {
+    cwd: root,
   });
   assertSuccess(status, "v0.6 urgent status");
   assert.equal(JSON.parse(status.stdout).consumed_count, 1);
@@ -282,6 +301,26 @@ test("run activation needs no tracked setup and replays the same disclosed autho
   assert.deepEqual(
     repeated.runtime_authority.coordinator_recipient,
     context.result.runtime_authority.coordinator_recipient,
+  );
+});
+
+test("run activation rejects a workflow outside its reservation envelope before state acquisition", async (t) => {
+  const root = await createGitFixture("codex-flow-cli-v06-envelope-refusal-");
+  const requests = await mkdtemp(resolve(tmpdir(), "codex-flow-cli-v06-envelope-requests-"));
+  t.after(async () => {
+    await Promise.all([removeFixture(root), rm(requests, { recursive: true, force: true })]);
+  });
+  const request = activationRequest("run-cli-envelope-refusal");
+  request.fences.path_fences = [];
+  const requestPath = await requestFile(requests, "activation", request);
+  const result = runCli([
+    "run", "activate", "--run-id", request.run_id, "--file", requestPath, "--json",
+  ], { cwd: root });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /outside the admitted run fence envelope/);
+  await assert.rejects(
+    stat(resolve(root, ".git", "codex-flow", "v0.6.0")),
+    (error) => error?.code === "ENOENT",
   );
 });
 
@@ -579,6 +618,20 @@ test("task creation and release expose each native host payload at most once", a
 
 test("audited close refuses an incomplete run and keeps it active", async (t) => {
   const context = await activatedFixture(t, "close-refusal");
+  const cleanupResult = runCli([
+    "cleanup", "plan", "--run-id", context.runId, "--json",
+  ], { cwd: context.root });
+  assertSuccess(cleanupResult, "read-only v0.6 cleanup plan");
+  const cleanup = JSON.parse(cleanupResult.stdout);
+  assert.equal(cleanup.run_id, context.runId);
+  assert.equal(cleanup.mutation_performed, false);
+  assert.equal(cleanup.counts.close_blocked, 0);
+  const cleanupApply = runCli([
+    "cleanup", "apply", "--run-id", context.runId, "--json",
+  ], { cwd: context.root });
+  assert.notEqual(cleanupApply.status, 0);
+  assert.match(cleanupApply.stderr, /read-only plan only/);
+
   const auditResult = runCli([
     "run", "audit", "--run-id", context.runId, "--json",
   ], { cwd: context.root });
@@ -611,7 +664,6 @@ test("terminal runs remain inspectable but every public mutation family fails cl
   const abandonPath = await requestFile(context.requests, "abandon", {
     run_id: context.runId,
     resume: context.result.run.binding,
-    unresolved_fences: context.result.workflow_authority.fences,
     reason: "Bounded regression terminalizes the run with its admitted fences intact.",
     abandoned_at: "2026-08-29T20:01:30.000Z",
   });
@@ -620,6 +672,10 @@ test("terminal runs remain inspectable but every public mutation family fails cl
   ], { cwd: context.root });
   assertSuccess(abandoned, "run abandonment");
   assert.equal(JSON.parse(abandoned.stdout).run.status, "abandoned");
+  assert.deepEqual(
+    JSON.parse(abandoned.stdout).run.terminal.unresolved_fences,
+    context.result.workflow_authority.fences,
+  );
 
   const inertPath = await requestFile(context.requests, "terminal-mutation", {
     run_id: context.runId,
@@ -646,7 +702,6 @@ test("terminal runs remain inspectable but every public mutation family fails cl
   }
 
   const rebind = structuredClone(JSON.parse(await readFile(abandonPath, "utf8")));
-  delete rebind.unresolved_fences;
   delete rebind.reason;
   delete rebind.abandoned_at;
   rebind.next = {

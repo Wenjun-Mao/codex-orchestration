@@ -25,6 +25,7 @@ import {
   observeCallback,
 } from "../lib/callbacks.mjs";
 import { cleanupAudit } from "../lib/cleanup.mjs";
+import { cleanupPlanV06 } from "../lib/cleanup-v06.mjs";
 import {
   projectConfigPath,
   REASONING_EFFORTS,
@@ -89,6 +90,16 @@ import {
   urgentSignalStatus,
 } from "../lib/urgent-signals.mjs";
 import {
+  consumeUrgentSignalV06,
+  expireUrgentSignalV06,
+  observeUrgentSignalV06,
+  persistUrgentSignalV06,
+  prepareUrgentAttemptV06,
+  reconcileUrgentAttemptV06,
+  urgentSignalRecordV06,
+  urgentSignalStatusV06,
+} from "../lib/urgent-signals-v06.mjs";
+import {
   applyAdoptionPlan,
   applyAdoptionRetirementPlan,
   planAdoption,
@@ -127,6 +138,7 @@ import {
 import {
   abandonRun,
   admitRun,
+  assertWorkflowReservationCovered,
   buildFencePlan,
   fencePlanConflicts,
   readRun,
@@ -155,6 +167,7 @@ import {
   subagentOperationStatus,
 } from "../lib/subagent-operations-v06.mjs";
 import {
+  preflightVisibleTaskBranchReservations,
   prepareVisibleTaskCreation,
   reconcileVisibleTaskCreation,
   recordVisibleTaskCreationAttempt,
@@ -229,6 +242,7 @@ Usage:
   codex-flow integration status --run-id ID --integration-id ID [--json]
   codex-flow archive prepare|reconcile --run-id ID --file request.json [--json]
   codex-flow archive status --run-id ID --archive-id ID [--json]
+  codex-flow cleanup plan --run-id ID [--json]
   codex-flow adopt plan|apply|retire-plan|retire-apply --run-id ID --file request.json [--json]
   codex-flow adopt status --run-id ID [--json]
 
@@ -1309,7 +1323,7 @@ async function callbackAuthority(git, callbackId, runId) {
 }
 
 async function urgentAuthority(git, urgentId, runId) {
-  const record = await urgentSignalRecord({ stateRoot: git.stateRoot, urgentId });
+  const record = await urgentSignalRecordV06({ stateRoot: git.stateRoot, urgentId });
   assertRunIdentity(record.signal, runId, "urgent signal");
   return record;
 }
@@ -1453,13 +1467,12 @@ async function rebindRunCoordinatorRecipient({ git, runId, resume, next, rebound
 
 function activationFences(value) {
   requireExactFields(value, {
-    required: ["path_fences", "resource_fences", "branch_fences", "operation_fences"],
+    required: ["path_fences", "resource_fences", "branch_fences"],
   }, "run activation request.fences");
   return buildFencePlan({
     pathFences: value.path_fences,
     resourceFences: value.resource_fences,
     branchFences: value.branch_fences,
-    operationFences: value.operation_fences,
   });
 }
 
@@ -1483,6 +1496,12 @@ async function commandRunV06(args) {
     await assertNoTrackedLegacyAuthority(git.root);
     const workflow = createWorkflowPlanRevision(request.workflow);
     const fences = activationFences(request.fences);
+    assertWorkflowReservationCovered(fences, workflow);
+    await preflightVisibleTaskBranchReservations({
+      stateRoot: git.stateRoot,
+      runId,
+      branchFences: fences.branch_fences,
+    });
     const bundleSource = await loadRuntimeBundleSource({ packageRoot });
     const runtime = buildRuntimeContext({
       bundle: bundleSource.bundle,
@@ -1654,7 +1673,7 @@ async function commandRunV06(args) {
       rebind: { required: ["resume", "next"], optional: ["rebound_at"] },
       close: { required: ["resume", "audit_id"], optional: ["closed_at"] },
       abandon: {
-        required: ["resume", "unresolved_fences", "reason"],
+        required: ["resume", "reason"],
         optional: ["abandoned_at"],
       },
     };
@@ -1678,7 +1697,6 @@ async function commandRunV06(args) {
         gitCommonDirectory: git.commonDir,
         runId,
         resume: request.resume,
-        unresolvedFences: request.unresolved_fences,
         reason: request.reason,
         abandonedAt: request.abandoned_at ?? new Date().toISOString(),
       }));
@@ -2084,7 +2102,7 @@ async function commandUrgentV06(args) {
   if (subcommand === "status") {
     const runId = explicitRunId(values);
     await readRun({ gitCommonDirectory: git.commonDir, runId });
-    v06Output(await urgentSignalStatus(git.stateRoot, { runId }));
+    v06Output(await urgentSignalStatusV06(git.stateRoot, { runId }));
     return;
   }
   const shapes = {
@@ -2135,7 +2153,7 @@ async function commandUrgentV06(args) {
         73,
       );
     }
-    result = await persistUrgentSignal({
+    result = await persistUrgentSignalV06({
       stateRoot: git.stateRoot,
       signal: request.signal,
       now: commandNow(request, "persisted_at"),
@@ -2143,14 +2161,14 @@ async function commandUrgentV06(args) {
   } else {
     await urgentAuthority(git, request.urgent_id, runId);
     if (subcommand === "attempt") {
-      result = urgentAttemptView(await prepareUrgentAttempt({
+      result = urgentAttemptView(await prepareUrgentAttemptV06({
         stateRoot: git.stateRoot,
         urgentId: request.urgent_id,
         attemptSequence: 1,
         now: commandNow(request, "prepared_at"),
       }));
     } else if (subcommand === "reconcile") {
-      result = await reconcileUrgentAttempt({
+      result = await reconcileUrgentAttemptV06({
         stateRoot: git.stateRoot,
         urgentId: request.urgent_id,
         deliveryAttemptId: request.delivery_attempt_id,
@@ -2158,7 +2176,7 @@ async function commandUrgentV06(args) {
         now: commandNow(request, "reconciled_at"),
       });
     } else if (subcommand === "observe") {
-      result = await observeUrgentSignal({
+      result = await observeUrgentSignalV06({
         stateRoot: git.stateRoot,
         urgentId: request.urgent_id,
         deliveryAttemptId: request.delivery_attempt_id,
@@ -2166,7 +2184,7 @@ async function commandUrgentV06(args) {
         now: commandNow(request, "observed_at"),
       });
     } else if (subcommand === "consume") {
-      result = await consumeUrgentSignal({
+      result = await consumeUrgentSignalV06({
         stateRoot: git.stateRoot,
         urgentId: request.urgent_id,
         recipient: request.recipient,
@@ -2174,7 +2192,7 @@ async function commandUrgentV06(args) {
         now: commandNow(request, "consumed_at"),
       });
     } else {
-      result = await expireUrgentSignal({
+      result = await expireUrgentSignalV06({
         stateRoot: git.stateRoot,
         urgentId: request.urgent_id,
         now: commandNow(request, "expired_at"),
@@ -2393,6 +2411,23 @@ async function commandArchiveV06(args) {
   v06Output(subcommand === "prepare" ? archivePrepareView(result) : result);
 }
 
+async function commandCleanupV06(args) {
+  const [subcommand, ...rest] = args;
+  if (subcommand !== "plan") {
+    throw new CliError("v0.6 cleanup exposes read-only plan only; cleanup apply is unavailable");
+  }
+  const values = parseV06Options(rest);
+  const runId = explicitRunId(values);
+  const git = v06Repository();
+  await readRun({ gitCommonDirectory: git.commonDir, runId });
+  const first = await cleanupPlanV06({ stateRoot: git.stateRoot, runId });
+  const confirmed = await cleanupPlanV06({ stateRoot: git.stateRoot, runId });
+  if (stableStringify(first) !== stableStringify(confirmed)) {
+    throw new CliError("Cleanup state changed while deriving the read-only plan; inspect and retry", 75);
+  }
+  v06Output(confirmed);
+}
+
 async function assertAdoptionRun(git, runId) {
   return (await readRun({ gitCommonDirectory: git.commonDir, runId })).run;
 }
@@ -2503,7 +2538,7 @@ async function mainLegacyV05(argv) {
 function migratedV05Command(command) {
   return [
     "init", "sync", "config", "doctor", "plan", "recipient", "urgent",
-    "git", "lease", "cleanup",
+    "git", "lease",
   ].includes(command);
 }
 
@@ -2569,6 +2604,7 @@ async function main() {
   if (command === "verification") return dispatchV06Command(command, args, commandVerificationV06);
   if (command === "integration") return dispatchV06Command(command, args, commandIntegrationV06);
   if (command === "archive") return dispatchV06Command(command, args, commandArchiveV06);
+  if (command === "cleanup") return commandCleanupV06(args);
   if (command === "adopt") return dispatchV06Command(command, args, commandAdoptV06);
   if (migratedV05Command(command)) {
     throw new CliError(

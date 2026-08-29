@@ -44,6 +44,7 @@ function workflowTask(suffix, overrides = {}) {
     dependencies: [],
     read_paths: ["lib"],
     write_paths: [`audit-sentinel/${suffix}.txt`],
+    shared_resources: [],
     primary_outcome: `Complete lifecycle task ${suffix}.`,
     causal_question: null,
     cheapest_safe_direct_attempt: `Execute lifecycle task ${suffix} once.`,
@@ -86,6 +87,7 @@ export async function createAcceptedVisibleTask(root, suffix, {
     root,
     runId,
     plan,
+    branchFences: [executorBranch],
     lineage: {
       lineage_id: coordinator.lineage_id,
       thread_id: coordinator.thread_id,

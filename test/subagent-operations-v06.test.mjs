@@ -60,6 +60,7 @@ async function fixture(t) {
       dependencies: [],
       read_paths: ["docs/mission.md"],
       write_paths: [],
+      shared_resources: [],
       primary_outcome: "Return a bounded source review.",
       causal_question: "Does the source preserve the named contract?",
       cheapest_safe_direct_attempt: "Read the named source and report the result.",

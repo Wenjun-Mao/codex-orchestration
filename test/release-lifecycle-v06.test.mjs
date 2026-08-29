@@ -45,6 +45,7 @@ function task(overrides = {}) {
     dependencies: [],
     read_paths: ["lib"],
     write_paths: ["lib/release-visible-task.mjs"],
+    shared_resources: [],
     primary_outcome: "Implement the exact generated release task.",
     causal_question: null,
     cheapest_safe_direct_attempt: "Execute the generated task contract once.",
@@ -81,6 +82,7 @@ async function fixture() {
     root,
     runId,
     plan,
+    branchFences: ["codex/release-visible-task"],
     lineage: {
       lineage_id: coordinator.lineage_id,
       thread_id: coordinator.thread_id,
