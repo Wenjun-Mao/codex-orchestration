@@ -1,7 +1,7 @@
 {
   "name": "codex-orchestration",
   "version": "0.6.0-dev.0",
-  "description": "Coordinate native Codex tasks with explicit ownership, model routing, quiet durable results, and serial integration.",
+  "description": "Orchestrate visible Codex tasks with explicit model routing, bounded ownership, and quiet durable results.",
   "author": {
     "name": "Wenjun Mao"
   },
@@ -10,17 +10,15 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "Codex Orchestration",
-    "shortDescription": "Coordinate parallel Codex work safely.",
-    "longDescription": "Plan and run coordinator/executor workflows with explicit task kinds, bounded ownership, reconciled host operations, durable terminal callbacks, shared-resource leases, and audited Git cleanup.",
+    "shortDescription": "Orchestrate visible Codex tasks safely.",
+    "longDescription": "Use one coordinator to plan and govern multiple user-visible Codex tasks with explicit model routing, bounded ownership, reconciled host operations, quiet durable results, serial integration, and audited cleanup.",
     "developerName": "Wenjun Mao",
     "category": "Productivity",
-    "capabilities": ["Planning", "Task coordination", "Workflow validation"],
+    "capabilities": ["Multi-task planning", "Model routing", "Durable result coordination"],
     "defaultPrompt": [
-      "Set up Codex Flow in this new repository.",
-      "Adopt Codex Flow in this existing project without disturbing ongoing work.",
-      "Plan this work across independent Codex tasks.",
-      "Validate this executor task packet.",
-      "Integrate journaled task results safely."
+      "Plan this work across separate Terra executor tasks.",
+      "Run this workflow with one Sol coordinator and Terra tasks.",
+      "Review and integrate the journaled task results."
     ]
   }
 }
