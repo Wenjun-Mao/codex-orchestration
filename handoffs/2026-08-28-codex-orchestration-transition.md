@@ -13,7 +13,8 @@ Before changing anything:
 
 1. Authenticate this repository, current branch, exact revision, cleanliness,
    remotes, and installed plugin version.
-2. Read `README.md`, `docs/coverage-v0.5.1.md`, ADRs 0007 through 0011, and the
+2. Read `README.md`, `docs/coverage-v0.5.1.md`, ADRs 0007 through 0011 and
+   0014, and the
    two latest field-test records named below.
 3. Preserve the accepted v0.5.1 package and private plugin installation until a
    newly scoped checkpoint is agreed.
@@ -28,7 +29,9 @@ Before changing anything:
   `d03cabfffb612ad8f33853896b15deee3ad66698`
 - Runtime correction exercised by the final held-out pilot:
   `b3d933a4b895dfee26fd142eb994f338456f5591`
-- Package, plugin, and runtime version: `0.5.1`
+- Accepted package, plugin, and pinned consumer runtime version: `0.5.1`
+- Editable source development identity after the post-release baseline:
+  `0.5.2-dev.0`
 - Worktree was clean before this handoff was added and after the final Git
   cleanup.
 - Canonical public remote:
@@ -45,10 +48,11 @@ Before changing anything:
 - The disposable `/Users/wjmao/projects/utility_projects/codex-flow-v05-heldout`
   fixture root was confirmed absent during the final cleanup audit.
 
-The handoff-only commits change no packaged path. Resolve the current `HEAD`
-after opening this repository; accepted v0.5.1 package bytes are exactly those
-at `d03cabf`. Later governance changes on `main` must not be repackaged or
-installed under the accepted version.
+The handoff-only commits at acceptance changed no packaged path. Accepted
+v0.5.1 package bytes remain exactly those at `d03cabf`. ADR 0014 records the
+later discovered source-validation gap and establishes the `0.5.2-dev.0`
+development identity; no later source change may be repackaged or installed
+under the accepted v0.5.1 version.
 
 ## Private distribution state
 
@@ -66,10 +70,11 @@ editing authority. Make changes only in this repository, validate and package
 them, then refresh the marketplace source and installed cache through the
 plugin update workflow.
 
-Because v0.5.1 is now accepted, do not silently replace its behavior under the
-same version. The next behavior or schema checkpoint should normally be a new
-exact version, likely v0.5.2. Exact-release state isolation will then give it a
-new `.git/codex-flow/v0.5.2/` namespace.
+Because v0.5.1 is accepted, do not silently replace its behavior under the
+same version. The editable source now uses the unreleased `0.5.2-dev.0`
+identity and, if explicitly installed, its exact-release state namespace is
+`.git/codex-flow/v0.5.2-dev.0/`. Marketplace and UK Dev adoption remain
+separate explicit decisions.
 
 ## Product intent
 
@@ -188,9 +193,9 @@ v0.5.1 fixed two related host lifecycle gaps:
 The first repilot exposed one additional root cause: v0.5.1 reused
 `.git/codex-flow/v0.5`, so it parsed retained v0.5.0 task records whose schema
 predated `observation_policy`. The durable breaking correction derives the
-state namespace from the exact package version. Current mutable state is
-`.git/codex-flow/v0.5.1`; retained v0.5 and v0.4 evidence is untouched, unread,
-and unmigrated.
+state namespace from the exact package version. The accepted v0.5.1 runtime's
+mutable state is `.git/codex-flow/v0.5.1`; retained v0.5 and v0.4 evidence is
+untouched, unread, and unmigrated.
 
 Final source verification passed:
 

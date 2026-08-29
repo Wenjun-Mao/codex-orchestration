@@ -47,6 +47,12 @@ handoff-only commits. `main` may advance beyond the latest accepted tag, but a
 future accepted artifact whose packaged-path tree differs from `v0.5.1`
 requires a new exact version and acceptance checkpoint.
 
+ADR 0014 adds a source-validation guardrail for that rule: an annotated tag
+for the current exact package version rejects tracked or untracked changes to
+packaged paths. The next editable source identity is `0.5.2-dev.0`; it is not
+an accepted distribution artifact and does not alter the accepted v0.5.1
+consumer runtime.
+
 Existing reviewed field-test and transition provenance remains intentionally
 in public history after the bounded audit detected no credential. It grants no
 runtime authority and does not authorize pilot contact or consumer adoption.
@@ -77,5 +83,7 @@ necessary for reproducibility.
 - Accepted tags are never moved or reused. A correction receives a new version.
 - Creating a tag does not trigger packaging, plugin installation, runtime
   migration, or adoption in UK Dev or any other consumer.
+- Source validation refuses to reuse an annotated release version for changed
+  packaged paths; version metadata equality alone is insufficient.
 - Credential and user-data prohibitions remain unchanged. Field evidence must
   stay bounded and should minimize environment-specific identifiers.

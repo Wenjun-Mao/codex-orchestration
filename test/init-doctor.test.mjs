@@ -10,6 +10,7 @@ import {
   removeFixture,
   runCli,
 } from "./helpers.mjs";
+import { PACKAGE_VERSION } from "../lib/core.mjs";
 import { discoverGit } from "../lib/git.mjs";
 
 async function snapshotFiles(root) {
@@ -138,7 +139,7 @@ test("v0.5 rejects older project configuration instead of migrating it", async (
   }
 });
 
-test("v0.5.1 uses an exact-release state namespace and ignores retained earlier evidence", async () => {
+test("the current package version uses an exact-release state namespace and ignores retained earlier evidence", async () => {
   const root = await createGitFixture("codex-flow-state-v05-");
   try {
     const v04Record = resolve(
@@ -166,11 +167,11 @@ test("v0.5.1 uses an exact-release state namespace and ignores retained earlier 
 
     initializeFixture([], { cwd: root });
     const context = discoverGit(root);
-    assert.equal(context.stateRoot, resolve(context.commonDir, "codex-flow", "v0.5.1"));
+    assert.equal(context.stateRoot, resolve(context.commonDir, "codex-flow", `v${PACKAGE_VERSION}`));
     assert.equal(await readFile(v04Record, "utf8"), "{\"schema_version\":2}\n");
     assert.equal(await readFile(v05Record, "utf8"), "{\"schema_version\":8}\n");
     const doctor = runCli(["doctor", "--json"], { cwd: root });
-    assertSuccess(doctor, "v0.5.1 namespaced doctor");
+    assertSuccess(doctor, "current-version namespaced doctor");
     assert.equal(JSON.parse(doctor.stdout).ok, true);
   } finally {
     await removeFixture(root);

@@ -15,7 +15,7 @@ This is not a daemon, secretary task, or MCP server. Each repository pins a
 reviewable runtime under `.codex/orchestration/`. Mutable recipient bindings,
 task-operation attempts, urgent-signal and callback journals, and leases live under that
 repository's Git common directory in an exact-release namespace such as
-`.git/codex-flow/v0.5.1/`, so linked worktrees on the same release share the
+`.git/codex-flow/v0.5.2-dev.0/`, so linked worktrees on the same release share the
 same coordination state.
 
 ## Requirements
@@ -42,7 +42,7 @@ Replacing any earlier pinned runtime is a fresh installation on a dedicated
 branch: retain the old `.git/codex-flow/` evidence, explicitly remove the old
 tracked `.codex/orchestration/` runtime and configuration from that branch,
 then plan and apply the selected release. New operational records live only in
-that exact release's namespace, currently `.git/codex-flow/v0.5.1/`; the
+that exact release's namespace, currently `.git/codex-flow/v0.5.2-dev.0/`; the
 current release neither reads nor deletes retained namespaces.
 
 ## Source and private distribution
@@ -53,6 +53,13 @@ used for accepted private packages. A tag does not publish or refresh the
 personal-marketplace plugin, alter installed caches, or upgrade a pinned
 consumer runtime. See
 [ADR 0012](docs/adr/0012-public-source-private-distribution-and-release-tags.md).
+
+The editable source currently has the unreleased identity `0.5.2-dev.0`; the
+accepted marketplace artifact and repository-pinned consumer runtime remain
+`0.5.1`. During `npm run validate`, a matching annotated `v<version>` tag
+requires every packaged path to still match that tag. This prevents source
+changes from being packaged under an already accepted version; see
+[ADR 0014](docs/adr/0014-post-release-development-identity.md).
 
 Install `codex-orchestration` from the personal Codex plugin marketplace. The
 installed plugin version is the accepted package authority: its `setup` skill
@@ -411,6 +418,8 @@ identity.
 [Source repository self-hosting](docs/adr/0013-source-repository-self-hosting.md)
 defines how this project consumes its own accepted plugin without making the
 editable source tree its runtime authority.
+[Post-release development identity](docs/adr/0014-post-release-development-identity.md)
+defines the tagged-package path guard and unreleased source identity.
 The current covered boundary is listed in
 [v0.5.1 orchestration coverage](docs/coverage-v0.5.1.md), with the accepted
 [UK Dev exact-state replay](docs/field-tests/2026-08-28-uk-dev-v0.5.1-exact-state-replay.md).

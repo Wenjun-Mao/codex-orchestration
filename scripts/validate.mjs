@@ -4,6 +4,7 @@ import { spawnSync } from "node:child_process";
 import { access, readdir, readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { PACKAGE_VERSION } from "../lib/core.mjs";
+import { validateReleaseIdentity } from "./release-identity.mjs";
 import { validatePlan } from "../lib/plan.mjs";
 import { validateTaskPacket } from "../lib/task-packet.mjs";
 import { validateTerminalReceipt } from "../lib/callbacks.mjs";
@@ -30,6 +31,11 @@ const plugin = JSON.parse(await readFile(resolve(root, ".codex-plugin/plugin.jso
 if (packageJson.version !== PACKAGE_VERSION || plugin.version !== PACKAGE_VERSION) {
   throw new Error("Package, plugin, and runtime versions must match");
 }
+const managedAgentsTemplate = await readFile(resolve(root, "templates/agents-block.md"), "utf8");
+if (!managedAgentsTemplate.startsWith(`<!-- codex-flow:start v${PACKAGE_VERSION} -->`)) {
+  throw new Error("Managed AGENTS template version must match the package version");
+}
+validateReleaseIdentity(root, packageJson);
 if (packageJson.private !== true) throw new Error("Package must remain private");
 if (!packageJson.files.includes("skills/") || packageJson.files.includes("prompts/")) {
   throw new Error("Published package must include skills and exclude retired copy-paste prompts");
