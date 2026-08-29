@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { readFile, realpath } from "node:fs/promises";
+import { readFile, readdir, realpath, unlink } from "node:fs/promises";
 import { resolve } from "node:path";
 import test from "node:test";
 import {
+  preflightVisibleTaskBranchReservations,
   prepareVisibleTaskCreation,
   reconcileVisibleTaskCreation,
   recordVisibleTaskCreationAttempt,
@@ -498,6 +499,79 @@ test("one admitted executor branch cannot be claimed by two task contracts", asy
         now: START + 2_000,
       }),
       /already claimed by another task contract/,
+    );
+  } finally {
+    await removeFixture(context.root);
+  }
+});
+
+test("branch reservation preflight allows an exact same-run replay without writing state", async () => {
+  const context = await fixture();
+  try {
+    await prepareVisibleTaskCreation({
+      stateRoot: context.stateRoot,
+      taskContract: context.contract,
+      requestedSelectors: context.requested,
+      now: START,
+    });
+    const creationRoot = resolve(context.stateRoot, "visible-task-creations");
+    const before = (await readdir(creationRoot, { recursive: true })).sort();
+    await preflightVisibleTaskBranchReservations({
+      stateRoot: context.stateRoot,
+      runId: context.runId,
+      branchFences: [context.requested.worktree.executor_branch],
+    });
+    const after = (await readdir(creationRoot, { recursive: true })).sort();
+    assert.deepEqual(after, before);
+  } finally {
+    await removeFixture(context.root);
+  }
+});
+
+test("branch reservation preflight rejects a retained claim owned by another run", async () => {
+  const context = await fixture();
+  try {
+    await prepareVisibleTaskCreation({
+      stateRoot: context.stateRoot,
+      taskContract: context.contract,
+      requestedSelectors: context.requested,
+      now: START,
+    });
+    await assert.rejects(
+      preflightVisibleTaskBranchReservations({
+        stateRoot: context.stateRoot,
+        runId: "run-visible-task-next",
+        branchFences: [context.requested.worktree.executor_branch],
+      }),
+      /retained by another run \(run-visible-task\)/,
+    );
+  } finally {
+    await removeFixture(context.root);
+  }
+});
+
+test("branch reservation preflight fails closed for an orphaned retained claim", async () => {
+  const context = await fixture();
+  try {
+    const prepared = await prepareVisibleTaskCreation({
+      stateRoot: context.stateRoot,
+      taskContract: context.contract,
+      requestedSelectors: context.requested,
+      now: START,
+    });
+    await unlink(resolve(
+      context.stateRoot,
+      "visible-task-creations",
+      "records",
+      `${prepared.operation_id}.json`,
+    ));
+    await assert.rejects(
+      preflightVisibleTaskBranchReservations({
+        stateRoot: context.stateRoot,
+        runId: context.runId,
+        branchFences: [context.requested.worktree.executor_branch],
+      }),
+      /claim is orphaned without its creation record/,
     );
   } finally {
     await removeFixture(context.root);
