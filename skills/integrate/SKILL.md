@@ -14,6 +14,9 @@ branch names, and caller-supplied digests are not result authority.
 2. Observe only the exact durable result selected for a decision. Prepare its
    coordinator-owned disposition with `disposition prepare`; do not expose a
    public bare callback-consume shortcut.
+   If delivery was durably `rejected-before-send` before release acceptance or
+   callback creation, use `disposition cancel` for the callback-less terminal
+   path.
 3. For `clean-commit`, use `integration prepare|verification-request|reconcile|status`
    and integrate serially. For `unchanged`, persist the explicit no-change
    path. `dirty-blocked` remains visible and fenced.
@@ -25,12 +28,15 @@ branch names, and caller-supplied digests are not result authority.
    consumption exactly once.
 6. Use `archive prepare|reconcile|status` only after the accepted disposition,
    integration or no-change proof, PASS combined verification, internal
-   callback consumption, and managed-worktree reconciliation are durable.
+   callback consumption, and managed-worktree reconciliation are durable. The
+   archive worktree path is derived from persisted creation evidence, never
+   supplied by the caller.
 
 Rejected or blocked work receives an explicit durable disposition and remains
 visible whenever user attention or dirty state is unresolved. Archive and Git
 cleanup are separate actions. After archival, use `codex-orchestration:cleanup`
-for eligible branches/worktrees and retained leases.
+to derive the exact read-only branch/worktree plan. v0.6 does not apply Git
+deletion.
 
 Read [Communication loop](../../templates/references/communication-loop.md)
 for quiet versus urgent delivery and [Task lifecycle](../../templates/references/task-lifecycle.md)

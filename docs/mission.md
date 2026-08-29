@@ -89,8 +89,8 @@ waits, task-final events, and notification adapters may provide liveness, but
 they do not become competing integration authorities.
 
 Urgent blockers, approval requests, and high-risk drift use a separate direct
-path. The event is persisted before one bounded interrupt attempt. A retry is a
-new, explicit attempt; host replay or ambiguity cannot authorize duplicate
+path. The event is persisted before one bounded interrupt attempt. v0.6 does
+not retry that attempt; host replay or ambiguity cannot authorize duplicate
 coordinator action. Ordinary completion never uses the urgent path.
 
 The durable queue describes non-interrupting, resumable availability; it
@@ -156,7 +156,7 @@ contract remains unmet.
 | Managed worktree provisioning | Repository baseline, branch, and Git provenance |
 | Task titles, messaging, waiting, and status | Quiet completion versus urgent interruption policy |
 | Handoff and archive lifecycle | Durable result selection and exactly-once disposition |
-| Native managed-worktree cleanup | Integration proof and deterministic Git cleanup authority |
+| Native managed-worktree lifecycle and user-authorized Git mutation | Integration proof, cleanup eligibility, and deterministic read-only cleanup planning |
 
 Generic orchestration mechanics belong in this repository. Pilot and product
 repositories own their domain behavior and provide held-out evidence; they do

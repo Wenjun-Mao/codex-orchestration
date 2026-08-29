@@ -17,7 +17,7 @@ operational state or creates a native task, disclose:
 - the package/runtime source and exact bundle hash;
 - the `.git/codex-flow/v0.6.0/` Git-common state root;
 - the repository, baseline, host, coordinator lineage and generation;
-- the proposed workflow revision, path/resource/branch fences, and leases;
+- the proposed workflow revision and path/resource/branch reservation envelope;
 - each task's saved project, visible-task or subagent surface, requested model
   and reasoning effort, placement, and external host call; and
 - which facts are configured, requested, host-accepted, independently observed,
@@ -47,13 +47,17 @@ contract beside the plan. Name:
 A supporting-instrument task must immediately unlock the named direct attempt
 or pause/replan. After one instrument-only checkpoint, more supporting
 instrument work needs explicit authorization in a later immutable revision.
-Started or released contracts never change. Only completed accepted durable
-dispositions unblock dependencies.
+Started or released contracts never change. Only accepted terminal authority
+unblocks dependencies: a completed visible-task disposition or an accepted
+native-subagent operation.
 
 Use visible Codex tasks for independently running or mutating executor work.
-Use `subagent prepare|created|complete|dispose|status` only for bounded read-only
-research/review. A subagent cannot use Ultra, own writes, or enter the visible
-task lifecycle.
+Use `subagent prepare|attempt|reconcile|complete|dispose|status` only for
+bounded read-only research/review. `attempt` exposes one native spawn request;
+ambiguous reconciliation never authorizes another spawn. The v0.6 contract
+forbids Ultra and full-history forks so an explicit model/effort override stays
+compatible with the current host. A subagent cannot own writes, enter the
+visible-task lifecycle, or spawn nested subagents.
 
 Read [Parallel execution](../../templates/references/parallel-execution.md)
 when the workflow has multiple lanes and [Stop policy](../../templates/references/stop-policy.md)
@@ -77,15 +81,19 @@ ambiguous send never authorizes blind resend.
 
 ## Monitor and close
 
-Use native waits only for liveness. After a wake, inspect the durable journal;
-task final text and wait status are never results. Routine completion must stay
-quiet and journal-only. A direct message or Steer is reserved for a persisted
-blocker, approval request, or high-risk drift with one identified attempt.
+Use native waits only for liveness. After a wait returns, inspect the durable
+journal; task final text and wait status are never results. Visible-task routine
+completion must stay quiet and journal-only; native subagents finish through
+their operation lane. A direct message or Steer is reserved for a persisted
+blocker, approval request, or high-risk drift. Use `urgent persist`, then
+`urgent attempt`, make the one returned native direct call, and finish with
+`urgent reconcile`; the recipient uses `urgent observe` then `urgent consume`,
+or `urgent expire` when eligible.
 
 Follow [Communication loop](../../templates/references/communication-loop.md)
 and hand terminal work to `codex-orchestration:integrate`. Before normal close,
 use `run audit` to persist the content-addressed terminal proof across every
 workflow claim, native operation, result, disposition, integration,
-verification, archive, fence, and lease. `run close` accepts only a current
-passing audit. Abandonment releases the active slot but retains every
-unresolved fence and lease for later review.
+verification, archive, cleanup, and reservation fence. `run close` accepts only
+a current passing audit. Abandonment releases the active slot but retains the
+complete admitted path/resource/branch envelope for later review.

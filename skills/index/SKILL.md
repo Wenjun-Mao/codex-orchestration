@@ -21,7 +21,7 @@ Route by intent before inspecting or changing repository state.
   `codex-orchestration:execute`.
 - For durable results, dispositions, integration or no-change proof, combined
   verification, and task archival, use `codex-orchestration:integrate`.
-- For retained fences, leases, worktrees, branches, or other completed-run
+- For retained reservation fences, worktrees, branches, or other completed-run
   state, use `codex-orchestration:cleanup`.
 
 Visible Codex tasks are the primary surface for independently running,

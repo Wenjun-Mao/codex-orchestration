@@ -42,5 +42,6 @@ envelope.
 Archive is also a prepared/reconciled host operation. Automatic archive is
 eligible only after accepted terminal disposition, integration or no-change
 proof, authoritative PASS combined verification, internal callback
-consumption, and managed-worktree reconciliation. Preserve ambiguous archive
+consumption, and managed-worktree reconciliation. The worktree path comes from
+the persisted creation record, never caller input. Preserve ambiguous archive
 state and leave blocked/attention-needed tasks visible.

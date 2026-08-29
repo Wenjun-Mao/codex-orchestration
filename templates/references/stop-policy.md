@@ -3,8 +3,8 @@
 Stop and preserve durable evidence when:
 
 - product, repository, package, or release authority is absent;
-- requested work crosses owned paths, retained fences, or active leases;
-- a shared resource is held by another owner;
+- requested work crosses owned paths or a retained reservation envelope;
+- an unordered task claims the same exclusive resource as another task;
 - an external or irreversible action lacks authorization;
 - ready task identity lacks the exact launch nonce, selector evidence
   contradicts the request, or release delivery is ambiguous;

@@ -16,7 +16,8 @@ or pause/replan; more instrumentation requires a later authorized workflow
 revision.
 
 Persist an urgent blocker, approval request, ownership collision, or high-risk
-drift before one identified direct interrupt attempt. Routine terminal
+drift, prepare its one identified direct interrupt attempt, make only the
+returned native call, and reconcile the result. Routine terminal
 completion never calls messaging or Steer. Derive Git outcome as `unchanged`,
 `clean-commit`, or `dirty-blocked`, allow null upstream, and persist exactly one
 terminal-receipt-v3 result in the journal. Task final text is liveness only.

@@ -4,6 +4,11 @@
 
 Accepted for v0.6.
 
+The lease and operation-fence portions of this decision are superseded by
+[ADR 0017](0017-dag-resource-gates-and-run-reservation-envelope.md): v0.6 uses
+DAG resource gates and a retained path/resource/branch reservation envelope,
+not TTL leases or operation fences.
+
 ## Context
 
 Through v0.5.1 the router requires a tracked `.codex/orchestration/` runtime
@@ -16,8 +21,8 @@ common directory.
 Codex App supplies native task, model, worktree, message, wait, Handoff, and
 archive primitives. Codex Orchestration still needs one exact runtime and one
 repository-wide authority for cross-task identity, callbacks, branch claims,
-leases, integration, and cleanup. A silent fallback, a second daemon, or
-implicit reuse of retained v0.5 state would create competing authorities.
+integration, and cleanup proof. A silent fallback, a second daemon, or implicit
+reuse of retained v0.5 state would create competing authorities.
 
 ## Decision
 
@@ -34,12 +39,13 @@ v0.6 uses progressive activation backed by one execution engine.
 - Every operational command names an explicit run ID. No command infers the
   newest run.
 - Exactly one coordinator run may be active per clone/common directory. The
-  active pointer and path, resource, branch, operation, callback, urgent,
-  recipient, lease, archive, and cleanup ledgers are repository-wide within
-  the exact-version namespace.
-- A normal close requires terminal reconciled state. Explicit abandonment
-  releases the active slot but retains every unresolved fence. A later plan is
-  admitted only when disjoint from those fences.
+  active pointer, path/resource/branch reservation envelope, workflow/task
+  operations, callbacks, urgent signals, recipient, archive, and cleanup
+  evidence are repository-wide within the exact-version namespace.
+- A normal close requires terminal reconciled state and current Git cleanup
+  proof. Explicit abandonment releases the active slot but retains the complete
+  admitted reservation envelope. A later plan is admitted only when disjoint
+  from that envelope.
 - Active and closed runtime evidence survives restart, compaction, plugin
   upgrade, and plugin removal. v0.6 performs no runtime pruning.
 - Permanent tracked adoption remains an explicit plan/apply choice for team
@@ -75,3 +81,7 @@ Cross-host journal transfer is not part of this decision.
 - Closed evidence and abandoned fences are retained until a later explicitly
   designed pruning release.
 
+Cleanup and closure details are refined by
+[ADR 0019](0019-read-only-cleanup-planning-and-terminal-fence-release.md).
+Tracked adoption and predecessor-transition scope are refined by
+[ADR 0020](0020-active-run-adoption-and-deferred-v05-transition.md).

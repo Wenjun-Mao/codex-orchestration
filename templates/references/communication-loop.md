@@ -6,8 +6,8 @@ Codex Flow separates completion from interruption.
 
 Persist one strict terminal-receipt-v3 result with `callback deliver`. This is
 a quiet Git-common journal write: it must not call direct messaging, Steer, or
-create a coordinator turn. Native waits may wake an active coordinator, but
-wait state and task final text are only liveness. The durable journal is the
+create a coordinator turn. An explicit native wait returns liveness to the
+waiting coordinator; wait state and task final text are only liveness. The durable journal is the
 sole result authority across restart, compaction, or coordinator resumption.
 
 The coordinator uses `callback status` for discovery, authenticates the exact
@@ -20,12 +20,13 @@ result.
 
 ## Urgent interruption
 
-A blocker, approval request, or high-risk drift is persisted before one
-identified direct-delivery attempt. Use only the runtime-generated envelope,
-then reconcile `sent`, `rejected-before-send`, or `ambiguous`. An ambiguous
-host call never authorizes replay. The recipient observes the persisted IDs
-before acting and suppresses duplicate host delivery. Ordinary completion is
-never upgraded to urgent merely to get attention.
+A blocker, approval request, or high-risk drift uses `urgent persist`, then
+`urgent attempt`. Make only the runtime-generated native direct call and record
+it with `urgent reconcile` as `sent`, `rejected-before-send`, or `ambiguous`.
+An ambiguous host call never authorizes replay. The recipient uses `urgent
+observe` before acting and `urgent consume` afterward, or `urgent expire` when
+eligible. Duplicate host delivery is suppressed. Ordinary completion is never
+upgraded to urgent merely to get attention.
 
 After coordinator handoff or replacement, rebind the run to the new lineage
 generation before processing results. Stale recipient identity cannot dispose

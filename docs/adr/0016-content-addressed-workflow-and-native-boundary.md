@@ -4,6 +4,9 @@
 
 Accepted for v0.6.
 
+The native-subagent selector and task-name clauses are refined by
+[ADR 0018](0018-native-subagent-selector-and-host-name-boundary.md).
+
 ## Context
 
 In v0.5.1 the parallel plan is validated but not persisted, task packets are
@@ -15,9 +18,10 @@ pushed. These gaps weaken the causal chain from user intent to repository
 effect.
 
 Native Codex tasks and subagents are different execution surfaces. Visible
-tasks can own durable Git work and continue independently. Native subagents
-share the coordinator context and are valuable for cheaper research or review,
-but should not acquire a second branch/callback/integration lifecycle.
+tasks can own durable Git work and continue independently. Native subagents are
+attached to the coordinator and receive the context selected by bounded
+`fork_turns`; they are valuable for cheaper research or review but should not
+acquire a second branch/callback/integration lifecycle.
 
 ## Decision
 
@@ -42,9 +46,10 @@ from it.
   reconciled as sent, rejected-before-send, or ambiguous. Executor acceptance
   of the exact release, packet, runtime, and common directory is the authority
   to begin work; ambiguity never authorizes blind resend.
-- Every terminal task receives a durable coordinator disposition. Only accepted
-  dependency dispositions advance the graph; native waits and task finals are
-  liveness evidence only.
+- Every visible terminal task receives a durable coordinator disposition.
+  Dependencies advance only from accepted terminal authority: a completed
+  visible-task disposition or an accepted native-subagent operation. Native
+  waits and task finals are liveness evidence only.
 - The CLI derives Git outcome as `unchanged`, `clean-commit`, or
   `dirty-blocked`. Upstream is nullable. Only `clean-commit` can integrate and
   `dirty-blocked` remains visible and fenced.
@@ -52,7 +57,8 @@ from it.
   direct message or Steer. Urgent delivery persists first and permits one
   identified direct attempt.
 - Native subagents are a separate read-only supporting lane. Each has explicit
-  model, reasoning, and `fork_turns`; Ultra and write ownership are forbidden.
+  model, reasoning, and bounded `fork_turns`; the v0.6 contract forbids Ultra,
+  full-history selector overrides, nested spawning, and write ownership.
   The coordinator records created identity, result digest/classification,
   unchanged Git proof, and accepted or rejected disposition. Subagents do not
   create worktrees, branches, callbacks, integrations, archives, or cleanup.

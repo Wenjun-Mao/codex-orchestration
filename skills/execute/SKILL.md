@@ -25,9 +25,9 @@ Follow the task's progress contract:
   revision that explicitly authorizes it.
 
 For a blocker, approval request, ownership collision, or high-risk drift,
-persist the urgent signal before one identified direct interrupt attempt.
-Never send raw or identity-less urgent content and never replay an ambiguous
-attempt.
+use `urgent persist`, then `urgent attempt`, make only the returned native
+direct call, and record its outcome with `urgent reconcile`. Never send raw or
+identity-less urgent content and never replay an ambiguous attempt.
 
 At terminal state, derive Git outcome mechanically as `unchanged`,
 `clean-commit`, or `dirty-blocked`; an upstream may be null. Persist exactly

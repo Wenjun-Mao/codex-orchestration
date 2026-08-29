@@ -7,16 +7,18 @@ Preserve all existing bytes and establish a named, committed Git baseline
 without rewriting history. Use the repository's normal reviewed branch/worktree
 workflow; do not invent or overwrite a branch.
 
-Run `adopt plan` from the exact intended worktree. Review the proposed
+First activate a named v0.6 run through an authorized actionable workflow;
+adoption promotes that run's runtime and cannot bootstrap one. Then run `adopt
+plan --run-id ...` from the exact intended worktree. Review the proposed
 `.codex/orchestration/v0.6/` write set, content-addressed runtime bundle,
 configuration/policy snapshots, and reviewed instructions. The plan is
 read-only and must bind the repository and current state.
 
-Run `adopt apply` only for that exact unchanged plan after explicit review.
-Then use `adopt status` and the repository's existing validators. Confirm no
-product path changed and integrate the adoption through the repository's normal
-review process.
+Run `adopt apply --run-id ...` only for that exact unchanged plan after
+explicit review. Then use `adopt status --run-id ...` and the repository's
+existing validators. Confirm no product path changed and integrate the
+adoption through the repository's normal review process.
 
-Adoption does not activate a coordinator run or authorize task creation. A
-later orchestration request uses the same v0.6 runtime semantics through an
-explicit run.
+Adoption does not authorize additional task creation. Continue only through
+the named run's already disclosed workflow, or activate a later explicit run
+after it closes.

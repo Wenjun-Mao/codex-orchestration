@@ -1,21 +1,23 @@
 # Codex Orchestration v0.6 development boundary
 
-Status: accepted design boundary; implementation and release acceptance remain
-separate checkpoints.
+Status: implemented development boundary; release acceptance remains a
+separate checkpoint.
 
 This document summarizes the v0.6 contract established by
-[ADR 0015](adr/0015-progressive-run-activation-authority.md) and
-[ADR 0016](adr/0016-content-addressed-workflow-and-native-boundary.md). It does
-not claim that the installed marketplace package has moved beyond v0.5.1.
+[ADR 0015](adr/0015-progressive-run-activation-authority.md) through
+[ADR 0020](adr/0020-active-run-adoption-and-deferred-v05-transition.md).
+It does not claim that the installed marketplace package has moved beyond
+v0.5.1.
 
 ## Retained cross-task authority
 
 - Authenticated repository baseline, coordinator lineage, path/resource/branch
-  ownership, leases, and shared-resource gates.
+  reservation envelopes, and DAG-ordered shared-resource gates.
 - Explicit requested/accepted/observed model and reasoning evidence.
 - Quiet durable routine results and separately journaled urgent interrupts.
 - Exactly-once coordinator disposition, serial Git integration, combined
-  verification, archive reconciliation, and proof-based cleanup.
+  verification, archive reconciliation, and deterministic read-only cleanup
+  planning. v0.6 does not apply Git deletion.
 
 ## Native primitives consumed directly
 
@@ -51,10 +53,14 @@ durable result journal or coordinator disposition.
   runtime, common directory, and ready task must be accepted before work.
 - Terminal receipt v3 derives `unchanged`, `clean-commit`, or `dirty-blocked`;
   upstream is nullable.
-- The terminal chain is result -> prepared disposition -> integration or
+- The visible-task terminal chain is result -> prepared disposition -> integration or
   no-change -> content-addressed PASS combined verification -> finalized
-  disposition/internal consumption -> reconciled archive -> proof-based Git
-  cleanup.
+  disposition/internal consumption -> reconciled archive -> cleanup plan ->
+  independently resolved Git refs/worktrees. Cleanup application is a later
+  checkpoint.
+- Native subagents instead close through `complete` and accepted `dispose`
+  records with unchanged-Git evidence; they never enter the visible-task
+  callback/integration/archive chain.
 
 ## Retired mechanisms
 
@@ -65,8 +71,27 @@ durable result journal or coordinator disposition.
 - Direct message/Steer for routine completion.
 - Task-final, UI-state, raw-digest, or branch-name integration authority.
 - Visible-task Git/callback lifecycle for native subagents.
+- Full-history native-subagent forks paired with explicit model/effort
+  overrides; bounded forks preserve current host selector compatibility.
+- v0.5 TTL leases and caller-authored operation fences in the v0.6 runtime.
+- Git cleanup apply; v0.6 exposes a read-only exact-state plan only.
 - Public bare callback consumption.
 - v0.5 compatibility readers or operational-state migration.
 
+## Deferred transition boundary
+
+- Tracked v0.6 adoption promotes the exact runtime of an already active run;
+  it is not a standalone initial setup engine.
+- `adopt retire-plan|retire-apply` retires a tracked v0.6 adoption only.
+- Tracked-v0.5 retirement is not implemented in this checkpoint. Such a
+  repository remains blocked from v0.6 activation/adoption until a separately
+  approved, byte-preserving transition contract exists.
+
 Historical v0.5 coverage documents, examples, and field tests remain useful
 evidence of the accepted predecessor but are not active v0.6 guidance.
+`npm run test:v06` runs the active v0.6 suite plus shared recipient,
+urgent-signal, and release-identity contracts. `npm run test:v05.1` authenticates
+the immutable accepted tag/commit, extracts it outside the repository, and runs
+its complete predecessor suite against its own CLI. `npm test` runs both
+version-authoritative suites; it does not execute historical v0.5 mutation
+tests against the breaking v0.6 CLI.

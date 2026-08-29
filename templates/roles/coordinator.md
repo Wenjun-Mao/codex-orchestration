@@ -7,7 +7,7 @@ executor-owned paths concurrently.
 
 Before an external task call, disclose and bind the exact runtime bundle,
 Git-common state root, repository baseline, coordinator lineage/generation,
-workflow revision, leases/fences, saved project, native surface, requested
+workflow revision, path/resource/branch reservation envelope, saved project, native surface, requested
 model/reasoning, and placement. Keep configured, requested, host-accepted,
 observed, and unavailable selector evidence distinct.
 
@@ -23,17 +23,21 @@ host-observed pristine worktree at the authenticated baseline. Send the
 prepared release once and require exact executor acceptance before work.
 
 For a native subagent, require a read-only contract with explicit model,
-reasoning, and `fork_turns`. Do not give it worktree, branch, callback,
-integration, archive, or cleanup ownership.
+reasoning, and bounded `fork_turns`. The v0.6 contract forbids Ultra,
+full-history selector overrides, and nested subagent spawning. Do not give it
+worktree, branch, callback, integration, archive, or cleanup ownership.
 
-Use native wait/status only for liveness. Routine executor results remain in
-the quiet journal and never direct-message or Steer the coordinator. Observe a
-persisted urgent signal before acting on its single identified interrupt
-attempt; suppress replays.
+Use native wait/status only for liveness. Visible-task routine results remain
+in the quiet journal and never direct-message or Steer the coordinator. Native
+subagents instead finish through `subagent complete` and `subagent dispose`
+with unchanged-Git proof. For an urgent signal, persist then prepare the single
+identified interrupt, make the returned native call once, reconcile it, and
+observe/consume the persisted IDs; suppress replays.
 
-For each terminal result, prepare a durable disposition, reconcile integration
-or no-change, run and reload an authoritative PASS combined-verification
-record, finalize the disposition exactly once, and then reconcile archival.
-Dirty or attention-needed work remains visible and fenced. Git cleanup is a
-separate reviewed proof-based action. Close only a fully reconciled run;
-abandonment retains unresolved fences and leases.
+For each visible-task terminal result, prepare a durable disposition, reconcile
+integration or no-change, run and reload an authoritative PASS
+combined-verification record, finalize the disposition exactly once, and then
+reconcile archival. Dirty or attention-needed work remains visible and keeps
+the run active. Git cleanup is a separate read-only exact-state plan; v0.6 does
+not apply deletion. Close only a fully reconciled run; abandonment retains the
+complete admitted path/resource/branch envelope.

@@ -11,7 +11,7 @@
   "interface": {
     "displayName": "Codex Orchestration",
     "shortDescription": "Orchestrate visible Codex tasks safely.",
-    "longDescription": "Use one coordinator to plan and govern multiple user-visible Codex tasks with explicit model routing, bounded ownership, reconciled host operations, quiet durable results, serial integration, and audited cleanup.",
+    "longDescription": "Use one coordinator to plan and govern multiple user-visible Codex tasks with explicit model routing, bounded ownership, reconciled host operations, quiet durable results, serial integration, audited closure, and read-only cleanup planning.",
     "developerName": "Wenjun Mao",
     "category": "Productivity",
     "capabilities": ["Multi-task planning", "Model routing", "Durable result coordination"],

@@ -39,8 +39,8 @@ Codex App native harness
    v
 Codex Orchestration meta-harness
       workflow DAG, ownership, run/task/Git identity, quiet results,
-      urgent interruption policy, dispositions, verification, leases,
-      integration and cleanup proof
+      urgent interruption policy, dispositions, verification,
+      integration, reservation fences, and cleanup proof
 ```
 
 The plugin consumes native primitives; it does not recreate the task runtime,
@@ -49,7 +49,7 @@ worktree manager, project system, model selector, task queue, or archive API.
 | Surface | Intended use | Codex Orchestration lifecycle |
 | --- | --- | --- |
 | Visible Codex task | Independently running, heterogeneous-model work; required for mutating executor lanes | Creation, nonce correlation, Git binding, release, result, disposition, integration/no-change, verification, archive and cleanup proof |
-| Native subagent | Bounded read-only research or review inside the coordinator task | Explicit model/reasoning/`fork_turns`, result classification, unchanged-Git proof and accept/reject disposition only |
+| Native subagent | Bounded read-only research or review attached to the coordinator task | Explicit model/reasoning with bounded `fork_turns`, result classification, unchanged-Git proof and accept/reject disposition only |
 
 Subagents are never a silent fallback for visible tasks. They cannot own writes,
 worktrees, branches, callbacks, integration, archive, or cleanup.
@@ -59,7 +59,10 @@ worktrees, branches, callbacks, integration, archive, or cleanup.
 ### Progressive run activation
 
 Questions, explanations, audits, and plans are read-only. A repository no
-longer needs `.codex/orchestration/` before it can use the plugin.
+longer needs `.codex/orchestration/` before it can use the v0.6 source. The
+currently installed v0.5.1 package still uses its accepted setup gate, and
+tracked v0.5 authority must be explicitly retired before v0.6 can activate in
+that repository.
 
 When the user authorizes actionable orchestration, the plugin may activate one
 run after disclosing:
@@ -67,7 +70,8 @@ run after disclosing:
 - the exact package/runtime source and bundle hash;
 - the `.git/codex-flow/v0.6.0/` operational state root;
 - repository/common-directory, baseline, host, and coordinator binding;
-- the immutable workflow revision, fences, shared resources, and leases;
+- the immutable workflow revision and its path/resource/branch reservation
+  envelope;
 - every native task surface, saved project, model/reasoning request, placement,
   and proposed host call; and
 - the difference between configured, requested, host-accepted, independently
@@ -77,16 +81,15 @@ Run activation writes no tracked setup. Every stateful operation names its
 exact run ID; no command infers the newest run. One coordinator run may be
 active per clone/Git common directory. A normal close requires a current,
 content-addressed terminal run audit over all reconciled state. Explicit
-abandonment releases the active slot but retains
-unresolved path, resource, branch, operation, callback, urgent, recipient, and
-lease fences.
+abandonment releases the active slot but retains the complete admitted path,
+resource, and branch reservation envelope.
 
 ### Content-addressed workflow
 
 One stable logical plan groups immutable workflow revisions. Task contracts are
 generated from a revision rather than authored independently. Each contract
 binds the run, runtime/configuration, repository/common directory, coordinator,
-plan/revision, concrete dependency dispositions, and baseline.
+plan/revision, concrete dependency terminal authorities, and baseline.
 
 Each task states:
 
@@ -109,7 +112,10 @@ coordinating Terra is a useful default shape, not a permanent dependency.
 The plugin records configuration, request, host acceptance, and independent
 observation separately. Accepted-but-unobservable selectors remain partial
 evidence; a contradictory observed selector blocks. Native subagents also name
-`fork_turns` explicitly and cannot use Ultra.
+bounded `fork_turns` explicitly. For native subagents, the v0.6 plugin forbids
+Ultra and full-history forks: current full-history forks inherit the parent
+model/effort and cannot accept the explicit heterogeneous selectors this
+contract records. Visible tasks retain the host's supported reasoning range.
 
 ### One-shot task identity and release
 
@@ -128,17 +134,17 @@ substitution.
 
 ### Quiet results and urgent interrupts
 
-Routine completion writes one terminal-receipt-v3 result to the durable
-Git-common journal. It never direct-messages or Steers the coordinator. Native
-waits and task finals are liveness signals only; they do not authorize
-integration.
+Visible-task routine completion writes one terminal-receipt-v3 result to the
+durable Git-common journal. It never direct-messages or Steers the coordinator.
+Native waits and task finals are liveness signals only; they do not authorize
+integration. Native subagents complete through their separate operation lane.
 
 A true blocker, approval request, or high-risk drift uses a separate urgent
 path. The signal is persisted before one identified direct interrupt attempt.
 Ambiguous delivery cannot be replayed blindly, and recipient observation
 suppresses duplicate host delivery.
 
-### Result proof chain
+### Visible-task result proof chain
 
 ```text
 journaled terminal result
@@ -156,13 +162,19 @@ content-addressed combined verification at exact repository state
 disposition finalized and result consumed exactly once
           |
           v
-reconciled task archive, lease/fence release, reviewed Git cleanup
+reconciled task archive, reviewed cleanup plan and branch/worktree proof
 ```
 
 Task final text, branch names, UI status, and caller-supplied raw digests are
 never proof. Git outcome is derived as `unchanged`, `clean-commit`, or
 `dirty-blocked`; upstream is nullable. Dirty or attention-needed tasks remain
-visible and fenced. Archive and Git cleanup are separate reconciled actions.
+visible and keep the run from closing. Archive and Git cleanup are separate
+actions. v0.6 can derive a deterministic read-only cleanup plan and verify that
+refs/worktrees are resolved; it does not apply deletions.
+
+Native subagents use their separate `complete` then `dispose` proof chain with
+unchanged-Git evidence. They never enter this callback, integration, archive,
+or cleanup lifecycle.
 
 ## Use from Codex App
 
@@ -179,19 +191,23 @@ The first request is read-only. An actionable request routes through
 repository setup. External task creation remains visible in the disclosed
 plan.
 
-Permanent tracked adoption is a separate explicit choice for team policy,
-portable clones, or headless operation:
+After a clean repository has an active v0.6 run, permanent tracked adoption is
+a separate explicit promotion choice for team policy, portable clones, or
+headless operation:
 
 ```text
-Permanently adopt Codex Flow v0.6 in this repository.
-Plan retirement of the tracked v0.5 authority, but do not apply it yet.
+Promote this active Codex Flow v0.6 runtime to permanent tracked adoption.
+Plan retirement of this repository's tracked v0.6 adoption, but do not apply it.
 ```
 
 The setup skill uses read-only `adopt plan` followed by an exact reviewed
-`adopt apply`. Tracked adoption stores the same runtime/configuration/policy
-semantics under `.codex/orchestration/v0.6/`; it is not a second engine. A
-tracked v0.5 authority must be retired through its own explicit plan/apply, with
-its evidence byte-preserved, before v0.6 adoption.
+`adopt apply`, both bound to the named active run. Tracked adoption stores that
+run's same runtime/configuration/policy semantics under
+`.codex/orchestration/v0.6/`; it is not a second engine. `adopt retire-plan` and
+`retire-apply` retire only a tracked v0.6 adoption. The current development
+boundary does not implement tracked-v0.5 retirement; repositories that still
+carry that authority remain blocked pending a separately approved transition
+checkpoint.
 
 ## Public CLI families
 
@@ -202,13 +218,15 @@ lifecycle is organized around these command families:
 run activate|status|resume|rebind|audit|close|abandon
 workflow create|revise|status|contract
 task create prepare|attempt|reconcile|status
-subagent prepare|created|complete|dispose|status
+subagent prepare|attempt|reconcile|complete|dispose|status
 release prepare|reconcile|accept|status
 callback deliver|observe|status
-disposition prepare|finalize|status
+urgent persist|attempt|reconcile|observe|consume|expire|status
+disposition prepare|finalize|cancel|status
 verification run|status
 integration prepare|verification-request|reconcile|status
 archive prepare|reconcile|status
+cleanup plan
 adopt plan|apply|status|retire-plan|retire-apply
 ```
 
@@ -216,7 +234,8 @@ There is no public bare callback-consume command. Consumption is an internal
 exactly-once consequence of finalizing an authoritative disposition.
 `run audit` derives and persists the complete terminal closure proof;
 `run close` accepts only that exact audit while its source records remain
-unchanged.
+unchanged. `cleanup plan` is read-only; this development boundary exposes no
+cleanup-apply command.
 
 ## Permanent adoption and headless use
 
@@ -232,8 +251,9 @@ tracked write set and runtime hashes, then apply only that unchanged plan.
 
 v0.6 is intentionally breaking. It has no v0.5 compatibility reader, dual
 execution path, or state migration. Retained v0.5 records remain independently
-auditable in their exact namespace. Historical v0.5 schemas, examples, field
-tests, and ADRs are labeled as such; they are not v0.6 operating authority.
+auditable in their exact namespace. Historical v0.5 schemas, examples, and
+field tests are not v0.6 operating authority. Earlier ADRs remain useful
+decision evidence where a later ADR supersedes their mechanism.
 
 The accepted v0.5.1 boundary remains documented in
 [v0.5.1 orchestration coverage](docs/coverage-v0.5.1.md). The v0.6 development
