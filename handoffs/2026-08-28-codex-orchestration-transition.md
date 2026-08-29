@@ -23,21 +23,23 @@ Before changing anything:
 ## Current source authority
 
 - Repository: `/Users/wjmao/projects/utility_projects/codex-orchestration`
-- Accepted branch: `codex/host-placement-v0.5.1`
+- Current branch: `main`
 - Accepted source tip:
   `d03cabfffb612ad8f33853896b15deee3ad66698`
 - Runtime correction exercised by the final held-out pilot:
   `b3d933a4b895dfee26fd142eb994f338456f5591`
 - Package, plugin, and runtime version: `0.5.1`
-- Worktree was clean before this handoff was added.
+- Worktree was clean before this handoff was added and after the final Git
+  cleanup.
 - The repository has no Git remote or upstream.
-- Local `main` is still
-  `8ad1106f2d5ed481b0b010a6b0f9d5af7f83791c` and is an ancestor of the
-  accepted branch.
-- Every historical local release branch reported by `git branch` is already
-  merged into the accepted tip. Do not delete branches merely from this note;
-  first decide whether to fast-forward `main`, create a private remote, and
-  preserve or tag release history.
+- Local `main` was fast-forwarded through the accepted source and handoff-only
+  commits. It is the sole local branch and the sole registered worktree is this
+  repository path.
+- Eleven merged historical `codex/*` branches were deleted only after Git
+  proved each was an ancestor of the handoff tip. There were no unmerged or
+  remote branches and no stale worktree registrations.
+- The disposable `/Users/wjmao/projects/utility_projects/codex-flow-v05-heldout`
+  fixture root was confirmed absent during the final cleanup audit.
 
 The handoff-only commits change no packaged path. Resolve the current `HEAD`
 after opening this repository; the accepted package bytes are those at
@@ -270,11 +272,10 @@ PASS does not automatically replace active runtimes elsewhere.
 
 ## Open decisions and useful next work
 
-1. **Repository branch and remote hygiene.** Decide whether to fast-forward
-   local `main` to the accepted source tip, tag accepted private releases, add a
-   private remote, and then delete merged historical branches. This is the most
-   natural first repository-maintenance checkpoint, but it requires discussion
-   because no remote currently protects the history.
+1. **Remote and release protection.** Branch/worktree cleanup is complete, but
+   no remote currently protects this repository history. Decide whether to add
+   a private remote and tags for accepted private releases; do not invent or
+   publish either automatically.
 2. **Self-hosting.** This repository has no `AGENTS.md` and is not itself pinned
    as a Codex Flow target. Decide whether the package source should self-host
    its own runtime or remain the canonical external authority. Do not bootstrap
