@@ -11,7 +11,7 @@ import {
   runCli,
 } from "./helpers.mjs";
 import { PACKAGE_VERSION } from "../lib/core.mjs";
-import { discoverGit } from "../lib/git.mjs";
+import { CODEX_FLOW_STATE_NAMESPACE, discoverGit } from "../lib/git.mjs";
 
 async function snapshotFiles(root) {
   const snapshot = {};
@@ -180,7 +180,7 @@ test("v0.5.2-dev.0 preserves retained v0.5.1 state in its exact-release namespac
 
     initializeFixture([], { cwd: root });
     const context = discoverGit(root);
-    assert.equal(context.stateRoot, resolve(context.commonDir, "codex-flow", `v${PACKAGE_VERSION}`));
+    assert.equal(context.stateRoot, resolve(context.commonDir, "codex-flow", CODEX_FLOW_STATE_NAMESPACE));
     assert.equal(await readFile(v04Record, "utf8"), "{\"schema_version\":2}\n");
     assert.equal(await readFile(v05Record, "utf8"), "{\"schema_version\":8}\n");
     assert.deepEqual(await snapshotFiles(v051StateRoot), retainedV051State);

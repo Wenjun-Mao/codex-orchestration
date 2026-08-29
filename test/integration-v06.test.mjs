@@ -1,9 +1,8 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { readFile, realpath, writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import test from "node:test";
-import { bindRecipient } from "../lib/recipients.mjs";
 import { deliverCallbackV06, observeCallbackV06 } from "../lib/callbacks-v06.mjs";
 import { prepareTaskDisposition } from "../lib/dispositions.mjs";
 import {
@@ -12,17 +11,9 @@ import {
   reconcileSerialIntegration,
   serialIntegrationStatus,
 } from "../lib/integration-v06.mjs";
-import {
-  acceptTaskRelease,
-  prepareTaskRelease,
-  reconcileTaskRelease,
-} from "../lib/release-lifecycle.mjs";
-import {
-  recipientBindingDigest,
-  validateTerminalReceiptV3,
-} from "../lib/task-results.mjs";
 import { runCombinedVerification } from "../lib/verifications-v06.mjs";
 import { createGitFixture, removeFixture } from "./helpers.mjs";
+import { createAcceptedVisibleTask, terminalReceipt } from "./v06-lifecycle-fixture.mjs";
 
 const digest = (character) => character.repeat(64);
 
@@ -50,78 +41,28 @@ async function integrationFixture(suffix, { decision = "accepted-for-integration
     `executor ${suffix}`,
   );
   git(root, ["switch", "--quiet", "main"]);
-
-  const recipient = {
-    lineage_id: `integration-lineage-${suffix}`,
-    thread_id: `integration-coordinator-${suffix}`,
-    generation: 1,
-  };
-  await bindRecipient({ stateRoot, recipient });
-  const commonDir = await realpath(resolve(root, ".git"));
-  const releaseInput = {
-    run_id: `integration-run-${suffix}`,
-    plan_id: `integration-plan-${suffix}`,
-    revision_id: `integration-revision-${suffix}`,
-    task_id: `integration-task-${suffix}`,
-    task_contract_digest: digest("a"),
-    operation_id: `integration-operation-${suffix}`,
-    ready_thread_id: `integration-executor-thread-${suffix}`,
-    runtime_digest: digest("b"),
-    config_digest: digest("c"),
-    repository_id: `integration-repository-${suffix}`,
-    common_dir: commonDir,
-    prompt: "Execute the exact integration test packet.",
-  };
-  const release = await prepareTaskRelease({ stateRoot, input: releaseInput });
-  await reconcileTaskRelease({ stateRoot, releaseId: release.release_id, outcome: "sent" });
-  await acceptTaskRelease({
-    stateRoot,
-    releaseId: release.release_id,
-    executorThreadId: releaseInput.ready_thread_id,
-    taskContractDigest: releaseInput.task_contract_digest,
-    runtimeDigest: releaseInput.runtime_digest,
-    commonDir,
+  const authority = await createAcceptedVisibleTask(root, `integration-${suffix}`, {
+    task: { write_paths: [`executor-${suffix}.txt`] },
+    executorBranch,
   });
-  const receipt = validateTerminalReceiptV3({
-    schema_version: 3,
-    recipient: { ...recipient, binding_digest: recipientBindingDigest(recipient) },
-    executor_id: `integration-executor-${suffix}`,
-    run_id: releaseInput.run_id,
-    runtime_digest: releaseInput.runtime_digest,
-    config_digest: releaseInput.config_digest,
-    plan_id: releaseInput.plan_id,
-    revision_id: releaseInput.revision_id,
-    task_id: releaseInput.task_id,
-    task_contract_digest: releaseInput.task_contract_digest,
-    operation_id: releaseInput.operation_id,
-    release_id: release.release_id,
-    classification: "PASS",
-    git_outcome: {
-      kind: "clean-commit",
-      baseline_revision: baseline,
-      commit: executorTip,
-      branch: executorBranch,
-      upstream: null,
-      cleanliness: "clean",
-    },
-    model_evidence: {
-      configured: { model: "gpt-5.6-terra", reasoning_effort: "xhigh" },
-      requested: { model: "gpt-5.6-terra", reasoning_effort: "xhigh" },
-      accepted: { model: "gpt-5.6-terra", reasoning_effort: "xhigh" },
-      observed: null,
-    },
-    result_or_blocker: "The executor committed its path-bounded result.",
-    next_decision: "Review and integrate the exact executor tip.",
-    accounting: {
-      PRODUCT: 1,
-      CROSS_CUTTING_PRODUCT_FIX: 0,
-      ENVIRONMENT: 0,
-      PROOF_HARNESS: 0,
-    },
-    completed_at: "2026-08-29T16:00:00-04:00",
+  const receipt = terminalReceipt(authority, {
+    kind: "clean-commit",
+    baseline_revision: baseline,
+    commit: executorTip,
+    branch: executorBranch,
+    upstream: null,
+    cleanliness: "clean",
   });
   const delivered = await deliverCallbackV06({ stateRoot, receipt });
-  await observeCallbackV06({ stateRoot, callbackId: delivered.callback_id, recipient });
+  await observeCallbackV06({
+    stateRoot,
+    callbackId: delivered.callback_id,
+    recipient: {
+      lineage_id: authority.coordinator.lineage_id,
+      thread_id: authority.coordinator.thread_id,
+      generation: authority.coordinator.generation,
+    },
+  });
   const disposition = await prepareTaskDisposition({
     stateRoot,
     callbackId: delivered.callback_id,
@@ -137,6 +78,7 @@ async function integrationFixture(suffix, { decision = "accepted-for-integration
     executorBranch,
     executorTip,
     disposition,
+    authority,
   };
 }
 
@@ -152,7 +94,7 @@ test("serial integration preparation binds all task authorities and exact Git ti
     assert.equal(prepared.state, "prepared");
     assert.equal(prepared.prepared_main_tip, value.baseline);
     assert.equal(prepared.executor_tip, value.executorTip);
-    assert.equal(prepared.operation_id, "integration-operation-identity");
+    assert.equal(prepared.operation_id, value.authority.creation.operation_id);
     assert.equal(prepared.release_id.startsWith("release-v1-"), true);
     assert.equal(prepared.callback_id.startsWith("terminal-v3-"), true);
     assert.equal(prepared.disposition_id, value.disposition.disposition_id);

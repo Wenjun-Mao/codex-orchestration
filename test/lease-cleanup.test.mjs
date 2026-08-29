@@ -3,7 +3,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import test from "node:test";
 import { assertSuccess, createGitFixture, initializeFixture, removeFixture, runCli } from "./helpers.mjs";
-import { PACKAGE_VERSION } from "../lib/core.mjs";
+import { CODEX_FLOW_STATE_NAMESPACE } from "../lib/git.mjs";
 
 test("exclusive leases prevent competing owners and release idempotently", async () => {
   const root = await createGitFixture("codex-flow-lease-");
@@ -54,7 +54,7 @@ test("an expired holder token cannot release a replacement lease with the same o
     ], { cwd: root });
     assertSuccess(first, "first lease");
     const firstLease = JSON.parse(first.stdout).lease;
-    const leasePath = resolve(root, ".git", "codex-flow", `v${PACKAGE_VERSION}`, "leases", "browser", "lease.json");
+    const leasePath = resolve(root, ".git", "codex-flow", CODEX_FLOW_STATE_NAMESPACE, "leases", "browser", "lease.json");
     const stored = JSON.parse(await readFile(leasePath, "utf8"));
     stored.expires_at = "2000-01-01T00:00:00.000Z";
     await writeFile(leasePath, JSON.stringify(stored), "utf8");
@@ -93,7 +93,7 @@ test("cleanup is audit-only and reports repository-scoped state", async () => {
     const report = JSON.parse(audit.stdout);
     assert.equal(report.mutation_performed, false);
     assert.equal(report.leases.length, 1);
-    assert.ok(report.state_root.endsWith(`/.git/codex-flow/v${PACKAGE_VERSION}`));
+    assert.ok(report.state_root.endsWith(`/.git/codex-flow/${CODEX_FLOW_STATE_NAMESPACE}`));
   } finally {
     await removeFixture(root);
   }

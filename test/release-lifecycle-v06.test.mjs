@@ -20,6 +20,10 @@ import {
   createWorkflowPlanRevision,
   generateTaskContract,
 } from "../lib/workflow-plan.mjs";
+import {
+  createWorkflowJournal,
+  persistWorkflowTaskContract,
+} from "../lib/workflow-journal-v06.mjs";
 import { createGitFixture, packageRoot, removeFixture } from "./helpers.mjs";
 
 const START = Date.parse("2026-08-29T22:00:00.000Z");
@@ -74,12 +78,23 @@ async function fixture() {
     common_dir: commonDir,
     coordinator_binding: coordinator,
   };
-  const contract = generateTaskContract({
-    plan_revision: plan,
-    task_id: "release-visible-task",
-    current_baseline: { revision },
-    dependency_records: [],
+  const stateRoot = resolve(commonDir, "codex-flow", "v0.6.0");
+  await createWorkflowJournal({
+    stateRoot,
+    runId: authority.run_id,
+    planId: plan.plan_id,
+    planRevision: plan,
+    now: START - 2_000,
+  });
+  const contract = await persistWorkflowTaskContract({
+    stateRoot,
+    runId: authority.run_id,
+    planId: plan.plan_id,
+    taskId: "release-visible-task",
+    currentBaseline: { revision },
+    dependencyRecords: [],
     authority,
+    now: START - 1_000,
   });
   const requestedSelectors = {
     project_id: "release-saved-project",
@@ -93,7 +108,6 @@ async function fixture() {
       path: null,
     },
   };
-  const stateRoot = resolve(commonDir, "codex-flow", "v0.6.0");
   const creation = await prepareVisibleTaskCreation({
     stateRoot,
     taskContract: contract,

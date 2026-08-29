@@ -25,8 +25,11 @@ import {
 import {
   coordinatorBindingDigest,
   createWorkflowPlanRevision,
-  generateTaskContract,
 } from "../lib/workflow-plan.mjs";
+import {
+  createWorkflowJournal,
+  persistWorkflowTaskContract,
+} from "../lib/workflow-journal-v06.mjs";
 import { createGitFixture, packageRoot, removeFixture } from "./helpers.mjs";
 
 const START = Date.parse("2026-08-29T23:00:00.000Z");
@@ -74,19 +77,31 @@ async function acceptedAuthority() {
     parent_revision_digest: null,
     tasks: [task()],
   });
-  const contract = generateTaskContract({
-    plan_revision: plan,
-    task_id: task().task_id,
-    current_baseline: { revision: baseline },
-    dependency_records: [],
-    authority: {
-      run_id: "disposition-run-v06",
-      runtime_context_digest: digest("b"),
-      configuration_digest: digest("c"),
-      repository_id: "disposition-repository-v06",
-      common_dir: commonDir,
-      coordinator_binding: coordinator,
-    },
+  const stateRoot = resolve(commonDir, "codex-flow", "v0.6.0");
+  const authority = {
+    run_id: "disposition-run-v06",
+    runtime_context_digest: digest("b"),
+    configuration_digest: digest("c"),
+    repository_id: "disposition-repository-v06",
+    common_dir: commonDir,
+    coordinator_binding: coordinator,
+  };
+  await createWorkflowJournal({
+    stateRoot,
+    runId: authority.run_id,
+    planId: plan.plan_id,
+    planRevision: plan,
+    now: START - 2_000,
+  });
+  const contract = await persistWorkflowTaskContract({
+    stateRoot,
+    runId: authority.run_id,
+    planId: plan.plan_id,
+    taskId: task().task_id,
+    currentBaseline: { revision: baseline },
+    dependencyRecords: [],
+    authority,
+    now: START - 1_000,
   });
   const requested = {
     project_id: "disposition-project-v06",
@@ -100,7 +115,6 @@ async function acceptedAuthority() {
       path: root,
     },
   };
-  const stateRoot = resolve(commonDir, "codex-flow", "v0.6.0");
   const creation = await prepareVisibleTaskCreation({
     stateRoot,
     taskContract: contract,

@@ -22,6 +22,7 @@ import {
   removeFixture,
 } from "./helpers.mjs";
 import { PACKAGE_VERSION } from "../lib/core.mjs";
+import { CODEX_FLOW_STATE_NAMESPACE } from "../lib/git.mjs";
 
 async function createCachedPlugin() {
   const cacheRoot = await mkdtemp(resolve(tmpdir(), "codex-flow-plugin-cache-"));
@@ -234,7 +235,7 @@ test("an installed v0.5.1 runtime requires explicit retirement without mutation"
       assert.deepEqual(await snapshotFiles(runtimeRoot), retainedRuntime);
       assert.deepEqual(await snapshotFiles(v051StateRoot), retainedState);
     }
-    const stateRoot = resolve(repositoryRoot, ".git", "codex-flow", `v${PACKAGE_VERSION}`);
+    const stateRoot = resolve(repositoryRoot, ".git", "codex-flow", CODEX_FLOW_STATE_NAMESPACE);
     const stateBefore = await snapshotFiles(stateRoot);
 
     for (const args of [

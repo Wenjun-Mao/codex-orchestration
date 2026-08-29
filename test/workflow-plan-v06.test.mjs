@@ -111,15 +111,25 @@ function contractFor(plan, taskId, dependencyRecords = []) {
 }
 
 function acceptedDisposition(plan) {
+  const research = contractFor(plan, "research");
   return {
     schema_version: 1,
     kind: "codex-flow-v06-task-disposition",
     disposition_id: "disposition-research",
     run_id: authority().run_id,
+    runtime_context_digest: authority().runtime_context_digest,
+    configuration_digest: authority().configuration_digest,
+    repository_id: authority().repository_id,
+    common_dir: authority().common_dir,
+    coordinator_binding: authority().coordinator_binding,
     plan_id: plan.plan_id,
-    revision_id: plan.revision_digest,
+    revision_digest: plan.revision_digest,
     task_id: "research",
-    task_contract_digest: "3".repeat(64),
+    task_digest: research.task_digest,
+    contract_id: research.contract_id,
+    operation_id: "operation-research",
+    release_id: "release-research",
+    executor_thread_id: "executor-research",
     callback_id: "callback-research",
     receipt_digest: "4".repeat(64),
     decision: "accepted-no-change",

@@ -20,17 +20,9 @@ import {
   reconcileSerialIntegration,
 } from "../lib/integration-v06.mjs";
 import { bindRecipient } from "../lib/recipients.mjs";
-import {
-  acceptTaskRelease,
-  prepareTaskRelease,
-  reconcileTaskRelease,
-} from "../lib/release-lifecycle.mjs";
-import {
-  recipientBindingDigest,
-  validateTerminalReceiptV3,
-} from "../lib/task-results.mjs";
 import { runCombinedVerification } from "../lib/verifications-v06.mjs";
 import { createGitFixture, removeFixture } from "./helpers.mjs";
+import { createAcceptedVisibleTask, terminalReceipt } from "./v06-lifecycle-fixture.mjs";
 
 const digest = (character) => character.repeat(64);
 const recipient = {
@@ -67,73 +59,16 @@ function archivedObservation(threadId) {
   };
 }
 
-async function acceptedRelease(root, suffix) {
-  const commonDir = await realpath(resolve(root, ".git"));
-  const input = {
-    run_id: `archive-run-${suffix}`,
-    plan_id: `archive-plan-${suffix}`,
-    revision_id: `archive-revision-${suffix}`,
-    task_id: `archive-task-${suffix}`,
-    task_contract_digest: digest("a"),
-    operation_id: `archive-operation-${suffix}`,
-    ready_thread_id: `archive-thread-${suffix}`,
-    runtime_digest: digest("b"),
-    config_digest: digest("c"),
-    repository_id: "archive-repository-v06",
-    common_dir: commonDir,
-    prompt: `Execute archive task ${suffix}.`,
-  };
-  const prepared = await prepareTaskRelease({ stateRoot: resolve(commonDir, "codex-flow", "v0.6.0"), input });
-  await reconcileTaskRelease({
-    stateRoot: resolve(commonDir, "codex-flow", "v0.6.0"),
-    releaseId: prepared.release_id,
-    outcome: "sent",
+async function acceptedRelease(root, suffix, options = {}) {
+  const context = await createAcceptedVisibleTask(root, `archive-${suffix}`, {
+    coordinator: recipient,
+    ...options,
   });
-  await acceptTaskRelease({
-    stateRoot: resolve(commonDir, "codex-flow", "v0.6.0"),
-    releaseId: prepared.release_id,
-    executorThreadId: input.ready_thread_id,
-    taskContractDigest: input.task_contract_digest,
-    runtimeDigest: input.runtime_digest,
-    commonDir,
-  });
-  return { input, releaseId: prepared.release_id };
+  return { ...context, releaseId: context.release.release_id };
 }
 
 function receipt(release, gitOutcome, classification = "PASS") {
-  return validateTerminalReceiptV3({
-    schema_version: 3,
-    recipient: { ...recipient, binding_digest: recipientBindingDigest(recipient) },
-    executor_id: release.input.ready_thread_id,
-    run_id: release.input.run_id,
-    runtime_digest: release.input.runtime_digest,
-    config_digest: release.input.config_digest,
-    plan_id: release.input.plan_id,
-    revision_id: release.input.revision_id,
-    task_id: release.input.task_id,
-    task_contract_digest: release.input.task_contract_digest,
-    operation_id: release.input.operation_id,
-    release_id: release.releaseId,
-    classification,
-    git_outcome: gitOutcome,
-    model_evidence: {
-      configured: { model: "gpt-5.6-terra", reasoning_effort: "xhigh" },
-      requested: { model: "gpt-5.6-terra", reasoning_effort: "xhigh" },
-      accepted: { model: "gpt-5.6-terra", reasoning_effort: "xhigh" },
-      observed: null,
-    },
-    result_or_blocker: classification === "PASS"
-      ? "The exact archive test task completed."
-      : "The archive test task retained unresolved Git state.",
-    next_decision: "Apply the exact coordinator disposition.",
-    accounting: {
-      PRODUCT: 1,
-      CROSS_CUTTING_PRODUCT_FIX: 0,
-      ENVIRONMENT: 0,
-      PROOF_HARNESS: 0,
-    },
-    completed_at: "2026-08-29T16:00:00-04:00",
-  });
+  return terminalReceipt(release, gitOutcome, { classification });
 }
 
 async function observedDisposition({
@@ -158,7 +93,7 @@ async function observedDisposition({
     stateRoot,
     dispositionId: disposition.disposition_id,
     recipient,
-    executorId: payload.executor_id,
+    executorThreadId: payload.executor_thread_id,
     integrationId,
     verificationId,
   });
@@ -204,7 +139,7 @@ test("clean no-change visible task archives only after setter and independent ob
     const prepared = await prepareTaskArchive({
       stateRoot: authority.stateRoot,
       dispositionId: authority.disposition.disposition_id,
-      taskObservation: activeObservation(authority.release.input.ready_thread_id),
+      taskObservation: activeObservation(authority.release.readyThreadId),
       hostId: "local",
       worktree: { management: "none", path: null },
     });
@@ -213,14 +148,14 @@ test("clean no-change visible task archives only after setter and independent ob
     assert.deepEqual(prepared.host_intent, {
       action: "set-thread-archived",
       attempt_id: prepared.host_intent.attempt_id,
-      thread_id: authority.release.input.ready_thread_id,
+      thread_id: authority.release.readyThreadId,
       host_id: "local",
       archived: true,
     });
     const replay = await prepareTaskArchive({
       stateRoot: authority.stateRoot,
       dispositionId: authority.disposition.disposition_id,
-      taskObservation: activeObservation(authority.release.input.ready_thread_id),
+      taskObservation: activeObservation(authority.release.readyThreadId),
       hostId: "local",
       worktree: { management: "none", path: null },
     });
@@ -230,7 +165,7 @@ test("clean no-change visible task archives only after setter and independent ob
       prepareTaskArchive({
         stateRoot: authority.stateRoot,
         dispositionId: authority.disposition.disposition_id,
-        taskObservation: activeObservation(authority.release.input.ready_thread_id),
+        taskObservation: activeObservation(authority.release.readyThreadId),
         hostId: "different-host",
         worktree: { management: "none", path: null },
       }),
@@ -260,7 +195,7 @@ test("clean no-change visible task archives only after setter and independent ob
       archiveId: prepared.archive_id,
       attemptId: prepared.host_intent.attempt_id,
       outcome: "accepted",
-      observation: archivedObservation(authority.release.input.ready_thread_id),
+      observation: archivedObservation(authority.release.readyThreadId),
     });
     assert.equal(completed.state, "completed");
     assert.equal(completed.keep_visible, false);
@@ -281,7 +216,10 @@ test("integrated host-worktree task remains visible until the clean worktree is 
   try {
     const stateRoot = resolve(root, ".git", "codex-flow", "v0.6.0");
     await bindRecipient({ stateRoot, recipient });
-    const release = await acceptedRelease(root, "integrated");
+    const release = await acceptedRelease(root, "integrated", {
+      executorBranch: "codex/archive-integrated",
+      task: { write_paths: ["archive-result.txt"] },
+    });
     const baseline = git(root, ["rev-parse", "HEAD"]);
     const executorBranch = "codex/archive-integrated";
     git(root, ["worktree", "add", "-q", "-b", executorBranch, worktreePath, "main"]);
@@ -335,7 +273,7 @@ test("integrated host-worktree task remains visible until the clean worktree is 
       stateRoot,
       dispositionId: preparedDisposition.disposition.disposition_id,
       recipient,
-      executorId: payload.executor_id,
+      executorThreadId: payload.executor_thread_id,
       integrationId: integration.integration_id,
       verificationId: verification.verification_id,
     });
@@ -345,7 +283,7 @@ test("integrated host-worktree task remains visible until the clean worktree is 
       prepareTaskArchive({
         stateRoot,
         dispositionId: disposition.disposition_id,
-        taskObservation: activeObservation(release.input.ready_thread_id),
+        taskObservation: activeObservation(release.readyThreadId),
         worktree: { management: "host-managed", path: worktreePath },
       }),
       /Dirty worktree must remain visible/,
@@ -354,7 +292,7 @@ test("integrated host-worktree task remains visible until the clean worktree is 
     const prepared = await prepareTaskArchive({
       stateRoot,
       dispositionId: disposition.disposition_id,
-      taskObservation: activeObservation(release.input.ready_thread_id),
+      taskObservation: activeObservation(release.readyThreadId),
       worktree: { management: "host-managed", path: worktreePath },
     });
     assert.equal(prepared.worktree.prepared_state, "present-clean");
@@ -370,7 +308,7 @@ test("integrated host-worktree task remains visible until the clean worktree is 
         archiveId: prepared.archive_id,
         attemptId: prepared.host_intent.attempt_id,
         outcome: "accepted",
-        observation: archivedObservation(release.input.ready_thread_id),
+        observation: archivedObservation(release.readyThreadId),
       }),
       /worktree still exists/,
     );
@@ -380,7 +318,7 @@ test("integrated host-worktree task remains visible until the clean worktree is 
       archiveId: prepared.archive_id,
       attemptId: prepared.host_intent.attempt_id,
       outcome: "accepted",
-      observation: archivedObservation(release.input.ready_thread_id),
+      observation: archivedObservation(release.readyThreadId),
     });
     assert.equal(completed.state, "completed");
     assert.equal(completed.observation.worktree_state, "absent");
@@ -423,7 +361,7 @@ test("blocked and ambiguous archive outcomes remain visible", async () => {
       prepareTaskArchive({
         stateRoot: blockedState,
         dispositionId: blocked.disposition.disposition_id,
-        taskObservation: activeObservation(blockedRelease.input.ready_thread_id),
+        taskObservation: activeObservation(blockedRelease.readyThreadId),
         worktree: { management: "none", path: null },
       }),
       /must remain visible/,
@@ -434,7 +372,7 @@ test("blocked and ambiguous archive outcomes remain visible", async () => {
     const prepared = await prepareTaskArchive({
       stateRoot: ambiguous.stateRoot,
       dispositionId: ambiguous.disposition.disposition_id,
-      taskObservation: activeObservation(ambiguous.release.input.ready_thread_id),
+      taskObservation: activeObservation(ambiguous.release.readyThreadId),
       worktree: { management: "none", path: null },
     });
     const unresolved = await reconcileTaskArchive({
@@ -460,7 +398,7 @@ test("blocked and ambiguous archive outcomes remain visible", async () => {
       archiveId: prepared.archive_id,
       attemptId: prepared.host_intent.attempt_id,
       outcome: "ambiguous",
-      observation: archivedObservation(ambiguous.release.input.ready_thread_id),
+      observation: archivedObservation(ambiguous.release.readyThreadId),
     });
     assert.equal(observedAfterAmbiguity.state, "completed");
     assert.equal(observedAfterAmbiguity.keep_visible, false);
