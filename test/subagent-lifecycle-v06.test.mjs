@@ -261,5 +261,7 @@ test("v0.6 subagent schema makes operations read-only, classified, Git-proven, a
   assert.equal(schema.properties.reasoning_effort.enum.includes("ultra"), false);
   assert.equal(schema.required.includes("coordinator_binding"), true);
   assert.equal(schema.required.includes("initial_git_proof"), true);
+  assert.equal(schema.required.includes("contract_id"), true);
+  assert.equal(Object.hasOwn(schema.properties, "task_contract_id"), false);
   assert.deepEqual(schema.$defs.result.properties.classification.enum, ["PASS", "BLOCKED", "FAIL"]);
 });

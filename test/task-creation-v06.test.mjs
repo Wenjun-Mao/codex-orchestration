@@ -380,4 +380,6 @@ test("visible task creation schema preserves provisional/ready distinction and f
     assert.equal(schema.properties.status.enum.includes(status), true);
   }
   assert.equal(schema.properties.operation_id.pattern.startsWith("^visible-task-operation-v1-"), true);
+  assert.equal(schema.required.includes("contract_id"), true);
+  assert.equal(Object.hasOwn(schema.properties, "task_contract_id"), false);
 });
