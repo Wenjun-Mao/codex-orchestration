@@ -1,4 +1,4 @@
-<!-- codex-flow:start v0.6.1-dev.0 -->
+<!-- codex-flow:start v0.6.1 -->
 ## Codex Orchestration
 
 For work that creates, coordinates, or integrates separate Codex tasks, invoke

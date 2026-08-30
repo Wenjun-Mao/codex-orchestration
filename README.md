@@ -17,12 +17,13 @@ See [Mission and product boundary](docs/mission.md) for the durable charter.
 
 This public repository is the editing authority and remains `UNLICENSED`;
 public visibility does not grant an open-source license. The accepted source
-release and personal-marketplace package are v0.6.0. A repository may retain
+release and personal-marketplace package are v0.6.1. A repository may retain
 v0.5.1 consumer authority until its own explicit transition is approved and
 applied.
 
-This editable checkout is the unreleased v0.6.1 development line. It does not
-replace the installed v0.6.0 package or any immutable runtime snapshot.
+The v0.6.1 release aligns provisional identity, linked-worktree release
+acceptance, run-bound runtime recovery, and terminal callback admission with
+their authoritative Codex App records.
 
 Editing this checkout never changes an installed plugin or active repository
 runtime. An activated v0.6 run snapshots its exact bundle into the repository's

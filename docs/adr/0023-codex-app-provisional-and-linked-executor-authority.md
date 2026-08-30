@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted for the v0.6.1 development boundary.
+Accepted in v0.6.1.
 
 ## Context
 
@@ -66,6 +66,6 @@ configuration-hidden dirt, and coordinator-only mutation rejection. The
 runtime regression executes the exact printed recovery command, including a
 shell-sensitive request path, before successful snapshot-bound acceptance.
 
-Existing v0.6.0 snapshots remain immutable and independently executable. This
-source change begins `0.6.1-dev.0`; installation, publication, and migration
-remain separate explicit checkpoints.
+Existing v0.6.0 snapshots remain immutable and independently executable. The
+v0.6.1 release has its own exact package identity and state namespace; it does
+not migrate earlier snapshots.

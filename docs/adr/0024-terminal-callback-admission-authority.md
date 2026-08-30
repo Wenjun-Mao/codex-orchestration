@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted for the v0.6.1 development boundary.
+Accepted in v0.6.1.
 
 ## Context
 
