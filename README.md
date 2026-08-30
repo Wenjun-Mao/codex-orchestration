@@ -34,6 +34,20 @@ Git common directory, so its authority survives task restart, compaction,
 plugin upgrade, and plugin removal. v0.6 does not read, migrate, or delete
 retained v0.5 operational state.
 
+### Instruction authority
+
+The installed plugin skills are the sole live instruction authority for v0.6.2
+operation. Ordinary activation and optional tracked adoption neither read nor
+write `AGENTS.md`, and they do not create, require, validate, or load a tracked
+`INSTRUCTIONS.md`. An adoption preserves only the exact runtime bundle,
+configuration, and structured policy for the active run; it is not a second
+prompt source.
+
+This does not rewrite history: an accepted v0.5.1 repository can still be
+verified read-only and explicitly retired through its isolated legacy contract.
+Only that legacy retirement may remove the exact old managed `AGENTS.md` block
+it authenticates. It never edits externally attested instructions.
+
 ## Layered architecture
 
 ```text
@@ -116,6 +130,19 @@ The coordinator explicitly selects the executor model and reasoning effort in
 the native creation call. Prompt text alone does not configure them. Sol
 coordinating Terra is a useful default shape, not a permanent dependency.
 
+Every workflow task also has a bounded `selector_rationale`. It is included in
+the immutable revision and task contract, and disclosed alongside the exact
+model, reasoning effort, execution surface, and (for a subagent) `fork_turns`.
+Use the least capable sufficient lane:
+
+- Luna-medium for mechanical, local, or read-only work with clear acceptance
+  criteria.
+- Terra-high for a bounded nontrivial implementation or review.
+- Terra-xhigh for multi-module root-cause or integration work.
+- Sol-high for coordination and systemic decisions; Sol-xhigh or Sol-max needs
+  a stated reason.
+- Ultra is forbidden for native subagents and exceptional for visible tasks.
+
 The plugin records configuration, request, host acceptance, and independent
 observation separately. Accepted-but-unobservable selectors remain partial
 evidence; a contradictory observed selector blocks. Native subagents also name
@@ -141,6 +168,24 @@ accept from that exact persisted worktree and reserved branch using the exact
 release, contract, run-bound runtime, and common directory before work.
 Ambiguous creation or release fails closed rather than authorizing retry or
 substitution.
+
+### Selector rejection and bounded replan
+
+An exact selector rejection before any native identity is a terminal
+no-object result, not a retry. A visible task records
+`selector-rejected-before-task-identity`; a native subagent records
+`selector-rejected-before-agent-identity`. Each consumes its one-shot native
+call and creates a `terminal-no-object` workflow claim.
+
+The coordinator may make exactly one ordinary content-addressed child revision
+for that same unstarted task. It changes only the model, reasoning effort, and
+selector rationale, and receives a new contract and operation; the original
+call cannot be replayed. A visible-task branch may be reused only when the
+exact predecessor belongs to the same run and task, no task identity exists,
+and live Git proof shows that neither its branch nor worktree exists. Any
+ambiguity, transport failure, provisional or ready task identity, subagent
+identity, post-creation selector mismatch, or missing evidence remains
+fail-closed and cannot authorize replanning.
 
 ### Quiet results and urgent interrupts
 
@@ -216,9 +261,11 @@ Plan retirement of this repository's tracked v0.6 adoption, but do not apply it.
 
 The setup skill uses read-only `adopt plan` followed by an exact reviewed
 `adopt apply`, both bound to the named active run. Tracked adoption stores that
-run's same runtime/configuration/policy semantics under
-`.codex/orchestration/v0.6/`; it is not a second engine. `adopt retire-plan` and
-`retire-apply` retire only a tracked v0.6 adoption. Accepted tracked v0.5.1 uses
+run's same runtime/configuration/structured-policy semantics under
+`.codex/orchestration/v0.6/`; it is not a second engine or instruction source.
+It does not create a tracked `INSTRUCTIONS.md` or touch `AGENTS.md`.
+`adopt retire-plan` and `retire-apply` retire only a tracked v0.6 adoption.
+Accepted tracked v0.5.1 uses
 the separate run-independent `adopt legacy-retire-plan|legacy-retire-apply`
 contract. Planning is read-only; applying still requires review of the exact
 unchanged plan and leaves the v0.5.1 tag, cache, tasks, Git-common evidence,

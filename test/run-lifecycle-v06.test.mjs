@@ -347,6 +347,7 @@ test("run admission binds a persisted root workflow to its path and resource env
       mode: "write",
       model: "gpt-5.6-terra",
       reasoning_effort: "xhigh",
+      selector_rationale: "Terra-xhigh is required for this multi-module run lifecycle fixture.",
       fork_turns: null,
       dependencies: [],
       read_paths: ["lib"],

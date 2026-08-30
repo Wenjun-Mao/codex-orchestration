@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, realpath, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import test from "node:test";
@@ -10,7 +10,7 @@ import {
   removeFixture,
   runCli,
 } from "./helpers.mjs";
-import { createAcceptedVisibleTask } from "./v06-lifecycle-fixture.mjs";
+import { createAcceptedVisibleTask, terminalReceipt } from "./v06-lifecycle-fixture.mjs";
 
 const ACTIVATED_AT = "2026-08-29T20:00:00.000Z";
 
@@ -22,6 +22,7 @@ function task() {
     mode: "write",
     model: "gpt-5.6-terra",
     reasoning_effort: "xhigh",
+    selector_rationale: "Terra-xhigh is required for this multi-module CLI lifecycle fixture.",
     fork_turns: null,
     dependencies: [],
     read_paths: ["lib"],
@@ -117,6 +118,59 @@ test("v0.6 help exposes no bare callback consume and direct v0.5 paths fail clos
   const oldInit = runCli(["init", "--check"]);
   assert.notEqual(oldInit.status, 0);
   assert.match(oldInit.stderr, /quarantined v0\.5 command/);
+});
+
+test("v0.6 callback delivery accepts an authenticated linked executor worktree", async (t) => {
+  const root = await createGitFixture("codex-flow-cli-v06-callback-linked-");
+  const worktreeParent = await mkdtemp(resolve(tmpdir(), "codex-flow-cli-v06-linked-worktree-"));
+  const linkedWorktree = resolve(worktreeParent, "executor");
+  let linkedWorktreeCreated = false;
+  t.after(async () => {
+    if (linkedWorktreeCreated) {
+      execFileSync("git", ["worktree", "remove", "--force", linkedWorktree], { cwd: root });
+    }
+    await Promise.all([
+      removeFixture(root),
+      rm(worktreeParent, { recursive: true, force: true }),
+    ]);
+  });
+
+  const context = await createAcceptedVisibleTask(root, "callback-linked", {
+    task: {
+      selector_rationale: "Terra xhigh validates callback delivery against a linked executor worktree.",
+    },
+  });
+  execFileSync("git", ["worktree", "add", "--detach", linkedWorktree, context.baseline], { cwd: root });
+  linkedWorktreeCreated = true;
+  const canonicalLinkedWorktree = await realpath(linkedWorktree);
+  assert.equal(execFileSync("git", ["rev-parse", "--show-toplevel"], {
+    cwd: linkedWorktree,
+    encoding: "utf8",
+  }).trim(), canonicalLinkedWorktree);
+  assert.equal(execFileSync("git", ["rev-parse", "--git-common-dir"], {
+    cwd: linkedWorktree,
+    encoding: "utf8",
+  }).trim(), context.commonDir);
+
+  const receipt = terminalReceipt(context, {
+    kind: "unchanged",
+    baseline_revision: context.baseline,
+    final_revision: context.baseline,
+    branch: context.requestedSelectors.worktree.executor_branch,
+    upstream: null,
+    cleanliness: "clean",
+  });
+  const requestPath = await requestFile(worktreeParent, "callback-deliver", {
+    run_id: context.contract.run_id,
+    receipt,
+    delivered_at: "2026-08-29T20:00:07.000Z",
+  });
+  const delivered = runCli([
+    "callback", "deliver", "--run-id", context.contract.run_id,
+    "--file", requestPath, "--json",
+  ], { cwd: linkedWorktree });
+  assertSuccess(delivered, "linked-worktree callback delivery");
+  assert.equal(JSON.parse(delivered.stdout).status, "persisted");
 });
 
 test("v0.6 urgent delivery is journal-first, one-shot, and separate from quiet callbacks", async (t) => {

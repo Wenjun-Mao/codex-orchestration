@@ -9,7 +9,7 @@
   },
   "scripts": {
     "test": "npm run test:v06 && npm run test:v05.1",
-    "test:v06": "node --test --test-concurrency=1 test/*-v06.test.mjs test/recipient.test.mjs test/release-identity.test.mjs test/urgent-signal.test.mjs",
+    "test:v06": "node --test --test-concurrency=1 test/*-v06.test.mjs test/recipient.test.mjs test/release-identity.test.mjs",
     "test:v05.1": "node scripts/test-accepted-v05.mjs",
     "validate": "node scripts/validate.mjs",
     "prepack": "node scripts/release-identity.mjs",

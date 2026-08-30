@@ -57,9 +57,9 @@ import {
 } from "../lib/release-lifecycle.mjs";
 import { bindRecipient } from "../lib/recipients.mjs";
 import {
-  expireUrgentSignal,
-  persistUrgentSignal,
-} from "../lib/urgent-signals.mjs";
+  expireUrgentSignalV06,
+  persistUrgentSignalV06,
+} from "../lib/urgent-signals-v06.mjs";
 import { deliverCallbackV06, observeCallbackV06 } from "../lib/callbacks-v06.mjs";
 import {
   cancelTaskBeforeExecution,
@@ -764,7 +764,7 @@ test("an unresolved urgent interrupt blocks closure until durably expired", asyn
   const context = await runFixture(t, "urgent-closure", taskThread("urgent-closure"));
   const visible = await prepareVisible(context, "urgent-closure", { ready: true });
   const release = await acceptRelease(context, visible, "urgent-closure");
-  const persisted = await persistUrgentSignal({
+  const persisted = await persistUrgentSignalV06({
     stateRoot: context.stateRoot,
     signal: {
       schema_version: 1,
@@ -784,7 +784,7 @@ test("an unresolved urgent interrupt blocks closure until durably expired", asyn
   let result = await audit(context, 101_000);
   assert(blockerCodes(result).has("urgent-unresolved"));
   assert.equal(result.audit.counts.urgent_signals, 1);
-  await expireUrgentSignal({
+  await expireUrgentSignalV06({
     stateRoot: context.stateRoot,
     urgentId: persisted.urgent_id,
     now: at(13_000),
@@ -837,7 +837,7 @@ test("non-created closes while rejected, blocked, and cancelled visible paths re
     stateRoot: notCreated.stateRoot,
     operationId: notCreatedVisible.creation.operation_id,
     outcome: "not-created",
-    reasonCode: "host-rejected-before-create",
+    reasonCode: "create-returned-not-created",
     now: at(7_000),
   });
   const notCreatedAudit = await audit(notCreated);

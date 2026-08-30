@@ -9,11 +9,10 @@
     "adopted_at",
     "bundle",
     "config",
-    "policy",
-    "reviewed_instructions"
+    "policy"
   ],
   "properties": {
-    "schema_version": { "const": 1 },
+    "schema_version": { "const": 2 },
     "kind": { "const": "codex-flow-v06-adoption" },
     "adopted_at": { "type": "string", "maxLength": 64, "format": "date-time" },
     "bundle": { "$ref": "https://private.local/codex-flow/runtime-bundle.schema.json" },
@@ -33,16 +32,6 @@
       "properties": {
         "policy_id": { "$ref": "#/$defs/safeId" },
         "snapshot": { "$ref": "#/$defs/snapshot" }
-      }
-    },
-    "reviewed_instructions": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["reviewed_by", "reviewed_at", "text"],
-      "properties": {
-        "reviewed_by": { "type": "string", "minLength": 1, "maxLength": 256 },
-        "reviewed_at": { "type": "string", "maxLength": 64, "format": "date-time" },
-        "text": { "type": "string", "minLength": 1, "maxLength": 16384 }
       }
     }
   },

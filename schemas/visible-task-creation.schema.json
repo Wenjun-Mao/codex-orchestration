@@ -302,7 +302,7 @@
         "reason_code": {
           "enum": [
             "host-result-ambiguous", "identity-evidence-missing", "selector-mismatch",
-            "reconciliation-window-expired", "host-rejected-before-create",
+            "reconciliation-window-expired", "selector-rejected-before-task-identity",
             "create-returned-not-created", "argument-serialization",
             "adapter-unavailable", "backend-unavailable", "schema-runtime-drift",
             "host-control-failure"

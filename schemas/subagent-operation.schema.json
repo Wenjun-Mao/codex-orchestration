@@ -35,7 +35,7 @@
     "initial_git_proof": { "$ref": "#/$defs/gitProof" },
     "state": {
       "enum": [
-        "prepared", "attempting", "created", "rejected-before-send",
+        "prepared", "attempting", "created", "selector-rejected-before-agent-identity",
         "ambiguous", "completed", "accepted", "rejected"
       ]
     },
@@ -80,7 +80,7 @@
         "started_at": { "$ref": "#/$defs/timestamp" },
         "reconcile_by": { "$ref": "#/$defs/timestamp" },
         "outcome": {
-          "enum": [null, "accepted", "rejected-before-send", "ambiguous"]
+          "enum": [null, "accepted", "selector-rejected-before-agent-identity", "ambiguous"]
         },
         "ambiguity_reason": {
           "enum": [null, "host-result-ambiguous", "reconciliation-window-expired"]

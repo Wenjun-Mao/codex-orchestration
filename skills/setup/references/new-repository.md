@@ -11,7 +11,8 @@ First activate a named v0.6 run through an authorized actionable workflow;
 adoption promotes that run's runtime and cannot bootstrap one. Then run `adopt
 plan --run-id ...` from the exact intended worktree. Review the proposed
 `.codex/orchestration/v0.6/` write set, content-addressed runtime bundle,
-configuration/policy snapshots, and reviewed instructions. The plan is
+configuration snapshot, and structured policy. It must not propose
+`INSTRUCTIONS.md`, `AGENTS.md`, or another instruction authority. The plan is
 read-only and must bind the repository and current state.
 
 Run `adopt apply --run-id ...` only for that exact unchanged plan after

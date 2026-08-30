@@ -80,17 +80,12 @@ async function prepareAdoption(root) {
     repositoryRoot: root,
     gitCommonDirectory: commonDir,
     runtimeId: runtime.runtime_id,
-    reviewedInstructions: {
-      reviewed_by: "release-review",
-      reviewed_at: "2026-08-29T14:01:00.000Z",
-      text: "Use the exact bound runtime. Review retirement before applying it.",
-    },
     adoptedAt: "2026-08-29T14:02:00.000Z",
   });
   return { commonDir, runtime, plan, packageRoot };
 }
 
-test("adoption plan applies exact runtime, config, policy, and reviewed instructions", async (t) => {
+test("adoption plan applies only the exact runtime, config, and structured policy", async (t) => {
   const root = await createGitFixture("codex-flow-v06-adoption-");
   t.after(() => removeFixture(root));
   const { commonDir, runtime, plan, packageRoot } = await prepareAdoption(root);
@@ -102,7 +97,7 @@ test("adoption plan applies exact runtime, config, policy, and reviewed instruct
 
   const operationPaths = plan.operations.map((operation) => operation.path);
   assert.ok(operationPaths.includes(".codex/orchestration/v0.6/adoption.json"));
-  assert.ok(operationPaths.includes(".codex/orchestration/v0.6/INSTRUCTIONS.md"));
+  assert.equal(operationPaths.includes(".codex/orchestration/v0.6/INSTRUCTIONS.md"), false);
   assert.ok(operationPaths.includes(".codex/orchestration/v0.6/runtime/bundle.json"));
   assert.ok(operationPaths.includes(".codex/orchestration/v0.6/runtime/files/bin/codex-flow.mjs"));
   const applied = await applyAdoptionPlan({ repositoryRoot: root, plan });
@@ -111,9 +106,11 @@ test("adoption plan applies exact runtime, config, policy, and reviewed instruct
   assert.deepEqual(adoption.adoption.bundle, runtime.bundle);
   assert.deepEqual(adoption.adoption.config, runtime.config);
   assert.deepEqual(adoption.adoption.policy, runtime.policy);
+  assert.equal(adoption.adoption.schema_version, 2);
+  assert.equal(Object.hasOwn(adoption.adoption, "reviewed_instructions"), false);
   assert.equal(stableAdoptionText(adoption.adoption).includes(root), false);
   assert.equal(stableAdoptionText(adoption.adoption).includes("host-adoption"), false);
-  assert.match(await readFile(adoptionInstructionsPath(root), "utf8"), /Review retirement before applying it/);
+  await assert.rejects(stat(adoptionInstructionsPath(root)), { code: "ENOENT" });
   assert.deepEqual(await readFile(v05.path), v05.bytes);
   assert.deepEqual(
     await readFile(resolve(commonDir, "codex-flow", "v0.6.2", "contexts", `${runtime.runtime_id}.json`)),
@@ -124,11 +121,6 @@ test("adoption plan applies exact runtime, config, policy, and reviewed instruct
     repositoryRoot: root,
     gitCommonDirectory: commonDir,
     runtimeId: runtime.runtime_id,
-    reviewedInstructions: {
-      reviewed_by: "release-review",
-      reviewed_at: "2026-08-29T14:01:00.000Z",
-      text: "Use the exact bound runtime. Review retirement before applying it.",
-    },
     adoptedAt: "2026-08-29T14:02:00.000Z",
   });
   assert.deepEqual(repeatPlan.operations, []);
@@ -137,10 +129,10 @@ test("adoption plan applies exact runtime, config, policy, and reviewed instruct
     gitCommonDirectory: commonDir,
     runtimeId: runtime.runtime_id,
   })).context, runtime);
-  await writeFile(adoptionInstructionsPath(root), "tampered instructions\n", "utf8");
+  await writeFile(adoptionInstructionsPath(root), "unexpected tracked instructions\n", "utf8");
   await assert.rejects(
     readAdoption({ repositoryRoot: root }),
-    /instructions do not match/,
+    /file inventory does not match/,
   );
 });
 
@@ -204,13 +196,52 @@ test("tracked v0.5 authority blocks activation and adoption instead of migrating
       repositoryRoot: root,
       gitCommonDirectory: commonDir,
       runtimeId: runtime.runtime_id,
-      reviewedInstructions: {
-        reviewed_by: "release-review",
-        reviewed_at: "2026-08-29T16:00:00.000Z",
-        text: "Do not migrate retained v0.5 authority.",
-      },
       adoptedAt: "2026-08-29T16:01:00.000Z",
     }),
     /must be explicitly retired/,
   );
+});
+
+test("schema-v1 tracked adoption stays auditable and retireable without migration", async (t) => {
+  const root = await createGitFixture("codex-flow-v06-legacy-adoption-");
+  t.after(() => removeFixture(root));
+  const { plan } = await prepareAdoption(root);
+  await applyAdoptionPlan({ repositoryRoot: root, plan });
+
+  const legacy = {
+    ...plan.adoption,
+    schema_version: 1,
+    reviewed_instructions: {
+      reviewed_by: "v0.6.1-release",
+      reviewed_at: "2026-08-29T14:01:00.000Z",
+      text: "Historical tracked instructions remain read-only until explicit retirement.",
+    },
+  };
+  await writeFile(adoptionManifestPath(root), `${JSON.stringify(legacy, null, 2)}\n`, "utf8");
+  await writeFile(adoptionInstructionsPath(root), [
+    "# Codex Flow v0.6 adoption instructions",
+    "",
+    "Reviewed by: v0.6.1-release",
+    "Reviewed at: 2026-08-29T14:01:00.000Z",
+    `Runtime bundle: ${legacy.bundle.bundle_sha256}`,
+    `Configuration: ${legacy.config.config_id}`,
+    `Policy: ${legacy.policy.policy_id}`,
+    "",
+    legacy.reviewed_instructions.text,
+    "",
+  ].join("\n"), "utf8");
+
+  const status = await readAdoption({ repositoryRoot: root });
+  assert.equal(status.adoption.schema_version, 1);
+  const retirement = await planAdoptionRetirement({
+    repositoryRoot: root,
+    retiredAt: "2026-08-29T14:04:00.000Z",
+    reason: "Explicitly retire the historical schema-v1 adoption.",
+  });
+  assert.ok(retirement.operations.some((operation) => (
+    operation.path === ".codex/orchestration/v0.6/INSTRUCTIONS.md"
+  )));
+  await applyAdoptionRetirementPlan({ repositoryRoot: root, plan: retirement });
+  await assert.rejects(stat(adoptionManifestPath(root)), { code: "ENOENT" });
+  await assert.rejects(stat(adoptionInstructionsPath(root)), { code: "ENOENT" });
 });

@@ -371,6 +371,19 @@ test("revision admission derives visible-task starts from the persisted native o
   assert.equal(status.historical_authority, true);
   assert.equal(status.start_permitted, false);
   assert.equal(revised.current_revision.revision, 2);
+  const invalidJournal = structuredClone((await workflowJournalStatus({
+    stateRoot: context.stateRoot,
+    runId: context.runId,
+    planId,
+  })).journal);
+  const visibleClaim = invalidJournal.contract_claims.find(
+    (claim) => claim.contract_id === contract.contract_id,
+  );
+  visibleClaim.operation_kind = "subagent-operation";
+  assert.throws(
+    () => validateWorkflowJournal(invalidJournal),
+    /subagent operation does not match its task execution kind/,
+  );
 });
 
 test("revision admission also derives native-subagent starts without caller assertions", async (t) => {
@@ -407,6 +420,12 @@ test("revision admission also derives native-subagent starts without caller asse
   assert.equal(status.contracts[0].claim.state, "started");
   assert.equal(status.contracts[0].claim.operation_kind, "subagent-operation");
   assert.equal(status.contracts[0].operation_record_present, true);
+  const invalidJournal = structuredClone(status.journal);
+  invalidJournal.contract_claims[0].operation_kind = "visible-task-creation";
+  assert.throws(
+    () => validateWorkflowJournal(invalidJournal),
+    /visible-task operation does not match its task execution kind/,
+  );
 });
 
 test("dependent contracts resolve exact persisted accepted authority instead of caller lookalikes", async (t) => {

@@ -19,7 +19,7 @@ operational state or creates a native task, disclose:
 - the repository, baseline, host, coordinator lineage and generation;
 - the proposed workflow revision and path/resource/branch reservation envelope;
 - each task's saved project, visible-task or subagent surface, requested model
-  and reasoning effort, placement, and external host call; and
+  and reasoning effort, selector rationale, placement, and external host call;
 - which facts are configured, requested, host-accepted, independently observed,
   or unavailable.
 
@@ -43,6 +43,13 @@ contract beside the plan. Name:
   a concrete baseline; and
 - the actual native surface, model, reasoning effort, selector rationale, and
   (for subagents) `fork_turns`.
+
+Use the least capable sufficient selector: Luna-medium for mechanical, local,
+or read-only work with clear acceptance criteria; Terra-high for bounded
+nontrivial implementation or review; Terra-xhigh for multi-module root-cause
+or integration work; and Sol-high for coordination or systemic decisions.
+Sol-xhigh or Sol-max needs a stated need. Ultra is forbidden for native
+subagents and exceptional for visible tasks.
 
 A supporting-instrument task must immediately unlock the named direct attempt
 or pause/replan. After one instrument-only checkpoint, more supporting
@@ -82,11 +89,19 @@ persisted pristine worktree, on its reserved branch and baseline, using the
 exact release, contract, run-bound runtime, and common directory. An ambiguous
 send never authorizes blind resend.
 
-If the host rejects the exact model selector before creating a native object,
-reconcile one terminal `host-rejected-before-create` outcome. That consumes the
-contract's one-shot selector call; it never authorizes a retry or fallback. A
-coordinator may instead revise the unstarted task in one new content-addressed
-workflow revision, with a new selector rationale and contract.
+If the host rejects the exact selector before creating a native object,
+reconcile one terminal no-object outcome: visible tasks use
+`selector-rejected-before-task-identity`; subagents use
+`selector-rejected-before-agent-identity`. It consumes the contract's one-shot
+native call and never authorizes retry or fallback. The coordinator may make
+exactly one ordinary content-addressed child revision for that same unstarted
+task, changing only its model, reasoning effort, and selector rationale. The
+replacement receives a new contract and operation; the original call cannot be
+replayed. A visible-task branch may be reused only for that exact predecessor,
+same run/task, and live proof that no branch or worktree exists. Ambiguity,
+transport failure, any provisional/ready task or subagent identity,
+post-creation selector mismatch, or missing evidence stays fail-closed and
+cannot authorize replanning.
 
 ## Monitor and close
 

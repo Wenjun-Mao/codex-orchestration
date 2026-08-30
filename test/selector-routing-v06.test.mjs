@@ -116,7 +116,7 @@ async function fixture(t, suffix) {
       path: null,
     },
   };
-  return { stateRoot, runId, plan, task, contract, requestedSelectors, revision };
+  return { root, stateRoot, runId, plan, task, contract, requestedSelectors, revision };
 }
 
 async function rejectBeforeIdentity(context, reasonCode) {
@@ -126,7 +126,7 @@ async function rejectBeforeIdentity(context, reasonCode) {
     requestedSelectors: context.requestedSelectors,
     now: START,
   });
-  await recordVisibleTaskCreationAttempt({
+  const attempt = await recordVisibleTaskCreationAttempt({
     stateRoot: context.stateRoot,
     operationId: prepared.operation_id,
     hostSessionId: "selector-routing-host-session",
@@ -140,7 +140,7 @@ async function rejectBeforeIdentity(context, reasonCode) {
     reasonCode,
     now: START + 2_000,
   });
-  return { prepared, terminal };
+  return { prepared, attempt, terminal };
 }
 
 test("selector rationale is required in the content-addressed task authority", () => {
@@ -167,13 +167,17 @@ test("selector rationale is required in the content-addressed task authority", (
 
 test("exact selector rejection consumes the call without identity and permits one revised contract", async (t) => {
   const context = await fixture(t, "replan");
-  const { prepared, terminal } = await rejectBeforeIdentity(context, "host-rejected-before-create");
+  const { prepared, attempt, terminal } = await rejectBeforeIdentity(
+    context,
+    "selector-rejected-before-task-identity",
+  );
   assert.equal(terminal.status, "not-created");
   assert.equal(terminal.provisional, null);
   assert.equal(terminal.ready, null);
   assert.equal(terminal.selector_evidence.accepted, null);
   assert.equal(terminal.selector_evidence.observed, null);
   assert.equal(terminal.selector_rationale, context.task.selector_rationale);
+  assert.equal(attempt.host_request.selector_rationale, context.task.selector_rationale);
 
   const beforeReplan = await workflowJournalStatus({
     stateRoot: context.stateRoot,
@@ -184,6 +188,7 @@ test("exact selector rejection consumes the call without identity and permits on
   assert.equal(consumed.claim.state, "terminal-no-object");
   assert.equal(consumed.claim.operation_id, prepared.operation_id);
   assert.equal(consumed.claim.terminal_at, terminal.resolution.recorded_at);
+  assert.equal(consumed.claim.superseded_by_revision_digest, null);
 
   const revisedTask = selectorTask({
     model: "gpt-5.6-luna",
@@ -198,10 +203,11 @@ test("exact selector rejection consumes the call without identity and permits on
     now: START + 3_000,
   });
   assert.equal(revised.current_revision.revision, 2);
-  assert.equal(
-    revised.contracts.find((entry) => entry.contract.contract_id === context.contract.contract_id).claim.state,
-    "terminal-no-object",
-  );
+  const predecessor = revised.contracts.find(
+    (entry) => entry.contract.contract_id === context.contract.contract_id,
+  ).claim;
+  assert.equal(predecessor.state, "terminal-no-object");
+  assert.equal(predecessor.superseded_by_revision_digest, revised.current_revision.revision_digest);
 
   const replacement = await persistWorkflowTaskContract({
     stateRoot: context.stateRoot,
@@ -215,6 +221,113 @@ test("exact selector rejection consumes the call without identity and permits on
   assert.equal(validateGeneratedTaskContract(replacement).task.model, "gpt-5.6-luna");
   assert.equal(replacement.task.selector_rationale, revisedTask.selector_rationale);
   assert.notEqual(replacement.contract_id, context.contract.contract_id);
+
+  const replacementPrepared = await prepareVisibleTaskCreation({
+    stateRoot: context.stateRoot,
+    taskContract: replacement,
+    requestedSelectors: {
+      ...context.requestedSelectors,
+      model: revisedTask.model,
+      reasoning_effort: revisedTask.reasoning_effort,
+    },
+    now: START + 5_000,
+  });
+  await recordVisibleTaskCreationAttempt({
+    stateRoot: context.stateRoot,
+    operationId: replacementPrepared.operation_id,
+    hostSessionId: "selector-routing-replacement-session",
+    timeoutSeconds: 60,
+    now: START + 6_000,
+  });
+  await reconcileVisibleTaskCreation({
+    stateRoot: context.stateRoot,
+    operationId: replacementPrepared.operation_id,
+    outcome: "not-created",
+    reasonCode: "selector-rejected-before-task-identity",
+    now: START + 7_000,
+  });
+  await assert.rejects(
+    () => reviseWorkflowJournal({
+      stateRoot: context.stateRoot,
+      runId: context.runId,
+      planId: context.plan.plan_id,
+      draft: {
+        schema_version: 1,
+        plan_id: context.plan.plan_id,
+        revision: 3,
+        parent_revision_digest: revised.current_revision.revision_digest,
+        tasks: [selectorTask({
+          model: "gpt-5.6-terra",
+          reasoning_effort: "high",
+          selector_rationale: "A second selector fallback is forbidden; this draft must be rejected.",
+        })],
+      },
+      now: START + 8_000,
+    }),
+    /already consumed its one selector-replan child/,
+  );
+});
+
+test("selector replan rejects unrelated task mutation", async (t) => {
+  const context = await fixture(t, "bounded-child");
+  await rejectBeforeIdentity(context, "selector-rejected-before-task-identity");
+  await assert.rejects(
+    () => reviseWorkflowJournal({
+      stateRoot: context.stateRoot,
+      runId: context.runId,
+      planId: context.plan.plan_id,
+      draft: revisionTwo(context.plan, selectorTask({
+        title: "Also change unrelated task authority",
+        model: "gpt-5.6-luna",
+        reasoning_effort: "medium",
+        selector_rationale: "Use Luna-medium after exact pre-identity selector rejection.",
+      })),
+      now: START + 3_000,
+    }),
+    /may change only model, reasoning_effort, and selector_rationale/,
+  );
+});
+
+test("selector replan branch reuse fails while the local branch exists", async (t) => {
+  const context = await fixture(t, "live-branch");
+  await rejectBeforeIdentity(context, "selector-rejected-before-task-identity");
+  const revisedTask = selectorTask({
+    model: "gpt-5.6-luna",
+    reasoning_effort: "medium",
+    selector_rationale: "Use Luna-medium after exact pre-identity selector rejection.",
+  });
+  await reviseWorkflowJournal({
+    stateRoot: context.stateRoot,
+    runId: context.runId,
+    planId: context.plan.plan_id,
+    draft: revisionTwo(context.plan, revisedTask),
+    now: START + 3_000,
+  });
+  const replacement = await persistWorkflowTaskContract({
+    stateRoot: context.stateRoot,
+    runId: context.runId,
+    planId: context.plan.plan_id,
+    taskId: revisedTask.task_id,
+    currentBaseline: { revision: context.revision },
+    dependencyAuthorities: [],
+    now: START + 4_000,
+  });
+  execFileSync("git", ["branch", "codex/selector-routing"], {
+    cwd: context.root,
+  });
+  await assert.rejects(
+    () => prepareVisibleTaskCreation({
+      stateRoot: context.stateRoot,
+      taskContract: replacement,
+      requestedSelectors: {
+        ...context.requestedSelectors,
+        model: revisedTask.model,
+        reasoning_effort: revisedTask.reasoning_effort,
+      },
+      now: START + 5_000,
+    }),
+    /local branch to be absent/,
+  );
 });
 
 test("a host outcome other than exact selector rejection remains immutable", async (t) => {

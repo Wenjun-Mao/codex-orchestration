@@ -44,6 +44,7 @@ function task(overrides = {}) {
     mode: "write",
     model: "gpt-5.6-terra",
     reasoning_effort: "xhigh",
+    selector_rationale: "Terra-xhigh is required for this multi-module release lifecycle fixture.",
     fork_turns: null,
     dependencies: [],
     read_paths: ["lib"],

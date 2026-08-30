@@ -1,25 +1,21 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { mkdir, readFile, symlink, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import test from "node:test";
-import { bindRecipient } from "../lib/recipients.mjs";
-import {
-  persistUrgentSignal as persistLegacyUrgentSignal,
-  prepareUrgentAttempt as prepareLegacyUrgentAttempt,
-  reconcileUrgentAttempt as reconcileLegacyUrgentAttempt,
-  urgentAttemptIdFor,
-  urgentSignalStatus as legacyUrgentSignalStatus,
-} from "../lib/urgent-signals.mjs";
+import { bindRecipient, rebindRecipient } from "../lib/recipients.mjs";
 import {
   consumeUrgentSignalV06,
+  expireUrgentSignalV06,
   observeUrgentSignalV06,
   persistUrgentSignalV06,
   prepareUrgentAttemptV06,
   reconcileUrgentAttemptV06,
   urgentAttemptIdForV06,
   urgentIdForV06,
+  urgentSignalPathsV06,
   urgentSignalRecordV06,
   urgentSignalStatusV06,
+  validateUrgentSignalV06,
   validateUrgentSignalRecordV06,
 } from "../lib/urgent-signals-v06.mjs";
 import { createGitFixture, packageRoot, removeFixture } from "./helpers.mjs";
@@ -160,36 +156,25 @@ test("v0.6 urgent delivery persists once and never authorizes a second direct at
   }
 });
 
-test("v0.6 rejects retry-capable records while the accepted legacy runtime remains unchanged", async () => {
-  const root = await fixture("codex-flow-urgent-v06-legacy-boundary-");
+test("v0.6 rejects a retry-capable raw record before it can become journal authority", async () => {
+  const root = await fixture("codex-flow-urgent-v06-retry-boundary-");
   try {
-    const stored = await persistLegacyUrgentSignal({
+    const payload = signal({ run_id: "urgent-v06-retry-boundary-run" });
+    const stored = await persistUrgentSignalV06({
       stateRoot: stateRoot(root),
-      signal: signal({ run_id: "urgent-v06-legacy-run" }),
+      signal: payload,
       now: START,
     });
-    const first = await prepareLegacyUrgentAttempt({
+    const first = await prepareUrgentAttemptV06({
       stateRoot: stateRoot(root),
       urgentId: stored.urgent_id,
-      attemptSequence: 1,
       now: START + 1_000,
     });
-    await reconcileLegacyUrgentAttempt({
-      stateRoot: stateRoot(root),
-      urgentId: stored.urgent_id,
-      deliveryAttemptId: first.delivery_attempt_id,
-      hostCallResult: "ambiguous",
-      now: START + 2_000,
-    });
-    const retry = await prepareLegacyUrgentAttempt({
-      stateRoot: stateRoot(root),
-      urgentId: stored.urgent_id,
-      attemptSequence: 2,
-      retryReason: "host-ambiguous",
-      now: START + 3_000,
-    });
-    assert.equal(retry.status, "prepared");
-    assert.equal((await legacyUrgentSignalStatus(stateRoot(root))).pending[0].attempt_count, 2);
+    const paths = urgentSignalPathsV06(stateRoot(root), payload);
+    const raw = JSON.parse(await readFile(paths.record, "utf8"));
+    raw.attempts.push({ ...raw.attempts[0], attempt_sequence: 2 });
+    await mkdir(resolve(paths.record, ".."), { recursive: true });
+    await writeFile(paths.record, `${JSON.stringify(raw)}\n`, "utf8");
 
     await assert.rejects(
       urgentSignalRecordV06({ stateRoot: stateRoot(root), urgentId: stored.urgent_id }),
@@ -202,6 +187,139 @@ test("v0.6 rejects retry-capable records while the accepted legacy runtime remai
     await assert.rejects(
       prepareUrgentAttemptV06({ stateRoot: stateRoot(root), urgentId: stored.urgent_id }),
       /exactly one direct attempt/,
+    );
+  } finally {
+    await removeFixture(root);
+  }
+});
+
+test("v0.6 preserves corrected-signal, recipient-fence, expiry, and content-safety contracts", async () => {
+  const root = await fixture("codex-flow-urgent-v06-fencing-");
+  try {
+    const first = signal({ run_id: "urgent-v06-correction-run" });
+    const firstStored = await persistUrgentSignalV06({
+      stateRoot: stateRoot(root),
+      signal: first,
+      now: START,
+    });
+    const firstAttempt = await prepareUrgentAttemptV06({
+      stateRoot: stateRoot(root),
+      urgentId: firstStored.urgent_id,
+      now: START + 1_000,
+    });
+    const corrected = signal({
+      run_id: first.run_id,
+      sequence: 2,
+      supersedes_urgent_ids: [firstStored.urgent_id],
+      summary: "A clarified ownership conflict requires coordinator attention.",
+      requested_action: "Resolve the clarified ownership conflict before execution resumes.",
+    });
+    const correctedStored = await persistUrgentSignalV06({
+      stateRoot: stateRoot(root),
+      signal: corrected,
+      now: START + 2_000,
+    });
+    assert.equal((await urgentSignalRecordV06({
+      stateRoot: stateRoot(root),
+      urgentId: firstStored.urgent_id,
+    })).state, "superseded");
+    assert.equal((await observeUrgentSignalV06({
+      stateRoot: stateRoot(root),
+      urgentId: firstStored.urgent_id,
+      deliveryAttemptId: firstAttempt.delivery_attempt_id,
+      recipient: recipient(),
+      now: START + 3_000,
+    })).disposition, "suppress");
+
+    const correctedAttempt = await prepareUrgentAttemptV06({
+      stateRoot: stateRoot(root),
+      urgentId: correctedStored.urgent_id,
+      now: START + 4_000,
+    });
+    assert.equal((await observeUrgentSignalV06({
+      stateRoot: stateRoot(root),
+      urgentId: correctedStored.urgent_id,
+      deliveryAttemptId: correctedAttempt.delivery_attempt_id,
+      recipient: recipient(),
+      now: START + 5_000,
+    })).disposition, "process");
+
+    assert.throws(
+      () => validateUrgentSignalV06(signal({ summary: "stdout: raw device output" })),
+      /raw log/,
+    );
+    assert.throws(
+      () => validateUrgentSignalV06(signal({ requested_action: "Contact jane@example.com" })),
+      /identity-like/,
+    );
+    const expiring = await persistUrgentSignalV06({
+      stateRoot: stateRoot(root),
+      signal: signal({
+        run_id: "urgent-v06-expiry-run",
+        expires_at: "2026-08-29T20:00:00.000Z",
+      }),
+      now: START - 1_000,
+    });
+    assert.equal((await expireUrgentSignalV06({
+      stateRoot: stateRoot(root),
+      urgentId: expiring.urgent_id,
+      now: START,
+    })).status, "expired");
+  } finally {
+    await removeFixture(root);
+  }
+});
+
+test("v0.6 fences a rebound recipient and rejects symlinked urgent state", async () => {
+  const root = await fixture("codex-flow-urgent-v06-fence-lock-");
+  try {
+    const stored = await persistUrgentSignalV06({
+      stateRoot: stateRoot(root),
+      signal: signal({ run_id: "urgent-v06-fence-lock-run" }),
+      now: START,
+    });
+    const attempt = await prepareUrgentAttemptV06({
+      stateRoot: stateRoot(root),
+      urgentId: stored.urgent_id,
+      now: START + 1_000,
+    });
+    const registryPath = resolve(
+      stateRoot(root),
+      "recipients",
+      "bindings",
+      `${recipient().lineage_id}.json`,
+    );
+    const registry = JSON.parse(await readFile(registryPath, "utf8"));
+    const rebound = {
+      lineage_id: recipient().lineage_id,
+      thread_id: "urgent-v06-coordinator-next",
+      generation: 2,
+    };
+    await rebindRecipient({
+      stateRoot: stateRoot(root),
+      recipient: rebound,
+      fenceToken: registry.current.fence_token,
+      nextFenceToken: "urgent-v06-next-fence",
+    });
+    await assert.rejects(
+      prepareUrgentAttemptV06({ stateRoot: stateRoot(root), urgentId: stored.urgent_id }),
+      /prior coordinator generation/,
+    );
+    await assert.rejects(
+      observeUrgentSignalV06({
+        stateRoot: stateRoot(root),
+        urgentId: stored.urgent_id,
+        deliveryAttemptId: attempt.delivery_attempt_id,
+        recipient: recipient(),
+      }),
+      /binding is stale/,
+    );
+    const paths = urgentSignalPathsV06(stateRoot(root), signal({ run_id: "urgent-v06-fence-lock-run" }));
+    const linked = resolve(paths.urgentRoot, "journal", "linked.json");
+    await symlink(paths.record, linked);
+    await assert.rejects(
+      urgentSignalStatusV06(stateRoot(root)),
+      /symbolic link/,
     );
   } finally {
     await removeFixture(root);
@@ -254,15 +372,7 @@ test("v0.6 urgent record schema and runtime expose the same one-shot boundary", 
   };
   assert.deepEqual(validateUrgentSignalRecordV06(record), record);
 
-  const retryAttempt = {
-    ...firstAttempt,
-    attempt_sequence: 2,
-    delivery_attempt_id: urgentAttemptIdFor(urgentId, 2, payload.recipient),
-    retry_reason: "host-ambiguous",
-    prepared_at: "2026-08-29T20:00:03.000Z",
-    outcome: null,
-    reconciled_at: null,
-  };
+  const retryAttempt = { ...firstAttempt, attempt_sequence: 2 };
   assert.throws(
     () => validateUrgentSignalRecordV06({ ...record, attempts: [firstAttempt, retryAttempt] }),
     /exactly one direct attempt/,

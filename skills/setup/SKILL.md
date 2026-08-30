@@ -19,11 +19,12 @@ current `--help` for flags. Do not ask for a checkout path, npm install, or
 copied runtime. Automatic skill discovery is not mutation authority.
 
 Permanent adoption is optional and requires a named active v0.6 run. It writes
-reviewed policy, instructions, and that run's same exact content-addressed
-runtime under `.codex/orchestration/v0.6/`; it does not create a second engine
-or migrate the active run. Use `adopt plan|apply|status` with the exact
-`run_id`, and apply only the exact unchanged read-only plan after the user
-reviews the tracked write set.
+only that run's exact content-addressed runtime, configuration, and structured
+policy under `.codex/orchestration/v0.6/`; it does not create a second engine
+or migrate the active run. Ordinary activation and adoption never read, write,
+validate, or require any `AGENTS.md` or tracked instruction file. Use `adopt
+plan|apply|status` with the exact `run_id`, and apply only the exact unchanged
+read-only plan after the user reviews the tracked write set.
 
 `adopt retire-plan|retire-apply` applies only to an existing tracked v0.6
 adoption. Accepted tracked v0.5.1 uses the distinct run-independent
@@ -32,9 +33,9 @@ read-only plan first and present its owned tracked changes, settlement blockers,
 retained Git/task state, and Git-common evidence digest. Never apply it merely
 because retirement was discussed or planned; apply only the unchanged plan
 after explicit review and approval. It makes no commit and does not activate or
-adopt v0.6. Byte-preserve the v0.5.1 tag, package/cache identity, Git-common
-state, tasks, branches, worktrees, and audit evidence. Other predecessor
-versions remain unsupported and blocked.
+adopt v0.6. This isolated historical path may remove only its authenticated
+v0.5.1 managed `AGENTS.md` block; it never grants live instruction authority.
+Other predecessor versions remain unsupported and blocked.
 
 Read the relevant mode only:
 

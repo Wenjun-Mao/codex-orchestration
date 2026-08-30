@@ -100,8 +100,8 @@ durable result journal or coordinator disposition.
 - Other predecessor versions and run-independent initial tracked-v0.6 adoption
   remain deferred.
 
-Historical v0.5 coverage documents, examples, and field tests remain useful
-evidence of the accepted predecessor but are not active v0.6 guidance.
+Accepted v0.5.1 tests run only from its immutable tag; predecessor fixtures are
+not shipped as active v0.6 package authority.
 `npm run test:v06` runs the active v0.6 suite plus shared recipient,
 urgent-signal, and release-identity contracts. `npm run test:v05.1` authenticates
 the immutable accepted tag/commit, extracts it outside the repository, and runs

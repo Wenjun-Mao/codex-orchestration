@@ -237,6 +237,8 @@
             "visible-creation-in-flight",
             "visible-creation-ambiguous",
             "visible-creation-session-blocked",
+            "selector-replan-required",
+            "selector-replan-exhausted",
             "subagent-incomplete",
             "release-missing",
             "release-unaccepted",

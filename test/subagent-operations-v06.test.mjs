@@ -19,6 +19,8 @@ import { createWorkflowPlanRevision } from "../lib/workflow-plan.mjs";
 import {
   createWorkflowJournal,
   persistWorkflowTaskContract,
+  reviseWorkflowJournal,
+  workflowJournalStatus,
 } from "../lib/workflow-journal-v06.mjs";
 import {
   activateV06FixtureRun,
@@ -94,7 +96,7 @@ async function fixture(t) {
     dependencyAuthorities: [],
     now: START - 1_000,
   });
-  return { root, commonDir, stateRoot, contract };
+  return { root, commonDir, stateRoot, contract, plan, runId, revision };
 }
 
 async function prepared(t, overrides = {}) {
@@ -179,6 +181,7 @@ test("one generated contract claims one prepared subagent operation and one disp
     message: PROMPT,
     model: "gpt-5.6-terra",
     reasoning_effort: "high",
+    selector_rationale: context.contract.task.selector_rationale,
     fork_turns: "3",
   });
   const {
@@ -268,13 +271,13 @@ test("accepted spawn reconciliation binds one exact agent before completion and 
   assert.deepEqual(acceptedSubagentDependency(accepted), accepted);
 });
 
-test("rejected-before-send is terminal and never authorizes a second spawn", async (t) => {
+test("selector rejection before agent identity is terminal and never authorizes a second spawn", async (t) => {
   const context = await prepared(t);
   await assert.rejects(
     () => reconcileSubagentOperationAttempt({
       stateRoot: context.stateRoot,
       operationId: context.operation.operation_id,
-      outcome: "rejected-before-send",
+      outcome: "selector-rejected-before-agent-identity",
       now: START + 1_000,
     }),
     /must begin its one-shot attempt/,
@@ -289,11 +292,21 @@ test("rejected-before-send is terminal and never authorizes a second spawn", asy
   const rejected = await reconcileSubagentOperationAttempt({
     stateRoot: context.stateRoot,
     operationId: context.operation.operation_id,
-    outcome: "rejected-before-send",
+    outcome: "selector-rejected-before-agent-identity",
     now: START + 2_000,
   });
-  assert.equal(rejected.state, "rejected-before-send");
+  assert.equal(rejected.state, "selector-rejected-before-agent-identity");
   assert.equal(rejected.agent_id, null);
+  const workflow = await workflowJournalStatus({
+    stateRoot: context.stateRoot,
+    runId: context.contract.run_id,
+    planId: context.contract.plan_id,
+  });
+  const claim = workflow.contracts.find(
+    (entry) => entry.claim.contract_id === context.contract.contract_id,
+  ).claim;
+  assert.equal(claim.state, "terminal-no-object");
+  assert.equal(claim.operation_id, rejected.operation_id);
   const replay = await beginSubagentOperationAttempt({
     stateRoot: context.stateRoot,
     operationId: context.operation.operation_id,
@@ -311,6 +324,96 @@ test("rejected-before-send is terminal and never authorizes a second spawn", asy
       evidence_digests: [],
     }),
     /Only a created/,
+  );
+});
+
+test("subagent selector rejection permits exactly one selector-only child revision", async (t) => {
+  const context = await prepared(t);
+  await beginSubagentOperationAttempt({
+    stateRoot: context.stateRoot,
+    operationId: context.operation.operation_id,
+    prompt: PROMPT,
+    timeoutSeconds: 60,
+    now: START + 1_000,
+  });
+  await reconcileSubagentOperationAttempt({
+    stateRoot: context.stateRoot,
+    operationId: context.operation.operation_id,
+    outcome: "selector-rejected-before-agent-identity",
+    now: START + 2_000,
+  });
+  const replacementTask = {
+    ...context.plan.tasks[0],
+    model: "gpt-5.6-luna",
+    reasoning_effort: "medium",
+    selector_rationale: "Use Luna-medium after the exact selector was rejected before agent identity.",
+  };
+  const revisionTwo = await reviseWorkflowJournal({
+    stateRoot: context.stateRoot,
+    runId: context.runId,
+    planId: context.plan.plan_id,
+    draft: {
+      schema_version: 1,
+      plan_id: context.plan.plan_id,
+      revision: 2,
+      parent_revision_digest: context.plan.revision_digest,
+      tasks: [replacementTask],
+    },
+    now: START + 3_000,
+  });
+  const replacement = await persistWorkflowTaskContract({
+    stateRoot: context.stateRoot,
+    runId: context.runId,
+    planId: context.plan.plan_id,
+    taskId: replacementTask.task_id,
+    currentBaseline: { revision: context.revision },
+    dependencyAuthorities: [],
+    now: START + 4_000,
+  });
+  const replacementOperation = await prepareSubagentOperation({
+    stateRoot: context.stateRoot,
+    task_contract: replacement,
+    model: replacementTask.model,
+    reasoning_effort: replacementTask.reasoning_effort,
+    fork_turns: replacementTask.fork_turns,
+    mode: "read",
+    prompt_digest: sha256(PROMPT),
+    worktree_path: context.root,
+    now: START + 5_000,
+  });
+  await beginSubagentOperationAttempt({
+    stateRoot: context.stateRoot,
+    operationId: replacementOperation.operation_id,
+    prompt: PROMPT,
+    timeoutSeconds: 60,
+    now: START + 6_000,
+  });
+  await reconcileSubagentOperationAttempt({
+    stateRoot: context.stateRoot,
+    operationId: replacementOperation.operation_id,
+    outcome: "selector-rejected-before-agent-identity",
+    now: START + 7_000,
+  });
+  await assert.rejects(
+    () => reviseWorkflowJournal({
+      stateRoot: context.stateRoot,
+      runId: context.runId,
+      planId: context.plan.plan_id,
+      draft: {
+        schema_version: 1,
+        plan_id: context.plan.plan_id,
+        revision: 3,
+        parent_revision_digest: revisionTwo.current_revision.revision_digest,
+        tasks: [{
+          ...replacementTask,
+          model: "gpt-5.6-terra",
+          reasoning_effort: "high",
+          selector_rationale: "This second fallback must be rejected by the one-child contract.",
+        }],
+      },
+      now: START + 8_000,
+    }),
+    /already consumed its one selector-replan child/,
   );
 });
 
@@ -422,11 +525,14 @@ test("subagent operation schema closes the durable attempt and ambiguity contrac
   assert.equal(schema.required.includes("attempt"), true);
   assert.equal(schema.properties.state.enum.includes("attempting"), true);
   assert.equal(schema.properties.state.enum.includes("ambiguous"), true);
-  assert.equal(schema.properties.state.enum.includes("rejected-before-send"), true);
+  assert.equal(
+    schema.properties.state.enum.includes("selector-rejected-before-agent-identity"),
+    true,
+  );
   assert.equal(schema.$defs.attempt.additionalProperties, false);
   assert.match(schema.$defs.attempt.properties.attempt_id.pattern, /subagent-attempt-v1/);
   assert.deepEqual(
     schema.$defs.attempt.properties.outcome.enum,
-    [null, "accepted", "rejected-before-send", "ambiguous"],
+    [null, "accepted", "selector-rejected-before-agent-identity", "ambiguous"],
   );
 });

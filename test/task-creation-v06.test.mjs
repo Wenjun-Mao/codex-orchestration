@@ -501,7 +501,7 @@ test("one admitted executor branch cannot be claimed by two task contracts", asy
         },
         now: START + 2_000,
       }),
-      /already claimed by another task contract/,
+      /retained by a non-reusable task contract/,
     );
   } finally {
     await removeFixture(context.root);

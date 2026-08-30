@@ -140,14 +140,22 @@ function integrationRecord(overrides = {}) {
   return draft;
 }
 
-test("active v0.6 schemas match direct runtime timestamp and thread boundaries", async () => {
-  const [integrationSchema, verificationSchema, receiptSchema, dispositionSchema, callbackSchema] =
+test("active v0.6 schemas match direct runtime timestamp, thread, and task-surface boundaries", async () => {
+  const [
+    integrationSchema,
+    verificationSchema,
+    receiptSchema,
+    dispositionSchema,
+    callbackSchema,
+    workflowJournalSchema,
+  ] =
     await Promise.all([
       schema("integration-record.schema.json"),
       schema("verification-record.schema.json"),
       schema("terminal-receipt-v3.schema.json"),
       schema("task-disposition.schema.json"),
       schema("callback-record.schema.json"),
+      schema("workflow-journal-v06.schema.json"),
     ]);
 
   assert.equal(integrationSchema.properties.executor_thread_id.$ref, "#/$defs/threadId");
@@ -188,6 +196,17 @@ test("active v0.6 schemas match direct runtime timestamp and thread boundaries",
   );
   assert.equal(verificationSchema.$defs.safeId.maxLength, 128);
   assert.equal(verificationSchema.$defs.timestamp.maxLength, 64);
+
+  const surfaceRules = workflowJournalSchema.$defs.contractClaim.allOf.filter(
+    (rule) => rule.if?.properties?.execution_kind,
+  );
+  const operationKindsFor = (executionKind) => surfaceRules.find(
+    (rule) => rule.if.properties.execution_kind.const === executionKind,
+  )?.then?.properties?.operation_kind?.enum;
+  assert.deepEqual(operationKindsFor("task-thread"), [null, "visible-task-creation"]);
+  assert.deepEqual(operationKindsFor("subagent"), [null, "subagent-operation"]);
+  assert.equal(operationKindsFor("task-thread").includes("subagent-operation"), false);
+  assert.equal(operationKindsFor("subagent").includes("visible-task-creation"), false);
 
   const integration = integrationRecord();
   assert.deepEqual(validateIntegrationRecordV06(integration), integration);

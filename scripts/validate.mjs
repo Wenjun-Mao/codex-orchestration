@@ -3,7 +3,6 @@
 import { spawnSync } from "node:child_process";
 import { access, readdir, readFile } from "node:fs/promises";
 import { basename, resolve } from "node:path";
-import { validateProjectConfig } from "../lib/config.mjs";
 import { PACKAGE_VERSION } from "../lib/core.mjs";
 import { CODEX_FLOW_STATE_NAMESPACE } from "../lib/git.mjs";
 import { V06_RUNTIME_DIRECTORY } from "../lib/runtime-context.mjs";
@@ -45,33 +44,7 @@ const ACTIVE_V06_SCHEMA_NAMES = Object.freeze([
   "cleanup-plan-v06",
 ]);
 
-// These contracts are retained package history. They are syntax-checked as JSON
-// assets, but they are not compiled into the active v0.6 schema graph.
-const HISTORICAL_V05_SCHEMA_NAMES = new Set([
-  "project",
-  "install-plan",
-  "task-packet",
-  "parallel-plan",
-  "task-operation",
-  "host-capability-evidence",
-  "host-observation-evidence",
-  "terminal-receipt",
-  "git-branch-claim",
-  "git-ownership",
-  "git-integration",
-  "git-cleanup-plan",
-]);
-
 const ACTIVE_V06_EXAMPLES = new Set(["v0.6-workflow-draft.json"]);
-const HISTORICAL_V05_EXAMPLES = new Set([
-  "parallel-plan.json",
-  "task-packet.json",
-  "task-thread-packet.json",
-  "host-capability-evidence.json",
-  "host-observation-evidence.json",
-  "terminal-receipt.json",
-  "urgent-signal.json",
-]);
 
 async function walk(path) {
   const result = [];
@@ -269,21 +242,29 @@ for (const field of [
   if (packageJson[field]) throw new Error(`Zero-third-party-dependency contract violated by ${field}`);
 }
 
-const managedAgentsTemplate = await readRequired("templates/agents-block.md");
-const startMarker = `<!-- codex-flow:start v${PACKAGE_VERSION} -->`;
-if (!managedAgentsTemplate.startsWith(`${startMarker}\n`)
-  || managedAgentsTemplate.split(startMarker).length !== 2
-  || managedAgentsTemplate.split("<!-- codex-flow:end -->").length !== 2) {
-  throw new Error("Managed AGENTS template must have one exact package-version boundary");
+for (const path of [
+  "templates/agents-block.md",
+  "templates/project.json",
+  "lib/config.mjs",
+  "lib/doctor.mjs",
+  "lib/installation.mjs",
+  "lib/managed.mjs",
+  "lib/task-operations.mjs",
+  "lib/task-packet.mjs",
+  "lib/urgent-signals.mjs",
+  "schemas/project.schema.json",
+  "schemas/install-plan.schema.json",
+  "schemas/task-operation.schema.json",
+  "schemas/task-packet.schema.json",
+  "test/urgent-signal.test.mjs",
+]) {
+  try {
+    await access(resolve(root, path));
+    throw new Error(`Retired predecessor authority must not be packaged: ${path}`);
+  } catch (error) {
+    if (error?.code !== "ENOENT") throw error;
+  }
 }
-assertMarkers(managedAgentsTemplate, [
-  "progressively activate one explicit v0.6 run without tracked setup",
-  "visible tasks for independently running or mutating work",
-  "native subagents are a separate read-only supporting lane",
-  "Visible-task routine completion goes only to the quiet durable journal",
-  "result -> disposition -> integration/no-change -> combined verification -> archive -> read-only cleanup plan",
-  "v0.6 cleanup never deletes Git refs or worktrees",
-], "templates/agents-block.md");
 
 const modules = (await walk(root)).filter((path) => (
   path.endsWith(".mjs") && !path.includes("node_modules") && !path.startsWith(resolve(root, ".git"))
@@ -319,10 +300,7 @@ const schemaDirectory = resolve(root, "schemas");
 const schemaFiles = (await readdir(schemaDirectory, { withFileTypes: true }))
   .filter((entry) => entry.isFile() && entry.name.endsWith(".schema.json"))
   .map((entry) => entry.name);
-const registeredSchemaNames = new Set([
-  ...ACTIVE_V06_SCHEMA_NAMES,
-  ...HISTORICAL_V05_SCHEMA_NAMES,
-]);
+const registeredSchemaNames = new Set(ACTIVE_V06_SCHEMA_NAMES);
 assertExactInventory(schemaFiles.map(schemaNameFromFile), registeredSchemaNames, "Schema authority");
 
 const parsedSchemas = new Map();
@@ -339,7 +317,7 @@ const exampleJsonFiles = (await readdir(exampleDirectory, { withFileTypes: true 
   .map((entry) => entry.name);
 assertExactInventory(
   exampleJsonFiles,
-  new Set([...ACTIVE_V06_EXAMPLES, ...HISTORICAL_V05_EXAMPLES]),
+  ACTIVE_V06_EXAMPLES,
   "Example authority",
 );
 const workflowDraft = JSON.parse(await readRequired("examples/v0.6-workflow-draft.json"));
@@ -355,12 +333,11 @@ if (!workflowRevision.tasks.some((task) => task.execution_kind === "task-thread"
 const examplesReadme = await readRequired("examples/README.md");
 assertMarkers(examplesReadme, [
   "v0.6-workflow-draft.json` is the only user-authored v0.6 example",
-  "remaining JSON files in this directory are v0.5.1 historical fixtures",
-  "not active v0.6 operating guidance",
+  "Accepted v0.5.1 examples remain available from its immutable tag",
 ], "examples/README.md");
 assertMarkers(await readRequired("docs/coverage-v0.6.md"), [
-  "Historical v0.5 coverage documents, examples, and field tests remain useful evidence",
-  "not active v0.6 guidance",
+  "Accepted v0.5.1 tests run only from its immutable tag",
+  "not shipped as active v0.6 package authority",
 ], "docs/coverage-v0.6.md");
 
 const skillContracts = new Map([
@@ -372,6 +349,7 @@ const skillContracts = new Map([
   ["setup", [
     "installed plugin containing this skill as package authority",
     "Permanent adoption is optional",
+    "Ordinary activation and adoption never read, write, validate, or require any `AGENTS.md`",
     "adopt plan|apply|status",
     "adopt retire-plan|retire-apply",
   ]],
@@ -422,6 +400,7 @@ const setupReferences = new Map([
     ".codex/orchestration/v0.6/",
     "First activate a named v0.6 run",
     "adoption promotes that run's runtime and cannot bootstrap one",
+    "It must not propose `INSTRUCTIONS.md`, `AGENTS.md`, or another instruction authority",
     "Run `adopt apply --run-id ...` only for that exact unchanged plan",
     "Adoption does not authorize additional task creation",
   ]],
@@ -430,6 +409,7 @@ const setupReferences = new Map([
     "Use `adopt legacy-retire-plan` without a run ID",
     "Use `legacy-retire-apply` only with that exact unchanged plan",
     "`adopt retire-plan|retire-apply` remains specific to tracked v0.6 adoption",
+    "Reject any ordinary adoption plan that reads or writes `AGENTS.md`",
     "Pre-adoption tasks finish under their original contract",
   ]],
 ]);
@@ -491,7 +471,6 @@ const templateContracts = new Map([
 for (const [path, markers] of templateContracts) {
   assertMarkers(await readRequired(path), markers, path);
 }
-validateProjectConfig(JSON.parse(await readRequired("templates/project.json")));
 
 try {
   await access(resolve(root, "prompts"));
