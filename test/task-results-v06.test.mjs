@@ -76,6 +76,12 @@ test("Git outcomes distinguish unchanged, clean local commit, and dirty blocker"
       expectedBranch: null,
       classification: "PASS",
     }).kind, "unchanged");
+    assert.throws(() => deriveGitOutcome({
+      worktreePath: root,
+      baselineRevision: baseline,
+      expectedBranch: "codex/expected-executor-v06",
+      classification: "PASS",
+    }), /wrong Git branch/);
 
     execFileSync("git", ["switch", "-c", "codex/result-v06"], { cwd: root });
     await writeFile(resolve(root, "result.txt"), "result\n", "utf8");

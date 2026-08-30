@@ -81,7 +81,7 @@ async function fixture() {
     tasks: [task()],
   });
   const runId = "release-run";
-  const stateRoot = resolve(commonDir, "codex-flow", "v0.6.2");
+  const stateRoot = resolve(commonDir, "codex-flow", "v0.6.3");
   const { authority, runtime } = await activateV06FixtureRun({
     root,
     runId,
@@ -445,7 +445,7 @@ test("release acceptance authenticates the exact linked executor worktree", asyn
       "--file", reconcilePath, "--json",
     ], { cwd: observedWorktreePath });
     assert.equal(coordinatorOnlyMutation.status, 73);
-    assert.match(coordinatorOnlyMutation.stderr, /active run\/runtime\/repository authority/);
+    assert.match(coordinatorOnlyMutation.stderr, /coordinator-only mutation authority/);
 
     execFileSync("git", ["switch", "--quiet", "--detach", context.revision], {
       cwd: observedWorktreePath,

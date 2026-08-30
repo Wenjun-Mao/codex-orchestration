@@ -362,7 +362,7 @@ test("run admission binds a persisted root workflow to its path and resource env
     }],
   });
   await createWorkflowJournal({
-    stateRoot: resolve(commonDir, "codex-flow", "v0.6.2"),
+    stateRoot: resolve(commonDir, "codex-flow", "v0.6.3"),
     runId: "run-root-envelope",
     planId: workflow.plan_id,
     planRevision: workflow,
@@ -408,7 +408,7 @@ test("runtime reads retain the exact bundle after the plugin source disappears",
     context: runtime,
     bundleSource,
   });
-  assert.match(acquired.bundle_root, /codex-flow\/v0\.6\.2\/runtimes\/[0-9a-f]{64}\/files$/);
+  assert.match(acquired.bundle_root, /codex-flow\/v0\.6\.3\/runtimes\/[0-9a-f]{64}\/files$/);
   await stat(resolve(acquired.bundle_root, "bin", "codex-flow.mjs"));
   await rm(packageRoot, { recursive: true, force: true });
   const read = await readRuntimeContext({

@@ -26,6 +26,11 @@ makes plugin skills the sole live instruction authority, requires deliberate
 model-routing rationale, and permits one bounded replan only after exact proof
 that a rejected selector created no native task or agent.
 
+This editable checkout is the unreleased v0.6.3 compatibility line. It does
+not replace the installed v0.6.2 package or its immutable runtime snapshots.
+It keeps verification journal mutation coordinator-owned while resolving an
+accepted no-change check against the exact persisted executor worktree.
+
 Editing this checkout never changes an installed plugin or active repository
 runtime. An activated v0.6 run snapshots its exact bundle into the repository's
 Git common directory, so its authority survives task restart, compaction,
@@ -34,7 +39,7 @@ retained v0.5 operational state.
 
 ### Instruction authority
 
-The installed plugin skills are the sole live instruction authority for v0.6.2
+The installed plugin skills are the sole live instruction authority for v0.6
 operation. Ordinary activation and optional tracked adoption neither read nor
 write `AGENTS.md`, and they do not create, require, validate, or load a tracked
 `INSTRUCTIONS.md`. An adoption preserves only the exact runtime bundle,
@@ -87,7 +92,7 @@ When the user authorizes actionable orchestration, the plugin may activate one
 run after disclosing:
 
 - the exact package/runtime source and bundle hash;
-- the `.git/codex-flow/v0.6.2/` operational state root;
+- the `.git/codex-flow/v0.6.3/` operational state root;
 - repository/common-directory, baseline, host, and coordinator binding;
 - the immutable workflow revision and its path/resource/branch reservation
   envelope;

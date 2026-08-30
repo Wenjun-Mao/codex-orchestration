@@ -60,9 +60,10 @@ export async function createAcceptedVisibleTask(root, suffix, {
   task = {},
   executorBranch = `codex/lifecycle-${suffix}`,
   coordinator: requestedCoordinator = null,
+  observedWorktreePath = null,
 } = {}) {
   const commonDir = await realpath(resolve(root, ".git"));
-  const stateRoot = resolve(commonDir, "codex-flow", "v0.6.2");
+  const stateRoot = resolve(commonDir, "codex-flow", "v0.6.3");
   const baseline = git(root, ["rev-parse", "HEAD"]);
   const coordinator = requestedCoordinator === null
     ? {
@@ -169,7 +170,16 @@ export async function createAcceptedVisibleTask(root, suffix, {
         worktree: requestedSelectors.worktree,
         accepted_at: new Date(BASE_TIME + 1_500).toISOString(),
       },
-      observed: null,
+      observed: observedWorktreePath === null ? null : {
+        project_id: requestedSelectors.project_id,
+        model: requestedSelectors.model,
+        reasoning_effort: requestedSelectors.reasoning_effort,
+        worktree: {
+          ...requestedSelectors.worktree,
+          path: observedWorktreePath,
+        },
+        observed_at: new Date(BASE_TIME + 2_000).toISOString(),
+      },
     },
     now: BASE_TIME + 2_000,
   });
@@ -203,6 +213,7 @@ export async function createAcceptedVisibleTask(root, suffix, {
     plan,
     contract,
     requestedSelectors,
+    observedWorktreePath,
     creation,
     readyThreadId,
     release,
@@ -248,7 +259,7 @@ export function terminalReceipt(context, gitOutcome, {
       configured: selector,
       requested: selector,
       accepted: selector,
-      observed: null,
+      observed: context.observedWorktreePath === null ? null : selector,
     },
     result_or_blocker: classification === "PASS"
       ? "The exact lifecycle task completed."

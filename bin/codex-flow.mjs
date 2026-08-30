@@ -117,6 +117,7 @@ import {
   visibleTaskCreationStatus,
 } from "../lib/task-creation-v06.mjs";
 import {
+  resolveNoChangeVerificationSubject,
   runCombinedVerification,
   verificationStatus,
 } from "../lib/verifications-v06.mjs";
@@ -374,8 +375,13 @@ async function activeRunAuthority(git, runId, planId = null, { allowLinkedWorktr
     || binding.policy_hash !== run.binding.policy_hash
     || binding.repository_hash !== run.binding.repository_hash
     || runtime.repository.common_dir !== git.commonDir
-    || (!allowLinkedWorktree && runtime.repository.root !== git.root)
   ) throw new CliError("active run/runtime/repository authority is inconsistent", 73);
+  if (!allowLinkedWorktree && runtime.repository.root !== git.root) {
+    throw new CliError(
+      "v0.6 mutation requires coordinator-only mutation authority from the exact coordinator checkout",
+      73,
+    );
+  }
   return {
     run,
     runtime,
@@ -615,7 +621,7 @@ async function commandRunV06(args) {
         bundle_sha256: runtime.bundle.bundle_sha256,
       },
       state_authority: {
-        namespace: "v0.6.2",
+        namespace: "v0.6.3",
         state_root: git.stateRoot,
         git_common_dir: git.commonDir,
       },
@@ -1317,11 +1323,18 @@ async function commandVerificationV06(args) {
     optional: ["integration_scope", "verified_at"],
   });
   if (request.receipt.run_id !== runId) throw new CliError("receipt.run_id does not match --run-id", 73);
+  const integrationScope = request.integration_scope ?? null;
+  const verificationSubject = integrationScope === null
+    ? await resolveNoChangeVerificationSubject({
+      stateRoot: git.stateRoot,
+      receipt: request.receipt,
+    })
+    : null;
   const result = await runCombinedVerification({
     stateRoot: git.stateRoot,
-    repositoryPath: git.root,
+    repositoryPath: verificationSubject?.repository_path ?? git.root,
     receipt: request.receipt,
-    integrationScope: request.integration_scope ?? null,
+    integrationScope,
     checks: request.checks,
     now: commandNow(request, "verified_at"),
   });

@@ -1,12 +1,13 @@
 # Codex Orchestration v0.6 boundary
 
-Status: accepted v0.6.2 boundary.
+Status: accepted v0.6.2 boundary with an unreleased v0.6.3 compatibility
+checkpoint in progress.
 
 This document summarizes the v0.6 contract established by
 [ADR 0015](adr/0015-progressive-run-activation-authority.md) through
-[ADR 0025](adr/0025-v062-plugin-instruction-authority-and-selector-replan.md).
-The accepted source and personal-marketplace package are v0.6.2. Editing a
-checkout does not replace that immutable release.
+[ADR 0026](adr/0026-coordinator-owned-verification-subject-resolution.md).
+The accepted source and personal-marketplace package remain v0.6.2. Editing
+this development checkout does not replace that immutable release.
 
 ## Retained cross-task authority
 
@@ -33,7 +34,7 @@ durable result journal or coordinator disposition.
 
 - A read-only question or plan never requires tracked repository setup.
 - An authorized actionable request may progressively activate one explicit run
-  under `.git/codex-flow/v0.6.2/`, with an exact runtime snapshot and disclosure
+  under `.git/codex-flow/v0.6.3/`, with an exact runtime snapshot and disclosure
   before external task creation.
 - Permanent tracked adoption is optional and uses the same engine. Existing
   tracked v0.5 authority must be explicitly retired; its evidence is preserved

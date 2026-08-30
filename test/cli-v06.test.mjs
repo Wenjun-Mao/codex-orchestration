@@ -173,6 +173,176 @@ test("v0.6 callback delivery accepts an authenticated linked executor worktree",
   assert.equal(JSON.parse(delivered.stdout).status, "persisted");
 });
 
+test("v0.6 no-change verification uses the observed linked executor worktree from a detached coordinator", async (t) => {
+  const root = await createGitFixture("codex-flow-cli-v06-verification-linked-");
+  const worktreeParent = await mkdtemp(resolve(tmpdir(), "codex-flow-cli-v06-verification-worktree-"));
+  const linkedWorktree = resolve(worktreeParent, "executor");
+  let linkedWorktreeCreated = false;
+  t.after(async () => {
+    if (linkedWorktreeCreated) {
+      execFileSync("git", ["worktree", "remove", "--force", linkedWorktree], { cwd: root });
+    }
+    await Promise.all([
+      removeFixture(root),
+      rm(worktreeParent, { recursive: true, force: true }),
+    ]);
+  });
+
+  const context = await createAcceptedVisibleTask(root, "verification-linked", {
+    observedWorktreePath: linkedWorktree,
+  });
+  execFileSync("git", [
+    "worktree", "add", "-b", context.requestedSelectors.worktree.executor_branch,
+    linkedWorktree, context.baseline,
+  ], { cwd: root });
+  linkedWorktreeCreated = true;
+  const canonicalLinkedWorktree = await realpath(linkedWorktree);
+  assert.equal(execFileSync("git", ["rev-parse", "--show-toplevel"], {
+    cwd: linkedWorktree,
+    encoding: "utf8",
+  }).trim(), canonicalLinkedWorktree);
+  assert.equal(execFileSync("git", ["branch", "--show-current"], {
+    cwd: linkedWorktree,
+    encoding: "utf8",
+  }).trim(), context.requestedSelectors.worktree.executor_branch);
+
+  execFileSync("git", ["checkout", "--detach", context.baseline], { cwd: root });
+  const coordinatorBranch = execFileSync("git", ["branch", "--show-current"], {
+    cwd: root,
+    encoding: "utf8",
+  }).trim();
+  assert.equal(coordinatorBranch, "");
+
+  const receipt = terminalReceipt(context, {
+    kind: "unchanged",
+    baseline_revision: context.baseline,
+    final_revision: context.baseline,
+    branch: context.requestedSelectors.worktree.executor_branch,
+    upstream: null,
+    cleanliness: "clean",
+  });
+  const requestPath = await requestFile(worktreeParent, "verification-run", {
+    run_id: context.contract.run_id,
+    receipt,
+    checks: [{
+      check_id: "detached-coordinator-no-change",
+      argv: [process.execPath, "-e", "process.exit(0)"],
+    }],
+    verified_at: "2026-08-29T20:00:07.000Z",
+  });
+  const verified = runCli([
+    "verification", "run", "--run-id", context.contract.run_id,
+    "--file", requestPath, "--json",
+  ], { cwd: root });
+  assertSuccess(verified, "detached-coordinator no-change verification");
+  const record = JSON.parse(verified.stdout);
+  assert.equal(record.classification, "PASS");
+  assert.equal(record.repository.root, canonicalLinkedWorktree);
+  assert.equal(record.repository.requested_branch, context.requestedSelectors.worktree.executor_branch);
+  assert.equal(record.repository.started_branch, context.requestedSelectors.worktree.executor_branch);
+  assert.equal(record.repository.completed_branch, context.requestedSelectors.worktree.executor_branch);
+
+  const mismatchedReceipts = [
+    {
+      name: "wrong-receipt-branch",
+      receipt: {
+        ...receipt,
+        git_outcome: { ...receipt.git_outcome, branch: "main" },
+      },
+      pattern: /Terminal Git branch does not match the ready task executor branch/,
+    },
+    {
+      name: "wrong-receipt-baseline",
+      receipt: {
+        ...receipt,
+        git_outcome: {
+          ...receipt.git_outcome,
+          baseline_revision: "a".repeat(40),
+          final_revision: "a".repeat(40),
+        },
+      },
+      pattern: /Terminal Git baseline does not match the ready task starting revision/,
+    },
+    {
+      name: "wrong-receipt-model",
+      receipt: {
+        ...receipt,
+        model_evidence: {
+          configured: { model: "gpt-5.6-luna", reasoning_effort: "medium" },
+          requested: { model: "gpt-5.6-luna", reasoning_effort: "medium" },
+          accepted: { model: "gpt-5.6-luna", reasoning_effort: "medium" },
+          observed: null,
+        },
+      },
+      pattern: /Terminal model evidence does not match the visible-task selector evidence/,
+    },
+  ];
+  for (const mismatch of mismatchedReceipts) {
+    const mismatchPath = await requestFile(worktreeParent, mismatch.name, {
+      run_id: context.contract.run_id,
+      receipt: mismatch.receipt,
+      checks: [{
+        check_id: mismatch.name,
+        argv: [process.execPath, "-e", "process.exit(0)"],
+      }],
+      verified_at: "2026-08-29T20:00:07.000Z",
+    });
+    const rejected = runCli([
+      "verification", "run", "--run-id", context.contract.run_id,
+      "--file", mismatchPath, "--json",
+    ], { cwd: root });
+    assert.notEqual(rejected.status, 0);
+    assert.match(rejected.stderr, mismatch.pattern);
+  }
+
+  const executorCaller = runCli([
+    "verification", "run", "--run-id", context.contract.run_id,
+    "--file", requestPath, "--json",
+  ], { cwd: linkedWorktree });
+  assert.notEqual(executorCaller.status, 0);
+  assert.match(executorCaller.stderr, /coordinator-only mutation authority/);
+
+  await writeFile(resolve(linkedWorktree, "unexpected-verification-dirt.txt"), "dirty\n", "utf8");
+  const dirtySubject = runCli([
+    "verification", "run", "--run-id", context.contract.run_id,
+    "--file", requestPath, "--json",
+  ], { cwd: root });
+  assert.notEqual(dirtySubject.status, 0);
+  assert.match(dirtySubject.stderr, /exact clean requested revision and branch/);
+  await rm(resolve(linkedWorktree, "unexpected-verification-dirt.txt"));
+
+  execFileSync("git", ["switch", "--quiet", "--detach", context.baseline], {
+    cwd: linkedWorktree,
+  });
+  const wrongBranchSubject = runCli([
+    "verification", "run", "--run-id", context.contract.run_id,
+    "--file", requestPath, "--json",
+  ], { cwd: root });
+  assert.notEqual(wrongBranchSubject.status, 0);
+  assert.match(wrongBranchSubject.stderr, /exact clean requested revision and branch/);
+  execFileSync("git", [
+    "switch", "--quiet", context.requestedSelectors.worktree.executor_branch,
+  ], { cwd: linkedWorktree });
+
+  execFileSync("git", ["worktree", "remove", "--force", linkedWorktree], { cwd: root });
+  linkedWorktreeCreated = false;
+  const missingSubject = runCli([
+    "verification", "run", "--run-id", context.contract.run_id,
+    "--file", requestPath, "--json",
+  ], { cwd: root });
+  assert.notEqual(missingSubject.status, 0);
+  assert.match(missingSubject.stderr, /Persisted task release worktree path does not exist/);
+
+  const verificationStatus = runCli([
+    "verification", "status", "--run-id", context.contract.run_id, "--json",
+  ], { cwd: root });
+  assertSuccess(verificationStatus, "verification status after rejected subjects");
+  assert.deepEqual(
+    JSON.parse(verificationStatus.stdout),
+    { total: 1, pass: 1, fail: 0, records: [record] },
+  );
+});
+
 test("v0.6 urgent delivery is journal-first, one-shot, and separate from quiet callbacks", async (t) => {
   const root = await createGitFixture("codex-flow-cli-v06-urgent-one-shot-");
   const requests = await mkdtemp(resolve(tmpdir(), "codex-flow-cli-v06-urgent-requests-"));
@@ -314,8 +484,8 @@ test("run activation needs no tracked setup and replays the same disclosed autho
   const context = await activatedFixture(t, "activation");
   await assert.rejects(stat(resolve(context.root, ".codex", "orchestration")), /ENOENT/);
   assert.equal(context.result.status, "admitted");
-  assert.equal(context.result.state_authority.namespace, "v0.6.2");
-  assert.match(context.result.state_authority.state_root, /\.git\/codex-flow\/v0\.6\.2$/);
+  assert.equal(context.result.state_authority.namespace, "v0.6.3");
+  assert.match(context.result.state_authority.state_root, /\.git\/codex-flow\/v0\.6\.3$/);
   assert.equal(context.result.repository_authority.cleanliness, "clean");
   assert.equal(context.result.workflow_authority.run_id, context.runId);
   assert.equal(context.result.model_routing[0].model, "gpt-5.6-terra");
@@ -373,7 +543,7 @@ test("run activation rejects a workflow outside its reservation envelope before 
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /outside the admitted run fence envelope/);
   await assert.rejects(
-    stat(resolve(root, ".git", "codex-flow", "v0.6.2")),
+    stat(resolve(root, ".git", "codex-flow", "v0.6.3")),
     (error) => error?.code === "ENOENT",
   );
 });
@@ -454,7 +624,7 @@ test("a second active run is refused before acquiring orphan runtime or workflow
   const contextsRoot = resolve(
     context.result.state_authority.git_common_dir,
     "codex-flow",
-    "v0.6.2",
+    "v0.6.3",
     "contexts",
   );
   const beforeContexts = await readdir(contextsRoot);
