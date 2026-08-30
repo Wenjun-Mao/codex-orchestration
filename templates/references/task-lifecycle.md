@@ -1,7 +1,7 @@
 # Task Lifecycle
 
 1. **Activate:** snapshot the exact runtime under
-   `.git/codex-flow/v0.6.5/runtimes/<bundle-sha256>/`; bind repository/common
+   `.git/codex-flow/v0.7/runtimes/<bundle-sha256>/`; bind repository/common
    directory, host, coordinator lineage/generation, configuration/policy, and
    the path/resource/branch reservation envelope to an explicit run ID.
 2. **Plan:** persist a content-addressed workflow revision with dependency DAG,
@@ -37,7 +37,7 @@
    once.
 10. **Archive and clean:** reconcile native archive only after the full proof
     chain and managed-worktree reconciliation. Derive the separate exact-state
-    cleanup plan and independently resolve branch/worktree state; v0.6 does not
+    cleanup plan and independently resolve branch/worktree state; v0.7 does not
     apply Git deletion.
 11. **Audit and close:** persist a content-addressed `run audit` over every
     current lifecycle record, then close only while that exact terminal proof

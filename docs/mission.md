@@ -89,7 +89,7 @@ waits, task-final events, and notification adapters may provide liveness, but
 they do not become competing integration authorities.
 
 Urgent blockers, approval requests, and high-risk drift use a separate direct
-path. The event is persisted before one bounded interrupt attempt. v0.6 does
+path. The event is persisted before one bounded interrupt attempt. v0.7 does
 not retry that attempt; host replay or ambiguity cannot authorize duplicate
 coordinator action. Ordinary completion never uses the urgent path.
 
@@ -197,12 +197,12 @@ mission.
 
 ## Version relationship
 
-This charter guides the v0.6 boundary and later development. It does not change
+This charter guides the v0.7 boundary and later development. It does not change
 the accepted v0.5.1 runtime, install a development package, migrate operational
-state, or claim that every promise is already satisfied. v0.6 may plan and,
+state, or claim that every promise is already satisfied. v0.7 may plan and,
 after separate approval, apply exact retirement of accepted tracked v0.5.1
 authority while byte-preserving its package/cache, tag, tasks, Git resources,
 and Git-common evidence. That transition makes a repository setup-free; it
-does not itself activate v0.6 or change the installed plugin. Versioned schemas,
+does not itself activate v0.7 or change the installed plugin. Versioned schemas,
 runtime behavior, and compatibility decisions remain explicit implementation
 checkpoints.

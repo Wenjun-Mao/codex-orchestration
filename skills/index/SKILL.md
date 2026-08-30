@@ -11,7 +11,7 @@ Route by intent before inspecting or changing repository state.
   repository does not need `.codex/orchestration/` to discuss or plan Codex
   Flow.
 - For an authorized actionable orchestration request, use
-  `codex-orchestration:coordinate`. It may progressively activate one v0.6 run
+  `codex-orchestration:coordinate`. It may progressively activate one v0.7 run
   without tracked setup, after disclosing the exact runtime, Git-common state,
   workflow revision, model routing, and proposed external task creation. Every
   native model choice must include a durable selector rationale.

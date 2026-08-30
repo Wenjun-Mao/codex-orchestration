@@ -5,7 +5,7 @@ description: Activate and coordinate one Codex Flow run across separate visible 
 
 # Coordinate Codex Work
 
-Use the installed plugin's bundled v0.6 CLI. Inspect its current `--help` for
+Use the installed plugin's bundled v0.7 CLI. Inspect its current `--help` for
 exact flags; use the public command families named below and include the
 explicit `run_id` in every stateful operation.
 
@@ -15,7 +15,7 @@ Questions and planning remain read-only. Before an actionable run writes
 operational state or creates a native task, disclose:
 
 - the package/runtime source and exact bundle hash;
-- the `.git/codex-flow/v0.6.5/` Git-common state root;
+- the `.git/codex-flow/v0.7/` Git-common state root;
 - the repository, baseline, host, coordinator lineage and generation;
 - the proposed workflow revision and path/resource/branch reservation envelope;
 - each task's saved project, visible-task or subagent surface, requested model
@@ -61,7 +61,7 @@ native-subagent operation.
 Use visible Codex tasks for independently running or mutating executor work.
 Use `subagent prepare|attempt|reconcile|complete|dispose|status` only for
 bounded read-only research/review. `attempt` exposes one native spawn request;
-ambiguous reconciliation never authorizes another spawn. The v0.6 contract
+ambiguous reconciliation never authorizes another spawn. The v0.7 contract
 forbids Ultra and full-history forks so an explicit model/effort override stays
 compatible with the current host. A subagent cannot own writes, enter the
 visible-task lifecycle, or spawn nested subagents.

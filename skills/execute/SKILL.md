@@ -5,7 +5,7 @@ description: Execute one accepted, generated Codex Flow visible-task contract an
 
 # Execute a Generated Task Contract
 
-Use the exact v0.6 runtime named by the release and include its `run_id` in
+Use the exact v0.7 runtime named by the release and include its `run_id` in
 every stateful command.
 
 If the first turn contains only a launch nonce bootstrap, do no repository

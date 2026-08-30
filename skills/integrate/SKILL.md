@@ -5,7 +5,7 @@ description: Review and disposition durable Codex Flow results, reconcile integr
 
 # Disposition and Integrate Results
 
-Use the exact run-bound v0.6 runtime. Task finals, native waits, direct messages,
+Use the exact run-bound v0.7 runtime. Task finals, native waits, direct messages,
 branch names, and caller-supplied digests are not result authority.
 
 1. Inspect `callback status` without mutation. Authenticate the terminal
@@ -35,7 +35,7 @@ branch names, and caller-supplied digests are not result authority.
 Rejected or blocked work receives an explicit durable disposition and remains
 visible whenever user attention or dirty state is unresolved. Archive and Git
 cleanup are separate actions. After archival, use `codex-orchestration:cleanup`
-to derive the exact read-only branch/worktree plan. v0.6 does not apply Git
+to derive the exact read-only branch/worktree plan. v0.7 does not apply Git
 deletion.
 
 Read [Communication loop](../../templates/references/communication-loop.md)

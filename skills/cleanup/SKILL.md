@@ -19,7 +19,7 @@ It reloads the completed disposition/archive chain, terminal Git receipt,
 current local ref, expected and configured upstream, original worktree path,
 and every current attachment. Missing or unsafe lifecycle evidence, exact-tip
 drift, upstream mismatch, or an attached worktree fails closed. `run audit`
-separately reloads the authoritative PASS verification before closure. v0.6
+separately reloads the authoritative PASS verification before closure. v0.7
 exposes no cleanup apply command: do not delete branches, worktrees, or refs
 through this workflow.
 
@@ -28,5 +28,5 @@ source record and proves that no live executor ref, attached worktree, retained
 visible task, or unresolved reservation remains. A prior audit cannot authorize
 close after state drift. Explicit abandonment keeps the complete admitted
 path/resource/branch envelope durable; a later run may proceed only when its
-plan is disjoint. v0.6 does not prune runtime snapshots or import/remove
+plan is disjoint. v0.7 does not prune runtime snapshots or import/remove
 retained v0.5 evidence.

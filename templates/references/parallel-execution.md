@@ -17,7 +17,7 @@ One immutable workflow revision must prove:
 - serial integration and combined verification gates.
 
 Visible tasks are the primary independent/mutating lanes. Native subagents are
-read-only supporting lanes with bounded `fork_turns`; the v0.6 contract forbids
+read-only supporting lanes with bounded `fork_turns`; the v0.7 contract forbids
 Ultra, full-history selector overrides, nested spawning, and any Git/callback
 lifecycle. Never silently substitute one for the other.
 
