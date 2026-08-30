@@ -73,4 +73,3 @@ version namespace.
   predecessor coverage and field-test directories.
 - Historical recovery uses the exact immutable tag that created the old state;
   v0.7 neither weakens nor impersonates that authority.
-
