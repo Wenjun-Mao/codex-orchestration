@@ -6,7 +6,9 @@ This document summarizes the breaking v0.7 authority established by
 [ADR 0015](adr/0015-progressive-run-activation-authority.md) through
 [ADR 0031](adr/0031-clean-start-unplug-boundary.md) and
 [ADR 0032](adr/0032-detached-codex-app-worktree-unplug.md), with opaque-state
-planning refined by [ADR 0033](adr/0033-opaque-root-state-unplug-plans.md).
+planning refined by [ADR 0033](adr/0033-opaque-root-state-unplug-plans.md) and
+host-ref identity refined by
+[ADR 0034](adr/0034-host-managed-turn-diff-ref-authority.md).
 
 ## Retained cross-task authority
 
@@ -39,7 +41,7 @@ durable result journal or coordinator disposition.
 
 - Read-only questions and plans require no repository setup.
 - An authorized actionable request may progressively activate one explicit run
-  under `.git/codex-flow/v0.7.3/`, with an exact runtime snapshot and
+  under `.git/codex-flow/v0.7.4/`, with an exact runtime snapshot and
   disclosure before external task creation.
 - Activation writes no tracked setup, adoption, instructions, or `AGENTS.md`.
 - A bounded sibling-namespace sentinel checks Git-common state at admission.
@@ -121,6 +123,12 @@ crash-resume journal outside that state root blocks new activation until the
 exact operation resumes; both the Flow state root and journal must have zero
 residue before a clean start is reported. Optional App-plugin uninstallation
 is a separate explicit user action after that confirmation.
+
+Unplug repository identity excludes only host-managed
+`refs/codex/turn-diffs/` capture refs, which Codex App may create between an
+approved plan and apply. Local heads, Flow cleanup branches, remotes, tags,
+other Codex refs, worktrees, source status, planned resource tips, and exact
+state bytes remain fail-closed authority.
 
 ## Retired mechanisms
 

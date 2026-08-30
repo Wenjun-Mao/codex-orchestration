@@ -23,7 +23,7 @@ readers, mutators, migration paths, retirement commands, tracked adoption, and
 test fixtures are not packaged in v0.7.
 
 v0.7 carries forward the proven cross-task behavior from v0.6.5 under new
-`codex-flow-v07-*` identities and the exact `.git/codex-flow/v0.7.3/`
+`codex-flow-v07-*` identities and the exact `.git/codex-flow/v0.7.4/`
 namespace. It adds a bounded foreign-active-run sentinel so a live predecessor
 run blocks admission instead of being silently ignored or migrated.
 
@@ -94,7 +94,7 @@ When the user authorizes actionable orchestration, the plugin may activate one
 run after disclosing:
 
 - the exact package/runtime source and bundle hash;
-- the `.git/codex-flow/v0.7.3/` operational state root;
+- the `.git/codex-flow/v0.7.4/` operational state root;
 - repository/common-directory, baseline, host, and coordinator binding;
 - the immutable workflow revision and its path/resource/branch reservation
   envelope;
@@ -242,7 +242,9 @@ worktrees whose tips are already integrated) and separately bound local
 `codex/*` branches, then deletes every exact planned `.git/codex-flow` entry
 last. A v2 plan distinguishes authenticated namespace directories from opaque
 root files so content or type drift fails closed. It proves that both state and
-its crash journal have zero residue.
+its crash journal have zero residue. Host-managed
+`refs/codex/turn-diffs/` captures do not invalidate the plan; all other Git
+refs and every cleanup-resource tip remain authoritative.
 
 Native subagents use their separate `complete` then `dispose` proof chain with
 unchanged-Git evidence. They never enter this callback, integration, archive,
@@ -320,7 +322,9 @@ prepare atomicity, and [ADR 0031](docs/adr/0031-clean-start-unplug-boundary.md)
 defines the clean-start/unplug contract. [ADR 0032](docs/adr/0032-detached-codex-app-worktree-unplug.md)
 defines detached Codex App worktree eligibility within that contract, and
 [ADR 0033](docs/adr/0033-opaque-root-state-unplug-plans.md) defines opaque
-root-file inventory plus v1 crash-resume compatibility.
+root-file inventory plus v1 crash-resume compatibility, and
+[ADR 0034](docs/adr/0034-host-managed-turn-diff-ref-authority.md) classifies
+Codex App turn-diff capture refs as non-authoritative unplug observations.
 
 ## Source and distribution
 

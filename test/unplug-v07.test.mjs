@@ -180,6 +180,61 @@ test("unplug v2 authenticates mixed namespace directories and opaque root files"
   }
 });
 
+test("host-managed Codex turn-diff refs do not invalidate an exact unplug plan", async () => {
+  const root = await createGitFixture("codex-flow-unplug-turn-diff-ref-");
+  try {
+    const common = git(root, ["rev-parse", "--path-format=absolute", "--git-common-dir"]);
+    const stateRoot = await namespace(common);
+    const plan = await unplugPlanV07({ repositoryPath: root, resources: [] });
+
+    git(root, [
+      "update-ref",
+      "refs/codex/turn-diffs/captures/1788124442550/task/base",
+      "HEAD",
+    ]);
+
+    const refreshed = await unplugPlanV07({ repositoryPath: root, resources: [] });
+    assert.equal(refreshed.plan_id, plan.plan_id);
+    assert.equal(refreshed.git_digest, plan.git_digest);
+
+    const receipt = await unplugApplyV07({ repositoryPath: root, plan });
+    assert.equal(receipt.residue, false);
+    assert.equal(await pathExists(stateRoot), false);
+  } finally {
+    await removeFixture(root);
+  }
+});
+
+test("ordinary and turn-diff-lookalike refs still invalidate an exact unplug plan", async () => {
+  const authoritativeRefs = [
+    "refs/heads/unrelated-source",
+    "refs/heads/codex/unrelated-cleanup",
+    "refs/remotes/origin/unrelated-source",
+    "refs/tags/unrelated-release",
+    "refs/codex/turn-diffs-like/captures/task/base",
+    "refs/codex/Turn-Diffs/captures/task/base",
+  ];
+
+  for (const ref of authoritativeRefs) {
+    const root = await createGitFixture("codex-flow-unplug-authoritative-ref-");
+    try {
+      const common = git(root, ["rev-parse", "--path-format=absolute", "--git-common-dir"]);
+      const stateRoot = await namespace(common);
+      const plan = await unplugPlanV07({ repositoryPath: root, resources: [] });
+      git(root, ["update-ref", ref, "HEAD"]);
+
+      await assert.rejects(
+        () => unplugApplyV07({ repositoryPath: root, plan }),
+        /plan drifted/,
+      );
+      assert.equal(await pathExists(stateRoot), true);
+      assert.equal(await pathExists(resolve(common, "codex-flow-unplug-v07")), false);
+    } finally {
+      await removeFixture(root);
+    }
+  }
+});
+
 test("opaque state content and type drift block before deletion", async () => {
   const contentRoot = await createGitFixture("codex-flow-unplug-opaque-drift-");
   try {
