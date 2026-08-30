@@ -4,6 +4,11 @@
 
 Accepted for the v0.6 development boundary.
 
+The deferred predecessor-transition portion is superseded by
+[ADR 0022](0022-exact-v051-tracked-authority-retirement.md) for accepted
+tracked v0.5.1 authority. Run-independent tracked v0.6 adoption remains
+deferred.
+
 ## Context
 
 Progressive activation removes mandatory tracked setup for a repository that

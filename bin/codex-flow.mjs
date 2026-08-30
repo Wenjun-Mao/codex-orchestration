@@ -35,6 +35,15 @@ import {
 import { runDoctor } from "../lib/doctor.mjs";
 import { discoverGit, gitSnapshot } from "../lib/git.mjs";
 import {
+  LEGACY_V05_PACKAGE_VERSION,
+  createLegacyV05ReadonlyContext,
+  readLegacyV05ReadonlySummary,
+} from "../lib/legacy-v05-readonly.mjs";
+import {
+  applyLegacyRetirementPlan,
+  planLegacyRetirement,
+} from "../lib/legacy-retirement-v06.mjs";
+import {
   applyGitCleanupPlan,
   authorizeGitBoundTaskRelease,
   bindGitOwnership,
@@ -192,7 +201,7 @@ import {
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
-const LEGACY_HELP = `codex-flow ${PACKAGE_VERSION} legacy-v05
+const LEGACY_HELP = `codex-flow ${LEGACY_V05_PACKAGE_VERSION} legacy-v05
 
 Read-only historical verification:
   codex-flow init --check
@@ -245,6 +254,7 @@ Usage:
   codex-flow cleanup plan --run-id ID [--json]
   codex-flow adopt plan|apply|retire-plan|retire-apply --run-id ID --file request.json [--json]
   codex-flow adopt status --run-id ID [--json]
+  codex-flow adopt legacy-retire-plan|legacy-retire-apply --file request.json [--json]
 
 Every run-scoped command requires an explicit --run-id. Complex mutations read
 one JSON request from --file and reject a mismatched request.run_id before any
@@ -2435,8 +2445,29 @@ async function assertAdoptionRun(git, runId) {
 async function commandAdoptV06(args) {
   const [subcommand, ...rest] = args;
   const values = parseV06Options(rest);
-  const runId = explicitRunId(values);
   const git = v06Repository();
+  if (["legacy-retire-plan", "legacy-retire-apply"].includes(subcommand)) {
+    if (values["run-id"] !== undefined) {
+      throw new CliError(`adopt ${subcommand} is repository-scoped and does not accept --run-id`);
+    }
+    if (!values.file) throw new CliError(`adopt ${subcommand} requires --file <request.json>`);
+    const request = await readJsonInput(values.file);
+    if (subcommand === "legacy-retire-plan") {
+      requireExactFields(request, { required: ["reason", "planned_at"] }, "adopt legacy-retire-plan request");
+      v06Output({
+        result: await planLegacyRetirement({
+          repositoryRoot: git.root,
+          reason: request.reason,
+          plannedAt: request.planned_at,
+        }),
+      });
+    } else {
+      requireExactFields(request, { required: ["plan"] }, "adopt legacy-retire-apply request");
+      v06Output({ result: await applyLegacyRetirementPlan({ repositoryRoot: git.root, plan: request.plan }) });
+    }
+    return;
+  }
+  const runId = explicitRunId(values);
   if (subcommand === "status") {
     await assertAdoptionRun(git, runId);
     v06Output({ run_id: runId, adoption: await readAdoption({ repositoryRoot: git.root }) });
@@ -2451,7 +2482,11 @@ async function commandAdoptV06(args) {
     "retire-plan": { required: ["reason", "retired_at"] },
     "retire-apply": { required: ["plan"] },
   };
-  if (!shapes[subcommand]) throw new CliError("adopt requires plan, apply, status, retire-plan, or retire-apply");
+  if (!shapes[subcommand]) {
+    throw new CliError(
+      "adopt requires plan, apply, status, retire-plan, retire-apply, legacy-retire-plan, or legacy-retire-apply",
+    );
+  }
   const scoped = await runScopedRequest(values, `adopt ${subcommand}`, shapes[subcommand]);
   const request = scoped.request;
   const run = await assertAdoptionRun(git, runId);
@@ -2483,6 +2518,119 @@ async function commandAdoptV06(args) {
   v06Output({ run_id: runId, result });
 }
 
+async function legacyReadonlyAuthority() {
+  const context = createLegacyV05ReadonlyContext({ git: gitSnapshot() });
+  const summary = await readLegacyV05ReadonlySummary(context);
+  return { context, summary };
+}
+
+function requireLegacyProject(summary) {
+  if (!summary.project) {
+    throw new CliError("Accepted v0.5.1 project configuration is unavailable");
+  }
+  return summary.project;
+}
+
+async function commandLegacyV05Readonly(command, args) {
+  const { context, summary } = await legacyReadonlyAuthority();
+  if (command === "init" || command === "sync") {
+    const { values } = parse(boolAndJsonOptions({ check: { type: "boolean" } }), args);
+    output(summary, { json: values.json });
+    if (!summary.ok) process.exitCode = 1;
+    return;
+  }
+  if (command === "config") {
+    const [, ...rest] = args;
+    const { values } = parse(boolAndJsonOptions(), rest);
+    output(requireLegacyProject(summary), { json: values.json });
+    return;
+  }
+  if (command === "doctor" || (command === "cleanup" && args[0] === "audit")) {
+    const rest = command === "cleanup" ? args.slice(1) : args;
+    const { values } = parse(boolAndJsonOptions(), rest);
+    output(summary, { json: values.json });
+    if (command === "doctor" && !summary.ok) process.exitCode = 1;
+    return;
+  }
+  if (command === "task") {
+    const [family, action, ...rest] = args;
+    if (family === "packet") {
+      const { values, positionals } = parse(boolAndJsonOptions({
+        model: { type: "string" },
+        "reasoning-effort": { type: "string" },
+      }), rest);
+      if (positionals.length !== 1) throw new CliError("task packet requires exactly one JSON file");
+      const raw = await readJson(resolve(positionals[0]));
+      const packet = validateTaskPacket(withTaskOverrides(
+        applyTaskDefaults(raw, requireLegacyProject(summary)),
+        values,
+      ));
+      if (action === "render" && !values.json) console.log(renderTaskPacket(packet));
+      else output(packet, { json: values.json });
+      return;
+    }
+    const { values } = parse(boolAndJsonOptions({ "operation-id": { type: "string" } }), rest);
+    const operations = values["operation-id"]
+      ? summary.task_operations.filter((item) => item.operation_id === values["operation-id"])
+      : summary.task_operations;
+    output(operations, { json: values.json });
+    return;
+  }
+  if (command === "plan") {
+    const [, ...rest] = args;
+    const { values, positionals } = parse(boolAndJsonOptions(), rest);
+    if (positionals.length !== 1) throw new CliError("plan validate requires exactly one JSON file");
+    const result = validatePlan(await readJson(resolve(positionals[0])), {
+      projectMaxConcurrency: requireLegacyProject(summary).max_parallel_executors,
+    });
+    output(result, { json: values.json });
+    return;
+  }
+  if (command === "recipient") {
+    const [action, ...rest] = args;
+    if (action === "status") {
+      const { values } = parse(boolAndJsonOptions({ "lineage-id": { type: "string" } }), rest);
+      const result = values["lineage-id"]
+        ? summary.recipients.find((item) => item.lineage_id === values["lineage-id"]) ?? null
+        : summary.recipients;
+      output(result, { json: values.json });
+      return;
+    }
+    const { values } = parse(boolAndJsonOptions({
+      "lineage-id": { type: "string" },
+      "thread-id": { type: "string" },
+      generation: { type: "string" },
+    }), rest);
+    output(await resolveRecipient({
+      stateRoot: context.git.stateRoot,
+      recipient: recipientFromValues(values),
+    }), { json: values.json });
+    return;
+  }
+  if (command === "callback" || command === "urgent") {
+    const [, ...rest] = args;
+    const { values } = parse(boolAndJsonOptions(), rest);
+    output(command === "callback" ? summary.callbacks : summary.urgent_signals, { json: values.json });
+    return;
+  }
+  if (command === "git") {
+    const [, ...rest] = args;
+    const { values } = parse(boolAndJsonOptions(), rest);
+    output(summary.git_lifecycle, { json: values.json });
+    return;
+  }
+  if (command === "lease") {
+    const [, ...rest] = args;
+    const { values } = parse(boolAndJsonOptions({ resource: { type: "string" } }), rest);
+    const leases = values.resource
+      ? summary.leases.filter((item) => item.resource === values.resource)
+      : summary.leases;
+    output(leases, { json: values.json });
+    return;
+  }
+  throw new CliError(`Unknown legacy-v05 command: ${command}\n\n${LEGACY_HELP}`);
+}
+
 async function mainLegacyV05(argv) {
   const [command, ...args] = argv;
   if (!command || command === "help" || command === "--help" || command === "-h") {
@@ -2490,7 +2638,7 @@ async function mainLegacyV05(argv) {
     return;
   }
   if (command === "--version" || command === "version") {
-    console.log(PACKAGE_VERSION);
+    console.log(LEGACY_V05_PACKAGE_VERSION);
     return;
   }
   const exactFlags = (allowed) => args.every((argument) => allowed.includes(argument));
@@ -2520,19 +2668,7 @@ async function mainLegacyV05(argv) {
       64,
     );
   }
-  if (command === "init") return commandInit(args);
-  if (command === "sync") return commandSync(args);
-  if (command === "config") return commandConfig(args);
-  if (command === "doctor") return commandDoctor(args);
-  if (command === "task") return commandTask(args);
-  if (command === "plan") return commandPlan(args);
-  if (command === "recipient") return commandRecipient(args);
-  if (command === "callback") return commandCallback(args);
-  if (command === "urgent") return commandUrgent(args);
-  if (command === "git") return commandGit(args);
-  if (command === "lease") return commandLease(args);
-  if (command === "cleanup") return commandCleanup(args);
-  throw new CliError(`Unknown legacy-v05 command: ${command}\n\n${LEGACY_HELP}`);
+  return commandLegacyV05Readonly(command, args);
 }
 
 function migratedV05Command(command) {

@@ -5,7 +5,7 @@ separate checkpoint.
 
 This document summarizes the v0.6 contract established by
 [ADR 0015](adr/0015-progressive-run-activation-authority.md) through
-[ADR 0021](adr/0021-one-shot-v06-urgent-record-authority.md).
+[ADR 0022](adr/0022-exact-v051-tracked-authority-retirement.md).
 It does not claim that the installed marketplace package has moved beyond
 v0.5.1.
 
@@ -78,14 +78,20 @@ durable result journal or coordinator disposition.
 - Public bare callback consumption.
 - v0.5 compatibility readers or operational-state migration.
 
-## Deferred transition boundary
+## Tracked-authority transition boundary
 
 - Tracked v0.6 adoption promotes the exact runtime of an already active run;
   it is not a standalone initial setup engine.
 - `adopt retire-plan|retire-apply` retires a tracked v0.6 adoption only.
-- Tracked-v0.5 retirement is not implemented in this checkpoint. Such a
-  repository remains blocked from v0.6 activation/adoption until a separately
-  approved, byte-preserving transition contract exists.
+- `adopt legacy-retire-plan|legacy-retire-apply` handles accepted tracked
+  v0.5.1 through a separate exact plan/apply. It removes only predecessor-owned
+  tracked authority, never applies automatically, and leaves the repository
+  eligible for setup-free v0.6 activation.
+- The v0.5.1 tag, package/cache identity, tasks, Git state, branches, worktrees,
+  and `.git/codex-flow/v0.5.1/` evidence remain byte-preserved. No predecessor
+  record is imported into v0.6.
+- Other predecessor versions and run-independent initial tracked-v0.6 adoption
+  remain deferred.
 
 Historical v0.5 coverage documents, examples, and field tests remain useful
 evidence of the accepted predecessor but are not active v0.6 guidance.

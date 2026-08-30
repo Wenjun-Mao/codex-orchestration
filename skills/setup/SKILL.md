@@ -1,6 +1,6 @@
 ---
 name: setup
-description: Promote an active Codex Flow v0.6 runtime to tracked adoption, or retire that v0.6 adoption, through a reviewed plan/apply. Use only when the user asks for persistent team/headless adoption or v0.6 retirement; ordinary v0.6 runs do not require setup.
+description: Promote an active Codex Flow v0.6 runtime to tracked adoption, retire that adoption, or retire accepted tracked v0.5.1 authority through an exact reviewed plan/apply. Use only for explicitly requested persistent adoption or retirement; ordinary v0.6 runs do not require setup.
 ---
 
 # Permanently Adopt Codex Flow
@@ -26,12 +26,15 @@ or migrate the active run. Use `adopt plan|apply|status` with the exact
 reviews the tracked write set.
 
 `adopt retire-plan|retire-apply` applies only to an existing tracked v0.6
-adoption and still requires explicit retirement approval. If tracked v0.5
-authority exists, stop: this development checkpoint has no v0.5 retirement
-operation, and activation/adoption must remain blocked until a separate
-transition contract is approved. Byte-preserve the v0.5 tag, package/cache
-identity, Git-common state, and audit evidence. v0.6 never imports v0.5
-operational records.
+adoption. Accepted tracked v0.5.1 uses the distinct run-independent
+`adopt legacy-retire-plan|legacy-retire-apply` contract. Generate the exact
+read-only plan first and present its owned tracked changes, settlement blockers,
+retained Git/task state, and Git-common evidence digest. Never apply it merely
+because retirement was discussed or planned; apply only the unchanged plan
+after explicit review and approval. It makes no commit and does not activate or
+adopt v0.6. Byte-preserve the v0.5.1 tag, package/cache identity, Git-common
+state, tasks, branches, worktrees, and audit evidence. Other predecessor
+versions remain unsupported and blocked.
 
 Read the relevant mode only:
 

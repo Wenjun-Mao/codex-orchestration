@@ -16,7 +16,8 @@ Route by intent before inspecting or changing repository state.
   workflow revision, model routing, and proposed external task creation.
 - For permanent tracked team/headless policy, use
   `codex-orchestration:setup` only when the user explicitly asks to adopt,
-  install, or retire Codex Flow.
+  install, or retire Codex Flow, including an accepted v0.5.1-to-setup-free
+  transition.
 - Inside a released visible executor task, use
   `codex-orchestration:execute`.
 - For durable results, dispositions, integration or no-change proof, combined

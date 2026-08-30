@@ -9,11 +9,17 @@ Authenticate the intended repository/common directory and use a clean,
 reviewable adoption worktree when ongoing work would otherwise overlap. Keep
 existing instructions outside the reviewed Codex Flow boundary unchanged.
 
-If tracked v0.5 authority exists, stop before activation or adoption. The
-current v0.6 development boundary has no tracked-v0.5 retirement operation;
-`adopt retire-plan|retire-apply` retires only a tracked v0.6 adoption. Preserve
-v0.5 package/cache identity, tags, exact-version Git-common state, and audit
-evidence until a separately approved transition contract exists.
+If accepted tracked v0.5.1 authority exists, activation and adoption remain
+blocked until it is explicitly retired. Use `adopt legacy-retire-plan` without
+a run ID and review its exact manifest/configuration/managed-instruction
+operations, predecessor settlement result, retained resources, and raw
+`.git/codex-flow/v0.5.1/` digest. Use `legacy-retire-apply` only with that exact
+unchanged plan after separate approval. It makes no commit, performs no Git or
+task cleanup, and does not activate v0.6. Other predecessor versions fail
+closed.
+
+`adopt retire-plan|retire-apply` remains specific to tracked v0.6 adoption; do
+not substitute it for predecessor retirement.
 
 With a named active v0.6 run, run `adopt plan` and review the exact
 `.codex/orchestration/v0.6/` write set, runtime bundle, configuration/policy,

@@ -18,8 +18,8 @@ See [Mission and product boundary](docs/mission.md) for the durable charter.
 This public repository is the editing authority and remains `UNLICENSED`;
 public visibility does not grant an open-source license. The editable source is
 `0.6.0-dev.0`. The accepted personal-marketplace package and this repository's
-currently pinned consumer runtime remain v0.5.1 until a separate release and
-installation checkpoint is approved.
+currently pinned consumer runtime remain v0.5.1 until separate release and
+repository-transition checkpoints are approved and applied.
 
 Editing this checkout never changes an installed plugin or active repository
 runtime. An activated v0.6 run snapshots its exact bundle into the repository's
@@ -204,10 +204,12 @@ The setup skill uses read-only `adopt plan` followed by an exact reviewed
 `adopt apply`, both bound to the named active run. Tracked adoption stores that
 run's same runtime/configuration/policy semantics under
 `.codex/orchestration/v0.6/`; it is not a second engine. `adopt retire-plan` and
-`retire-apply` retire only a tracked v0.6 adoption. The current development
-boundary does not implement tracked-v0.5 retirement; repositories that still
-carry that authority remain blocked pending a separately approved transition
-checkpoint.
+`retire-apply` retire only a tracked v0.6 adoption. Accepted tracked v0.5.1 uses
+the separate run-independent `adopt legacy-retire-plan|legacy-retire-apply`
+contract. Planning is read-only; applying still requires review of the exact
+unchanged plan and leaves the v0.5.1 tag, cache, tasks, Git-common evidence,
+branches, and worktrees untouched. It makes no commit and does not activate
+v0.6.
 
 ## Public CLI families
 
@@ -227,7 +229,7 @@ verification run|status
 integration prepare|verification-request|reconcile|status
 archive prepare|reconcile|status
 cleanup plan
-adopt plan|apply|status|retire-plan|retire-apply
+adopt plan|apply|status|retire-plan|retire-apply|legacy-retire-plan|legacy-retire-apply
 ```
 
 There is no public bare callback-consume command. Consumption is an internal

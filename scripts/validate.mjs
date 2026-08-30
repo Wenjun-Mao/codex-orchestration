@@ -29,6 +29,7 @@ const ACTIVE_V06_SCHEMA_NAMES = Object.freeze([
   "adoption-manifest",
   "adoption-plan",
   "adoption-retirement-plan",
+  "legacy-retirement-plan",
   "workflow-plan",
   "workflow-journal-v06",
   "generated-task-contract",
@@ -426,8 +427,9 @@ const setupReferences = new Map([
   ]],
   ["existing-repository.md", [
     "never retroactively assumes authority for earlier tasks",
-    "has no tracked-v0.5 retirement operation",
-    "`adopt retire-plan|retire-apply` retires only a tracked v0.6 adoption",
+    "Use `adopt legacy-retire-plan` without a run ID",
+    "Use `legacy-retire-apply` only with that exact unchanged plan",
+    "`adopt retire-plan|retire-apply` remains specific to tracked v0.6 adoption",
     "Pre-adoption tasks finish under their original contract",
   ]],
 ]);
