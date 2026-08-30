@@ -80,7 +80,7 @@ async function fixture() {
     tasks: [task()],
   });
   const runId = "release-run";
-  const stateRoot = resolve(commonDir, "codex-flow", "v0.6.1");
+  const stateRoot = resolve(commonDir, "codex-flow", "v0.6.2");
   const { authority, runtime } = await activateV06FixtureRun({
     root,
     runId,

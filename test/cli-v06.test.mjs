@@ -260,8 +260,8 @@ test("run activation needs no tracked setup and replays the same disclosed autho
   const context = await activatedFixture(t, "activation");
   await assert.rejects(stat(resolve(context.root, ".codex", "orchestration")), /ENOENT/);
   assert.equal(context.result.status, "admitted");
-  assert.equal(context.result.state_authority.namespace, "v0.6.1");
-  assert.match(context.result.state_authority.state_root, /\.git\/codex-flow\/v0\.6\.1$/);
+  assert.equal(context.result.state_authority.namespace, "v0.6.2");
+  assert.match(context.result.state_authority.state_root, /\.git\/codex-flow\/v0\.6\.2$/);
   assert.equal(context.result.repository_authority.cleanliness, "clean");
   assert.equal(context.result.workflow_authority.run_id, context.runId);
   assert.equal(context.result.model_routing[0].model, "gpt-5.6-terra");
@@ -319,7 +319,7 @@ test("run activation rejects a workflow outside its reservation envelope before 
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /outside the admitted run fence envelope/);
   await assert.rejects(
-    stat(resolve(root, ".git", "codex-flow", "v0.6.1")),
+    stat(resolve(root, ".git", "codex-flow", "v0.6.2")),
     (error) => error?.code === "ENOENT",
   );
 });
@@ -400,7 +400,7 @@ test("a second active run is refused before acquiring orphan runtime or workflow
   const contextsRoot = resolve(
     context.result.state_authority.git_common_dir,
     "codex-flow",
-    "v0.6.1",
+    "v0.6.2",
     "contexts",
   );
   const beforeContexts = await readdir(contextsRoot);

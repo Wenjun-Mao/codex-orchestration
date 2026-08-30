@@ -23,7 +23,7 @@ function legacyStateRoot(snapshot) {
 }
 
 function currentStateRoot(snapshot) {
-  return resolve(snapshot.commonDir, "codex-flow", "v0.6.1");
+  return resolve(snapshot.commonDir, "codex-flow", "v0.6.2");
 }
 
 function taskPacket(index) {

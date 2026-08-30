@@ -25,6 +25,9 @@ The v0.6.1 release aligns provisional identity, linked-worktree release
 acceptance, run-bound runtime recovery, and terminal callback admission with
 their authoritative Codex App records.
 
+This editable checkout is the unreleased v0.6.2 development line. It does not
+replace the installed v0.6.1 package or any immutable runtime snapshot.
+
 Editing this checkout never changes an installed plugin or active repository
 runtime. An activated v0.6 run snapshots its exact bundle into the repository's
 Git common directory, so its authority survives task restart, compaction,
@@ -72,7 +75,7 @@ When the user authorizes actionable orchestration, the plugin may activate one
 run after disclosing:
 
 - the exact package/runtime source and bundle hash;
-- the `.git/codex-flow/v0.6.1/` operational state root;
+- the `.git/codex-flow/v0.6.2/` operational state root;
 - repository/common-directory, baseline, host, and coordinator binding;
 - the immutable workflow revision and its path/resource/branch reservation
   envelope;

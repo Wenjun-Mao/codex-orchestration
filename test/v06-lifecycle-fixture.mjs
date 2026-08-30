@@ -61,7 +61,7 @@ export async function createAcceptedVisibleTask(root, suffix, {
   coordinator: requestedCoordinator = null,
 } = {}) {
   const commonDir = await realpath(resolve(root, ".git"));
-  const stateRoot = resolve(commonDir, "codex-flow", "v0.6.1");
+  const stateRoot = resolve(commonDir, "codex-flow", "v0.6.2");
   const baseline = git(root, ["rev-parse", "HEAD"]);
   const coordinator = requestedCoordinator === null
     ? {

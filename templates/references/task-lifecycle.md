@@ -1,7 +1,7 @@
 # Task Lifecycle
 
 1. **Activate:** snapshot the exact runtime under
-   `.git/codex-flow/v0.6.1/runtimes/<bundle-sha256>/`; bind repository/common
+   `.git/codex-flow/v0.6.2/runtimes/<bundle-sha256>/`; bind repository/common
    directory, host, coordinator lineage/generation, configuration/policy, and
    the path/resource/branch reservation envelope to an explicit run ID.
 2. **Plan:** persist a content-addressed workflow revision with dependency DAG,
