@@ -1,0 +1,329 @@
+{
+  "manifest_version": 1,
+  "kind": "codex-flow-routing-evidence-preregistration",
+  "status": "retrospective-blind-feasibility-only",
+  "created_on": "2026-08-30",
+  "source_note": {
+    "path": "docs/research/2026-08-30-orchestration-routing-evidence.md",
+    "commit": "ecaae6f931f356fd0de8bf3d3e45e07525995e60"
+  },
+  "claims_boundary": {
+    "primary_outcome": "Determine whether deliberately selected Terra workers can preserve accepted outcome quality while improving total efficiency over one Sol task on two bounded retrospective cases.",
+    "causal_question": "Does a cheaper single task or a Sol-coordinated Terra pair improve the quality-efficiency trade-off on work that is explicitly admitted for its execution surface?",
+    "cheapest_safe_direct_attempt": "After a fresh v0.7.5 authority check, run only the two scheduled blind cases and their three frozen arms with no new telemetry or routing behavior.",
+    "may_promote_package_policy": false,
+    "reason": "The historical outcomes helped shape Codex Flow and are not independent held-out product evidence. This checkpoint tests feasibility and protocol discipline only."
+  },
+  "runtime_preconditions": {
+    "codex_app_restart_required": true,
+    "fresh_controller_task_required": true,
+    "accepted_plugin_version": "0.7.5",
+    "accepted_source_commit": "ad80e9357cecca691002413e31c9904cc20d9c85",
+    "accepted_source_tag": "v0.7.5",
+    "advertised_skill_version_must_equal": "0.7.5",
+    "installed_cache_must_equal_artifact": true,
+    "active_codex_flow_runs": 0,
+    "explicit_visible_task_creation_authorization_required": true,
+    "evaluation_harness_runtime_schema_or_telemetry_changes_allowed": false,
+    "historical_candidate_runtime_changes_may_be_requested_and_scored": true,
+    "predecessor_state_migration_allowed": false
+  },
+  "candidate_isolation": {
+    "source_materialization": "For every case_id/arm_id pair, extract the registered git-archive into its own new repository and Git common directory with no original Git objects, refs, tags, remotes, Flow state, research manifest, or prior-arm evidence, then create one pristine local baseline commit.",
+    "distinct_git_common_directories_required": 6,
+    "archive_sha256_must_match": true,
+    "later_oracle_commits_visible_to_candidate": false,
+    "external_network_or_web_search_allowed": false,
+    "prior_arm_outputs_visible_to_candidate": false,
+    "evaluator_may_open_oracle_only_after_candidate_terminal_result": true,
+    "arm_prompt_and_acceptance_criteria_may_not_change_after_first_launch": true
+  },
+  "selectors": {
+    "sol_single": {
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "high",
+      "selector_rationale": "Strong single-agent baseline for the complete frozen case."
+    },
+    "terra_single": {
+      "model": "gpt-5.6-terra",
+      "reasoning_effort": "high",
+      "selector_rationale": "Cheaper bounded nontrivial task using the same complete frozen case and acceptance criteria."
+    },
+    "coordinator": {
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "high",
+      "selector_rationale": "Systemic decomposition, synthesis, acceptance, and lifecycle coordination."
+    },
+    "worker": {
+      "model": "gpt-5.6-terra",
+      "reasoning_effort": "high",
+      "selector_rationale": "Bounded nontrivial evidence or implementation lane with explicit ownership."
+    },
+    "native_subagent_fork_turns": "3",
+    "luna_included": false,
+    "luna_exclusion_reason": "Neither scheduled case is a mechanical, repeatable, or high-volume Luna cohort."
+  },
+  "arms": {
+    "sol_single": {
+      "shape": "One fresh user-visible Sol-high task performs the full frozen case without subagents.",
+      "candidate_agent_threads": 1
+    },
+    "terra_single": {
+      "shape": "One fresh user-visible Terra-high task performs the same full frozen case without subagents.",
+      "candidate_agent_threads": 1
+    },
+    "sol_coord_two_terra_subagents": {
+      "shape": "One fresh Sol-high coordinator uses exactly two Terra-high native subagents with fork_turns=3 for the registered read-only lanes and performs final synthesis.",
+      "candidate_agent_threads": 3,
+      "surface": "native-subagent",
+      "writes_allowed": false
+    },
+    "sol_coord_two_terra_visible": {
+      "shape": "One fresh Sol-high coordinator uses exactly two Terra-high user-visible tasks according to the case-specific DAG and ownership, then integrates and verifies serially through v0.7.5.",
+      "candidate_agent_threads": 3,
+      "surface": "visible-task",
+      "writes_allowed": true
+    }
+  },
+  "limits": {
+    "scheduled_cases": 2,
+    "arms_per_scheduled_case": 3,
+    "scheduled_arm_runs": 6,
+    "candidate_agent_threads": 10,
+    "workers_per_coordinated_arm": 2,
+    "max_wall_clock_minutes_per_arm": 60,
+    "selector_replans": 0,
+    "automatic_fallbacks": 0,
+    "arm_retries": 0,
+    "additional_instrumentation_checkpoints": 0,
+    "run_order": [
+      "v051-acceptance-plan/sol_single",
+      "v051-acceptance-plan/terra_single",
+      "v051-acceptance-plan/sol_coord_two_terra_subagents",
+      "ignored-archive-artifacts/sol_single",
+      "ignored-archive-artifacts/terra_single",
+      "ignored-archive-artifacts/sol_coord_two_terra_visible"
+    ]
+  },
+  "measurements": {
+    "primary": [
+      "acceptance_pass",
+      "acceptance_score",
+      "terminal_classification",
+      "elapsed_wall_clock_seconds"
+    ],
+    "secondary": [
+      "requested_accepted_observed_selectors",
+      "worker_and_coordinator_count",
+      "wait_and_message_count",
+      "rework_count",
+      "integration_defect_count",
+      "interrupt_or_steer_count",
+      "failure_class",
+      "PRODUCT",
+      "CROSS_CUTTING_PRODUCT_FIX",
+      "ENVIRONMENT",
+      "PROOF_HARNESS"
+    ],
+    "authoritative_if_exposed_else_null": [
+      "total_tokens",
+      "per_role_tokens",
+      "chatgpt_usage_or_credits",
+      "api_dollar_cost",
+      "independently_observed_model",
+      "independently_observed_reasoning_effort"
+    ],
+    "prohibited_inferences": [
+      "Do not convert ChatGPT usage or credits into API-dollar cost without an authoritative product conversion.",
+      "Do not substitute token use or wall-clock time for cost.",
+      "Do not infer observed selectors from requested, configured, or accepted selectors."
+    ]
+  },
+  "scheduled_case_registry": [
+    {
+      "case_id": "v051-acceptance-plan",
+      "cohort": "breadth-research",
+      "baseline_commit": "b3d933a4b895dfee26fd142eb994f338456f5591",
+      "baseline_tree": "221e52b2772dbe9514a3bfa948470c68db9c2d1c",
+      "baseline_archive_sha256": "7a8e6aaf4bcbf2d3479a4d2ec2187928f7542cf96281339d24cb4100be3e40ca",
+      "oracle_commit": "d03cabfffb612ad8f33853896b15deee3ad66698",
+      "oracle_patch_sha256": "c227ec6a729c9ceabf8545882518cadea80a2714150aede210fbef87790e7d1f",
+      "oracle_visibility": "evaluator-only-after-terminal",
+      "prompt": "Using only the provided repository snapshot and no external network, produce a source-grounded eligibility and acceptance plan for one fresh UK Dev v0.5.1 exact-state replay. State which facts must be re-observed, what bytes and prior state must remain unchanged, which host facts may remain only host-accepted rather than independently observed, the exact task/Git/callback/integration/cleanup sequence, and what result would justify package acceptance. Do not modify files, create tasks, or perform the pilot.",
+      "arms": [
+        "sol_single",
+        "terra_single",
+        "sol_coord_two_terra_subagents"
+      ],
+      "coordinated_lanes": [
+        {
+          "lane_id": "host-session-evidence",
+          "execution_kind": "subagent",
+          "mode": "read",
+          "fork_turns": "3",
+          "instrument_role": "none",
+          "supporting_follow_up": null,
+          "write_paths": [],
+          "callback_or_git_lifecycle": false,
+          "paths": [
+            "docs/field-tests/2026-08-23-uk-dev-v0.3.1.md",
+            "docs/field-tests/2026-08-25-uk-dev-v0.4.1-urgent-direct.md",
+            "docs/field-tests/2026-08-25-uk-dev-v0.4.2-urgent-ux.md"
+          ]
+        },
+        {
+          "lane_id": "package-state-evidence",
+          "execution_kind": "subagent",
+          "mode": "read",
+          "fork_turns": "3",
+          "instrument_role": "none",
+          "supporting_follow_up": null,
+          "write_paths": [],
+          "callback_or_git_lifecycle": false,
+          "paths": [
+            "docs/field-tests/2026-08-27-uk-dev-v0.5.0-placement-gap.md",
+            "README.md",
+            "docs/coverage-v0.5.1.md"
+          ]
+        }
+      ],
+      "acceptance": {
+        "score_max": 10,
+        "pass_score": 8,
+        "critical_failures": [
+          "Claims project, model, or reasoning were independently observed when the host surface omitted them.",
+          "Migrates, rewrites, deletes, or normalizes retained v0.5 evidence.",
+          "Releases an objective before exact worktree, baseline, and branch authentication.",
+          "Treats task final text or UI status as durable result authority."
+        ],
+        "one_point_each": [
+          "Requires the later coordinator to authenticate exact package, tag, installed cache, and runtime authority before the proposed pilot.",
+          "Preserves retained v0.5 bytes and uses an isolated v0.5.1 namespace.",
+          "Requires a pristine detached host worktree at the exact full baseline revision.",
+          "Binds branch and ownership before objective release.",
+          "Separates requested, accepted, and observed project/model/reasoning evidence.",
+          "Uses nonce-bound one-shot task creation and exact identity reconciliation.",
+          "Uses quiet durable callback observation rather than final text as authority.",
+          "Requires authenticated integration and combined verification before consumption.",
+          "Archives the visible task and derives deterministic cleanup without force.",
+          "Defines a bounded PASS result without claiming universal host capability."
+        ]
+      }
+    },
+    {
+      "case_id": "ignored-archive-artifacts",
+      "cohort": "independent-implementation",
+      "baseline_commit": "aa7e09761c274252a02676bf840e5d6f58827614",
+      "baseline_tree": "8b538301dcc57682ed76acc6a830b17fe62ce276",
+      "baseline_archive_sha256": "8e80890aa9fa19a804f2caa8711582ee1424dbbedfe13b186c3ad389961383d5",
+      "oracle_commit": "44bf50a49f7953dd64d66b189b92dfa04b907d3f",
+      "oracle_patch_sha256": "a70ca324de9535844f59611ad551e7b745413c592881d8b0383894cc0667713d",
+      "oracle_visibility": "evaluator-only-after-terminal",
+      "prompt": "Archive preparation must permit Git-ignored generated output while still rejecting tracked changes and ordinary untracked source files. Starting from the exact accepted v0.6.4 snapshot, open the required next development identity, make the smallest contract-layer change, add focused real-Git regression coverage, preserve every other archive and cleanup safety boundary, and record any durable decision in the repository's established format. Do not release, tag, install, push, or weaken deletion authority.",
+      "arms": [
+        "sol_single",
+        "terra_single",
+        "sol_coord_two_terra_visible"
+      ],
+      "coordinated_lanes": [
+        {
+          "lane_id": "archive-policy-implementation",
+          "execution_kind": "task-thread",
+          "mode": "write",
+          "depends_on": [],
+          "instrument_role": "none",
+          "supporting_follow_up": null,
+          "owned_paths": [
+            "lib/archive-lifecycle.mjs"
+          ],
+          "shared_paths_forbidden": true
+        },
+        {
+          "lane_id": "archive-policy-regression",
+          "execution_kind": "task-thread",
+          "mode": "write",
+          "depends_on": [
+            "archive-policy-implementation"
+          ],
+          "instrument_role": "none",
+          "supporting_follow_up": null,
+          "read_paths": [
+            "lib/archive-lifecycle.mjs"
+          ],
+          "owned_paths": [
+            "test/archive-lifecycle-v06.test.mjs"
+          ],
+          "shared_paths_forbidden": true
+        }
+      ],
+      "coordinator_owned_shared_work": [
+        "development-version and namespace promotion",
+        "ADR and current-boundary documentation",
+        "mechanical active-namespace fixture alignment",
+        "serial integration and combined verification"
+      ],
+      "coordination_limitation": "The regression lane is ordered after the implementation lane because it reads the production path. This arm tests bounded manager-worker coordination and cheaper-worker quality, not parallel wall-clock speed.",
+      "acceptance": {
+        "pass_requires_all": [
+          "An otherwise clean worktree containing only ignored generated artifacts is archive-eligible.",
+          "Tracked, staged, and ordinary untracked changes remain archive blockers.",
+          "Ignored artifacts are not reclassified as cleanup or deletion targets.",
+          "All other archive identity, integration, task-state, and worktree safety checks remain active.",
+          "The exact next development identity follows the existing version/namespace contract.",
+          "Focused regression, full accepted-version tests, source validation, package dry run, and diff check pass."
+        ],
+        "quality_review": [
+          "Fixes the Git-cleanliness contract at its source rather than adding a caller-specific bypass.",
+          "Keeps the change cohesive and avoids unrelated lifecycle expansion.",
+          "Explains why ignored generated output is not source risk while ordinary untracked output is."
+        ]
+      }
+    }
+  ],
+  "deferred_control_registry": [
+    {
+      "case_id": "turn-diff-ref-review",
+      "cohort": "cross-cutting-review",
+      "scheduled": false,
+      "baseline_commit": "d01927f12845ffc6d660297dff195ed3df52136f",
+      "baseline_tree": "c7092a505b72146acf398fa18094bbe916b86073",
+      "baseline_archive_sha256": "d3ea0a5e372104d1ab916c686e072c55db813accccf60fcbda1154ab08ecacc5",
+      "oracle_commit": "53973eaa642dd913ac7ae2ce3744c19a96fe032d",
+      "oracle_patch_sha256": "ce8bb5be5754191386b2f24fa499273aa1bb1a2f82fb18c2d2e4dc04cf286688",
+      "prompt": "Review the exact-unplug identity contract after observing that Codex App may create turn-diff refs during an approval turn. Recommend the narrowest lawful authority change, identify every ref and repository fact that must remain plan-invalidating, and specify a regression matrix. Do not implement.",
+      "reason_deferred": "The first checkpoint already has one read-only case; adding this arm requires separate authorization."
+    },
+    {
+      "case_id": "detached-worktree-binding",
+      "cohort": "sequential-stateful-engineering",
+      "scheduled": false,
+      "parallel_arm_admitted": false,
+      "baseline_commit": "3e328e25f33a7e06aa46a8d0f7d165fb14217e3f",
+      "baseline_tree": "46b1304eaa48b381431ee30b2ee21c05b58ea3a0",
+      "baseline_archive_sha256": "f32ccfff118d05cdd02be5ee547ec49b95e87ab13a5facc4ef2454c9228b3573",
+      "oracle_commit": "54ee13b288e715c1f23525a13eca22072316a47f",
+      "oracle_patch_sha256": "ad2d4b1fcf1e247fc612ed5344ac8c879cb86f75ea21744d03f867597cda2c29",
+      "prompt": "Add an at-most-once coordinator-owned binding checkpoint for a host-created detached executor worktree. Persist exact intent before attaching the reserved branch, authenticate completed binding, admit release only after a live recheck, recover exact interruption windows, and fail closed on drift, collision, dirt, or unreceipted attachment.",
+      "reason_deferred": "The lifecycle, lock, Git topology, crash recovery, and release admission share one evolving state and form a preregistered single-agent-favoured negative control."
+    }
+  ],
+  "stopping_rules": [
+    "Stop before launch if the fresh v0.7.5 authority check fails, any required selector is unsupported, a source archive digest differs, the imported baseline is dirty, or visible-task authorization is absent.",
+    "An exact selector rejection before native identity terminates that arm with no replan. Ambiguity or any provisional, ready-task, or agent identity also forbids retry or substitution.",
+    "Stop a coordinated arm on ownership collision, required approval, high-risk drift, or an unrecoverable source or host blocker; use only the existing urgent path where warranted.",
+    "Treat the 60-minute limit as containment, not a performance target. Preserve timeout and host-liveness evidence separately.",
+    "End after the six scheduled arms finish or terminate. Do not add workers, cases, models, retries, thresholds, or instrumentation."
+  ],
+  "closure": {
+    "score_only_after_all_scheduled_arms_terminal": true,
+    "archive_only_tasks_created_by_this_checkpoint": true,
+    "cleanup_only_after_exact_integration_or_no_change_proof": true,
+    "result_may_choose": [
+      "evaluation-protocol-invalid",
+      "feasibility-not-demonstrated",
+      "larger-independent-held-out-study-justified",
+      "stop-with-no-plugin-change"
+    ],
+    "forbidden_result": "change-routing-policy-from-this-retrospective-checkpoint"
+  }
+}
