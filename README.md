@@ -16,10 +16,10 @@ See [Mission and product boundary](docs/mission.md) for the durable charter.
 ## Current authority
 
 This public repository is the editing authority and remains `UNLICENSED`;
-public visibility does not grant an open-source license. The editable source is
-`0.6.0-dev.0`. The accepted personal-marketplace package and this repository's
-currently pinned consumer runtime remain v0.5.1 until separate release and
-repository-transition checkpoints are approved and applied.
+public visibility does not grant an open-source license. The accepted source
+release and personal-marketplace package are v0.6.0. A repository may retain
+v0.5.1 consumer authority until its own explicit transition is approved and
+applied.
 
 Editing this checkout never changes an installed plugin or active repository
 runtime. An activated v0.6 run snapshots its exact bundle into the repository's
