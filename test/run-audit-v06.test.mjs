@@ -180,7 +180,7 @@ async function runFixture(t, suffix, task, { branchFences = [] } = {}) {
   const root = await createGitFixture(`codex-flow-v06-run-audit-${suffix}-`);
   t.after(() => removeFixture(root));
   const commonDir = await realpath(resolve(root, ".git"));
-  const stateRoot = resolve(commonDir, "codex-flow", "v0.6.3");
+  const stateRoot = resolve(commonDir, "codex-flow", "v0.6.4");
   const baseline = git(root, ["rev-parse", "HEAD"]);
   const coordinator = {
     lineage_id: `audit-lineage-${suffix}`,
@@ -1062,11 +1062,8 @@ test("accepted no-change task advances through release, callback, proof, disposi
   assert.equal(terminal.audit.terminal_ready, true);
   assert.deepEqual(terminal.audit.blockers, []);
   assert.equal(terminal.audit.counts.archives, 1);
-  assert.equal(terminal.audit.repository.expected_source, "combined-verification");
-  assert.equal(
-    terminal.audit.repository.expected_verification_id,
-    verification.verification_id,
-  );
+  assert.equal(terminal.audit.repository.expected_source, "activation-baseline");
+  assert.equal(terminal.audit.repository.expected_verification_id, null);
 
   const archivePath = resolve(
     context.stateRoot,
@@ -1099,6 +1096,125 @@ test("accepted no-change task advances through release, callback, proof, disposi
     audit(context, 109_000),
     /exact callback authority/,
   );
+});
+
+test("archived host-worktree no-change proof leaves coordinator authority at activation baseline", async (t) => {
+  const executorBranch = "codex/run-audit-no-change-cleanup";
+  const context = await runFixture(
+    t,
+    "host-no-change",
+    taskThread("host-no-change", { write_paths: ["host-no-change.txt"] }),
+    { branchFences: [executorBranch] },
+  );
+  const worktreeParent = await mkdtemp(resolve(tmpdir(), "codex-flow-run-audit-no-change-"));
+  const worktreePath = resolve(worktreeParent, "executor");
+  t.after(async () => {
+    if (await realpath(worktreePath).catch(() => null)) {
+      try {
+        git(context.root, ["worktree", "remove", "--force", worktreePath]);
+      } catch {
+        // Fixture teardown only; assertions below cover the authoritative path.
+      }
+    }
+    await rm(worktreeParent, { recursive: true, force: true });
+  });
+
+  const visible = await prepareHostVisible(context, "host-no-change", {
+    executorBranch,
+    worktreePath,
+  });
+  const release = await acceptRelease(context, visible, "host-no-change");
+  const payload = receipt(context, visible, release, {
+    kind: "unchanged",
+    baseline_revision: context.baseline,
+    final_revision: context.baseline,
+    branch: executorBranch,
+    upstream: null,
+    cleanliness: "clean",
+  });
+  payload.model_evidence.observed = {
+    model: context.contract.task.model,
+    reasoning_effort: context.contract.task.reasoning_effort,
+  };
+  const delivered = await deliverCallbackV06({ stateRoot: context.stateRoot, receipt: payload });
+  await observeCallbackV06({
+    stateRoot: context.stateRoot,
+    callbackId: delivered.callback_id,
+    recipient: context.coordinator,
+  });
+  const disposition = await prepareTaskDisposition({
+    stateRoot: context.stateRoot,
+    callbackId: delivered.callback_id,
+    decision: "accepted-no-change",
+    reason: "The exact host-worktree remained clean at its authenticated baseline.",
+  });
+  const verification = await runCombinedVerification({
+    stateRoot: context.stateRoot,
+    repositoryPath: worktreePath,
+    receipt: payload,
+    checks: [{
+      check_id: "run-audit-host-no-change",
+      argv: [process.execPath, "-e", "process.exit(0)"],
+    }],
+  });
+  const completedDisposition = await finalizeTaskDisposition({
+    stateRoot: context.stateRoot,
+    dispositionId: disposition.disposition_id,
+    recipient: context.coordinator,
+    executorThreadId: visible.readyThreadId,
+    verificationId: verification.verification_id,
+  });
+  git(context.root, ["worktree", "remove", worktreePath]);
+  const archive = await prepareTaskArchive({
+    stateRoot: context.stateRoot,
+    dispositionId: completedDisposition.disposition_id,
+    taskObservation: {
+      execution_kind: "task-thread",
+      thread_id: visible.readyThreadId,
+      source: "host-observed",
+      active_visible: true,
+      archived_visible: false,
+    },
+    hostId: "local",
+  });
+  await reconcileTaskArchive({
+    stateRoot: context.stateRoot,
+    archiveId: archive.archive_id,
+    attemptId: archive.host_intent.attempt_id,
+    outcome: "accepted",
+    observation: {
+      execution_kind: "task-thread",
+      thread_id: visible.readyThreadId,
+      source: "host-observed",
+      active_visible: false,
+      archived_visible: true,
+    },
+  });
+
+  const retained = await audit(context, 120_000);
+  assert.equal(retained.audit.repository.expected_source, "activation-baseline");
+  assert.equal(retained.audit.repository.expected_verification_id, null);
+  assert.equal(retained.audit.repository.head_revision, context.baseline);
+  assert.equal(retained.audit.repository.branch, "main");
+  assert.deepEqual([...blockerCodes(retained)], ["cleanup-unresolved"]);
+
+  git(context.root, ["branch", "-d", executorBranch]);
+  const terminal = await audit(context, 121_000);
+  assert.equal(terminal.audit.terminal_ready, true, JSON.stringify(terminal.audit.blockers));
+  assert.deepEqual(terminal.audit.blockers, []);
+
+  const dirtyPath = resolve(context.root, "host-no-change-dirty.txt");
+  await writeFile(dirtyPath, "dirty\n", "utf8");
+  const dirty = await audit(context, 122_000);
+  assert.equal(dirty.audit.terminal_ready, false);
+  assert(blockerCodes(dirty).has("repository-dirty"));
+  assert.equal(blockerCodes(dirty).has("repository-drift"), false);
+
+  git(context.root, ["add", "host-no-change-dirty.txt"]);
+  git(context.root, ["commit", "--quiet", "-m", "host no-change coordinator drift"]);
+  const drifted = await audit(context, 123_000);
+  assert.equal(drifted.audit.terminal_ready, false);
+  assert(blockerCodes(drifted).has("repository-drift"));
 });
 
 test("archived host-worktree integration cannot close until its exact executor branch is absent", async (t) => {
@@ -1355,6 +1471,7 @@ test("safe integration must preserve its exact combined-verification digest", as
   });
   const beforeTamper = await audit(context, 110_000);
   assert(blockerCodes(beforeTamper).has("disposition-unfinalized"));
+  assert.equal(beforeTamper.audit.repository.expected_source, "combined-verification");
   assert.equal(beforeTamper.audit.repository.expected_verification_id, verification.verification_id);
 
   const integrationPath = resolve(
