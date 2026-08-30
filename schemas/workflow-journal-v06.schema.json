@@ -99,7 +99,7 @@
         "configuration_digest", "repository_id", "common_dir", "coordinator_binding",
         "plan_id", "revision_digest", "task_id", "task_digest", "contract_id",
         "execution_kind", "state", "operation_kind", "operation_id", "claimed_at",
-        "started_at", "revoked_at"
+        "started_at", "terminal_at", "revoked_at"
       ],
       "properties": {
         "schema_version": { "const": 1 },
@@ -124,7 +124,7 @@
         "task_digest": { "$ref": "#/$defs/digest" },
         "contract_id": { "$ref": "#/$defs/digest" },
         "execution_kind": { "enum": ["task-thread", "subagent"] },
-        "state": { "enum": ["current", "started", "revoked"] },
+        "state": { "enum": ["current", "started", "terminal-no-object", "revoked"] },
         "operation_kind": {
           "enum": [null, "visible-task-creation", "subagent-operation"]
         },
@@ -136,6 +136,7 @@
         },
         "claimed_at": { "$ref": "#/$defs/timestamp" },
         "started_at": { "$ref": "#/$defs/nullableTimestamp" },
+        "terminal_at": { "$ref": "#/$defs/nullableTimestamp" },
         "revoked_at": { "$ref": "#/$defs/nullableTimestamp" }
       },
       "allOf": [
@@ -146,6 +147,7 @@
               "operation_kind": { "type": "null" },
               "operation_id": { "type": "null" },
               "started_at": { "type": "null" },
+              "terminal_at": { "type": "null" },
               "revoked_at": { "type": "null" }
             }
           }
@@ -159,6 +161,20 @@
               },
               "operation_id": { "$ref": "#/$defs/hostId" },
               "started_at": { "$ref": "#/$defs/timestamp" },
+              "terminal_at": { "type": "null" },
+              "revoked_at": { "type": "null" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "state": { "const": "terminal-no-object" } } },
+          "then": {
+            "properties": {
+              "execution_kind": { "const": "task-thread" },
+              "operation_kind": { "const": "visible-task-creation" },
+              "operation_id": { "$ref": "#/$defs/hostId" },
+              "started_at": { "$ref": "#/$defs/timestamp" },
+              "terminal_at": { "$ref": "#/$defs/timestamp" },
               "revoked_at": { "type": "null" }
             }
           }
@@ -170,6 +186,7 @@
               "operation_kind": { "type": "null" },
               "operation_id": { "type": "null" },
               "started_at": { "type": "null" },
+              "terminal_at": { "type": "null" },
               "revoked_at": { "$ref": "#/$defs/timestamp" }
             }
           }

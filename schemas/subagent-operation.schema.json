@@ -7,7 +7,7 @@
     "schema_version", "kind", "operation_id", "contract_id", "run_id",
     "runtime_context_digest", "configuration_digest", "repository_id", "common_dir",
     "coordinator_binding", "plan_id", "revision_digest", "task_id", "task_digest",
-    "mode", "model", "reasoning_effort", "fork_turns", "prompt_digest",
+    "mode", "model", "reasoning_effort", "selector_rationale", "fork_turns", "prompt_digest",
     "initial_git_proof", "state", "attempt", "agent_id", "result", "coordinator_disposition",
     "prepared_at", "created_at", "completed_at", "disposed_at"
   ],
@@ -29,6 +29,7 @@
     "mode": { "const": "read" },
     "model": { "type": "string", "minLength": 1, "maxLength": 128 },
     "reasoning_effort": { "enum": ["none", "minimal", "low", "medium", "high", "xhigh", "max"] },
+    "selector_rationale": { "type": "string", "minLength": 1, "maxLength": 512 },
     "fork_turns": { "$ref": "#/$defs/forkTurns" },
     "prompt_digest": { "$ref": "#/$defs/digest" },
     "initial_git_proof": { "$ref": "#/$defs/gitProof" },

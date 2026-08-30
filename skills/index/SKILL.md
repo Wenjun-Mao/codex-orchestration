@@ -13,7 +13,8 @@ Route by intent before inspecting or changing repository state.
 - For an authorized actionable orchestration request, use
   `codex-orchestration:coordinate`. It may progressively activate one v0.6 run
   without tracked setup, after disclosing the exact runtime, Git-common state,
-  workflow revision, model routing, and proposed external task creation.
+  workflow revision, model routing, and proposed external task creation. Every
+  native model choice must include a durable selector rationale.
 - For permanent tracked team/headless policy, use
   `codex-orchestration:setup` only when the user explicitly asks to adopt,
   install, or retire Codex Flow, including an accepted v0.5.1-to-setup-free

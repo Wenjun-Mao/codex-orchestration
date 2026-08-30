@@ -56,6 +56,7 @@ async function fixture(t) {
       mode: "read",
       model: "gpt-5.6-terra",
       reasoning_effort: "high",
+      selector_rationale: "Use the read-only review model lane for bounded source evidence.",
       fork_turns: "3",
       dependencies: [],
       read_paths: ["docs/mission.md"],
@@ -118,6 +119,7 @@ test("one generated contract claims one prepared subagent operation and one disp
   assert.equal(context.operation.state, "prepared");
   assert.equal(context.operation.attempt, null);
   assert.deepEqual(validateSubagentOperation(context.operation), context.operation);
+  assert.equal(context.operation.selector_rationale, context.contract.task.selector_rationale);
 
   const repeatedPreparation = await prepareSubagentOperation({
     stateRoot: context.stateRoot,

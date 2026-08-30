@@ -41,8 +41,8 @@ contract beside the plan. Name:
   and instrument role for every task;
 - dependencies, read/write ownership, exclusive resources, verification, and
   a concrete baseline; and
-- the actual native surface, model, reasoning effort, and (for subagents)
-  `fork_turns`.
+- the actual native surface, model, reasoning effort, selector rationale, and
+  (for subagents) `fork_turns`.
 
 A supporting-instrument task must immediately unlock the named direct attempt
 or pause/replan. After one instrument-only checkpoint, more supporting
@@ -81,6 +81,12 @@ prepared prompt at most once and require the executor to accept from the exact
 persisted pristine worktree, on its reserved branch and baseline, using the
 exact release, contract, run-bound runtime, and common directory. An ambiguous
 send never authorizes blind resend.
+
+If the host rejects the exact model selector before creating a native object,
+reconcile one terminal `host-rejected-before-create` outcome. That consumes the
+contract's one-shot selector call; it never authorizes a retry or fallback. A
+coordinator may instead revise the unstarted task in one new content-addressed
+workflow revision, with a new selector rationale and contract.
 
 ## Monitor and close
 

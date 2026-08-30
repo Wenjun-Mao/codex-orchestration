@@ -43,6 +43,7 @@ function workflowTask(overrides = {}) {
     mode: "read",
     model: "gpt-5.6-terra",
     reasoning_effort: "high",
+    selector_rationale: "Use the read-only research model lane for the bounded evidence task.",
     fork_turns: "3",
     dependencies: [],
     read_paths: ["docs/mission.md"],
@@ -66,6 +67,7 @@ function implementationTask(overrides = {}) {
     mode: "write",
     model: "gpt-5.6-terra",
     reasoning_effort: "xhigh",
+    selector_rationale: "Use the implementation model lane for the owned write and verification slice.",
     fork_turns: null,
     dependencies: ["research"],
     read_paths: ["lib"],
@@ -208,6 +210,7 @@ test("generated contracts bind run, runtime, repository, coordinator, and durabl
   const research = contractFor(plan, "research");
   assert.equal(validateGeneratedTaskContract(research).contract_id, research.contract_id);
   assert.equal(research.run_id, authority().run_id);
+  assert.equal(research.task.selector_rationale, workflowTask().selector_rationale);
   assert.equal(research.runtime_context_digest, RUNTIME_DIGEST);
   assert.equal(research.coordinator_binding.binding_digest, authority().coordinator_binding.binding_digest);
   assert.throws(
@@ -352,6 +355,7 @@ test("v0.6 workflow and generated-contract schemas have one closed root authorit
   const contractSchema = JSON.parse(await readFile(resolve(packageRoot, "schemas/generated-task-contract.schema.json"), "utf8"));
   assert.equal(workflowSchema.oneOf, undefined);
   assert.equal(workflowSchema.properties.revision_digest.$ref, "#/$defs/digest");
+  assert.equal(workflowSchema.$defs.task.required.includes("selector_rationale"), true);
   assert.equal(contractSchema.properties.kind.const, "codex-flow-generated-task-contract");
   assert.equal(contractSchema.required.includes("runtime_context_digest"), true);
   assert.equal(contractSchema.required.includes("coordinator_binding"), true);

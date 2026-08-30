@@ -56,7 +56,7 @@
     "task": {
       "type": "object", "additionalProperties": false,
       "required": [
-        "task_id", "title", "execution_kind", "mode", "model", "reasoning_effort", "fork_turns",
+        "task_id", "title", "execution_kind", "mode", "model", "reasoning_effort", "selector_rationale", "fork_turns",
         "dependencies", "read_paths", "write_paths", "shared_resources", "primary_outcome", "causal_question",
         "cheapest_safe_direct_attempt", "instrument_role", "supporting_follow_up", "supporting_authorization"
       ],
@@ -67,6 +67,7 @@
         "mode": { "enum": ["read", "write"] },
         "model": { "type": "string", "minLength": 1, "maxLength": 128 },
         "reasoning_effort": { "enum": ["none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"] },
+        "selector_rationale": { "type": "string", "minLength": 1, "maxLength": 512 },
         "fork_turns": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/forkTurns" }] },
         "dependencies": { "type": "array", "maxItems": 128, "uniqueItems": true, "items": { "$ref": "#/$defs/safeId" } },
         "read_paths": { "$ref": "#/$defs/paths" },

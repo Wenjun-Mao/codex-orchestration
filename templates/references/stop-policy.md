@@ -12,6 +12,10 @@ Stop and preserve durable evidence when:
 - Git state is dirty outside the accepted `dirty-blocked` terminal path; or
 - evidence disproves the workflow contract.
 
+An exact host selector rejection before identity is not permission to retry or
+fall back. Preserve it as terminal-no-object evidence, then use one new
+content-addressed revision if a replacement selector is authorized.
+
 Before expanding diagnostics, harnesses, validators, or evidence, name the
 primary outcome, causal question, and cheapest safe direct attempt they enable.
 Report instrument progress separately. After one supporting-instrument

@@ -11,7 +11,8 @@ One immutable workflow revision must prove:
 - an admitted path/resource reservation envelope that covers every workflow
   write/resource claim, plus an exact branch reservation checked when each
   host-worktree task is created;
-- actual native surface plus requested model/reasoning for each task;
+- actual native surface plus requested model/reasoning and a selector rationale
+  for each task;
 - one direct follow-up or pause/replan after supporting instrumentation; and
 - serial integration and combined verification gates.
 
@@ -24,4 +25,5 @@ Only accepted terminal authority unblocks a dependency: a completed visible
 task disposition or an accepted native-subagent operation. Task final text,
 wait status, or the existence of a branch does not. A workflow revision may
 change only unstarted tasks and edges; started/released contracts remain
-immutable.
+immutable. An exact selector rejection before native-object identity is terminal
+for that contract but may be replanned only as a new content-addressed revision.

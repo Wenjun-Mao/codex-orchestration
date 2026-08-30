@@ -7,7 +7,8 @@ bounded and separate requested, accepted, and observed evidence.
 ## Visible task creation and release
 
 1. Authenticate the generated visible-task contract, concrete baseline, saved
-   project, requested model/reasoning, placement, and unclaimed executor branch.
+   project, requested model/reasoning and selector rationale, placement, and
+   unclaimed executor branch.
 2. Prepare and start exactly one creation attempt. Use the generated bootstrap
    prompt, which contains a cryptographic launch nonce but no objective.
 3. Make one native creation call with the actual project, model, reasoning, and
@@ -29,6 +30,12 @@ A timeout is ambiguous. Inspect state through the bounded reconciliation window
 but never issue a second create or blind release resend for the same contract.
 A session/control failure is durable evidence, not permission to substitute a
 subagent or local task.
+
+An exact host rejection of the requested selector before any provisional or
+ready identity, accepted selector evidence, or observed host object exists is
+terminal-no-object evidence. It consumes the one-shot create call. Do not retry
+or silently substitute a selector; only a new content-addressed workflow
+revision may issue a replacement contract.
 
 ## Wait, urgent delivery, and archive
 
