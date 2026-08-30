@@ -18,6 +18,11 @@ Route by intent before inspecting or changing repository state.
 - v0.7 has no tracked setup, adoption, predecessor-retirement, or `AGENTS.md`
   mutation route. Ordinary actionable use activates only explicit Git-common
   run state through the coordinate skill.
+- If incompatible retained Codex Flow state requires a clean start, or the
+  user asks to remove this repository's local Codex Flow state, use
+  `codex-orchestration:unplug`. It plans one repository at a time, archives
+  its known tasks before cleanup, and requires explicit approval before the
+  local apply step. It is not ordinary run cleanup or predecessor migration.
 - Inside a released visible executor task, use
   `codex-orchestration:execute`.
 - For durable results, dispositions, integration or no-change proof, combined

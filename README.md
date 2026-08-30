@@ -23,16 +23,23 @@ readers, mutators, migration paths, retirement commands, tracked adoption, and
 test fixtures are not packaged in v0.7.
 
 v0.7 carries forward the proven cross-task behavior from v0.6.5 under new
-`codex-flow-v07-*` identities and the exact `.git/codex-flow/v0.7.0/`
+`codex-flow-v07-*` identities and the exact `.git/codex-flow/v0.7.1/`
 namespace. It adds a bounded foreign-active-run sentinel so a live predecessor
 run blocks admission instead of being silently ignored or migrated.
+
+Actionable activation also requires a clean namespace boundary: any retained
+incompatible Flow namespace blocks and points to the repository-scoped
+`unplug` lifecycle. `unplug plan` is read-only; an exact `unplug apply` requires
+separate approval, proves known tasks archived, removes only authenticated
+eligible local resources, and deletes Flow state last.
 
 Editing this checkout never changes an installed plugin or active repository
 runtime. An activated v0.7 run snapshots its exact bundle into the repository's
 Git common directory, so its authority survives task restart, compaction,
-plugin upgrade, and plugin removal. Apart from the bounded lifecycle sentinel,
-v0.7 does not read, import, migrate, retire, or delete predecessor operational
-state.
+plugin upgrade, and plugin removal. The runtime never reads, imports, migrates,
+or executes predecessor authority. The separate version-agnostic `unplug`
+lifecycle inventories retained paths as opaque local state and removes them
+only through its own reviewed clean-start contract.
 
 ### Instruction authority
 
@@ -76,14 +83,16 @@ worktrees, branches, callbacks, integration, archive, or cleanup.
 Questions, explanations, audits, and plans are read-only. A repository needs
 no `.codex/orchestration/` setup before it can use v0.7. Actionable activation
 fails closed if the bounded sibling-namespace sentinel finds another active
-Codex Flow run; that run must be completed or abandoned under its own runtime
-before v0.7 starts.
+Codex Flow run or any incompatible retained namespace. A live run must be
+completed or abandoned under its own runtime. Terminal incompatible state must
+be reviewed and removed through an exact approved `unplug` plan before v0.7
+starts.
 
 When the user authorizes actionable orchestration, the plugin may activate one
 run after disclosing:
 
 - the exact package/runtime source and bundle hash;
-- the `.git/codex-flow/v0.7.0/` operational state root;
+- the `.git/codex-flow/v0.7.1/` operational state root;
 - repository/common-directory, baseline, host, and coordinator binding;
 - the immutable workflow revision and its path/resource/branch reservation
   envelope;
@@ -223,7 +232,12 @@ never proof. Git outcome is derived as `unchanged`, `clean-commit`, or
 `dirty-blocked`; upstream is nullable. Dirty or attention-needed tasks remain
 visible and keep the run from closing. Archive and Git cleanup are separate
 actions. v0.7 can derive a deterministic read-only cleanup plan and verify that
-refs/worktrees are resolved; it does not apply deletions.
+refs/worktrees are resolved; ordinary run cleanup does not apply deletions.
+The separate repository-scoped `unplug` lifecycle can apply an explicitly
+approved clean-start plan after every named task has been archived. It removes
+only exact eligible linked worktrees and local `codex/*` branches, then deletes
+all planned `.git/codex-flow` state last and proves that both state and its
+crash journal have zero residue.
 
 Native subagents use their separate `complete` then `dispose` proof chain with
 unchanged-Git evidence. They never enter this callback, integration, archive,
@@ -262,6 +276,7 @@ verification run|status
 integration prepare|verification-request|reconcile|status
 archive prepare|reconcile|status
 cleanup plan
+unplug plan|apply
 ```
 
 There is no public bare callback-consume command. Consumption is an internal
@@ -269,7 +284,9 @@ exactly-once consequence of finalizing an authoritative disposition.
 `run audit` derives and persists the complete terminal closure proof;
 `run close` accepts only that exact audit while its source records remain
 unchanged. `cleanup plan` is read-only; this development boundary exposes no
-cleanup-apply command.
+ordinary run-scoped cleanup-apply command. `unplug apply` is a distinct,
+repository-scoped clean-start reset with exact approval, archive, Git-safety,
+crash-resume, and zero-residue requirements.
 
 ## Package execution
 
@@ -293,6 +310,9 @@ The current boundary is summarized in
 progressive activation and [ADR 0016](docs/adr/0016-content-addressed-workflow-and-native-boundary.md)
 defines workflow identity and the native-task boundary. [ADR 0029](docs/adr/0029-v070-clean-authority-cutover.md)
 defines the clean predecessor-free package cutover.
+[ADR 0030](docs/adr/0030-prepare-admission-ordering.md) defines native
+prepare atomicity, and [ADR 0031](docs/adr/0031-clean-start-unplug-boundary.md)
+defines the clean-start/unplug contract.
 
 ## Source and distribution
 
@@ -312,5 +332,5 @@ npm run pack:check
 ```
 
 Source validation checks current schemas, skills, package metadata, examples,
-and runtime files. Release, installation, pilot contact, and deletion of
-retained local operational state remain separate approval checkpoints.
+and runtime files. Release, installation, pilot contact, and each invocation of
+the exact approved unplug operation remain separate approval checkpoints.

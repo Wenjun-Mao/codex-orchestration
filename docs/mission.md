@@ -198,9 +198,22 @@ mission.
 ## Version relationship
 
 This charter guides v0.7 and later development. v0.7 is a clean authority
-boundary: it packages no predecessor reader, mutator, migration, retirement,
+boundary: it packages no predecessor protocol reader, migration, retirement,
 tracked adoption, or plugin-managed instruction path. Earlier releases remain
 immutable source-tag and Git-history evidence only. A bounded lifecycle
 sentinel blocks admission while another version still has an active run, but
-v0.7 never imports or normalizes that run. Versioned schemas, runtime behavior,
+v0.7 never imports or normalizes that run.
+
+When incompatible retained local Flow state prevents a clean start, the
+separate `unplug` lifecycle is deliberately narrower than predecessor support:
+it inventories one repository, archives its known tasks, and applies only an
+explicitly approved exact local cleanup plan. It may remove only authenticated,
+tracked-clean same-common-directory linked worktrees and unprotected local
+`codex/*` branches already ancestral to the authenticated base. Dirty,
+ordinary-untracked, unmerged, attached, protected, remote, or drifted resources block;
+Git-ignored generated artifacts alone do not.
+Flow state is deleted last. The lifecycle does not inspect old workflow
+semantics, touch remote refs, tags, or source history, or uninstall the App
+plugin as a side effect. App uninstallation is a distinct optional action after
+the repository has no Flow-state residue. Versioned schemas, runtime behavior,
 and compatibility decisions remain explicit implementation checkpoints.

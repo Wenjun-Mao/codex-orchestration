@@ -83,7 +83,7 @@ function receipt({ baseline, commonDir, final = baseline, kind = "unchanged" }) 
 }
 
 function stateRoot(root) {
-  return resolve(root, ".git", "codex-flow", "v0.7.0");
+  return resolve(root, ".git", "codex-flow", "v0.7.1");
 }
 
 async function terminalReceipt({ root, baseline, final = baseline, kind = "unchanged" }) {

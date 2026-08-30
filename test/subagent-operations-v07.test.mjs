@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { readFile, realpath, writeFile } from "node:fs/promises";
+import { readFile, readdir, realpath, unlink, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import test from "node:test";
 import { sha256 } from "../lib/core.mjs";
@@ -32,7 +32,31 @@ import {
 const START = Date.parse("2026-08-29T12:00:00.000Z");
 const PROMPT = "Inspect the bounded source and return only the generated subagent contract result.";
 
-async function fixture(t) {
+function subagentTask(overrides = {}) {
+  return {
+    task_id: "bounded-review",
+    title: "Review the bounded source",
+    execution_kind: "subagent",
+    mode: "read",
+    model: "gpt-5.6-terra",
+    reasoning_effort: "high",
+    selector_rationale: "Use the read-only review model lane for bounded source evidence.",
+    fork_turns: "3",
+    dependencies: [],
+    read_paths: ["docs/mission.md"],
+    write_paths: [],
+    shared_resources: [],
+    primary_outcome: "Return a bounded source review.",
+    causal_question: "Does the source preserve the named contract?",
+    cheapest_safe_direct_attempt: "Read the named source and report the result.",
+    instrument_role: "primary-deliverable",
+    supporting_follow_up: null,
+    supporting_authorization: null,
+    ...overrides,
+  };
+}
+
+async function fixture(t, { tasks = [subagentTask()] } = {}) {
   const root = await createGitFixture("codex-flow-v07-subagent-operation-");
   t.after(() => removeFixture(root));
   const commonDir = await realpath(resolve(root, ".git"));
@@ -40,7 +64,7 @@ async function fixture(t) {
     cwd: root,
     encoding: "utf8",
   }).trim();
-  const stateRoot = resolve(commonDir, "codex-flow", "v0.7.0");
+  const stateRoot = resolve(commonDir, "codex-flow", "v0.7.1");
   const coordinator = {
     lineage_id: "subagent-operation-lineage",
     thread_id: "subagent-operation-coordinator",
@@ -51,26 +75,7 @@ async function fixture(t) {
     plan_id: "subagent-operation-plan",
     revision: 1,
     parent_revision_digest: null,
-    tasks: [{
-      task_id: "bounded-review",
-      title: "Review the bounded source",
-      execution_kind: "subagent",
-      mode: "read",
-      model: "gpt-5.6-terra",
-      reasoning_effort: "high",
-      selector_rationale: "Use the read-only review model lane for bounded source evidence.",
-      fork_turns: "3",
-      dependencies: [],
-      read_paths: ["docs/mission.md"],
-      write_paths: [],
-      shared_resources: [],
-      primary_outcome: "Return a bounded source review.",
-      causal_question: "Does the source preserve the named contract?",
-      cheapest_safe_direct_attempt: "Read the named source and report the result.",
-      instrument_role: "primary-deliverable",
-      supporting_follow_up: null,
-      supporting_authorization: null,
-    }],
+    tasks,
   });
   const runId = "run-subagent-operation";
   await activateV07FixtureRun({
@@ -97,6 +102,17 @@ async function fixture(t) {
     now: START - 1_000,
   });
   return { root, commonDir, stateRoot, contract, plan, runId, revision };
+}
+
+async function subagentStateFiles(stateRoot) {
+  const root = resolve(stateRoot, "subagents");
+  const entries = await Promise.all(["claims", "records"].map(async (directory) => (
+    (await readdir(resolve(root, directory)).catch((error) => {
+      if (error?.code === "ENOENT") return [];
+      throw error;
+    })).map((name) => `${directory}/${name}`)
+  )));
+  return entries.flat().sort();
 }
 
 async function prepared(t, overrides = {}) {
@@ -212,6 +228,119 @@ test("one generated contract claims one prepared subagent operation and one disp
     }),
     /prompt does not match/,
   );
+});
+
+test("subagent preparation rejects stale and cross-task journal timestamps without native residue", async (t) => {
+  const secondTask = subagentTask({
+    task_id: "later-review",
+    title: "Persist a later bounded review",
+    selector_rationale: "Use the read-only review model lane for the second bounded source review.",
+  });
+  const context = await fixture(t, { tasks: [subagentTask(), secondTask] });
+  const prepare = (now) => prepareSubagentOperation({
+    stateRoot: context.stateRoot,
+    task_contract: context.contract,
+    model: "gpt-5.6-terra",
+    reasoning_effort: "high",
+    fork_turns: "3",
+    mode: "read",
+    prompt_digest: sha256(PROMPT),
+    worktree_path: context.root,
+    now,
+  });
+  await assert.rejects(prepare(START - 2_000), /preparation predates its contract claim/);
+  assert.deepEqual(await subagentStateFiles(context.stateRoot), []);
+
+  const later = await persistWorkflowTaskContract({
+    stateRoot: context.stateRoot,
+    runId: context.runId,
+    planId: context.plan.plan_id,
+    taskId: secondTask.task_id,
+    currentBaseline: { revision: context.revision },
+    dependencyAuthorities: [],
+    now: START + 1_000,
+  });
+  assert.equal(later.task_id, secondTask.task_id);
+  await assert.rejects(prepare(START), /preparation predates the workflow journal/);
+  assert.deepEqual(await subagentStateFiles(context.stateRoot), []);
+
+  const operation = await prepare(START + 1_000);
+  assert.equal(operation.state, "prepared");
+  assert.equal((await subagentStateFiles(context.stateRoot)).length, 2);
+});
+
+test("only an exact subagent pre-dispatch orphan is recovered", async (t) => {
+  const context = await fixture(t);
+  const journalPath = resolve(
+    context.stateRoot,
+    "workflows",
+    context.runId,
+    context.plan.plan_id,
+    "journal.json",
+  );
+  const prepare = (now) => prepareSubagentOperation({
+    stateRoot: context.stateRoot,
+    task_contract: context.contract,
+    model: "gpt-5.6-terra",
+    reasoning_effort: "high",
+    fork_turns: "3",
+    mode: "read",
+    prompt_digest: sha256(PROMPT),
+    worktree_path: context.root,
+    now,
+  });
+  const unstartedJournal = await readFile(journalPath, "utf8");
+  const first = await prepare(START);
+  await writeFile(journalPath, unstartedJournal, "utf8");
+  const recovered = await prepare(START + 1_000);
+  assert.equal(recovered.operation_id, first.operation_id);
+  assert.equal(recovered.prepared_at, new Date(START + 1_000).toISOString());
+
+  await beginSubagentOperationAttempt({
+    stateRoot: context.stateRoot,
+    operationId: recovered.operation_id,
+    prompt: PROMPT,
+    timeoutSeconds: 60,
+    now: START + 2_000,
+  });
+  await writeFile(journalPath, unstartedJournal, "utf8");
+  await assert.rejects(prepare(START + 3_000), /Workflow native operation exists without its durable claim transition/);
+});
+
+test("an exact subagent claim-only pre-dispatch crash is recovered without a spawn", async (t) => {
+  const context = await fixture(t);
+  const journalPath = resolve(
+    context.stateRoot,
+    "workflows",
+    context.runId,
+    context.plan.plan_id,
+    "journal.json",
+  );
+  const prepare = (now) => prepareSubagentOperation({
+    stateRoot: context.stateRoot,
+    task_contract: context.contract,
+    model: "gpt-5.6-terra",
+    reasoning_effort: "high",
+    fork_turns: "3",
+    mode: "read",
+    prompt_digest: sha256(PROMPT),
+    worktree_path: context.root,
+    now,
+  });
+  const unstartedJournal = await readFile(journalPath, "utf8");
+  const first = await prepare(START);
+  await unlink(resolve(
+    context.stateRoot,
+    "subagents",
+    "records",
+    `${first.operation_id}.json`,
+  ));
+  await writeFile(journalPath, unstartedJournal, "utf8");
+
+  const recovered = await prepare(START + 1_000);
+  assert.equal(recovered.operation_id, first.operation_id);
+  assert.equal(recovered.prepared_at, new Date(START + 1_000).toISOString());
+  assert.equal(recovered.attempt, null);
 });
 test("accepted spawn reconciliation binds one exact agent before completion and disposition", async (t) => {
   const context = await prepared(t);

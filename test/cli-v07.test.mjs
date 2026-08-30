@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtemp, readFile, readdir, realpath, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, realpath, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import test from "node:test";
@@ -108,6 +108,8 @@ test("v0.7 help exposes no bare callback consume or predecessor commands", () =>
   assert.match(help.stdout, /callback deliver\|observe --run-id/);
   assert.match(help.stdout, /urgent persist\|attempt\|reconcile\|observe\|consume\|expire --run-id/);
   assert.match(help.stdout, /cleanup plan --run-id/);
+  assert.match(help.stdout, /unplug plan/);
+  assert.match(help.stdout, /unplug apply/);
   assert.doesNotMatch(help.stdout, /callback consume/);
   assert.doesNotMatch(help.stdout, /legacy-v05|adopt/);
 
@@ -118,6 +120,79 @@ test("v0.7 help exposes no bare callback consume or predecessor commands", () =>
   const predecessor = runCli(["legacy-v05", "status"]);
   assert.notEqual(predecessor.status, 0);
   assert.match(predecessor.stderr, /Unknown command: legacy-v05/);
+});
+
+test("v0.7 activation requires a clean start when an incompatible namespace remains", async (t) => {
+  const root = await createGitFixture("codex-flow-cli-v07-clean-start-");
+  const requests = await mkdtemp(resolve(tmpdir(), "codex-flow-cli-v07-clean-start-requests-"));
+  t.after(async () => {
+    await Promise.all([removeFixture(root), rm(requests, { recursive: true, force: true })]);
+  });
+  await mkdir(resolve(root, ".git", "codex-flow", "v0.7.0"), { recursive: true });
+  const request = activationRequest("run-clean-start-blocked");
+  const path = await requestFile(requests, "activation", request);
+  const result = runCli([
+    "run", "activate", "--run-id", request.run_id, "--file", path, "--json",
+  ], { cwd: root });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /Clean start required before activation/);
+  assert.match(result.stderr, /codex-flow unplug plan/);
+  await assert.rejects(
+    stat(resolve(root, ".git", "codex-flow", "v0.7.1", "runs", "lifecycle.json")),
+    { code: "ENOENT" },
+  );
+});
+
+test("v0.7 activation cannot race an in-progress unplug", async (t) => {
+  const root = await createGitFixture("codex-flow-cli-v07-unplug-marker-");
+  const requests = await mkdtemp(resolve(tmpdir(), "codex-flow-cli-v07-unplug-marker-requests-"));
+  t.after(async () => {
+    await Promise.all([removeFixture(root), rm(requests, { recursive: true, force: true })]);
+  });
+  await mkdir(resolve(root, ".git", "codex-flow-unplug-v07"), { recursive: true });
+  const request = activationRequest("run-unplug-marker-blocked");
+  const path = await requestFile(requests, "activation", request);
+  const result = runCli([
+    "run", "activate", "--run-id", request.run_id, "--file", path, "--json",
+  ], { cwd: root });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /unplug is already in progress/i);
+  await assert.rejects(
+    stat(resolve(root, ".git", "codex-flow", "v0.7.1", "runs", "lifecycle.json")),
+    { code: "ENOENT" },
+  );
+});
+
+test("v0.7 CLI plans unplug read-only and requires exact explicit approval to apply", async (t) => {
+  const root = await createGitFixture("codex-flow-cli-v07-unplug-");
+  const requests = await mkdtemp(resolve(tmpdir(), "codex-flow-cli-v07-unplug-requests-"));
+  t.after(async () => {
+    await Promise.all([removeFixture(root), rm(requests, { recursive: true, force: true })]);
+  });
+  const planRequest = await requestFile(requests, "unplug-plan", { resources: [] });
+  const planned = runCli(["unplug", "plan", "--file", planRequest, "--json"], { cwd: root });
+  assertSuccess(planned, "unplug plan");
+  const plan = JSON.parse(planned.stdout);
+  assert.equal(plan.mutation_performed, false);
+
+  const deniedRequest = await requestFile(requests, "unplug-denied", {
+    approved: false,
+    plan,
+    archive_evidence: {},
+  });
+  const denied = runCli(["unplug", "apply", "--file", deniedRequest, "--json"], { cwd: root });
+  assert.notEqual(denied.status, 0);
+  assert.match(denied.stderr, /approved=true/);
+
+  const applyRequest = await requestFile(requests, "unplug-apply", {
+    approved: true,
+    plan,
+    archive_evidence: {},
+    applied_at: "2026-08-30T12:00:00.000Z",
+  });
+  const applied = runCli(["unplug", "apply", "--file", applyRequest, "--json"], { cwd: root });
+  assertSuccess(applied, "unplug apply");
+  assert.equal(JSON.parse(applied.stdout).residue, false);
 });
 
 test("v0.7 callback delivery accepts an authenticated linked executor worktree", async (t) => {
@@ -451,8 +526,8 @@ test("run activation needs no tracked setup and replays the same disclosed autho
   const context = await activatedFixture(t, "activation");
   await assert.rejects(stat(resolve(context.root, ".codex", "orchestration")), /ENOENT/);
   assert.equal(context.result.status, "admitted");
-  assert.equal(context.result.state_authority.namespace, "v0.7.0");
-  assert.match(context.result.state_authority.state_root, /\.git\/codex-flow\/v0\.7\.0$/);
+  assert.equal(context.result.state_authority.namespace, "v0.7.1");
+  assert.match(context.result.state_authority.state_root, /\.git\/codex-flow\/v0\.7\.1$/);
   assert.equal(context.result.repository_authority.cleanliness, "clean");
   assert.equal(context.result.workflow_authority.run_id, context.runId);
   assert.equal(context.result.model_routing[0].model, "gpt-5.6-terra");
@@ -510,7 +585,7 @@ test("run activation rejects a workflow outside its reservation envelope before 
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /outside the admitted run fence envelope/);
   await assert.rejects(
-    stat(resolve(root, ".git", "codex-flow", "v0.7.0")),
+    stat(resolve(root, ".git", "codex-flow", "v0.7.1")),
     (error) => error?.code === "ENOENT",
   );
 });
@@ -591,7 +666,7 @@ test("a second active run is refused before acquiring orphan runtime or workflow
   const contextsRoot = resolve(
     context.result.state_authority.git_common_dir,
     "codex-flow",
-    "v0.7.0",
+    "v0.7.1",
     "contexts",
   );
   const beforeContexts = await readdir(contextsRoot);

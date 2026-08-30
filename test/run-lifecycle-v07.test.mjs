@@ -19,7 +19,10 @@ import {
   retainedRunFences,
   resumeRun,
 } from "../lib/run-lifecycle.mjs";
-import { foreignActiveRunCollisions } from "../lib/foreign-active-run-sentinel.mjs";
+import {
+  assertNoIncompatibleFlowNamespace,
+  foreignActiveRunCollisions,
+} from "../lib/foreign-active-run-sentinel.mjs";
 import { createWorkflowJournal } from "../lib/workflow-journal-v07.mjs";
 import { createWorkflowPlanRevision } from "../lib/workflow-plan.mjs";
 import { createGitFixture, removeFixture } from "./helpers.mjs";
@@ -351,9 +354,26 @@ test("foreign active-run sentinel blocks admission and bounds foreign namespace 
   await assert.rejects(
     foreignActiveRunCollisions({
       gitCommonDirectory: commonDir,
-      currentNamespace: "v0.7.0",
+      currentNamespace: "v0.7.1",
     }),
     /exceeds 32 namespaces/,
+  );
+});
+
+test("clean-start guard rejects even terminal incompatible namespaces", async (t) => {
+  const root = await createGitFixture("codex-flow-v07-clean-start-guard-");
+  t.after(() => removeFixture(root));
+  const commonDir = resolve(root, ".git");
+  await mkdir(resolve(commonDir, "codex-flow", "v0.7.0", "runs"), { recursive: true });
+  await writeFile(resolve(commonDir, "codex-flow", "v0.7.0", "runs", "lifecycle.json"), `${JSON.stringify({
+    active_run_id: null,
+  })}\n`, "utf8");
+  await assert.rejects(
+    assertNoIncompatibleFlowNamespace({
+      gitCommonDirectory: commonDir,
+      currentNamespace: "v0.7.1",
+    }),
+    /Clean start required before activation.*v0\.7\.0/,
   );
 });
 
@@ -412,7 +432,7 @@ test("run admission binds a persisted root workflow to its path and resource env
     }],
   });
   await createWorkflowJournal({
-    stateRoot: resolve(commonDir, "codex-flow", "v0.7.0"),
+    stateRoot: resolve(commonDir, "codex-flow", "v0.7.1"),
     runId: "run-root-envelope",
     planId: workflow.plan_id,
     planRevision: workflow,
@@ -458,7 +478,7 @@ test("runtime reads retain the exact bundle after the plugin source disappears",
     context: runtime,
     bundleSource,
   });
-  assert.match(acquired.bundle_root, /codex-flow\/v0\.7\.0\/runtimes\/[0-9a-f]{64}\/files$/);
+  assert.match(acquired.bundle_root, /codex-flow\/v0\.7\.1\/runtimes\/[0-9a-f]{64}\/files$/);
   await stat(resolve(acquired.bundle_root, "bin", "codex-flow.mjs"));
   await rm(packageRoot, { recursive: true, force: true });
   const read = await readRuntimeContext({

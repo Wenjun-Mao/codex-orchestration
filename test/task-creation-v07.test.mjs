@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { readFile, readdir, realpath, unlink } from "node:fs/promises";
+import { readFile, readdir, realpath, unlink, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import test from "node:test";
 import {
@@ -78,7 +78,7 @@ async function fixture({
     generation: 1,
   };
   coordinator.binding_digest = coordinatorBindingDigest(coordinator);
-  const stateRoot = resolve(commonDir, "codex-flow", "v0.7.0");
+  const stateRoot = resolve(commonDir, "codex-flow", "v0.7.1");
   const runId = "run-visible-task";
   const snapshot = gitSnapshot(root);
   const bundleSource = await loadRuntimeBundleSource({ packageRoot });
@@ -165,6 +165,17 @@ function acceptedSelectors(requested, at = START + 500) {
     worktree: requested.worktree,
     accepted_at: new Date(at).toISOString(),
   };
+}
+
+async function visibleCreationStateFiles(stateRoot) {
+  const root = resolve(stateRoot, "visible-task-creations");
+  const entries = await Promise.all(["claims", "records"].map(async (directory) => (
+    (await readdir(resolve(root, directory)).catch((error) => {
+      if (error?.code === "ENOENT") return [];
+      throw error;
+    })).map((name) => `${directory}/${name}`)
+  )));
+  return entries.flat().sort();
 }
 
 test("one-shot visible creation binds provisional and ready identities through the exact launch nonce", async () => {
@@ -443,6 +454,148 @@ test("a generated visible-task contract authorizes exactly one native creation a
     assert.equal(expired.status, "ambiguous");
     assert.equal(expired.resolution.reason_code, "reconciliation-window-expired");
     assert.equal(expired.attempt_permitted, false);
+  } finally {
+    await removeFixture(context.root);
+  }
+});
+
+test("visible preparation rejects stale and cross-task journal timestamps without native residue", async () => {
+  const secondTask = visibleTask({
+    task_id: "visible-later-contract",
+    title: "Persist a later visible contract",
+    read_paths: ["README.md"],
+    write_paths: ["audit-sentinel/later-visible.txt"],
+  });
+  const context = await fixture({ tasks: [visibleTask(), secondTask] });
+  try {
+    await assert.rejects(
+      prepareVisibleTaskCreation({
+        stateRoot: context.stateRoot,
+        taskContract: context.contract,
+        requestedSelectors: context.requested,
+        now: START - 2_000,
+      }),
+      /preparation predates its contract claim/,
+    );
+    assert.deepEqual(await visibleCreationStateFiles(context.stateRoot), []);
+
+    const later = await persistWorkflowTaskContract({
+      stateRoot: context.stateRoot,
+      runId: context.runId,
+      planId: context.plan.plan_id,
+      taskId: secondTask.task_id,
+      currentBaseline: { revision: context.revision },
+      dependencyAuthorities: [],
+      now: START + 1_000,
+    });
+    assert.equal(later.task_id, secondTask.task_id);
+    await assert.rejects(
+      prepareVisibleTaskCreation({
+        stateRoot: context.stateRoot,
+        taskContract: context.contract,
+        requestedSelectors: context.requested,
+        now: START,
+      }),
+      /preparation predates the workflow journal/,
+    );
+    assert.deepEqual(await visibleCreationStateFiles(context.stateRoot), []);
+
+    const prepared = await prepareVisibleTaskCreation({
+      stateRoot: context.stateRoot,
+      taskContract: context.contract,
+      requestedSelectors: context.requested,
+      now: START + 1_000,
+    });
+    assert.equal(prepared.status, "prepared");
+    assert.equal((await visibleCreationStateFiles(context.stateRoot)).length, 2);
+  } finally {
+    await removeFixture(context.root);
+  }
+});
+
+test("only an exact visible pre-dispatch orphan is recovered", async () => {
+  const context = await fixture();
+  const journalPath = resolve(
+    context.stateRoot,
+    "workflows",
+    context.runId,
+    context.plan.plan_id,
+    "journal.json",
+  );
+  try {
+    const unstartedJournal = await readFile(journalPath, "utf8");
+    const first = await prepareVisibleTaskCreation({
+      stateRoot: context.stateRoot,
+      taskContract: context.contract,
+      requestedSelectors: context.requested,
+      now: START,
+    });
+    await writeFile(journalPath, unstartedJournal, "utf8");
+    const recovered = await prepareVisibleTaskCreation({
+      stateRoot: context.stateRoot,
+      taskContract: context.contract,
+      requestedSelectors: context.requested,
+      now: START + 1_000,
+    });
+    assert.equal(recovered.operation_id, first.operation_id);
+    assert.notEqual(recovered.launch_nonce, first.launch_nonce);
+
+    await recordVisibleTaskCreationAttempt({
+      stateRoot: context.stateRoot,
+      operationId: recovered.operation_id,
+      hostSessionId: "visible-recovery-attempt",
+      timeoutSeconds: 60,
+      now: START + 2_000,
+    });
+    await writeFile(journalPath, unstartedJournal, "utf8");
+    await assert.rejects(
+      prepareVisibleTaskCreation({
+        stateRoot: context.stateRoot,
+        taskContract: context.contract,
+        requestedSelectors: context.requested,
+        now: START + 3_000,
+      }),
+      /Workflow native operation exists without its durable claim transition/,
+    );
+  } finally {
+    await removeFixture(context.root);
+  }
+});
+
+test("an exact visible claim-only pre-dispatch crash is recovered without a host attempt", async () => {
+  const context = await fixture();
+  const journalPath = resolve(
+    context.stateRoot,
+    "workflows",
+    context.runId,
+    context.plan.plan_id,
+    "journal.json",
+  );
+  try {
+    const unstartedJournal = await readFile(journalPath, "utf8");
+    const first = await prepareVisibleTaskCreation({
+      stateRoot: context.stateRoot,
+      taskContract: context.contract,
+      requestedSelectors: context.requested,
+      now: START,
+    });
+    await unlink(resolve(
+      context.stateRoot,
+      "visible-task-creations",
+      "records",
+      `${first.operation_id}.json`,
+    ));
+    await writeFile(journalPath, unstartedJournal, "utf8");
+
+    const recovered = await prepareVisibleTaskCreation({
+      stateRoot: context.stateRoot,
+      taskContract: context.contract,
+      requestedSelectors: context.requested,
+      now: START + 1_000,
+    });
+    assert.equal(recovered.operation_id, first.operation_id);
+    assert.notEqual(recovered.launch_nonce, first.launch_nonce);
+    assert.equal(recovered.status, "prepared");
   } finally {
     await removeFixture(context.root);
   }

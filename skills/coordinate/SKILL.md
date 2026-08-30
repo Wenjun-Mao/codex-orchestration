@@ -15,7 +15,7 @@ Questions and planning remain read-only. Before an actionable run writes
 operational state or creates a native task, disclose:
 
 - the package/runtime source and exact bundle hash;
-- the `.git/codex-flow/v0.7.0/` Git-common state root;
+- the `.git/codex-flow/v0.7.1/` Git-common state root;
 - the repository, baseline, host, coordinator lineage and generation;
 - the proposed workflow revision and path/resource/branch reservation envelope;
 - each task's saved project, visible-task or subagent surface, requested model
@@ -30,6 +30,13 @@ There is no requirement for tracked `.codex/orchestration/`. Activation must
 snapshot the exact runtime under the exact-version Git-common namespace and
 fail closed on runtime drift, a bounded foreign active-run collision, a second
 v0.7 run, or conflicting retained fences.
+
+If admission reports an incompatible Flow namespace or requires a clean start,
+do not resume, reinterpret, migrate, or manually delete that state while
+coordinating a new run. Explain that the run was not activated. When the user
+asks to clean that exact repository, route to `codex-orchestration:unplug` for
+its archive-first, approval-gated plan; otherwise stop at the admission
+failure.
 
 ## Persist one workflow
 

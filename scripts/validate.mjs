@@ -13,7 +13,7 @@ import {
 import { validateReleaseIdentity } from "./release-identity.mjs";
 
 const root = resolve(import.meta.dirname, "..");
-const EXPECTED_PACKAGE_VERSION = "0.7.0";
+const EXPECTED_PACKAGE_VERSION = "0.7.1-dev.0";
 
 // ACTIVE V0.7 SCHEMA REGISTRY INSERTION POINT:
 // add every new operating schema here in the same change that introduces it.
@@ -38,6 +38,7 @@ const ACTIVE_V07_SCHEMA_NAMES = Object.freeze([
   "integration-record",
   "archive-operation",
   "cleanup-plan-v07",
+  "unplug-plan-v07",
 ]);
 
 const ACTIVE_V07_EXAMPLES = new Set(["v0.7-workflow-draft.json"]);
@@ -374,6 +375,12 @@ const skillContracts = new Map([
     "v0.7 exposes no cleanup apply command",
     "complete admitted path/resource/branch envelope durable",
   ]],
+  ["unplug", [
+    "Run `unplug plan` first",
+    "Archive every task named by the plan through the App",
+    "Apply only an approved exact plan",
+    "Delete every `.git/codex-flow` path last",
+  ]],
 ]);
 for (const [skillName, markers] of skillContracts) {
   const skill = await readRequired(`skills/${skillName}/SKILL.md`);
@@ -414,7 +421,7 @@ const templateContracts = new Map([
     "persist the signal before one identified interrupt attempt",
   ]],
   ["templates/references/task-lifecycle.md", [
-    ".git/codex-flow/v0.7.0/runtimes/<bundle-sha256>/",
+    ".git/codex-flow/v0.7.1/runtimes/<bundle-sha256>/",
     "terminal-receipt-v3 journal result without messaging",
     "content-addressed PASS verification and integration/no-change records",
     "Every stateful command names the run explicitly",

@@ -16,7 +16,15 @@ import {
 } from "../lib/core.mjs";
 import { cleanupPlanV07 } from "../lib/cleanup-v07.mjs";
 import { discoverGit, gitSnapshot } from "../lib/git.mjs";
-import { assertNoForeignActiveRunCollision } from "../lib/foreign-active-run-sentinel.mjs";
+import {
+  assertNoForeignActiveRunCollision,
+  assertNoIncompatibleFlowNamespace,
+} from "../lib/foreign-active-run-sentinel.mjs";
+import {
+  assertNoUnplugInProgressV07,
+  unplugApplyV07,
+  unplugPlanV07,
+} from "../lib/unplug-v07.mjs";
 import {
   bindRecipient,
   rebindRecipient,
@@ -148,6 +156,8 @@ Usage:
   codex-flow archive prepare|reconcile --run-id ID --file request.json [--json]
   codex-flow archive status --run-id ID --archive-id ID [--json]
   codex-flow cleanup plan --run-id ID [--json]
+  codex-flow unplug plan [--file request.json] [--json]
+  codex-flow unplug apply --file request.json [--json]
 
 Every run-scoped command requires an explicit --run-id. Complex mutations read
 one JSON request from --file and reject a mismatched request.run_id before any
@@ -487,7 +497,12 @@ async function commandRunV07(args) {
     if (git.cleanliness !== "clean") {
       throw new CliError("run activate requires a clean authenticated Git worktree", 73);
     }
+    await assertNoUnplugInProgressV07({ gitCommonDirectory: git.commonDir });
     await assertNoForeignActiveRunCollision({
+      gitCommonDirectory: git.commonDir,
+      currentNamespace: V07_RUNTIME_DIRECTORY,
+    });
+    await assertNoIncompatibleFlowNamespace({
       gitCommonDirectory: git.commonDir,
       currentNamespace: V07_RUNTIME_DIRECTORY,
     });
@@ -593,7 +608,7 @@ async function commandRunV07(args) {
         bundle_sha256: runtime.bundle.bundle_sha256,
       },
       state_authority: {
-        namespace: "v0.7.0",
+        namespace: "v0.7.1",
         state_root: git.stateRoot,
         git_common_dir: git.commonDir,
       },
@@ -1452,6 +1467,42 @@ async function commandCleanupV07(args) {
   v07Output(confirmed);
 }
 
+async function commandUnplugV07(args) {
+  const [subcommand, ...rest] = args;
+  if (!["plan", "apply"].includes(subcommand)) {
+    throw new CliError("unplug requires plan or apply");
+  }
+  const values = parseV07Options(rest);
+  if (values["run-id"] !== undefined) {
+    throw new CliError("unplug is repository-scoped and does not accept --run-id", 64);
+  }
+  requireCanonicalSource();
+  if (subcommand === "plan") {
+    const request = values.file === undefined ? { resources: [] } : await readJsonInput(values.file);
+    requireExactFields(request, { required: ["resources"] }, "unplug plan request");
+    v07Output(await unplugPlanV07({
+      repositoryPath: process.cwd(),
+      resources: request.resources,
+    }));
+    return;
+  }
+  if (!values.file) throw new CliError("unplug apply requires --file <request.json>");
+  const request = await readJsonInput(values.file);
+  requireExactFields(request, {
+    required: ["approved", "plan", "archive_evidence"],
+    optional: ["applied_at"],
+  }, "unplug apply request");
+  if (request.approved !== true) {
+    throw new CliError("unplug apply requires explicit approved=true for the exact plan", 73);
+  }
+  v07Output(await unplugApplyV07({
+    repositoryPath: process.cwd(),
+    plan: request.plan,
+    archiveEvidence: request.archive_evidence,
+    now: commandNow(request, "applied_at"),
+  }));
+}
+
 function isV07RunBoundMutation(command, args) {
   const subcommand = args[0];
   if (command === "workflow") return ["create", "revise", "contract"].includes(subcommand);
@@ -1522,6 +1573,7 @@ async function main() {
   if (command === "integration") return dispatchV07Command(command, args, commandIntegrationV07);
   if (command === "archive") return dispatchV07Command(command, args, commandArchiveV07);
   if (command === "cleanup") return commandCleanupV07(args);
+  if (command === "unplug") return commandUnplugV07(args);
   throw new CliError(`Unknown command: ${command}\n\n${HELP}`);
 }
 
