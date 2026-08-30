@@ -1,11 +1,12 @@
 # Codex Orchestration v0.6 boundary
 
-Status: accepted v0.6.4 boundary.
+Status: accepted v0.6.4 boundary; unreleased v0.6.5 archive-compatibility line.
 
 This document summarizes the v0.6 contract established by
 [ADR 0015](adr/0015-progressive-run-activation-authority.md) through
-[ADR 0027](adr/0027-run-audit-coordinator-anchor-by-verification-scope.md).
-The accepted source and personal-marketplace package are v0.6.4.
+[ADR 0028](adr/0028-archive-cleanliness-excludes-ignored-output.md).
+The accepted public source and personal-marketplace package remain v0.6.4.
+This editable checkout is the unreleased v0.6.5 archive-compatibility line.
 
 ## Retained cross-task authority
 
@@ -32,7 +33,7 @@ durable result journal or coordinator disposition.
 
 - A read-only question or plan never requires tracked repository setup.
 - An authorized actionable request may progressively activate one explicit run
-  under `.git/codex-flow/v0.6.4/`, with an exact runtime snapshot and disclosure
+  under `.git/codex-flow/v0.6.5/`, with an exact runtime snapshot and disclosure
   before external task creation.
 - Permanent tracked adoption is optional and uses the same engine. Existing
   tracked v0.5 authority must be explicitly retired; its evidence is preserved
@@ -66,6 +67,9 @@ durable result journal or coordinator disposition.
 - Native subagents instead close through `complete` and accepted `dispose`
   records with unchanged-Git evidence; they never enter the visible-task
   callback/integration/archive chain.
+- Archive preparation treats tracked and ordinary untracked changes as source
+  risk but permits Git-ignored generated output to remain until the host removes
+  the worktree.
 
 ## Retired mechanisms
 

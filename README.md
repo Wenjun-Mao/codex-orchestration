@@ -16,17 +16,19 @@ See [Mission and product boundary](docs/mission.md) for the durable charter.
 ## Current authority
 
 This public repository is the editing authority and remains `UNLICENSED`;
-public visibility does not grant an open-source license. The accepted source
-release and personal-marketplace package are v0.6.4. A repository may retain
-v0.5.1 consumer authority until its own explicit transition is approved and
-applied.
+public visibility does not grant an open-source license. The accepted public
+source release and personal-marketplace package remain v0.6.4; this editable
+checkout is the unreleased v0.6.5 archive-compatibility line. A repository may
+retain v0.5.1 consumer authority until its own explicit transition is approved
+and applied.
 
-The v0.6.4 release retains the v0.6.3 contract, including the Codex App
+The unreleased v0.6.5 line retains the v0.6.4 contract, including the Codex App
 compatibility fixes from v0.6.1, plugin-only instruction authority, deliberate
 model routing, and bounded selector-rejection replanning. It keeps no-change
 verification coordinator-owned while checking the persisted executor
 worktree, then keeps terminal run audits anchored to coordinator Git authority
-after that executor worktree is archived.
+after that executor worktree is archived. Archive preparation now distinguishes
+ignored generated output from tracked or ordinary untracked source risk.
 
 Editing this checkout never changes an installed plugin or active repository
 runtime. An activated v0.6 run snapshots its exact bundle into the repository's
@@ -89,7 +91,7 @@ When the user authorizes actionable orchestration, the plugin may activate one
 run after disclosing:
 
 - the exact package/runtime source and bundle hash;
-- the `.git/codex-flow/v0.6.4/` operational state root;
+- the `.git/codex-flow/v0.6.5/` operational state root;
 - repository/common-directory, baseline, host, and coordinator binding;
 - the immutable workflow revision and its path/resource/branch reservation
   envelope;
