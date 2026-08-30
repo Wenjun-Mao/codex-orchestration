@@ -13,7 +13,7 @@
   ],
   "properties": {
     "schema_version": { "const": 1 },
-    "kind": { "const": "codex-flow-v06-visible-task-creation" },
+    "kind": { "const": "codex-flow-v07-visible-task-creation" },
     "operation_id": {
       "type": "string",
       "pattern": "^visible-task-operation-v1-[0-9a-f]{64}$"

@@ -19,7 +19,7 @@ import {
 export const packageRoot = resolve(import.meta.dirname, "..");
 export const cli = resolve(packageRoot, "bin", "codex-flow.mjs");
 
-export async function activateV06FixtureRun({
+export async function activateV07FixtureRun({
   root,
   runId,
   plan,
@@ -109,23 +109,10 @@ export function runCli(args, { cwd, env = {}, input } = {}) {
   });
 }
 
-export function runLegacyCli(args, options = {}) {
-  return runCli(["legacy-v05", ...args], options);
-}
-
 export function assertSuccess(result, label = "command") {
   if (result.status !== 0) {
     throw new Error(`${label} failed (${result.status}): ${result.stderr || result.stdout}`);
   }
-}
-
-export function initializeFixture(args = [], { cwd, env = {} } = {}) {
-  const planned = runLegacyCli(["init", "--plan", "--json", ...args], { cwd, env });
-  assertSuccess(planned, "initialization plan");
-  const plan = JSON.parse(planned.stdout);
-  const applied = runLegacyCli(["init", "--apply-plan", plan.plan_id, "--json", ...args], { cwd, env });
-  assertSuccess(applied, "initialization apply");
-  return { plan, applied, result: JSON.parse(applied.stdout) };
 }
 
 export async function removeFixture(root) {

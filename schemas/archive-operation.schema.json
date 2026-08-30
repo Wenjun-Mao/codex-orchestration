@@ -13,7 +13,7 @@
   ],
   "properties": {
     "schema_version": { "const": 1 },
-    "kind": { "const": "codex-flow-v06-task-archive-operation" },
+    "kind": { "const": "codex-flow-v07-task-archive-operation" },
     "archive_id": { "$ref": "#/$defs/safeId" },
     "run_id": { "$ref": "#/$defs/safeId" },
     "runtime_context_digest": { "$ref": "#/$defs/digest" },

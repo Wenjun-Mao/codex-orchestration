@@ -14,50 +14,35 @@ import {
   requireText,
   stableStringify,
 } from "../lib/core.mjs";
-import { cleanupPlanV06 } from "../lib/cleanup-v06.mjs";
+import { cleanupPlanV07 } from "../lib/cleanup-v07.mjs";
 import { discoverGit, gitSnapshot } from "../lib/git.mjs";
-import {
-  LEGACY_V05_PACKAGE_VERSION,
-  createLegacyV05ReadonlyContext,
-  readLegacyV05ReadonlySummary,
-} from "../lib/legacy-v05-readonly.mjs";
-import {
-  applyLegacyRetirementPlan,
-  planLegacyRetirement,
-} from "../lib/legacy-retirement-v06.mjs";
+import { assertNoForeignActiveRunCollision } from "../lib/foreign-active-run-sentinel.mjs";
 import {
   bindRecipient,
   rebindRecipient,
   recipientStatus,
 } from "../lib/recipients.mjs";
 import {
-  consumeUrgentSignalV06,
-  expireUrgentSignalV06,
-  observeUrgentSignalV06,
-  persistUrgentSignalV06,
-  prepareUrgentAttemptV06,
-  reconcileUrgentAttemptV06,
-  urgentSignalRecordV06,
-  urgentSignalStatusV06,
-} from "../lib/urgent-signals-v06.mjs";
-import {
-  applyAdoptionPlan,
-  applyAdoptionRetirementPlan,
-  planAdoption,
-  planAdoptionRetirement,
-  readAdoption,
-} from "../lib/adoption-v06.mjs";
+  consumeUrgentSignalV07,
+  expireUrgentSignalV07,
+  observeUrgentSignalV07,
+  persistUrgentSignalV07,
+  prepareUrgentAttemptV07,
+  reconcileUrgentAttemptV07,
+  urgentSignalRecordV07,
+  urgentSignalStatusV07,
+} from "../lib/urgent-signals-v07.mjs";
 import {
   prepareTaskArchive,
   reconcileTaskArchive,
   taskArchiveStatus,
 } from "../lib/archive-lifecycle.mjs";
 import {
-  callbackRecordV06,
-  callbackStatusV06,
-  deliverCallbackV06,
-  observeCallbackV06,
-} from "../lib/callbacks-v06.mjs";
+  callbackRecordV07,
+  callbackStatusV07,
+  deliverCallbackV07,
+  observeCallbackV07,
+} from "../lib/callbacks-v07.mjs";
 import {
   cancelTaskBeforeExecution,
   finalizeTaskDisposition,
@@ -69,7 +54,7 @@ import {
   prepareSerialIntegration,
   reconcileSerialIntegration,
   serialIntegrationStatus,
-} from "../lib/integration-v06.mjs";
+} from "../lib/integration-v07.mjs";
 import {
   acceptTaskRelease,
   authenticateTaskReleaseExecutorWorktree,
@@ -91,12 +76,12 @@ import {
 } from "../lib/run-lifecycle.mjs";
 import {
   acquireRuntimeContext,
-  assertNoTrackedLegacyAuthority,
   buildRuntimeContext,
   loadRuntimeBundleSource,
   readRuntimeContext,
   runtimeBindingFromContext,
   runtimeContextHash,
+  V07_RUNTIME_DIRECTORY,
   validateRuntimeHost,
   validateRuntimeLineage,
 } from "../lib/runtime-context.mjs";
@@ -107,7 +92,7 @@ import {
   reconcileSubagentOperationAttempt,
   recordSubagentCoordinatorDisposition,
   subagentOperationStatus,
-} from "../lib/subagent-operations-v06.mjs";
+} from "../lib/subagent-operations-v07.mjs";
 import {
   preflightVisibleTaskBranchReservations,
   prepareVisibleTaskCreation,
@@ -115,35 +100,25 @@ import {
   recordVisibleTaskCreationAttempt,
   validateVisibleTaskCreationRecord,
   visibleTaskCreationStatus,
-} from "../lib/task-creation-v06.mjs";
+} from "../lib/task-creation-v07.mjs";
 import {
   resolveNoChangeVerificationSubject,
   runCombinedVerification,
   verificationStatus,
-} from "../lib/verifications-v06.mjs";
+} from "../lib/verifications-v07.mjs";
 import {
   createWorkflowJournal,
   persistWorkflowTaskContract,
   reviseWorkflowJournal,
   workflowJournalStatus,
   workflowTaskContractStatus,
-} from "../lib/workflow-journal-v06.mjs";
+} from "../lib/workflow-journal-v07.mjs";
 import {
   coordinatorBindingDigest,
   createWorkflowPlanRevision,
 } from "../lib/workflow-plan.mjs";
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-
-const LEGACY_HELP = `codex-flow ${LEGACY_V05_PACKAGE_VERSION} legacy-v05
-
-Read-only historical verification:
-  codex-flow legacy-v05 status [--json]
-  codex-flow legacy-v05 verify [--json]
-
-The exact v0.5.1 verifier is isolated and read-only. Predecessor installation,
-sync, doctor, task, callback, Git, lease, and cleanup commands are not packaged.
-`;
 
 const HELP = `codex-flow ${PACKAGE_VERSION}
 
@@ -173,18 +148,12 @@ Usage:
   codex-flow archive prepare|reconcile --run-id ID --file request.json [--json]
   codex-flow archive status --run-id ID --archive-id ID [--json]
   codex-flow cleanup plan --run-id ID [--json]
-  codex-flow adopt plan|apply|retire-plan|retire-apply --run-id ID --file request.json [--json]
-  codex-flow adopt status --run-id ID [--json]
-  codex-flow adopt legacy-retire-plan|legacy-retire-apply --file request.json [--json]
 
 Every run-scoped command requires an explicit --run-id. Complex mutations read
 one JSON request from --file and reject a mismatched request.run_id before any
 state change. Native App calls remain external: the CLI emits one exact host
 request when dispatch is permitted, then journals the separately reconciled
 outcome.
-
-The predecessor CLI is quarantined under codex-flow legacy-v05 ... for
-historical verification only. It is not v0.6 execution authority.
 `;
 
 function parse(options, args = process.argv.slice(2), allowPositionals = true) {
@@ -224,7 +193,7 @@ function requireCanonicalSource() {
   }
 }
 
-function v06Output(value) {
+function v07Output(value) {
   console.log(stableStringify(value, 2));
 }
 
@@ -267,7 +236,7 @@ async function assertRunBoundRuntimeExecution({ git, runId, requestFile, runtime
   ].join("\n"), 73);
 }
 
-function parseV06Options(args, extra = {}) {
+function parseV07Options(args, extra = {}) {
   return parse({
     "run-id": { type: "string" },
     file: { type: "string" },
@@ -301,7 +270,7 @@ function commandNow(request, field = "recorded_at") {
   return milliseconds;
 }
 
-function v06Repository() {
+function v07Repository() {
   return discoverGit(process.cwd());
 }
 
@@ -330,13 +299,13 @@ async function subagentAuthority(git, operationId, runId) {
 }
 
 async function callbackAuthority(git, callbackId, runId) {
-  const record = await callbackRecordV06({ stateRoot: git.stateRoot, callbackId });
+  const record = await callbackRecordV07({ stateRoot: git.stateRoot, callbackId });
   assertRunIdentity(record.receipt, runId, "terminal callback");
   return record;
 }
 
 async function urgentAuthority(git, urgentId, runId) {
-  const record = await urgentSignalRecordV06({ stateRoot: git.stateRoot, urgentId });
+  const record = await urgentSignalRecordV07({ stateRoot: git.stateRoot, urgentId });
   assertRunIdentity(record.signal, runId, "urgent signal");
   return record;
 }
@@ -358,7 +327,7 @@ async function archiveAuthority(git, archiveId, runId) {
 
 async function activeRunAuthority(git, runId, planId = null, { allowLinkedWorktree = false } = {}) {
   const { run } = await readRun({ gitCommonDirectory: git.commonDir, runId });
-  if (run.status !== "active") throw new CliError(`v0.6 run is not active: ${runId}`, 73);
+  if (run.status !== "active") throw new CliError(`v0.7 run is not active: ${runId}`, 73);
   if (planId !== null && run.workflow_plan_id !== planId) {
     throw new CliError("workflow plan_id does not match the active run", 73);
   }
@@ -378,7 +347,7 @@ async function activeRunAuthority(git, runId, planId = null, { allowLinkedWorktr
   ) throw new CliError("active run/runtime/repository authority is inconsistent", 73);
   if (!allowLinkedWorktree && runtime.repository.root !== git.root) {
     throw new CliError(
-      "v0.6 mutation requires coordinator-only mutation authority from the exact coordinator checkout",
+      "v0.7 mutation requires coordinator-only mutation authority from the exact coordinator checkout",
       73,
     );
   }
@@ -442,7 +411,7 @@ async function rebindRunCoordinatorRecipient({ git, runId, resume, next, rebound
     gitCommonDirectory: git.commonDir,
     runId,
   });
-  if (current.status !== "active") throw new CliError(`v0.6 run is not active: ${runId}`, 73);
+  if (current.status !== "active") throw new CliError(`v0.7 run is not active: ${runId}`, 73);
   const latest = current.rebind_history.at(-1) ?? null;
   const resumeIsCurrent = stableStringify(current.binding) === stableStringify(resume);
   const exactReplay = !resumeIsCurrent
@@ -501,10 +470,10 @@ function activationFences(value) {
   });
 }
 
-async function commandRunV06(args) {
+async function commandRunV07(args) {
   const [subcommand, ...rest] = args;
   if (subcommand === "activate") {
-    const values = parseV06Options(rest);
+    const values = parseV07Options(rest);
     const { runId, request } = await runScopedRequest(values, "run activate", {
       required: ["activated_at", "runtime", "workflow", "fences"],
     });
@@ -518,7 +487,10 @@ async function commandRunV06(args) {
     if (git.cleanliness !== "clean") {
       throw new CliError("run activate requires a clean authenticated Git worktree", 73);
     }
-    await assertNoTrackedLegacyAuthority(git.root);
+    await assertNoForeignActiveRunCollision({
+      gitCommonDirectory: git.commonDir,
+      currentNamespace: V07_RUNTIME_DIRECTORY,
+    });
     const workflow = createWorkflowPlanRevision(request.workflow);
     const fences = activationFences(request.fences);
     assertWorkflowReservationCovered(fences, workflow);
@@ -548,7 +520,7 @@ async function commandRunV06(args) {
       : lifecycle.state.runs[lifecycle.state.active_run_id];
     const existing = lifecycle.state.runs[runId] ?? null;
     if (active !== null && active.run_id !== runId) {
-      throw new CliError(`A different v0.6 run is already active: ${active.run_id}`, 75);
+      throw new CliError(`A different v0.7 run is already active: ${active.run_id}`, 75);
     }
     if (existing !== null && (
       existing.status !== "active"
@@ -557,7 +529,7 @@ async function commandRunV06(args) {
       || existing.workflow_revision_digest !== workflow.revision_digest
       || stableStringify(existing.plan) !== stableStringify(fences)
     )) {
-      throw new CliError(`v0.6 run activation does not match its immutable authority: ${runId}`, 73);
+      throw new CliError(`v0.7 run activation does not match its immutable authority: ${runId}`, 73);
     }
     if (runtime.lineage.generation !== 1) {
       throw new CliError("fresh run activation coordinator lineage must start at generation 1", 73);
@@ -612,7 +584,7 @@ async function commandRunV06(args) {
     });
     const binding = runtimeBindingFromContext(runtime);
     const coordinatorBinding = canonicalCoordinatorBinding(runtime.lineage);
-    v06Output({
+    v07Output({
       status: admitted.status,
       package_authority: {
         package: "@wjmao/codex-flow",
@@ -621,7 +593,7 @@ async function commandRunV06(args) {
         bundle_sha256: runtime.bundle.bundle_sha256,
       },
       state_authority: {
-        namespace: "v0.6.5",
+        namespace: "v0.7.0",
         state_root: git.stateRoot,
         git_common_dir: git.commonDir,
       },
@@ -665,9 +637,9 @@ async function commandRunV06(args) {
   }
 
   if (subcommand === "status") {
-    const values = parseV06Options(rest);
+    const values = parseV07Options(rest);
     const runId = explicitRunId(values);
-    const git = v06Repository();
+    const git = v07Repository();
     const result = await readRun({ gitCommonDirectory: git.commonDir, runId });
     const runtime = await readRuntimeContext({
       gitCommonDirectory: git.commonDir,
@@ -678,21 +650,21 @@ async function commandRunV06(args) {
       runId,
       planId: result.run.workflow_plan_id,
     });
-    v06Output({ ...result, runtime: runtime.context, workflow });
+    v07Output({ ...result, runtime: runtime.context, workflow });
     return;
   }
 
   if (subcommand === "audit") {
-    const values = parseV06Options(rest);
+    const values = parseV07Options(rest);
     const runId = explicitRunId(values);
-    const git = v06Repository();
-    const { auditRunClosure } = await import("../lib/run-audit-v06.mjs");
-    v06Output(await auditRunClosure({ stateRoot: git.stateRoot, runId }));
+    const git = v07Repository();
+    const { auditRunClosure } = await import("../lib/run-audit-v07.mjs");
+    v07Output(await auditRunClosure({ stateRoot: git.stateRoot, runId }));
     return;
   }
 
   if (["resume", "rebind", "close", "abandon"].includes(subcommand)) {
-    const values = parseV06Options(rest);
+    const values = parseV07Options(rest);
     const shapes = {
       resume: { required: ["resume"] },
       rebind: { required: ["resume", "next"], optional: ["rebound_at"] },
@@ -703,7 +675,7 @@ async function commandRunV06(args) {
       },
     };
     const { runId, request } = await runScopedRequest(values, `run ${subcommand}`, shapes[subcommand]);
-    const git = v06Repository();
+    const git = v07Repository();
     let result;
     if (subcommand === "resume") {
       result = await resumeRun({ gitCommonDirectory: git.commonDir, runId, resume: request.resume });
@@ -726,7 +698,7 @@ async function commandRunV06(args) {
         abandonedAt: request.abandoned_at ?? new Date().toISOString(),
       }));
     } else {
-      const { closeRunFromAudit } = await import("../lib/run-audit-v06.mjs");
+      const { closeRunFromAudit } = await import("../lib/run-audit-v07.mjs");
       result = await closeRunFromAudit({
         gitCommonDirectory: git.commonDir,
         stateRoot: git.stateRoot,
@@ -736,16 +708,16 @@ async function commandRunV06(args) {
         closedAt: request.closed_at ?? new Date().toISOString(),
       });
     }
-    v06Output(result);
+    v07Output(result);
     return;
   }
   throw new CliError("run requires activate, status, resume, rebind, audit, close, or abandon");
 }
 
-async function commandWorkflowV06(args) {
+async function commandWorkflowV07(args) {
   const [subcommand, ...rest] = args;
-  const values = parseV06Options(rest, { "plan-id": { type: "string" } });
-  const git = v06Repository();
+  const values = parseV07Options(rest, { "plan-id": { type: "string" } });
+  const git = v07Repository();
   if (subcommand === "status") {
     const runId = explicitRunId(values);
     const planId = requireText(values["plan-id"], "--plan-id", { max: 128, safeId: true });
@@ -753,7 +725,7 @@ async function commandWorkflowV06(args) {
     if (run.workflow_plan_id !== planId) {
       throw new CliError("workflow plan_id does not match --run-id", 73);
     }
-    v06Output(await workflowJournalStatus({ stateRoot: git.stateRoot, runId, planId }));
+    v07Output(await workflowJournalStatus({ stateRoot: git.stateRoot, runId, planId }));
     return;
   }
   const shapes = {
@@ -799,7 +771,7 @@ async function commandWorkflowV06(args) {
       now: commandNow(request, "created_at"),
     });
   }
-  v06Output(result);
+  v07Output(result);
 }
 
 function taskAttemptView(result) {
@@ -815,10 +787,10 @@ function taskAttemptView(result) {
     : base;
 }
 
-async function commandTaskCreateV06(args) {
+async function commandTaskCreateV07(args) {
   const [subcommand, ...rest] = args;
-  const values = parseV06Options(rest, { "operation-id": { type: "string" } });
-  const git = v06Repository();
+  const values = parseV07Options(rest, { "operation-id": { type: "string" } });
+  const git = v07Repository();
   if (subcommand === "status") {
     const runId = explicitRunId(values);
     const operationId = requireText(values["operation-id"], "--operation-id", {
@@ -827,7 +799,7 @@ async function commandTaskCreateV06(args) {
     });
     await visibleTaskAuthority(git, operationId, runId);
     const result = await visibleTaskCreationStatus({ stateRoot: git.stateRoot, operationId });
-    v06Output(assertRunIdentity(result, runId, "visible-task creation"));
+    v07Output(assertRunIdentity(result, runId, "visible-task creation"));
     return;
   }
   const shapes = {
@@ -881,26 +853,26 @@ async function commandTaskCreateV06(args) {
     });
   }
   assertRunIdentity(result, runId, "visible-task creation");
-  v06Output(subcommand === "attempt" ? taskAttemptView(result) : result);
+  v07Output(subcommand === "attempt" ? taskAttemptView(result) : result);
 }
 
-async function commandTaskV06(args) {
+async function commandTaskV07(args) {
   const [subcommand, ...rest] = args;
   if (subcommand !== "create") {
-    throw new CliError("v0.5 task packet/operation commands are not v0.6 authority; use workflow and task create");
+    throw new CliError("v0.5 task packet/operation commands are not v0.7 authority; use workflow and task create");
   }
-  return commandTaskCreateV06(rest);
+  return commandTaskCreateV07(rest);
 }
 
-async function commandSubagentV06(args) {
+async function commandSubagentV07(args) {
   const [subcommand, ...rest] = args;
-  const values = parseV06Options(rest, { "operation-id": { type: "string" } });
-  const git = v06Repository();
+  const values = parseV07Options(rest, { "operation-id": { type: "string" } });
+  const git = v07Repository();
   if (subcommand === "status") {
     const runId = explicitRunId(values);
     const operationId = requireText(values["operation-id"], "--operation-id", { max: 128, safeId: true });
     const result = await subagentAuthority(git, operationId, runId);
-    v06Output(assertRunIdentity(result, runId, "subagent operation"));
+    v07Output(assertRunIdentity(result, runId, "subagent operation"));
     return;
   }
   const shapes = {
@@ -983,9 +955,9 @@ async function commandSubagentV06(args) {
   const output = assertRunIdentity(result, runId, "subagent operation");
   if (subcommand === "attempt" && output.dispatch_permitted !== true) {
     const { host_request: ignored, ...withoutHostRequest } = output;
-    v06Output(withoutHostRequest);
+    v07Output(withoutHostRequest);
   } else {
-    v06Output(output);
+    v07Output(output);
   }
 }
 
@@ -1011,15 +983,15 @@ function releasePrepareView(result) {
     : base;
 }
 
-async function commandReleaseV06(args, mutationAuthority = null) {
+async function commandReleaseV07(args, mutationAuthority = null) {
   const [subcommand, ...rest] = args;
-  const values = parseV06Options(rest, { "release-id": { type: "string" } });
-  const git = v06Repository();
+  const values = parseV07Options(rest, { "release-id": { type: "string" } });
+  const git = v07Repository();
   if (subcommand === "status") {
     const runId = explicitRunId(values);
     const releaseId = requireText(values["release-id"], "--release-id", { max: 128, safeId: true });
     const result = await releaseAuthority(git, releaseId, runId);
-    v06Output(assertRunIdentity(result, runId, "task release"));
+    v07Output(assertRunIdentity(result, runId, "task release"));
     return;
   }
   const shapes = {
@@ -1085,16 +1057,16 @@ async function commandReleaseV06(args, mutationAuthority = null) {
     });
   }
   assertRunIdentity(result, runId, "task release");
-  v06Output(subcommand === "prepare" ? releasePrepareView(result) : result);
+  v07Output(subcommand === "prepare" ? releasePrepareView(result) : result);
 }
 
-async function commandCallbackV06(args) {
+async function commandCallbackV07(args) {
   const [subcommand, ...rest] = args;
-  const values = parseV06Options(rest);
-  const git = v06Repository();
+  const values = parseV07Options(rest);
+  const git = v07Repository();
   if (subcommand === "status") {
     const runId = explicitRunId(values);
-    v06Output(await callbackStatusV06({ stateRoot: git.stateRoot, runId }));
+    v07Output(await callbackStatusV07({ stateRoot: git.stateRoot, runId }));
     return;
   }
   if (subcommand === "consume") {
@@ -1109,7 +1081,7 @@ async function commandCallbackV06(args) {
   let result;
   if (subcommand === "deliver") {
     if (request.receipt.run_id !== runId) throw new CliError("receipt.run_id does not match --run-id", 73);
-    result = await deliverCallbackV06({
+    result = await deliverCallbackV07({
       stateRoot: git.stateRoot,
       receipt: request.receipt,
       expectedRunId: runId,
@@ -1117,7 +1089,7 @@ async function commandCallbackV06(args) {
     });
   } else {
     await callbackAuthority(git, request.callback_id, runId);
-    result = await observeCallbackV06({
+    result = await observeCallbackV07({
       stateRoot: git.stateRoot,
       callbackId: request.callback_id,
       recipient: request.recipient,
@@ -1125,7 +1097,7 @@ async function commandCallbackV06(args) {
     });
     if (result.receipt) assertRunIdentity(result.receipt, runId, "terminal callback");
   }
-  v06Output(result);
+  v07Output(result);
 }
 
 function urgentAttemptView(result) {
@@ -1140,14 +1112,14 @@ function urgentAttemptView(result) {
     : base;
 }
 
-async function commandUrgentV06(args) {
+async function commandUrgentV07(args) {
   const [subcommand, ...rest] = args;
-  const values = parseV06Options(rest);
-  const git = v06Repository();
+  const values = parseV07Options(rest);
+  const git = v07Repository();
   if (subcommand === "status") {
     const runId = explicitRunId(values);
     await readRun({ gitCommonDirectory: git.commonDir, runId });
-    v06Output(await urgentSignalStatusV06(git.stateRoot, { runId }));
+    v07Output(await urgentSignalStatusV07(git.stateRoot, { runId }));
     return;
   }
   const shapes = {
@@ -1198,7 +1170,7 @@ async function commandUrgentV06(args) {
         73,
       );
     }
-    result = await persistUrgentSignalV06({
+    result = await persistUrgentSignalV07({
       stateRoot: git.stateRoot,
       signal: request.signal,
       now: commandNow(request, "persisted_at"),
@@ -1206,14 +1178,14 @@ async function commandUrgentV06(args) {
   } else {
     await urgentAuthority(git, request.urgent_id, runId);
     if (subcommand === "attempt") {
-      result = urgentAttemptView(await prepareUrgentAttemptV06({
+      result = urgentAttemptView(await prepareUrgentAttemptV07({
         stateRoot: git.stateRoot,
         urgentId: request.urgent_id,
         attemptSequence: 1,
         now: commandNow(request, "prepared_at"),
       }));
     } else if (subcommand === "reconcile") {
-      result = await reconcileUrgentAttemptV06({
+      result = await reconcileUrgentAttemptV07({
         stateRoot: git.stateRoot,
         urgentId: request.urgent_id,
         deliveryAttemptId: request.delivery_attempt_id,
@@ -1221,7 +1193,7 @@ async function commandUrgentV06(args) {
         now: commandNow(request, "reconciled_at"),
       });
     } else if (subcommand === "observe") {
-      result = await observeUrgentSignalV06({
+      result = await observeUrgentSignalV07({
         stateRoot: git.stateRoot,
         urgentId: request.urgent_id,
         deliveryAttemptId: request.delivery_attempt_id,
@@ -1229,7 +1201,7 @@ async function commandUrgentV06(args) {
         now: commandNow(request, "observed_at"),
       });
     } else if (subcommand === "consume") {
-      result = await consumeUrgentSignalV06({
+      result = await consumeUrgentSignalV07({
         stateRoot: git.stateRoot,
         urgentId: request.urgent_id,
         recipient: request.recipient,
@@ -1237,25 +1209,25 @@ async function commandUrgentV06(args) {
         now: commandNow(request, "consumed_at"),
       });
     } else {
-      result = await expireUrgentSignalV06({
+      result = await expireUrgentSignalV07({
         stateRoot: git.stateRoot,
         urgentId: request.urgent_id,
         now: commandNow(request, "expired_at"),
       });
     }
   }
-  v06Output(result);
+  v07Output(result);
 }
 
-async function commandDispositionV06(args) {
+async function commandDispositionV07(args) {
   const [subcommand, ...rest] = args;
-  const values = parseV06Options(rest, { "disposition-id": { type: "string" } });
-  const git = v06Repository();
+  const values = parseV07Options(rest, { "disposition-id": { type: "string" } });
+  const git = v07Repository();
   if (subcommand === "status") {
     const runId = explicitRunId(values);
     const dispositionId = requireText(values["disposition-id"], "--disposition-id", { max: 128, safeId: true });
     const result = await dispositionAuthority(git, dispositionId, runId);
-    v06Output(assertRunIdentity(result, runId, "task disposition"));
+    v07Output(assertRunIdentity(result, runId, "task disposition"));
     return;
   }
   const shapes = {
@@ -1301,16 +1273,16 @@ async function commandDispositionV06(args) {
       now: commandNow(request, "finalized_at"),
     });
   }
-  v06Output(assertRunIdentity(result, runId, "task disposition"));
+  v07Output(assertRunIdentity(result, runId, "task disposition"));
 }
 
-async function commandVerificationV06(args) {
+async function commandVerificationV07(args) {
   const [subcommand, ...rest] = args;
-  const values = parseV06Options(rest, { "verification-id": { type: "string" } });
-  const git = v06Repository();
+  const values = parseV07Options(rest, { "verification-id": { type: "string" } });
+  const git = v07Repository();
   if (subcommand === "status") {
     const runId = explicitRunId(values);
-    v06Output(await verificationStatus({
+    v07Output(await verificationStatus({
       stateRoot: git.stateRoot,
       verificationId: values["verification-id"] ?? null,
       runId,
@@ -1339,18 +1311,18 @@ async function commandVerificationV06(args) {
     now: commandNow(request, "verified_at"),
   });
   assertRunIdentity(result.identity, runId, "combined verification");
-  v06Output(result);
+  v07Output(result);
 }
 
-async function commandIntegrationV06(args) {
+async function commandIntegrationV07(args) {
   const [subcommand, ...rest] = args;
-  const values = parseV06Options(rest, { "integration-id": { type: "string" } });
-  const git = v06Repository();
+  const values = parseV07Options(rest, { "integration-id": { type: "string" } });
+  const git = v07Repository();
   if (subcommand === "status") {
     const runId = explicitRunId(values);
     const integrationId = requireText(values["integration-id"], "--integration-id", { max: 128, safeId: true });
     const result = await integrationAuthority(git, integrationId, runId);
-    v06Output(assertRunIdentity(result, runId, "serial integration"));
+    v07Output(assertRunIdentity(result, runId, "serial integration"));
     return;
   }
   const shapes = {
@@ -1398,7 +1370,7 @@ async function commandIntegrationV06(args) {
     });
     assertRunIdentity(result, runId, "serial integration");
   }
-  v06Output(result);
+  v07Output(result);
 }
 
 function archivePrepareView(result) {
@@ -1414,15 +1386,15 @@ function archivePrepareView(result) {
     : base;
 }
 
-async function commandArchiveV06(args) {
+async function commandArchiveV07(args) {
   const [subcommand, ...rest] = args;
-  const values = parseV06Options(rest, { "archive-id": { type: "string" } });
-  const git = v06Repository();
+  const values = parseV07Options(rest, { "archive-id": { type: "string" } });
+  const git = v07Repository();
   if (subcommand === "status") {
     const runId = explicitRunId(values);
     const archiveId = requireText(values["archive-id"], "--archive-id", { max: 128, safeId: true });
     const result = await archiveAuthority(git, archiveId, runId);
-    v06Output(assertRunIdentity(result, runId, "task archive"));
+    v07Output(assertRunIdentity(result, runId, "task archive"));
     return;
   }
   const shapes = {
@@ -1460,153 +1432,27 @@ async function commandArchiveV06(args) {
       });
     })();
   assertRunIdentity(result, runId, "task archive");
-  v06Output(subcommand === "prepare" ? archivePrepareView(result) : result);
+  v07Output(subcommand === "prepare" ? archivePrepareView(result) : result);
 }
 
-async function commandCleanupV06(args) {
+async function commandCleanupV07(args) {
   const [subcommand, ...rest] = args;
   if (subcommand !== "plan") {
-    throw new CliError("v0.6 cleanup exposes read-only plan only; cleanup apply is unavailable");
+    throw new CliError("v0.7 cleanup exposes read-only plan only; cleanup apply is unavailable");
   }
-  const values = parseV06Options(rest);
+  const values = parseV07Options(rest);
   const runId = explicitRunId(values);
-  const git = v06Repository();
+  const git = v07Repository();
   await readRun({ gitCommonDirectory: git.commonDir, runId });
-  const first = await cleanupPlanV06({ stateRoot: git.stateRoot, runId });
-  const confirmed = await cleanupPlanV06({ stateRoot: git.stateRoot, runId });
+  const first = await cleanupPlanV07({ stateRoot: git.stateRoot, runId });
+  const confirmed = await cleanupPlanV07({ stateRoot: git.stateRoot, runId });
   if (stableStringify(first) !== stableStringify(confirmed)) {
     throw new CliError("Cleanup state changed while deriving the read-only plan; inspect and retry", 75);
   }
-  v06Output(confirmed);
+  v07Output(confirmed);
 }
 
-async function assertAdoptionRun(git, runId) {
-  return (await readRun({ gitCommonDirectory: git.commonDir, runId })).run;
-}
-
-async function commandAdoptV06(args) {
-  const [subcommand, ...rest] = args;
-  const values = parseV06Options(rest);
-  const git = v06Repository();
-  if (["legacy-retire-plan", "legacy-retire-apply"].includes(subcommand)) {
-    if (values["run-id"] !== undefined) {
-      throw new CliError(`adopt ${subcommand} is repository-scoped and does not accept --run-id`);
-    }
-    if (!values.file) throw new CliError(`adopt ${subcommand} requires --file <request.json>`);
-    const request = await readJsonInput(values.file);
-    if (subcommand === "legacy-retire-plan") {
-      requireExactFields(request, { required: ["reason", "planned_at"] }, "adopt legacy-retire-plan request");
-      v06Output({
-        result: await planLegacyRetirement({
-          repositoryRoot: git.root,
-          reason: request.reason,
-          plannedAt: request.planned_at,
-        }),
-      });
-    } else {
-      requireExactFields(request, { required: ["plan"] }, "adopt legacy-retire-apply request");
-      v06Output({ result: await applyLegacyRetirementPlan({ repositoryRoot: git.root, plan: request.plan }) });
-    }
-    return;
-  }
-  const runId = explicitRunId(values);
-  if (subcommand === "status") {
-    await assertAdoptionRun(git, runId);
-    v06Output({ run_id: runId, adoption: await readAdoption({ repositoryRoot: git.root }) });
-    return;
-  }
-  const shapes = {
-    plan: {
-      required: ["adopted_at"],
-      optional: ["config", "policy"],
-    },
-    apply: { required: ["plan"] },
-    "retire-plan": { required: ["reason", "retired_at"] },
-    "retire-apply": { required: ["plan"] },
-  };
-  if (!shapes[subcommand]) {
-    throw new CliError(
-      "adopt requires plan, apply, status, retire-plan, retire-apply, legacy-retire-plan, or legacy-retire-apply",
-    );
-  }
-  const scoped = await runScopedRequest(values, `adopt ${subcommand}`, shapes[subcommand]);
-  const request = scoped.request;
-  const run = await assertAdoptionRun(git, runId);
-  let result;
-  if (subcommand === "plan") {
-    result = await planAdoption({
-      repositoryRoot: git.root,
-      gitCommonDirectory: git.commonDir,
-      runtimeId: run.runtime_id,
-      config: request.config,
-      policy: request.policy,
-      adoptedAt: request.adopted_at,
-    });
-  } else if (subcommand === "apply") {
-    if (request.plan?.source_runtime?.runtime_id !== run.runtime_id) {
-      throw new CliError("adoption plan runtime does not match --run-id", 73);
-    }
-    result = await applyAdoptionPlan({ repositoryRoot: git.root, plan: request.plan });
-  } else if (subcommand === "retire-plan") {
-    result = await planAdoptionRetirement({
-      repositoryRoot: git.root,
-      retiredAt: request.retired_at,
-      reason: request.reason,
-    });
-  } else {
-    result = await applyAdoptionRetirementPlan({ repositoryRoot: git.root, plan: request.plan });
-  }
-  v06Output({ run_id: runId, result });
-}
-
-async function legacyReadonlyAuthority() {
-  const context = createLegacyV05ReadonlyContext({ git: gitSnapshot() });
-  const summary = await readLegacyV05ReadonlySummary(context);
-  return { context, summary };
-}
-
-async function mainLegacyV05(argv) {
-  const requestedAction = argv.find((argument) => !argument.startsWith("-"));
-  if (requestedAction !== undefined && !["status", "verify"].includes(requestedAction)) {
-    throw new CliError(
-      `legacy-v05 is read-only historical verification; predecessor mutation and workflow commands are unavailable\n\n${LEGACY_HELP}`,
-      64,
-    );
-  }
-  const { positionals, values } = parseArgs({
-    args: argv,
-    options: {
-      help: { type: "boolean", default: false },
-      json: { type: "boolean", default: false },
-    },
-    allowPositionals: true,
-    strict: true,
-  });
-  if (values.help) {
-    if (positionals.length > 0) throw new CliError("legacy-v05 --help does not accept an action", 64);
-    console.log(LEGACY_HELP);
-    return;
-  }
-  const action = positionals[0] ?? "status";
-  if (positionals.length > 1 || !["status", "verify"].includes(action)) {
-    throw new CliError(
-      `legacy-v05 is read-only historical verification; predecessor mutation and workflow commands are unavailable\n\n${LEGACY_HELP}`,
-      64,
-    );
-  }
-  const { summary } = await legacyReadonlyAuthority();
-  v06Output(summary);
-  if (action === "verify" && !summary.ok) process.exitCode = 1;
-}
-
-function migratedV05Command(command) {
-  return [
-    "init", "sync", "config", "doctor", "plan", "recipient", "urgent",
-    "git", "lease",
-  ].includes(command);
-}
-
-function isV06RunBoundMutation(command, args) {
+function isV07RunBoundMutation(command, args) {
   const subcommand = args[0];
   if (command === "workflow") return ["create", "revise", "contract"].includes(subcommand);
   if (command === "task") {
@@ -1624,12 +1470,11 @@ function isV06RunBoundMutation(command, args) {
   if (command === "verification") return subcommand === "run";
   if (command === "integration") return ["prepare", "reconcile"].includes(subcommand);
   if (command === "archive") return ["prepare", "reconcile"].includes(subcommand);
-  if (command === "adopt") return ["apply", "retire-apply"].includes(subcommand);
   return false;
 }
 
-async function dispatchV06Command(command, args, handler) {
-  if (!isV06RunBoundMutation(command, args)) return handler(args);
+async function dispatchV07Command(command, args, handler) {
+  if (!isV07RunBoundMutation(command, args)) return handler(args);
   const runIds = [];
   for (let index = 0; index < args.length; index += 1) {
     if (args[index] === "--run-id") {
@@ -1640,9 +1485,9 @@ async function dispatchV06Command(command, args, handler) {
     }
   }
   if (runIds.length === 0) return handler(args);
-  if (runIds.length !== 1) throw new CliError("v0.6 mutations require exactly one --run-id", 64);
+  if (runIds.length !== 1) throw new CliError("v0.7 mutations require exactly one --run-id", 64);
   const runId = requireText(runIds[0], "--run-id", { max: 128, safeId: true });
-  const git = v06Repository();
+  const git = v07Repository();
   const allowLinkedWorktree = (
     (command === "release" && args[0] === "accept")
     || (command === "callback" && args[0] === "deliver")
@@ -1665,27 +1510,18 @@ async function main() {
     console.log(PACKAGE_VERSION);
     return;
   }
-  if (command === "legacy-v05") return mainLegacyV05(args);
-  if (command === "run") return commandRunV06(args);
-  if (command === "workflow") return dispatchV06Command(command, args, commandWorkflowV06);
-  if (command === "task") return dispatchV06Command(command, args, commandTaskV06);
-  if (command === "subagent") return dispatchV06Command(command, args, commandSubagentV06);
-  if (command === "release") return dispatchV06Command(command, args, commandReleaseV06);
-  if (command === "callback") return dispatchV06Command(command, args, commandCallbackV06);
-  if (command === "urgent") return dispatchV06Command(command, args, commandUrgentV06);
-  if (command === "disposition") return dispatchV06Command(command, args, commandDispositionV06);
-  if (command === "verification") return dispatchV06Command(command, args, commandVerificationV06);
-  if (command === "integration") return dispatchV06Command(command, args, commandIntegrationV06);
-  if (command === "archive") return dispatchV06Command(command, args, commandArchiveV06);
-  if (command === "cleanup") return commandCleanupV06(args);
-  if (command === "adopt") return dispatchV06Command(command, args, commandAdoptV06);
-  if (migratedV05Command(command)) {
-    throw new CliError(
-      `${command} is a quarantined v0.5 command; v0.6 does not retain dual authority. `
-      + `Use a v0.6 command or explicit legacy-v05 ${command} only for historical verification.`,
-      64,
-    );
-  }
+  if (command === "run") return commandRunV07(args);
+  if (command === "workflow") return dispatchV07Command(command, args, commandWorkflowV07);
+  if (command === "task") return dispatchV07Command(command, args, commandTaskV07);
+  if (command === "subagent") return dispatchV07Command(command, args, commandSubagentV07);
+  if (command === "release") return dispatchV07Command(command, args, commandReleaseV07);
+  if (command === "callback") return dispatchV07Command(command, args, commandCallbackV07);
+  if (command === "urgent") return dispatchV07Command(command, args, commandUrgentV07);
+  if (command === "disposition") return dispatchV07Command(command, args, commandDispositionV07);
+  if (command === "verification") return dispatchV07Command(command, args, commandVerificationV07);
+  if (command === "integration") return dispatchV07Command(command, args, commandIntegrationV07);
+  if (command === "archive") return dispatchV07Command(command, args, commandArchiveV07);
+  if (command === "cleanup") return commandCleanupV07(args);
   throw new CliError(`Unknown command: ${command}\n\n${HELP}`);
 }
 

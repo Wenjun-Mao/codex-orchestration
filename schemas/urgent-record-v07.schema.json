@@ -1,0 +1,289 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://private.local/codex-flow/urgent-record-v07.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "kind", "urgent_id", "signal", "recipient", "state",
+    "observed_by_recipient", "consumed_by_recipient",
+    "first_observed_attempt_id", "superseded_by_urgent_id", "attempts",
+    "lifecycle"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "kind": { "const": "urgent-signal-record" },
+    "urgent_id": { "$ref": "#/$defs/urgentId" },
+    "signal": { "$ref": "#/$defs/signal" },
+    "recipient": { "$ref": "#/$defs/recipient" },
+    "state": { "enum": ["persisted", "observed", "consumed", "superseded", "expired"] },
+    "observed_by_recipient": { "$ref": "#/$defs/nullableRecipient" },
+    "consumed_by_recipient": { "$ref": "#/$defs/nullableRecipient" },
+    "first_observed_attempt_id": { "$ref": "#/$defs/nullableAttemptId" },
+    "superseded_by_urgent_id": { "$ref": "#/$defs/nullableUrgentId" },
+    "attempts": {
+      "type": "array",
+      "maxItems": 1,
+      "items": { "$ref": "#/$defs/attempt" }
+    },
+    "lifecycle": { "$ref": "#/$defs/lifecycle" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "state": { "const": "persisted" } } },
+      "then": {
+        "properties": {
+          "observed_by_recipient": { "type": "null" },
+          "consumed_by_recipient": { "type": "null" },
+          "first_observed_attempt_id": { "type": "null" },
+          "superseded_by_urgent_id": { "type": "null" },
+          "lifecycle": { "$ref": "#/$defs/persistedLifecycle" }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "state": { "const": "observed" } } },
+      "then": {
+        "properties": {
+          "observed_by_recipient": { "$ref": "#/$defs/recipient" },
+          "consumed_by_recipient": { "type": "null" },
+          "first_observed_attempt_id": { "$ref": "#/$defs/attemptId" },
+          "superseded_by_urgent_id": { "type": "null" },
+          "lifecycle": { "$ref": "#/$defs/observedLifecycle" }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "state": { "const": "consumed" } } },
+      "then": {
+        "properties": {
+          "observed_by_recipient": { "$ref": "#/$defs/recipient" },
+          "consumed_by_recipient": { "$ref": "#/$defs/recipient" },
+          "first_observed_attempt_id": { "$ref": "#/$defs/attemptId" },
+          "superseded_by_urgent_id": { "type": "null" },
+          "lifecycle": { "$ref": "#/$defs/consumedLifecycle" }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "state": { "const": "superseded" } } },
+      "then": {
+        "properties": {
+          "observed_by_recipient": { "type": "null" },
+          "consumed_by_recipient": { "type": "null" },
+          "first_observed_attempt_id": { "type": "null" },
+          "superseded_by_urgent_id": { "$ref": "#/$defs/urgentId" },
+          "lifecycle": { "$ref": "#/$defs/supersededLifecycle" }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "state": { "const": "expired" } } },
+      "then": {
+        "properties": {
+          "observed_by_recipient": { "type": "null" },
+          "consumed_by_recipient": { "type": "null" },
+          "first_observed_attempt_id": { "type": "null" },
+          "superseded_by_urgent_id": { "type": "null" },
+          "lifecycle": { "$ref": "#/$defs/expiredLifecycle" }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "safeId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9_.-]+$"
+    },
+    "urgentId": {
+      "type": "string",
+      "pattern": "^urgent-v1-[a-f0-9]{64}$"
+    },
+    "attemptId": {
+      "type": "string",
+      "pattern": "^urgent-attempt-v1-[a-f0-9]{64}$"
+    },
+    "nullableUrgentId": {
+      "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/urgentId" }]
+    },
+    "nullableAttemptId": {
+      "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/attemptId" }]
+    },
+    "timestamp": {
+      "type": "string",
+      "maxLength": 64,
+      "format": "date-time"
+    },
+    "nullableTimestamp": {
+      "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/timestamp" }]
+    },
+    "recipient": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["lineage_id", "thread_id", "generation"],
+      "properties": {
+        "lineage_id": { "$ref": "#/$defs/safeId" },
+        "thread_id": { "$ref": "#/$defs/safeId" },
+        "generation": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        }
+      }
+    },
+    "nullableRecipient": {
+      "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/recipient" }]
+    },
+    "signal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version", "recipient", "executor_id", "run_id", "sequence",
+        "supersedes_urgent_ids", "expires_at", "classification", "summary",
+        "requested_action"
+      ],
+      "properties": {
+        "schema_version": { "const": 1 },
+        "recipient": { "$ref": "#/$defs/recipient" },
+        "executor_id": { "$ref": "#/$defs/safeId" },
+        "run_id": { "$ref": "#/$defs/safeId" },
+        "sequence": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "supersedes_urgent_ids": {
+          "type": "array",
+          "maxItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/urgentId" }
+        },
+        "expires_at": { "$ref": "#/$defs/timestamp" },
+        "classification": { "enum": ["blocker", "approval", "high-risk-drift"] },
+        "summary": { "type": "string", "minLength": 1, "maxLength": 512 },
+        "requested_action": { "type": "string", "minLength": 1, "maxLength": 512 }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "sequence": { "const": 1 } } },
+          "then": { "properties": { "supersedes_urgent_ids": { "maxItems": 0 } } },
+          "else": { "properties": { "supersedes_urgent_ids": { "minItems": 1, "maxItems": 1 } } }
+        }
+      ]
+    },
+    "attempt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "attempt_sequence", "delivery_attempt_id", "recipient", "retry_reason",
+        "prepared_at", "outcome", "reconciled_at", "first_observed_at",
+        "observation_count"
+      ],
+      "properties": {
+        "attempt_sequence": { "const": 1 },
+        "delivery_attempt_id": { "$ref": "#/$defs/attemptId" },
+        "recipient": { "$ref": "#/$defs/recipient" },
+        "retry_reason": { "type": "null" },
+        "prepared_at": { "$ref": "#/$defs/timestamp" },
+        "outcome": {
+          "oneOf": [
+            { "type": "null" },
+            { "enum": ["accepted", "failed", "ambiguous"] }
+          ]
+        },
+        "reconciled_at": { "$ref": "#/$defs/nullableTimestamp" },
+        "first_observed_at": { "$ref": "#/$defs/nullableTimestamp" },
+        "observation_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "outcome": { "type": "null" } } },
+          "then": { "properties": { "reconciled_at": { "type": "null" } } },
+          "else": { "properties": { "reconciled_at": { "$ref": "#/$defs/timestamp" } } }
+        },
+        {
+          "if": { "properties": { "observation_count": { "const": 0 } } },
+          "then": { "properties": { "first_observed_at": { "type": "null" } } },
+          "else": { "properties": { "first_observed_at": { "$ref": "#/$defs/timestamp" } } }
+        }
+      ]
+    },
+    "lifecycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["persisted_at", "observed_at", "consumed_at", "superseded_at", "expired_at"],
+      "properties": {
+        "persisted_at": { "$ref": "#/$defs/timestamp" },
+        "observed_at": { "$ref": "#/$defs/nullableTimestamp" },
+        "consumed_at": { "$ref": "#/$defs/nullableTimestamp" },
+        "superseded_at": { "$ref": "#/$defs/nullableTimestamp" },
+        "expired_at": { "$ref": "#/$defs/nullableTimestamp" }
+      }
+    },
+    "persistedLifecycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["persisted_at", "observed_at", "consumed_at", "superseded_at", "expired_at"],
+      "properties": {
+        "persisted_at": { "$ref": "#/$defs/timestamp" },
+        "observed_at": { "type": "null" },
+        "consumed_at": { "type": "null" },
+        "superseded_at": { "type": "null" },
+        "expired_at": { "type": "null" }
+      }
+    },
+    "observedLifecycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["persisted_at", "observed_at", "consumed_at", "superseded_at", "expired_at"],
+      "properties": {
+        "persisted_at": { "$ref": "#/$defs/timestamp" },
+        "observed_at": { "$ref": "#/$defs/timestamp" },
+        "consumed_at": { "type": "null" },
+        "superseded_at": { "type": "null" },
+        "expired_at": { "type": "null" }
+      }
+    },
+    "consumedLifecycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["persisted_at", "observed_at", "consumed_at", "superseded_at", "expired_at"],
+      "properties": {
+        "persisted_at": { "$ref": "#/$defs/timestamp" },
+        "observed_at": { "$ref": "#/$defs/timestamp" },
+        "consumed_at": { "$ref": "#/$defs/timestamp" },
+        "superseded_at": { "type": "null" },
+        "expired_at": { "type": "null" }
+      }
+    },
+    "supersededLifecycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["persisted_at", "observed_at", "consumed_at", "superseded_at", "expired_at"],
+      "properties": {
+        "persisted_at": { "$ref": "#/$defs/timestamp" },
+        "observed_at": { "type": "null" },
+        "consumed_at": { "type": "null" },
+        "superseded_at": { "$ref": "#/$defs/timestamp" },
+        "expired_at": { "type": "null" }
+      }
+    },
+    "expiredLifecycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["persisted_at", "observed_at", "consumed_at", "superseded_at", "expired_at"],
+      "properties": {
+        "persisted_at": { "$ref": "#/$defs/timestamp" },
+        "observed_at": { "type": "null" },
+        "consumed_at": { "type": "null" },
+        "superseded_at": { "type": "null" },
+        "expired_at": { "$ref": "#/$defs/timestamp" }
+      }
+    }
+  }
+}

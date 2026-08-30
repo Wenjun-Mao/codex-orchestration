@@ -9,7 +9,7 @@
   ],
   "properties": {
     "schema_version": { "const": 1 },
-    "kind": { "const": "codex-flow-v06-terminal-callback" },
+    "kind": { "const": "codex-flow-v07-terminal-callback" },
     "callback_id": { "type": "string", "pattern": "^terminal-v3-[0-9a-f]{64}$" },
     "receipt": { "$ref": "terminal-receipt-v3.schema.json" },
     "delivery_recipient": { "$ref": "#/$defs/recipient" },
