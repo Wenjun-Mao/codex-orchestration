@@ -48,20 +48,25 @@ async function namespace(common, name = "v0.7.0", activeRunId = null) {
   return root;
 }
 
-async function worktreeFixture(prefix, { commitOnBranch = false } = {}) {
+async function worktreeFixture(prefix, { commitOnBranch = false, detached = false } = {}) {
   const root = await createGitFixture(prefix);
   const parent = await mkdtemp(resolve(tmpdir(), `${prefix}wt-`));
   const worktree = resolve(parent, "executor");
   const common = git(root, ["rev-parse", "--path-format=absolute", "--git-common-dir"]);
-  const branch = `codex/${prefix.replace(/[^a-z0-9-]/gi, "").toLowerCase()}`;
-  git(root, ["worktree", "add", "-q", "-b", branch, worktree, "HEAD"]);
+  const localBranch = detached
+    ? null
+    : `codex/${prefix.replace(/[^a-z0-9-]/gi, "").toLowerCase()}`;
+  const addArgs = detached
+    ? ["worktree", "add", "-q", "--detach", worktree, "HEAD"]
+    : ["worktree", "add", "-q", "-b", localBranch, worktree, "HEAD"];
+  git(root, addArgs);
   if (commitOnBranch) {
     await writeFile(resolve(worktree, "executor.txt"), "executor\n");
     git(worktree, ["add", "executor.txt"]);
     git(worktree, ["commit", "--quiet", "-m", "executor"]);
   }
   const tip = git(worktree, ["rev-parse", "HEAD"]);
-  return { root, parent, worktree, common, branch, tip };
+  return { root, parent, worktree, common, branch: localBranch, localBranch, tip };
 }
 
 function resources(fixture, { includeTask = false } = {}) {
@@ -77,18 +82,20 @@ function resources(fixture, { includeTask = false } = {}) {
       protected: false,
       thread_id: null,
     },
-    {
+  ];
+  if (fixture.localBranch !== null) {
+    result.push({
       kind: "branch",
       id: "executor-branch",
       provenance: "state-derived",
       path: null,
-      branch: fixture.branch,
+      branch: fixture.localBranch,
       expected_tip: fixture.tip,
       common_dir: fixture.common,
       protected: false,
       thread_id: null,
-    },
-  ];
+    });
+  }
   if (includeTask) {
     result.push({
       kind: "task",
@@ -157,6 +164,105 @@ test("unplug accepts ignored artifacts but blocks ordinary untracked files befor
     assert.equal(gitStatus(dirty.root, ["show-ref", "--verify", `refs/heads/${dirty.branch}`]), 0);
   } finally {
     await cleanupFixture(dirty);
+  }
+});
+
+test("unplug removes a clean detached Codex App worktree already integrated into the base", async () => {
+  const fixture = await worktreeFixture("codex-flow-unplug-detached-", { detached: true });
+  try {
+    await namespace(fixture.common);
+    const planned = resources(fixture);
+    assert.equal(planned[0].branch, null);
+    assert.equal(planned.length, 1);
+    const plan = await unplugPlanV07({ repositoryPath: fixture.root, resources: planned });
+    assert.equal(plan.resources[0].branch, null);
+    const receipt = await unplugApplyV07({ repositoryPath: fixture.root, plan });
+    assert.equal(receipt.residue, false);
+    assert.equal(await pathExists(fixture.worktree), false);
+  } finally {
+    await cleanupFixture(fixture);
+  }
+});
+
+test("unplug rejects a detached worktree whose commit is not integrated into the base", async () => {
+  const fixture = await worktreeFixture("codex-flow-unplug-detached-unmerged-", {
+    detached: true,
+    commitOnBranch: true,
+  });
+  try {
+    await namespace(fixture.common);
+    await assert.rejects(
+      () => unplugPlanV07({ repositoryPath: fixture.root, resources: resources(fixture) }),
+      /Detached worktree tip is not an ancestor of the authenticated base/,
+    );
+    assert.equal(await pathExists(fixture.worktree), true);
+  } finally {
+    await cleanupFixture(fixture);
+  }
+});
+
+test("controller identity drift immediately before removal preserves detached work and state", async () => {
+  const fixture = await worktreeFixture("codex-flow-unplug-controller-drift-", {
+    detached: true,
+    commitOnBranch: true,
+  });
+  try {
+    git(fixture.root, ["merge", "--ff-only", fixture.tip]);
+    const retained = await namespace(fixture.common);
+    const plan = await unplugPlanV07({
+      repositoryPath: fixture.root,
+      resources: resources(fixture),
+    });
+    let injected = false;
+    await assert.rejects(
+      () => unplugApplyV07({
+        repositoryPath: fixture.root,
+        plan,
+        testHook: async (point) => {
+          if (point === "before-action-git-facts-1" && !injected) {
+            injected = true;
+            git(fixture.root, ["reset", "--hard", "HEAD^"]);
+          }
+        },
+      }),
+      /repository identity or controller worktree drifted/,
+    );
+    assert.equal(injected, true);
+    assert.equal(await pathExists(fixture.worktree), true);
+    assert.equal(await pathExists(retained), true);
+  } finally {
+    await cleanupFixture(fixture);
+  }
+});
+
+test("detached worktree plans fail closed on attachment mismatch and protected paths", async () => {
+  const mismatch = await worktreeFixture("codex-flow-unplug-detached-mismatch-", { detached: true });
+  try {
+    await namespace(mismatch.common);
+    const incorrect = resources(mismatch);
+    incorrect[0] = { ...incorrect[0], branch: "codex/not-attached" };
+    await assert.rejects(
+      () => unplugPlanV07({ repositoryPath: mismatch.root, resources: incorrect }),
+      /does not match live Git state/,
+    );
+  } finally {
+    await cleanupFixture(mismatch);
+  }
+
+  const protectedFixture = await worktreeFixture("codex-flow-unplug-detached-protected-", { detached: true });
+  try {
+    await namespace(protectedFixture.common);
+    const protectedResource = { ...resources(protectedFixture)[0], protected: true };
+    const plan = await unplugPlanV07({
+      repositoryPath: protectedFixture.root,
+      resources: [protectedResource],
+    });
+    await assert.rejects(
+      () => unplugApplyV07({ repositoryPath: protectedFixture.root, plan }),
+      /protected-worktree/,
+    );
+  } finally {
+    await cleanupFixture(protectedFixture);
   }
 });
 

@@ -4,7 +4,8 @@ Status: current v0.7 package and runtime boundary.
 
 This document summarizes the breaking v0.7 authority established by
 [ADR 0015](adr/0015-progressive-run-activation-authority.md) through
-[ADR 0031](adr/0031-clean-start-unplug-boundary.md).
+[ADR 0031](adr/0031-clean-start-unplug-boundary.md) and
+[ADR 0032](adr/0032-detached-codex-app-worktree-unplug.md).
 
 ## Retained cross-task authority
 
@@ -37,7 +38,7 @@ durable result journal or coordinator disposition.
 
 - Read-only questions and plans require no repository setup.
 - An authorized actionable request may progressively activate one explicit run
-  under `.git/codex-flow/v0.7.1/`, with an exact runtime snapshot and
+  under `.git/codex-flow/v0.7.2/`, with an exact runtime snapshot and
   disclosure before external task creation.
 - Activation writes no tracked setup, adoption, instructions, or `AGENTS.md`.
 - A bounded sibling-namespace sentinel checks Git-common state at admission.
@@ -104,7 +105,8 @@ archived through the App.
 Only after those tasks are archived may `unplug apply` use the unchanged plan,
 and only after explicit user approval. Apply is local-only: it may remove only
 exact planned Flow paths, tracked-clean same-common-directory linked
-worktrees, and unprotected local `codex/*` branches already ancestral to the
+worktrees (including detached Codex App task worktrees whose tips are already
+ancestral to the authenticated base), and unprotected local `codex/*` branches already ancestral to the
 authenticated base. Git-ignored artifacts do not block that worktree check;
 tracked or ordinary-untracked changes, unmerged or attached branches,
 protected resources, remote state, and path or tip drift do. It never deletes

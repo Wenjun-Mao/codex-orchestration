@@ -112,7 +112,12 @@
             "id": { "type": "string" },
             "provenance": { "enum": ["state-derived", "user-bound"] },
             "path": { "type": "string" },
-            "branch": { "type": "string", "pattern": "^codex/" },
+            "branch": {
+              "anyOf": [
+                { "type": "null" },
+                { "type": "string", "pattern": "^codex/" }
+              ]
+            },
             "expected_tip": { "type": "string", "pattern": "^[0-9a-f]{40,64}$" },
             "common_dir": { "type": "string" },
             "protected": { "type": "boolean" },

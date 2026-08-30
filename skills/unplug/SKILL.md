@@ -21,8 +21,10 @@ Build the plan request from authenticated retained records and current App/Git
 observation. Each resource carries `provenance: "state-derived"` or
 `"user-bound"`, the exact Git common directory, and all kind-specific fields:
 
-- a worktree has its absolute path, local `codex/*` branch, expected tip, and
-  `thread_id: null`;
+- a worktree has its absolute path and expected tip. Its branch is either
+  `null` for a detached Codex App task worktree, or its attached local
+  `codex/*` branch; `thread_id` is null. A detached tip must already be an
+  ancestor of the authenticated base;
 - a branch has null path, its local `codex/*` name and expected tip, and
   `thread_id: null`;
 - a task has null Git fields and its exact visible `thread_id`.
@@ -48,8 +50,10 @@ Ask for explicit approval of the unchanged repository-specific plan before
 remove exact local Flow paths plus only these authenticated registered local
 resources:
 
-- a same-common-directory linked worktree at the planned path, branch, and
-  tip, when it is tracked-clean; Git-ignored artifacts may remain;
+- a same-common-directory linked worktree at the planned path and tip, when it
+  is tracked-clean. It may be detached only when its tip is already an ancestor
+  of the authenticated base, or attached to the planned local `codex/*` branch;
+  Git-ignored artifacts may remain;
 - an unprotected local `codex/*` branch at its planned tip, only after it is
   an ancestor of the authenticated base and no worktree still attaches it.
 

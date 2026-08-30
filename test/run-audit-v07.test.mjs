@@ -180,7 +180,7 @@ async function runFixture(t, suffix, task, { branchFences = [] } = {}) {
   const root = await createGitFixture(`codex-flow-v07-run-audit-${suffix}-`);
   t.after(() => removeFixture(root));
   const commonDir = await realpath(resolve(root, ".git"));
-  const stateRoot = resolve(commonDir, "codex-flow", "v0.7.1");
+  const stateRoot = resolve(commonDir, "codex-flow", "v0.7.2");
   const baseline = git(root, ["rev-parse", "HEAD"]);
   const coordinator = {
     lineage_id: `audit-lineage-${suffix}`,

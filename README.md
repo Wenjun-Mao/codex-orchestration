@@ -23,7 +23,7 @@ readers, mutators, migration paths, retirement commands, tracked adoption, and
 test fixtures are not packaged in v0.7.
 
 v0.7 carries forward the proven cross-task behavior from v0.6.5 under new
-`codex-flow-v07-*` identities and the exact `.git/codex-flow/v0.7.1/`
+`codex-flow-v07-*` identities and the exact `.git/codex-flow/v0.7.2/`
 namespace. It adds a bounded foreign-active-run sentinel so a live predecessor
 run blocks admission instead of being silently ignored or migrated.
 
@@ -92,7 +92,7 @@ When the user authorizes actionable orchestration, the plugin may activate one
 run after disclosing:
 
 - the exact package/runtime source and bundle hash;
-- the `.git/codex-flow/v0.7.1/` operational state root;
+- the `.git/codex-flow/v0.7.2/` operational state root;
 - repository/common-directory, baseline, host, and coordinator binding;
 - the immutable workflow revision and its path/resource/branch reservation
   envelope;
@@ -235,9 +235,10 @@ actions. v0.7 can derive a deterministic read-only cleanup plan and verify that
 refs/worktrees are resolved; ordinary run cleanup does not apply deletions.
 The separate repository-scoped `unplug` lifecycle can apply an explicitly
 approved clean-start plan after every named task has been archived. It removes
-only exact eligible linked worktrees and local `codex/*` branches, then deletes
-all planned `.git/codex-flow` state last and proves that both state and its
-crash journal have zero residue.
+only exact eligible linked worktrees (including detached Codex App task
+worktrees whose tips are already integrated) and separately bound local
+`codex/*` branches, then deletes all planned `.git/codex-flow` state last and
+proves that both state and its crash journal have zero residue.
 
 Native subagents use their separate `complete` then `dispose` proof chain with
 unchanged-Git evidence. They never enter this callback, integration, archive,
@@ -312,7 +313,8 @@ defines workflow identity and the native-task boundary. [ADR 0029](docs/adr/0029
 defines the clean predecessor-free package cutover.
 [ADR 0030](docs/adr/0030-prepare-admission-ordering.md) defines native
 prepare atomicity, and [ADR 0031](docs/adr/0031-clean-start-unplug-boundary.md)
-defines the clean-start/unplug contract.
+defines the clean-start/unplug contract. [ADR 0032](docs/adr/0032-detached-codex-app-worktree-unplug.md)
+defines detached Codex App worktree eligibility within that contract.
 
 ## Source and distribution
 
