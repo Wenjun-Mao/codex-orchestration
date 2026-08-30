@@ -1,0 +1,175 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://private.local/codex-flow/legacy-retirement-plan.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "kind", "reason", "planned_at", "repository", "authority", "git_common_evidence", "lifecycle_summary", "retained_authority", "blockers", "applicable", "operations", "retired_directories", "plan_id"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "kind": { "const": "codex-flow-v051-retirement-plan" },
+    "reason": { "type": "string", "minLength": 1, "maxLength": 512 },
+    "planned_at": { "type": "string", "maxLength": 64, "format": "date-time" },
+    "repository": {
+      "type": "object", "additionalProperties": false,
+      "required": ["root", "common_dir", "branch", "revision", "cleanliness"],
+      "properties": {
+        "root": { "type": "string", "minLength": 1, "maxLength": 2048, "pattern": "^/" },
+        "common_dir": { "type": "string", "minLength": 1, "maxLength": 2048, "pattern": "^/" },
+        "branch": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "revision": { "type": "string", "pattern": "^[0-9a-f]{40,64}$" },
+        "cleanliness": { "enum": ["clean", "dirty"] }
+      }
+    },
+    "authority": { "$ref": "#/$defs/authority" },
+    "git_common_evidence": { "$ref": "#/$defs/tree" },
+    "lifecycle_summary": { "$ref": "#/$defs/lifecycle" },
+    "retained_authority": { "$ref": "#/$defs/retainedAuthority" },
+    "blockers": {
+      "type": "array", "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["code", "detail"],
+        "properties": {
+          "code": { "type": "string", "minLength": 1, "maxLength": 128 },
+          "detail": { "type": "string", "minLength": 1, "maxLength": 512 }
+        }
+      }
+    },
+    "applicable": { "type": "boolean" },
+    "operations": { "type": "array", "items": { "$ref": "#/$defs/operation" } },
+    "retired_directories": {
+      "type": "array", "items": {
+        "type": "string", "minLength": 20, "maxLength": 1024,
+        "pattern": "^\\.codex/orchestration(?:/[A-Za-z0-9_.-]+)*$"
+      }
+    },
+    "plan_id": { "$ref": "#/$defs/digest" }
+  },
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "tree": {
+      "type": "object", "additionalProperties": false,
+      "required": ["relative_path", "exists", "file_count", "raw_tree_sha256"],
+      "properties": {
+        "relative_path": { "const": "codex-flow/v0.5.1" },
+        "exists": { "type": "boolean" },
+        "file_count": { "type": "integer", "minimum": 0 },
+        "raw_tree_sha256": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "authority": {
+      "type": "object", "additionalProperties": false,
+      "required": ["manifest", "config", "agents"],
+      "properties": {
+        "manifest": {
+          "type": "object", "additionalProperties": false,
+          "required": ["path", "sha256", "package_version", "files"],
+          "properties": {
+            "path": { "const": ".codex/orchestration/version.json" },
+            "sha256": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/digest" }] },
+            "package_version": { "oneOf": [{ "type": "null" }, { "const": "0.5.1" }] },
+            "files": {
+              "type": "object", "additionalProperties": { "$ref": "#/$defs/digest" },
+              "propertyNames": { "pattern": "^(?:bin|lib|schemas|roles|references)/[^\\\\]+$" }
+            }
+          }
+        },
+        "config": {
+          "type": "object", "additionalProperties": false,
+          "required": ["path", "sha256"],
+          "properties": {
+            "path": { "const": ".codex/orchestration/project.json" },
+            "sha256": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/digest" }] }
+          }
+        },
+        "agents": {
+          "type": "object", "additionalProperties": false,
+          "required": ["mode", "path", "before_sha256", "after_sha256", "managed_block_sha256"],
+          "properties": {
+            "mode": { "enum": ["managed", "external", "unknown"] },
+            "path": { "oneOf": [{ "type": "null" }, { "type": "string", "minLength": 1, "maxLength": 512 }] },
+            "before_sha256": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/digest" }] },
+            "after_sha256": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/digest" }] },
+            "managed_block_sha256": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/digest" }] }
+          }
+        }
+      }
+    },
+    "lifecycle": {
+      "type": "object", "additionalProperties": false,
+      "required": ["operations", "callbacks", "urgent_signals", "leases", "worktrees"],
+      "properties": {
+        "operations": { "$ref": "#/$defs/operationsSummary" },
+        "callbacks": { "$ref": "#/$defs/callbacksSummary" },
+        "urgent_signals": { "$ref": "#/$defs/urgentSummary" },
+        "leases": { "$ref": "#/$defs/leasesSummary" },
+        "worktrees": { "$ref": "#/$defs/worktreesSummary" }
+      }
+    },
+    "operationsSummary": {
+      "type": "object", "additionalProperties": false,
+      "required": ["total", "observed", "settled", "unresolved", "ambiguous"],
+      "properties": { "total": { "type": "integer", "minimum": 0 }, "observed": { "type": "integer", "minimum": 0 }, "settled": { "type": "integer", "minimum": 0 }, "unresolved": { "type": "integer", "minimum": 0 }, "ambiguous": { "type": "integer", "minimum": 0 } }
+    },
+    "callbacksSummary": {
+      "type": "object", "additionalProperties": false,
+      "required": ["total", "settled", "pending_or_invalid"],
+      "properties": { "total": { "type": "integer", "minimum": 0 }, "settled": { "type": "integer", "minimum": 0 }, "pending_or_invalid": { "type": "integer", "minimum": 0 } }
+    },
+    "urgentSummary": {
+      "type": "object", "additionalProperties": false,
+      "required": ["total", "pending", "settled"],
+      "properties": { "total": { "type": "integer", "minimum": 0 }, "pending": { "type": "integer", "minimum": 0 }, "settled": { "type": "integer", "minimum": 0 } }
+    },
+    "leasesSummary": {
+      "type": "object", "additionalProperties": false,
+      "required": ["total", "active", "expired"],
+      "properties": { "total": { "type": "integer", "minimum": 0 }, "active": { "type": "integer", "minimum": 0 }, "expired": { "type": "integer", "minimum": 0 } }
+    },
+    "worktreesSummary": {
+      "type": "object", "additionalProperties": false,
+      "required": ["total", "unbound"],
+      "properties": { "total": { "type": "integer", "minimum": 0 }, "unbound": { "type": "integer", "minimum": 0 } }
+    },
+    "retainedAuthority": {
+      "type": "object", "additionalProperties": false,
+      "required": ["git_common_evidence", "tasks", "retained_worktrees", "cleanup_eligible_branches", "tags", "branches"],
+      "properties": {
+        "git_common_evidence": { "$ref": "#/$defs/tree" },
+        "tasks": { "type": "array", "items": { "type": "string", "minLength": 1, "maxLength": 96 } },
+        "retained_worktrees": { "type": "array", "items": { "$ref": "#/$defs/worktree" } },
+        "cleanup_eligible_branches": { "type": "array", "items": { "$ref": "#/$defs/cleanupBranch" } },
+        "tags": { "type": "array", "items": { "type": "string", "minLength": 1, "maxLength": 512 } },
+        "branches": { "type": "array", "items": { "type": "string", "minLength": 1, "maxLength": 256 } }
+      }
+    },
+    "worktree": {
+      "type": "object", "additionalProperties": false,
+      "required": ["path", "branch", "revision", "bound_operation_id"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1, "maxLength": 2048, "pattern": "^/" },
+        "branch": { "oneOf": [{ "type": "null" }, { "type": "string", "minLength": 1, "maxLength": 256 }] },
+        "revision": { "oneOf": [{ "type": "null" }, { "type": "string", "pattern": "^[0-9a-f]{40,64}$" }] },
+        "bound_operation_id": { "oneOf": [{ "type": "null" }, { "type": "string", "minLength": 1, "maxLength": 96 }] }
+      }
+    },
+    "cleanupBranch": {
+      "type": "object", "additionalProperties": false,
+      "required": ["operation_id", "branch", "worktree_path"],
+      "properties": {
+        "operation_id": { "type": "string", "minLength": 1, "maxLength": 96 },
+        "branch": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "worktree_path": { "type": "string", "minLength": 1, "maxLength": 2048, "pattern": "^/" }
+      }
+    },
+    "operation": {
+      "type": "object", "additionalProperties": false,
+      "required": ["path", "action", "before_sha256", "after_sha256"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1, "maxLength": 1024 },
+        "action": { "enum": ["delete", "update"] },
+        "before_sha256": { "$ref": "#/$defs/digest" },
+        "after_sha256": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/digest" }] }
+      }
+    }
+  }
+}
