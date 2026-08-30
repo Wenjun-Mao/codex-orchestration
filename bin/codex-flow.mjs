@@ -608,7 +608,7 @@ async function commandRunV07(args) {
         bundle_sha256: runtime.bundle.bundle_sha256,
       },
       state_authority: {
-        namespace: "v0.7.2",
+        namespace: "v0.7.3",
         state_root: git.stateRoot,
         git_common_dir: git.commonDir,
       },

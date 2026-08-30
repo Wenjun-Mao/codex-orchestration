@@ -13,7 +13,7 @@ import {
 import { validateReleaseIdentity } from "./release-identity.mjs";
 
 const root = resolve(import.meta.dirname, "..");
-const EXPECTED_PACKAGE_VERSION = "0.7.2";
+const EXPECTED_PACKAGE_VERSION = "0.7.3-dev.0";
 
 // ACTIVE V0.7 SCHEMA REGISTRY INSERTION POINT:
 // add every new operating schema here in the same change that introduces it.
@@ -39,6 +39,7 @@ const ACTIVE_V07_SCHEMA_NAMES = Object.freeze([
   "archive-operation",
   "cleanup-plan-v07",
   "unplug-plan-v07",
+  "unplug-plan-v07-v2",
 ]);
 
 const ACTIVE_V07_EXAMPLES = new Set(["v0.7-workflow-draft.json"]);
@@ -377,9 +378,10 @@ const skillContracts = new Map([
   ]],
   ["unplug", [
     "Run `unplug plan` first",
+    "An opaque file is authenticated by exact root-child path, size, and byte digest",
     "Archive every task named by the plan through the App",
     "Apply only an approved exact plan",
-    "Delete every `.git/codex-flow` path last",
+    "Delete every exact planned `.git/codex-flow` path last",
   ]],
 ]);
 for (const [skillName, markers] of skillContracts) {
@@ -421,7 +423,7 @@ const templateContracts = new Map([
     "persist the signal before one identified interrupt attempt",
   ]],
   ["templates/references/task-lifecycle.md", [
-    ".git/codex-flow/v0.7.2/runtimes/<bundle-sha256>/",
+    ".git/codex-flow/v0.7.3/runtimes/<bundle-sha256>/",
     "terminal-receipt-v3 journal result without messaging",
     "content-addressed PASS verification and integration/no-change records",
     "Every stateful command names the run explicitly",

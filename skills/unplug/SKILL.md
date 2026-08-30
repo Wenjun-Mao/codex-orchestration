@@ -13,9 +13,13 @@ It never reads `AGENTS.md` or creates an instruction authority.
 ## Plan before changing anything
 
 Run `unplug plan` first and present the repository root, Git common directory,
-exact local paths, state digest, and every known task that must be archived.
-The plan is read-only. Do not substitute a branch-name heuristic or delete a
-parent directory because it appears to contain only Flow data.
+exact local state entries, state digest, and every known task that must be
+archived. Plan v2 distinguishes `namespace-directory` entries from
+`opaque-file` entries. An opaque file is authenticated by exact root-child
+path, size, and byte digest; never parse, classify, migrate, or treat its
+contents as current runtime authority. The plan is read-only. Do not substitute
+a branch-name heuristic or delete a parent directory because it appears to
+contain only Flow data.
 
 Build the plan request from authenticated retained records and current App/Git
 observation. Each resource carries `provenance: "state-derived"` or
@@ -60,9 +64,10 @@ resources:
 Dirty or ordinarily untracked worktrees, unmerged or attached branches,
 protected resources, remote state, and any path or tip drift block apply. Do
 not delete remote refs, tags, source files, or another repository's state.
-Delete every `.git/codex-flow` path last and require zero-residue confirmation.
-It does not delete Codex tasks; task archival is a separate host action
-completed first.
+Delete every exact planned `.git/codex-flow` path last: regular opaque files
+non-recursively and namespace directories recursively. Any content, path, or
+entry-kind drift blocks apply. Require zero-residue confirmation. It does not
+delete Codex tasks; task archival is a separate host action completed first.
 
 ## Optional App removal
 

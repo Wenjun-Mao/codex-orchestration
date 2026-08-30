@@ -141,7 +141,7 @@ async function observedDisposition({
 }
 
 async function noChangeAuthority(root, suffix) {
-  const stateRoot = resolve(root, ".git", "codex-flow", "v0.7.2");
+  const stateRoot = resolve(root, ".git", "codex-flow", "v0.7.3");
   const release = await acceptedRelease(root, suffix);
   const worktreeParent = await mkdtemp(resolve(tmpdir(), "codex-flow-v07-archive-observed-"));
   const worktreePath = resolve(worktreeParent, "executor");
@@ -261,7 +261,7 @@ test("clean no-change visible task archives only after setter and independent ob
 test("host-worktree archive fails closed without its persisted observed path", async () => {
   const root = await createGitFixture("codex-flow-v07-archive-unobserved-");
   try {
-    const stateRoot = resolve(root, ".git", "codex-flow", "v0.7.2");
+    const stateRoot = resolve(root, ".git", "codex-flow", "v0.7.3");
     const release = await acceptedRelease(root, "unobserved");
     const executorBranch = release.requestedSelectors.worktree.executor_branch;
     git(root, ["checkout", "-q", "-b", executorBranch]);
@@ -310,7 +310,7 @@ test("integrated host-worktree task remains visible until the clean worktree is 
     await writeFile(resolve(root, ".gitignore"), "*.ignored\n", "utf8");
     git(root, ["add", ".gitignore"]);
     git(root, ["commit", "--quiet", "-m", "ignore generated archive artifacts"]);
-    const stateRoot = resolve(root, ".git", "codex-flow", "v0.7.2");
+    const stateRoot = resolve(root, ".git", "codex-flow", "v0.7.3");
     const release = await acceptedRelease(root, "integrated", {
       executorBranch: "codex/archive-integrated",
       task: { write_paths: ["archive-result.txt"] },
@@ -449,7 +449,7 @@ test("blocked and ambiguous archive outcomes remain visible", async () => {
   const blockedRoot = await createGitFixture("codex-flow-v07-archive-blocked-");
   const ambiguousRoot = await createGitFixture("codex-flow-v07-archive-ambiguous-");
   try {
-    const blockedState = resolve(blockedRoot, ".git", "codex-flow", "v0.7.2");
+    const blockedState = resolve(blockedRoot, ".git", "codex-flow", "v0.7.3");
     const blockedRelease = await acceptedRelease(blockedRoot, "blocked");
     const baseline = git(blockedRoot, ["rev-parse", "HEAD"]);
     const blockedPayload = receipt(blockedRelease, {

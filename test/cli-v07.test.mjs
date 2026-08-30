@@ -138,7 +138,7 @@ test("v0.7 activation requires a clean start when an incompatible namespace rema
   assert.match(result.stderr, /Clean start required before activation/);
   assert.match(result.stderr, /codex-flow unplug plan/);
   await assert.rejects(
-    stat(resolve(root, ".git", "codex-flow", "v0.7.2", "runs", "lifecycle.json")),
+    stat(resolve(root, ".git", "codex-flow", "v0.7.3", "runs", "lifecycle.json")),
     { code: "ENOENT" },
   );
 });
@@ -158,7 +158,7 @@ test("v0.7 activation cannot race an in-progress unplug", async (t) => {
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /unplug is already in progress/i);
   await assert.rejects(
-    stat(resolve(root, ".git", "codex-flow", "v0.7.2", "runs", "lifecycle.json")),
+    stat(resolve(root, ".git", "codex-flow", "v0.7.3", "runs", "lifecycle.json")),
     { code: "ENOENT" },
   );
 });
@@ -169,11 +169,19 @@ test("v0.7 CLI plans unplug read-only and requires exact explicit approval to ap
   t.after(async () => {
     await Promise.all([removeFixture(root), rm(requests, { recursive: true, force: true })]);
   });
+  const retainedState = resolve(root, ".git", "codex-flow", "retained-evidence.json");
+  await mkdir(resolve(root, ".git", "codex-flow"), { recursive: true });
+  await writeFile(retainedState, "{not-runtime-json\n");
   const planRequest = await requestFile(requests, "unplug-plan", { resources: [] });
   const planned = runCli(["unplug", "plan", "--file", planRequest, "--json"], { cwd: root });
   assertSuccess(planned, "unplug plan");
   const plan = JSON.parse(planned.stdout);
   assert.equal(plan.mutation_performed, false);
+  assert.equal(plan.schema_version, 2);
+  assert.equal(plan.kind, "codex-flow-v07-unplug-plan-v2");
+  assert.deepEqual(plan.state_entries.map((entry) => [entry.name, entry.kind]), [
+    ["retained-evidence.json", "opaque-file"],
+  ]);
 
   const deniedRequest = await requestFile(requests, "unplug-denied", {
     approved: false,
@@ -193,6 +201,7 @@ test("v0.7 CLI plans unplug read-only and requires exact explicit approval to ap
   const applied = runCli(["unplug", "apply", "--file", applyRequest, "--json"], { cwd: root });
   assertSuccess(applied, "unplug apply");
   assert.equal(JSON.parse(applied.stdout).residue, false);
+  await assert.rejects(stat(retainedState), { code: "ENOENT" });
 });
 
 test("v0.7 callback delivery accepts an authenticated linked executor worktree", async (t) => {
@@ -526,8 +535,8 @@ test("run activation needs no tracked setup and replays the same disclosed autho
   const context = await activatedFixture(t, "activation");
   await assert.rejects(stat(resolve(context.root, ".codex", "orchestration")), /ENOENT/);
   assert.equal(context.result.status, "admitted");
-  assert.equal(context.result.state_authority.namespace, "v0.7.2");
-  assert.match(context.result.state_authority.state_root, /\.git\/codex-flow\/v0\.7\.2$/);
+  assert.equal(context.result.state_authority.namespace, "v0.7.3");
+  assert.match(context.result.state_authority.state_root, /\.git\/codex-flow\/v0\.7\.3$/);
   assert.equal(context.result.repository_authority.cleanliness, "clean");
   assert.equal(context.result.workflow_authority.run_id, context.runId);
   assert.equal(context.result.model_routing[0].model, "gpt-5.6-terra");
@@ -585,7 +594,7 @@ test("run activation rejects a workflow outside its reservation envelope before 
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /outside the admitted run fence envelope/);
   await assert.rejects(
-    stat(resolve(root, ".git", "codex-flow", "v0.7.2")),
+    stat(resolve(root, ".git", "codex-flow", "v0.7.3")),
     (error) => error?.code === "ENOENT",
   );
 });
@@ -666,7 +675,7 @@ test("a second active run is refused before acquiring orphan runtime or workflow
   const contextsRoot = resolve(
     context.result.state_authority.git_common_dir,
     "codex-flow",
-    "v0.7.2",
+    "v0.7.3",
     "contexts",
   );
   const beforeContexts = await readdir(contextsRoot);

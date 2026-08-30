@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { lstat, mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { lstat, mkdir, mkdtemp, readFile, rm, symlink, truncate, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import test from "node:test";
@@ -10,6 +10,7 @@ import {
   unplugPlanV07,
   validateUnplugPlanV07,
 } from "../lib/unplug-v07.mjs";
+import { sha256, stableStringify } from "../lib/core.mjs";
 import { createGitFixture, removeFixture } from "./helpers.mjs";
 
 function git(cwd, args) {
@@ -119,6 +120,331 @@ async function cleanupFixture(fixture) {
   await removeFixture(fixture.root);
   await removeFixture(fixture.parent);
 }
+
+function legacyPlanWithNamespaces(plan, namespaces) {
+  const draft = {
+    schema_version: 1,
+    kind: "codex-flow-v07-unplug-plan",
+    plan_id: "",
+    repository: plan.repository,
+    namespaces,
+    resources: plan.resources,
+    active_runs: plan.active_runs,
+    state_digest: sha256(stableStringify(namespaces)),
+    git_digest: plan.git_digest,
+    mutation_performed: false,
+  };
+  const { plan_id: ignored, ...seed } = draft;
+  draft.plan_id = `unplug-plan-v1-${sha256(stableStringify(seed))}`;
+  return validateUnplugPlanV07(draft);
+}
+
+function legacyPlanFromV2(plan) {
+  const namespaces = plan.state_entries.map((entry) => {
+    assert.equal(entry.kind, "namespace-directory");
+    return { name: entry.name, path: entry.path, digest: entry.digest };
+  });
+  return legacyPlanWithNamespaces(plan, namespaces);
+}
+
+test("unplug v2 authenticates mixed namespace directories and opaque root files", async () => {
+  const root = await createGitFixture("codex-flow-unplug-opaque-mixed-");
+  try {
+    const common = git(root, ["rev-parse", "--path-format=absolute", "--git-common-dir"]);
+    await namespace(common, "v0.4");
+    await namespace(common, "v0.6.0");
+    const stateRoot = resolve(common, "codex-flow");
+    await writeFile(resolve(stateRoot, "ade-plan.json"), "{not-json-on-purpose\n");
+    await writeFile(resolve(stateRoot, "restyle-evidence.json"), "{\"retained\":true}\n");
+
+    const first = await unplugPlanV07({ repositoryPath: root, resources: [] });
+    const second = await unplugPlanV07({ repositoryPath: root, resources: [] });
+    assert.deepEqual(first, second);
+    assert.equal(first.schema_version, 2);
+    assert.equal(first.kind, "codex-flow-v07-unplug-plan-v2");
+    assert.match(first.plan_id, /^unplug-plan-v2-[0-9a-f]{64}$/);
+    assert.deepEqual(first.state_entries.map((entry) => [entry.name, entry.kind]), [
+      ["ade-plan.json", "opaque-file"],
+      ["restyle-evidence.json", "opaque-file"],
+      ["v0.4", "namespace-directory"],
+      ["v0.6.0", "namespace-directory"],
+    ]);
+    assert.equal(first.active_runs.length, 0);
+    assert.deepEqual(validateUnplugPlanV07(first), first);
+
+    const receipt = await unplugApplyV07({ repositoryPath: root, plan: first });
+    assert.equal(receipt.residue, false);
+    assert.equal(await pathExists(stateRoot), false);
+  } finally {
+    await removeFixture(root);
+  }
+});
+
+test("opaque state content and type drift block before deletion", async () => {
+  const contentRoot = await createGitFixture("codex-flow-unplug-opaque-drift-");
+  try {
+    const common = git(contentRoot, ["rev-parse", "--path-format=absolute", "--git-common-dir"]);
+    const retained = await namespace(common);
+    const opaque = resolve(common, "codex-flow", "retained.json");
+    await writeFile(opaque, "one\n");
+    const plan = await unplugPlanV07({ repositoryPath: contentRoot, resources: [] });
+    await writeFile(opaque, "two\n");
+    await assert.rejects(
+      () => unplugApplyV07({ repositoryPath: contentRoot, plan }),
+      /plan drifted|state drifted/,
+    );
+    assert.equal(await pathExists(opaque), true);
+    assert.equal(await pathExists(retained), true);
+  } finally {
+    await removeFixture(contentRoot);
+  }
+
+  const typeRoot = await createGitFixture("codex-flow-unplug-opaque-type-");
+  try {
+    const common = git(typeRoot, ["rev-parse", "--path-format=absolute", "--git-common-dir"]);
+    await namespace(common);
+    const opaque = resolve(common, "codex-flow", "retained.json");
+    await writeFile(opaque, "retained\n");
+    const plan = await unplugPlanV07({ repositoryPath: typeRoot, resources: [] });
+    await rm(opaque);
+    await mkdir(opaque);
+    await assert.rejects(
+      () => unplugApplyV07({ repositoryPath: typeRoot, plan }),
+      /plan drifted|state drifted/,
+    );
+    assert.equal((await lstat(opaque)).isDirectory(), true);
+  } finally {
+    await removeFixture(typeRoot);
+  }
+
+  const directoryTypeRoot = await createGitFixture("codex-flow-unplug-directory-type-");
+  try {
+    const common = git(directoryTypeRoot, ["rev-parse", "--path-format=absolute", "--git-common-dir"]);
+    const retained = await namespace(common, "v0.6.0");
+    const plan = await unplugPlanV07({ repositoryPath: directoryTypeRoot, resources: [] });
+    await rm(retained, { recursive: true });
+    await writeFile(retained, "replacement\n");
+    await assert.rejects(
+      () => unplugApplyV07({ repositoryPath: directoryTypeRoot, plan }),
+      /plan drifted|state drifted/,
+    );
+    assert.equal((await lstat(retained)).isFile(), true);
+  } finally {
+    await removeFixture(directoryTypeRoot);
+  }
+});
+
+test("opaque content changed inside the state-removal phase is reauthenticated", async () => {
+  const root = await createGitFixture("codex-flow-unplug-opaque-phase-drift-");
+  try {
+    const common = git(root, ["rev-parse", "--path-format=absolute", "--git-common-dir"]);
+    const stateRoot = resolve(common, "codex-flow");
+    await mkdir(stateRoot, { recursive: true });
+    const opaque = resolve(stateRoot, "retained.json");
+    await writeFile(opaque, "original\n");
+    const plan = await unplugPlanV07({ repositoryPath: root, resources: [] });
+    let injected = false;
+    await assert.rejects(
+      () => unplugApplyV07({
+        repositoryPath: root,
+        plan,
+        testHook: async (point) => {
+          if (point === "before-state-entry-1" && !injected) {
+            injected = true;
+            await writeFile(opaque, "changed\n");
+          }
+        },
+      }),
+      /state(?: entry)? changed during state removal/,
+    );
+    assert.equal(injected, true);
+    assert.equal(await readFile(opaque, "utf8"), "changed\n");
+  } finally {
+    await removeFixture(root);
+  }
+});
+
+test("unplug rejects root symlinks, special files, and inventory overflow", async () => {
+  const symlinkRoot = await createGitFixture("codex-flow-unplug-opaque-symlink-");
+  try {
+    const common = git(symlinkRoot, ["rev-parse", "--path-format=absolute", "--git-common-dir"]);
+    const stateRoot = resolve(common, "codex-flow");
+    await mkdir(stateRoot, { recursive: true });
+    const target = resolve(common, "retained-target.json");
+    await writeFile(target, "target\n");
+    await symlink(target, resolve(stateRoot, "retained.json"));
+    await assert.rejects(
+      () => unplugPlanV07({ repositoryPath: symlinkRoot, resources: [] }),
+      /symbolic link/,
+    );
+  } finally {
+    await removeFixture(symlinkRoot);
+  }
+
+  const specialRoot = await createGitFixture("codex-flow-unplug-opaque-special-");
+  try {
+    const common = git(specialRoot, ["rev-parse", "--path-format=absolute", "--git-common-dir"]);
+    const stateRoot = resolve(common, "codex-flow");
+    await mkdir(stateRoot, { recursive: true });
+    execFileSync("mkfifo", [resolve(stateRoot, "retained.pipe")]);
+    await assert.rejects(
+      () => unplugPlanV07({ repositoryPath: specialRoot, resources: [] }),
+      /special file/,
+    );
+  } finally {
+    await removeFixture(specialRoot);
+  }
+
+  const overflowRoot = await createGitFixture("codex-flow-unplug-opaque-overflow-");
+  try {
+    const common = git(overflowRoot, ["rev-parse", "--path-format=absolute", "--git-common-dir"]);
+    const stateRoot = resolve(common, "codex-flow");
+    await mkdir(stateRoot, { recursive: true });
+    await Promise.all(Array.from({ length: 65 }, (_, index) => (
+      writeFile(resolve(stateRoot, `retained-${String(index).padStart(2, "0")}.json`), "{}\n")
+    )));
+    await assert.rejects(
+      () => unplugPlanV07({ repositoryPath: overflowRoot, resources: [] }),
+      /exceeds 64 root entries/,
+    );
+  } finally {
+    await removeFixture(overflowRoot);
+  }
+
+  const byteRoot = await createGitFixture("codex-flow-unplug-opaque-byte-bound-");
+  try {
+    const common = git(byteRoot, ["rev-parse", "--path-format=absolute", "--git-common-dir"]);
+    const stateRoot = resolve(common, "codex-flow");
+    await mkdir(stateRoot, { recursive: true });
+    const oversized = resolve(stateRoot, "oversized.bin");
+    await writeFile(oversized, "");
+    await truncate(oversized, (64 * 1024 * 1024) + 1);
+    await assert.rejects(
+      () => unplugPlanV07({ repositoryPath: byteRoot, resources: [] }),
+      /inventory bound/,
+    );
+  } finally {
+    await removeFixture(byteRoot);
+  }
+
+  const depthRoot = await createGitFixture("codex-flow-unplug-depth-bound-");
+  try {
+    const common = git(depthRoot, ["rev-parse", "--path-format=absolute", "--git-common-dir"]);
+    const namespaceRoot = resolve(common, "codex-flow", "v0.6.0");
+    await mkdir(resolve(namespaceRoot, ...Array.from({ length: 34 }, (_, index) => `d${index}`)), {
+      recursive: true,
+    });
+    await assert.rejects(
+      () => unplugPlanV07({ repositoryPath: depthRoot, resources: [] }),
+      /depth bound/,
+    );
+  } finally {
+    await removeFixture(depthRoot);
+  }
+});
+
+test("opaque-file removal resumes safely and v1 directory-only journals remain resumable", async () => {
+  const opaqueRoot = await createGitFixture("codex-flow-unplug-opaque-resume-");
+  try {
+    const common = git(opaqueRoot, ["rev-parse", "--path-format=absolute", "--git-common-dir"]);
+    const stateRoot = resolve(common, "codex-flow");
+    await namespace(common, "v0.7.0");
+    const opaque = resolve(stateRoot, "legacy.json");
+    await writeFile(opaque, "legacy\n");
+    const plan = await unplugPlanV07({ repositoryPath: opaqueRoot, resources: [] });
+    await assert.rejects(
+      () => unplugApplyV07({ repositoryPath: opaqueRoot, plan, testHook: "after-state-entry-1" }),
+      /Test interruption/,
+    );
+    assert.equal(await pathExists(opaque), false);
+    assert.equal(await pathExists(stateRoot), true);
+    const receipt = await unplugApplyV07({ repositoryPath: opaqueRoot, plan });
+    assert.equal(receipt.residue, false);
+  } finally {
+    await removeFixture(opaqueRoot);
+  }
+
+  const legacyRoot = await createGitFixture("codex-flow-unplug-v1-resume-");
+  try {
+    const common = git(legacyRoot, ["rev-parse", "--path-format=absolute", "--git-common-dir"]);
+    const stateRoot = resolve(common, "codex-flow");
+    await namespace(common, "v0.7.0");
+    const v2 = await unplugPlanV07({ repositoryPath: legacyRoot, resources: [] });
+    const v1 = legacyPlanFromV2(v2);
+    await assert.rejects(
+      () => unplugApplyV07({ repositoryPath: legacyRoot, plan: v1, testHook: "before-state-removal" }),
+      /Test interruption/,
+    );
+    const receipt = await unplugApplyV07({ repositoryPath: legacyRoot, plan: v1 });
+    assert.equal(receipt.residue, false);
+    assert.equal(await pathExists(stateRoot), false);
+  } finally {
+    await removeFixture(legacyRoot);
+  }
+});
+
+test("v1 resume preserves the original per-namespace inventory byte bound", async () => {
+  const root = await createGitFixture("codex-flow-unplug-v1-budget-");
+  try {
+    const common = git(root, ["rev-parse", "--path-format=absolute", "--git-common-dir"]);
+    const stateRoot = resolve(common, "codex-flow");
+    const namespaceNames = ["v0.7.0", "v0.7.1"];
+    await Promise.all(namespaceNames.map((name) => mkdir(resolve(stateRoot, name), { recursive: true })));
+    const base = await unplugPlanV07({ repositoryPath: root, resources: [] });
+    const payloadSize = (32 * 1024 * 1024) + 1;
+    const payloadDigest = sha256(Buffer.alloc(payloadSize));
+    const namespaces = [];
+    for (const name of namespaceNames) {
+      const path = resolve(stateRoot, name);
+      const payload = resolve(path, "payload.bin");
+      await writeFile(payload, "");
+      await truncate(payload, payloadSize);
+      namespaces.push({
+        name,
+        path,
+        digest: sha256(stableStringify([["payload.bin", "file", payloadSize, payloadDigest]])),
+      });
+    }
+    const v1 = legacyPlanWithNamespaces(base, namespaces);
+    const receipt = await unplugApplyV07({ repositoryPath: root, plan: v1 });
+    assert.equal(receipt.residue, false);
+    assert.equal(await pathExists(stateRoot), false);
+  } finally {
+    await removeFixture(root);
+  }
+});
+
+test("a newly active later namespace blocks before any state entry is removed", async () => {
+  const root = await createGitFixture("codex-flow-unplug-active-race-");
+  try {
+    const common = git(root, ["rev-parse", "--path-format=absolute", "--git-common-dir"]);
+    const first = await namespace(common, "v0.5.1");
+    const later = await namespace(common, "v0.6.0");
+    const plan = await unplugPlanV07({ repositoryPath: root, resources: [] });
+    let activated = false;
+    await assert.rejects(
+      () => unplugApplyV07({
+        repositoryPath: root,
+        plan,
+        testHook: async (point) => {
+          if (point === "before-state-entry-1" && !activated) {
+            activated = true;
+            await writeFile(
+              resolve(later, "runs", "lifecycle.json"),
+              `${JSON.stringify({ active_run_id: "became-active", runs: {} })}\n`,
+            );
+          }
+        },
+      }),
+      /active run/,
+    );
+    assert.equal(activated, true);
+    assert.equal(await pathExists(first), true);
+    assert.equal(await pathExists(later), true);
+  } finally {
+    await removeFixture(root);
+  }
+});
 
 test("unplug plan is deterministic and exact apply leaves zero repository residue", async () => {
   const fixture = await worktreeFixture("codex-flow-unplug-clean-");
@@ -270,9 +596,13 @@ test("active and malformed lifecycle state fail closed", async () => {
   const active = await worktreeFixture("codex-flow-unplug-active-");
   try {
     await namespace(active.common, "v0.7.0", "still-running");
+    const opaque = resolve(active.common, "codex-flow", "retained-evidence.json");
+    await writeFile(opaque, "{not-runtime-json\n");
     const plan = await unplugPlanV07({ repositoryPath: active.root, resources: resources(active) });
     assert.deepEqual(plan.active_runs, ["still-running"]);
+    assert.equal(plan.state_entries.some((entry) => entry.kind === "opaque-file"), true);
     await assert.rejects(() => unplugApplyV07({ repositoryPath: active.root, plan }), /active run/);
+    assert.equal(await pathExists(opaque), true);
   } finally {
     await cleanupFixture(active);
   }
@@ -423,7 +753,7 @@ test("new namespace drift after journal creation blocks state deletion", async (
   }
 });
 
-test("new namespace drift during state-removal phase blocks without deleting it", async () => {
+test("new opaque-file drift during state-removal phase blocks without deleting it", async () => {
   const fixture = await worktreeFixture("codex-flow-unplug-state-phase-drift-");
   try {
     await namespace(fixture.common);
@@ -432,7 +762,8 @@ test("new namespace drift during state-removal phase blocks without deleting it"
       () => unplugApplyV07({ repositoryPath: fixture.root, plan, testHook: "before-state-removal" }),
       /Test interruption/,
     );
-    const added = await namespace(fixture.common, "v0.7.1");
+    const added = resolve(fixture.common, "codex-flow", "late-evidence.json");
+    await writeFile(added, "late\n");
     await assert.rejects(() => unplugApplyV07({ repositoryPath: fixture.root, plan }), /changed during state removal/);
     assert.equal(await pathExists(added), true);
   } finally {

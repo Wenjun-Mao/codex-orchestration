@@ -47,7 +47,7 @@ function signal(overrides = {}) {
 }
 
 function stateRoot(root) {
-  return resolve(root, ".git", "codex-flow", "v0.7.2");
+  return resolve(root, ".git", "codex-flow", "v0.7.3");
 }
 
 async function fixture(prefix) {
@@ -302,7 +302,11 @@ test("v0.7 fences a rebound recipient and rejects symlinked urgent state", async
       nextFenceToken: "urgent-v07-next-fence",
     });
     await assert.rejects(
-      prepareUrgentAttemptV07({ stateRoot: stateRoot(root), urgentId: stored.urgent_id }),
+      prepareUrgentAttemptV07({
+        stateRoot: stateRoot(root),
+        urgentId: stored.urgent_id,
+        now: START + 2_000,
+      }),
       /prior coordinator generation/,
     );
     await assert.rejects(
@@ -311,6 +315,7 @@ test("v0.7 fences a rebound recipient and rejects symlinked urgent state", async
         urgentId: stored.urgent_id,
         deliveryAttemptId: attempt.delivery_attempt_id,
         recipient: recipient(),
+        now: START + 3_000,
       }),
       /binding is stale/,
     );

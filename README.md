@@ -23,7 +23,7 @@ readers, mutators, migration paths, retirement commands, tracked adoption, and
 test fixtures are not packaged in v0.7.
 
 v0.7 carries forward the proven cross-task behavior from v0.6.5 under new
-`codex-flow-v07-*` identities and the exact `.git/codex-flow/v0.7.2/`
+`codex-flow-v07-*` identities and the exact `.git/codex-flow/v0.7.3/`
 namespace. It adds a bounded foreign-active-run sentinel so a live predecessor
 run blocks admission instead of being silently ignored or migrated.
 
@@ -38,8 +38,10 @@ runtime. An activated v0.7 run snapshots its exact bundle into the repository's
 Git common directory, so its authority survives task restart, compaction,
 plugin upgrade, and plugin removal. The runtime never reads, imports, migrates,
 or executes predecessor authority. The separate version-agnostic `unplug`
-lifecycle inventories retained paths as opaque local state and removes them
-only through its own reviewed clean-start contract.
+lifecycle inventories retained namespace directories and ordinary root files
+as exact local state. Root files are byte-authenticated but never parsed or
+migrated; all entries are removed only through the reviewed clean-start
+contract.
 
 ### Instruction authority
 
@@ -92,7 +94,7 @@ When the user authorizes actionable orchestration, the plugin may activate one
 run after disclosing:
 
 - the exact package/runtime source and bundle hash;
-- the `.git/codex-flow/v0.7.2/` operational state root;
+- the `.git/codex-flow/v0.7.3/` operational state root;
 - repository/common-directory, baseline, host, and coordinator binding;
 - the immutable workflow revision and its path/resource/branch reservation
   envelope;
@@ -237,8 +239,10 @@ The separate repository-scoped `unplug` lifecycle can apply an explicitly
 approved clean-start plan after every named task has been archived. It removes
 only exact eligible linked worktrees (including detached Codex App task
 worktrees whose tips are already integrated) and separately bound local
-`codex/*` branches, then deletes all planned `.git/codex-flow` state last and
-proves that both state and its crash journal have zero residue.
+`codex/*` branches, then deletes every exact planned `.git/codex-flow` entry
+last. A v2 plan distinguishes authenticated namespace directories from opaque
+root files so content or type drift fails closed. It proves that both state and
+its crash journal have zero residue.
 
 Native subagents use their separate `complete` then `dispose` proof chain with
 unchanged-Git evidence. They never enter this callback, integration, archive,
@@ -314,7 +318,9 @@ defines the clean predecessor-free package cutover.
 [ADR 0030](docs/adr/0030-prepare-admission-ordering.md) defines native
 prepare atomicity, and [ADR 0031](docs/adr/0031-clean-start-unplug-boundary.md)
 defines the clean-start/unplug contract. [ADR 0032](docs/adr/0032-detached-codex-app-worktree-unplug.md)
-defines detached Codex App worktree eligibility within that contract.
+defines detached Codex App worktree eligibility within that contract, and
+[ADR 0033](docs/adr/0033-opaque-root-state-unplug-plans.md) defines opaque
+root-file inventory plus v1 crash-resume compatibility.
 
 ## Source and distribution
 

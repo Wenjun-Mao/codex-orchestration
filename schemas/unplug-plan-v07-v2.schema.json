@@ -1,0 +1,190 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://private.local/codex-flow/unplug-plan-v07-v2.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "kind",
+    "plan_id",
+    "repository",
+    "state_entries",
+    "resources",
+    "active_runs",
+    "state_digest",
+    "git_digest",
+    "mutation_performed"
+  ],
+  "properties": {
+    "schema_version": { "const": 2 },
+    "kind": { "const": "codex-flow-v07-unplug-plan-v2" },
+    "plan_id": { "type": "string", "pattern": "^unplug-plan-v2-[0-9a-f]{64}$" },
+    "repository": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "root",
+        "common_dir",
+        "head",
+        "branch",
+        "status_digest",
+        "primary_worktree_path"
+      ],
+      "properties": {
+        "root": { "type": "string" },
+        "common_dir": { "type": "string" },
+        "head": { "type": "string", "pattern": "^[0-9a-f]{40,64}$" },
+        "branch": { "type": ["string", "null"] },
+        "status_digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "primary_worktree_path": { "type": "string" }
+      }
+    },
+    "state_entries": {
+      "type": "array",
+      "maxItems": 64,
+      "items": { "$ref": "#/$defs/stateEntry" }
+    },
+    "resources": {
+      "type": "array",
+      "maxItems": 512,
+      "items": { "$ref": "#/$defs/resource" }
+    },
+    "active_runs": {
+      "type": "array",
+      "maxItems": 128,
+      "items": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+$" }
+    },
+    "state_digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "git_digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "mutation_performed": { "const": false }
+  },
+  "$defs": {
+    "stateEntry": {
+      "oneOf": [
+        { "$ref": "#/$defs/namespaceDirectory" },
+        { "$ref": "#/$defs/opaqueFile" }
+      ]
+    },
+    "namespaceDirectory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "name", "path", "digest"],
+      "properties": {
+        "kind": { "const": "namespace-directory" },
+        "name": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+$", "maxLength": 128 },
+        "path": { "type": "string" },
+        "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    },
+    "opaqueFile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "name", "path", "size", "digest"],
+      "properties": {
+        "kind": { "const": "opaque-file" },
+        "name": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+$", "maxLength": 128 },
+        "path": { "type": "string" },
+        "size": { "type": "integer", "minimum": 0, "maximum": 67108864 },
+        "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    },
+    "resource": {
+      "oneOf": [
+        { "$ref": "#/$defs/worktreeResource" },
+        { "$ref": "#/$defs/branchResource" },
+        { "$ref": "#/$defs/taskResource" }
+      ]
+    },
+    "commonResource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "id",
+        "provenance",
+        "path",
+        "branch",
+        "expected_tip",
+        "common_dir",
+        "protected",
+        "thread_id"
+      ],
+      "properties": {
+        "kind": { "enum": ["worktree", "branch", "task"] },
+        "id": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+$" },
+        "provenance": { "enum": ["state-derived", "user-bound"] },
+        "path": { "type": ["string", "null"] },
+        "branch": { "type": ["string", "null"] },
+        "expected_tip": { "type": ["string", "null"] },
+        "common_dir": { "type": "string" },
+        "protected": { "type": "boolean" },
+        "thread_id": { "type": ["string", "null"] }
+      }
+    },
+    "worktreeResource": {
+      "allOf": [
+        { "$ref": "#/$defs/commonResource" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "worktree" },
+            "id": { "type": "string" },
+            "provenance": { "enum": ["state-derived", "user-bound"] },
+            "path": { "type": "string" },
+            "branch": {
+              "anyOf": [
+                { "type": "null" },
+                { "type": "string", "pattern": "^codex/" }
+              ]
+            },
+            "expected_tip": { "type": "string", "pattern": "^[0-9a-f]{40,64}$" },
+            "common_dir": { "type": "string" },
+            "protected": { "type": "boolean" },
+            "thread_id": { "type": "null" }
+          }
+        }
+      ]
+    },
+    "branchResource": {
+      "allOf": [
+        { "$ref": "#/$defs/commonResource" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "branch" },
+            "id": { "type": "string" },
+            "provenance": { "enum": ["state-derived", "user-bound"] },
+            "path": { "type": "null" },
+            "branch": { "type": "string", "pattern": "^codex/" },
+            "expected_tip": { "type": "string", "pattern": "^[0-9a-f]{40,64}$" },
+            "common_dir": { "type": "string" },
+            "protected": { "const": false },
+            "thread_id": { "type": "null" }
+          }
+        }
+      ]
+    },
+    "taskResource": {
+      "allOf": [
+        { "$ref": "#/$defs/commonResource" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "task" },
+            "id": { "type": "string" },
+            "provenance": { "enum": ["state-derived", "user-bound"] },
+            "path": { "type": "null" },
+            "branch": { "type": "null" },
+            "expected_tip": { "type": "null" },
+            "common_dir": { "type": "string" },
+            "protected": { "const": false },
+            "thread_id": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+$" }
+          }
+        }
+      ]
+    }
+  }
+}

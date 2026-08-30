@@ -5,7 +5,8 @@ Status: current v0.7 package and runtime boundary.
 This document summarizes the breaking v0.7 authority established by
 [ADR 0015](adr/0015-progressive-run-activation-authority.md) through
 [ADR 0031](adr/0031-clean-start-unplug-boundary.md) and
-[ADR 0032](adr/0032-detached-codex-app-worktree-unplug.md).
+[ADR 0032](adr/0032-detached-codex-app-worktree-unplug.md), with opaque-state
+planning refined by [ADR 0033](adr/0033-opaque-root-state-unplug-plans.md).
 
 ## Retained cross-task authority
 
@@ -38,7 +39,7 @@ durable result journal or coordinator disposition.
 
 - Read-only questions and plans require no repository setup.
 - An authorized actionable request may progressively activate one explicit run
-  under `.git/codex-flow/v0.7.2/`, with an exact runtime snapshot and
+  under `.git/codex-flow/v0.7.3/`, with an exact runtime snapshot and
   disclosure before external task creation.
 - Activation writes no tracked setup, adoption, instructions, or `AGENTS.md`.
 - A bounded sibling-namespace sentinel checks Git-common state at admission.
@@ -87,9 +88,11 @@ predecessor protocol.
 
 Predecessor versions remain available through immutable source tags and Git
 history, not through the current artifact. Their operational namespaces are not
-imported or normalized into v0.7. The only cross-version read is the bounded
-foreign-active-run sentinel's minimal sibling `runs/lifecycle.json` check at
-admission.
+imported or normalized into v0.7. Admission's only cross-version read is the
+bounded foreign-active-run sentinel's minimal sibling `runs/lifecycle.json`
+check. The version-agnostic unplug planner separately hashes opaque retained
+state without interpreting it. It can resume its own exact v0.7.2 plan-v1
+journal, but emits only plan v2 for new clean starts.
 
 A predecessor run must be completed or explicitly abandoned under its own
 snapshotted runtime before v0.7 can activate.
@@ -98,9 +101,10 @@ snapshotted runtime before v0.7 can activate.
 
 An incompatible Flow namespace is an admission failure, not a request to
 reinterpret retained state. `unplug plan` is read-only and repository-scoped:
-it binds the repository and Git common directory, inventories the exact local
-Flow paths, and identifies every task that must first be reconciled and
-archived through the App.
+it binds the repository and Git common directory, inventories exact namespace
+directories and ordinary root files, and identifies every task that must first
+be reconciled and archived through the App. Opaque files are authenticated by
+exact path, size, and byte digest but never parsed or migrated.
 
 Only after those tasks are archived may `unplug apply` use the unchanged plan,
 and only after explicit user approval. Apply is local-only: it may remove only
@@ -110,12 +114,13 @@ ancestral to the authenticated base), and unprotected local `codex/*` branches a
 authenticated base. Git-ignored artifacts do not block that worktree check;
 tracked or ordinary-untracked changes, unmerged or attached branches,
 protected resources, remote state, and path or tip drift do. It never deletes
-remote refs, tags, source history, or unrelated Git-common files. All
-planned `.git/codex-flow` state is deleted last. A crash-resume journal outside
-that state root blocks new activation until the exact operation resumes; both
-the Flow state root and journal must have zero residue before a clean start is
-reported. Optional App-plugin uninstallation is a separate explicit user
-action after that confirmation.
+remote refs, tags, source history, or unrelated Git-common files. All planned
+`.git/codex-flow` state is deleted last: opaque files non-recursively and
+namespace directories recursively, with type and content revalidated. A
+crash-resume journal outside that state root blocks new activation until the
+exact operation resumes; both the Flow state root and journal must have zero
+residue before a clean start is reported. Optional App-plugin uninstallation
+is a separate explicit user action after that confirmation.
 
 ## Retired mechanisms
 
