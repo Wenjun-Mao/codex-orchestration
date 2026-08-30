@@ -17,19 +17,16 @@ See [Mission and product boundary](docs/mission.md) for the durable charter.
 
 This public repository is the editing authority and remains `UNLICENSED`;
 public visibility does not grant an open-source license. The accepted source
-release and personal-marketplace package are v0.6.2. A repository may retain
+release and personal-marketplace package are v0.6.3. A repository may retain
 v0.5.1 consumer authority until its own explicit transition is approved and
 applied.
 
-The v0.6.2 release retains the Codex App compatibility fixes from v0.6.1,
+The v0.6.3 release retains the Codex App compatibility fixes from v0.6.1,
 makes plugin skills the sole live instruction authority, requires deliberate
 model-routing rationale, and permits one bounded replan only after exact proof
-that a rejected selector created no native task or agent.
-
-This editable checkout is the unreleased v0.6.3 compatibility line. It does
-not replace the installed v0.6.2 package or its immutable runtime snapshots.
-It keeps verification journal mutation coordinator-owned while resolving an
-accepted no-change check against the exact persisted executor worktree.
+that a rejected selector created no native task or agent. It also keeps
+verification journal mutation coordinator-owned while resolving accepted
+no-change checks against the exact persisted executor worktree.
 
 Editing this checkout never changes an installed plugin or active repository
 runtime. An activated v0.6 run snapshots its exact bundle into the repository's

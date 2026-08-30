@@ -1,13 +1,11 @@
 # Codex Orchestration v0.6 boundary
 
-Status: accepted v0.6.2 boundary with an unreleased v0.6.3 compatibility
-checkpoint in progress.
+Status: accepted v0.6.3 boundary.
 
 This document summarizes the v0.6 contract established by
 [ADR 0015](adr/0015-progressive-run-activation-authority.md) through
 [ADR 0026](adr/0026-coordinator-owned-verification-subject-resolution.md).
-The accepted source and personal-marketplace package remain v0.6.2. Editing
-this development checkout does not replace that immutable release.
+The accepted source and personal-marketplace package are v0.6.3.
 
 ## Retained cross-task authority
 
