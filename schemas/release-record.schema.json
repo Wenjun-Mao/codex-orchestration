@@ -13,7 +13,7 @@
   ],
   "properties": {
     "schema_version": { "const": 1 },
-    "kind": { "const": "codex-flow-v06-task-release" },
+    "kind": { "const": "codex-flow-v07-task-release" },
     "release_id": {
       "type": "string",
       "pattern": "^release-v1-[0-9a-f]{64}$"
