@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { existsSync, readFileSync } from "node:fs";
-import { readFile } from "node:fs/promises";
+import { readFile, realpath } from "node:fs/promises";
 import { parseArgs } from "node:util";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -140,6 +140,7 @@ import {
 } from "../lib/integration-v06.mjs";
 import {
   acceptTaskRelease,
+  authenticateTaskReleaseExecutorWorktree,
   prepareTaskRelease,
   reconcileTaskRelease,
   taskReleaseStatus,
@@ -1264,6 +1265,45 @@ function v06Output(value) {
   console.log(stableStringify(value, 2));
 }
 
+function shellArgument(value) {
+  return `'${String(value).replaceAll("'", `'\\''`)}'`;
+}
+
+async function assertRunBoundRuntimeExecution({ git, runId, requestFile, runtime }) {
+  const runBoundDigest = runtime.bundle.bundle_sha256;
+  const boundBundleRoot = resolve(
+    git.stateRoot,
+    "runtimes",
+    runBoundDigest,
+    "files",
+  );
+  const executingRoot = await realpath(packageRoot).catch(() => null);
+  const canonicalBoundRoot = await realpath(boundBundleRoot).catch(() => null);
+  if (executingRoot !== null && executingRoot === canonicalBoundRoot) return;
+  const executing = await loadRuntimeBundleSource({ packageRoot });
+  if (executing.bundle.bundle_sha256 === runBoundDigest) return;
+  const boundCli = resolve(boundBundleRoot, "bin", "codex-flow.mjs");
+  const requestPath = resolve(process.cwd(), requestFile);
+  const recovery = [
+    process.execPath,
+    boundCli,
+    "release",
+    "accept",
+    "--run-id",
+    runId,
+    "--file",
+    requestPath,
+    "--json",
+  ].map(shellArgument).join(" ");
+  throw new CliError([
+    "Release acceptance must use the exact run-bound runtime.",
+    `executing_bundle_sha256=${executing.bundle.bundle_sha256}`,
+    `run_bound_bundle_sha256=${runBoundDigest}`,
+    `runtime_context_digest=${runtimeContextHash(runtime)}`,
+    `recovery_command=${recovery}`,
+  ].join("\n"), 73);
+}
+
 function parseV06Options(args, extra = {}) {
   return parse({
     "run-id": { type: "string" },
@@ -1353,7 +1393,7 @@ async function archiveAuthority(git, archiveId, runId) {
   return assertRunIdentity(record, runId, "task archive");
 }
 
-async function activeRunAuthority(git, runId, planId = null) {
+async function activeRunAuthority(git, runId, planId = null, { allowLinkedWorktree = false } = {}) {
   const { run } = await readRun({ gitCommonDirectory: git.commonDir, runId });
   if (run.status !== "active") throw new CliError(`v0.6 run is not active: ${runId}`, 73);
   if (planId !== null && run.workflow_plan_id !== planId) {
@@ -1372,17 +1412,24 @@ async function activeRunAuthority(git, runId, planId = null) {
     || binding.policy_hash !== run.binding.policy_hash
     || binding.repository_hash !== run.binding.repository_hash
     || runtime.repository.common_dir !== git.commonDir
-    || runtime.repository.root !== git.root
+    || (!allowLinkedWorktree && runtime.repository.root !== git.root)
   ) throw new CliError("active run/runtime/repository authority is inconsistent", 73);
-  return { run, runtime, binding };
+  return {
+    run,
+    runtime,
+    binding,
+    caller_repository_mode: runtime.repository.root === git.root
+      ? "coordinator-checkout"
+      : "linked-worktree",
+  };
 }
 
-async function guardedActiveRunMutation(git, runId, operation) {
+async function guardedActiveRunMutation(git, runId, operation, { allowLinkedWorktree = false } = {}) {
   return withActiveRunMutation({
     gitCommonDirectory: git.commonDir,
     runId,
   }, async (locked) => {
-    const authority = await activeRunAuthority(git, runId);
+    const authority = await activeRunAuthority(git, runId, null, { allowLinkedWorktree });
     if (stableStringify(authority.run) !== stableStringify(locked.run)) {
       throw new CliError("active run changed while acquiring mutation authority", 75);
     }
@@ -1606,7 +1653,7 @@ async function commandRunV06(args) {
         bundle_sha256: runtime.bundle.bundle_sha256,
       },
       state_authority: {
-        namespace: "v0.6.0",
+        namespace: "v0.6.1",
         state_root: git.stateRoot,
         git_common_dir: git.commonDir,
       },
@@ -1996,7 +2043,7 @@ function releasePrepareView(result) {
     : base;
 }
 
-async function commandReleaseV06(args) {
+async function commandReleaseV06(args, mutationAuthority = null) {
   const [subcommand, ...rest] = args;
   const values = parseV06Options(rest, { "release-id": { type: "string" } });
   const git = v06Repository();
@@ -2039,6 +2086,26 @@ async function commandReleaseV06(args) {
     });
   } else {
     await releaseAuthority(git, request.release_id, runId);
+    if (mutationAuthority === null) {
+      throw new CliError("Release acceptance requires active mutation authority", 73);
+    }
+    await assertRunBoundRuntimeExecution({
+      git,
+      runId,
+      requestFile: values.file,
+      runtime: mutationAuthority.runtime,
+    });
+    const executor = await authenticateTaskReleaseExecutorWorktree({
+      stateRoot: git.stateRoot,
+      releaseId: request.release_id,
+      repositoryPath: git.root,
+    });
+    if (
+      executor.worktree.mode === "host-worktree"
+      && !mutationAuthority.run.plan.branch_fences.includes(executor.worktree.executor_branch)
+    ) {
+      throw new CliError("Release acceptance executor branch is outside the active run reservation", 73);
+    }
     result = await acceptTaskRelease({
       stateRoot: git.stateRoot,
       releaseId: request.release_id,
@@ -2715,7 +2782,13 @@ async function dispatchV06Command(command, args, handler) {
   if (runIds.length !== 1) throw new CliError("v0.6 mutations require exactly one --run-id", 64);
   const runId = requireText(runIds[0], "--run-id", { max: 128, safeId: true });
   const git = v06Repository();
-  return guardedActiveRunMutation(git, runId, () => handler(args));
+  const allowLinkedWorktree = command === "release" && args[0] === "accept";
+  return guardedActiveRunMutation(
+    git,
+    runId,
+    (authority) => handler(args, authority),
+    { allowLinkedWorktree },
+  );
 }
 
 async function main() {

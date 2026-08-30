@@ -126,6 +126,11 @@
       "maxLength": 256,
       "pattern": "^[A-Za-z0-9_.-]+$"
     },
+    "provisionalHostId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
     "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
     "revision": { "type": "string", "pattern": "^[0-9a-f]{40,64}$" },
     "timestamp": { "type": "string", "format": "date-time", "maxLength": 64 },
@@ -255,7 +260,7 @@
       "additionalProperties": false,
       "required": ["client_thread_id", "recorded_at"],
       "properties": {
-        "client_thread_id": { "$ref": "#/$defs/hostId" },
+        "client_thread_id": { "$ref": "#/$defs/provisionalHostId" },
         "recorded_at": { "$ref": "#/$defs/timestamp" }
       }
     },

@@ -14,7 +14,7 @@ import {
 import { validateReleaseIdentity } from "./release-identity.mjs";
 
 const root = resolve(import.meta.dirname, "..");
-const EXPECTED_PACKAGE_VERSION = "0.6.0";
+const EXPECTED_PACKAGE_VERSION = "0.6.1-dev.0";
 
 // ACTIVE V0.6 SCHEMA REGISTRY INSERTION POINT:
 // add every new operating schema here in the same change that introduces it.
@@ -472,7 +472,7 @@ const templateContracts = new Map([
     "persist the signal before one identified interrupt attempt",
   ]],
   ["templates/references/task-lifecycle.md", [
-    ".git/codex-flow/v0.6.0/runtimes/<bundle-sha256>/",
+    ".git/codex-flow/v0.6.1/runtimes/<bundle-sha256>/",
     "terminal-receipt-v3 journal result without messaging",
     "content-addressed PASS verification and integration/no-change records",
     "Every stateful command names the run explicitly",

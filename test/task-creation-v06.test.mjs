@@ -77,7 +77,7 @@ async function fixture({
     generation: 1,
   };
   coordinator.binding_digest = coordinatorBindingDigest(coordinator);
-  const stateRoot = resolve(commonDir, "codex-flow", "v0.6.0");
+  const stateRoot = resolve(commonDir, "codex-flow", "v0.6.1");
   const runId = "run-visible-task";
   const snapshot = gitSnapshot(root);
   const bundleSource = await loadRuntimeBundleSource({ packageRoot });
@@ -168,6 +168,7 @@ function acceptedSelectors(requested, at = START + 500) {
 
 test("one-shot visible creation binds provisional and ready identities through the exact launch nonce", async () => {
   const context = await fixture();
+  const provisionalClientThreadId = "client-new-thread:89fe4605-fa97-4b2b-8722-39a4aa8644fa";
   try {
     const prepared = await prepareVisibleTaskCreation({
       stateRoot: context.stateRoot,
@@ -201,7 +202,7 @@ test("one-shot visible creation binds provisional and ready identities through t
       stateRoot: context.stateRoot,
       operationId: prepared.operation_id,
       outcome: "provisional",
-      provisionalClientThreadId: "client-thread-1",
+      provisionalClientThreadId,
       selectorEvidence: {
         accepted: acceptedSelectors(context.requested),
         observed: null,
@@ -210,14 +211,14 @@ test("one-shot visible creation binds provisional and ready identities through t
     });
     assert.equal(provisional.status, "provisional");
     assert.equal(provisional.release_permitted, false);
-    assert.equal(provisional.provisional.client_thread_id, "client-thread-1");
+    assert.equal(provisional.provisional.client_thread_id, provisionalClientThreadId);
 
     await assert.rejects(
       () => reconcileVisibleTaskCreation({
         stateRoot: context.stateRoot,
         operationId: prepared.operation_id,
         outcome: "ready",
-        provisionalClientThreadId: "client-thread-1",
+        provisionalClientThreadId,
         readyThreadId: "ready-thread-1",
         initialTurn: {
           source: "host-observed",
@@ -241,7 +242,7 @@ test("one-shot visible creation binds provisional and ready identities through t
       stateRoot: context.stateRoot,
       operationId: prepared.operation_id,
       outcome: "ready",
-      provisionalClientThreadId: "client-thread-1",
+      provisionalClientThreadId,
       readyThreadId: "ready-thread-1",
       initialTurn: {
         source: "host-observed",
@@ -276,7 +277,7 @@ test("one-shot visible creation binds provisional and ready identities through t
       stateRoot: context.stateRoot,
       operationId: prepared.operation_id,
       outcome: "ready",
-      provisionalClientThreadId: "client-thread-1",
+      provisionalClientThreadId,
       readyThreadId: "ready-thread-1",
       initialTurn: {
         source: "host-observed",
@@ -590,4 +591,9 @@ test("visible task creation schema preserves provisional/ready distinction and f
   assert.equal(schema.properties.operation_id.pattern.startsWith("^visible-task-operation-v1-"), true);
   assert.equal(schema.required.includes("contract_id"), true);
   assert.equal(Object.hasOwn(schema.properties, "task_contract_id"), false);
+  assert.equal(
+    schema.$defs.provisional.properties.client_thread_id.$ref,
+    "#/$defs/provisionalHostId",
+  );
+  assert.equal(Object.hasOwn(schema.$defs.provisionalHostId, "pattern"), false);
 });

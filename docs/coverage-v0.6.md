@@ -1,13 +1,13 @@
 # Codex Orchestration v0.6 development boundary
 
-Status: implemented development boundary; release acceptance remains a
-separate checkpoint.
+Status: accepted v0.6.0 boundary with an unreleased v0.6.1 development
+checkpoint in progress.
 
 This document summarizes the v0.6 contract established by
 [ADR 0015](adr/0015-progressive-run-activation-authority.md) through
-[ADR 0022](adr/0022-exact-v051-tracked-authority-retirement.md).
-It does not claim that the installed marketplace package has moved beyond
-v0.5.1.
+[ADR 0024](adr/0024-terminal-callback-admission-authority.md).
+The accepted personal-marketplace package remains v0.6.0; editing this source
+does not replace it.
 
 ## Retained cross-task authority
 
@@ -34,7 +34,7 @@ durable result journal or coordinator disposition.
 
 - A read-only question or plan never requires tracked repository setup.
 - An authorized actionable request may progressively activate one explicit run
-  under `.git/codex-flow/v0.6.0/`, with an exact runtime snapshot and disclosure
+  under `.git/codex-flow/v0.6.1/`, with an exact runtime snapshot and disclosure
   before external task creation.
 - Permanent tracked adoption is optional and uses the same engine. Existing
   tracked v0.5 authority must be explicitly retired; its evidence is preserved
@@ -46,13 +46,20 @@ durable result journal or coordinator disposition.
   attempt, and instrument role. A supporting instrument must lead immediately
   to its direct attempt or pause/replan; another supporting checkpoint needs
   explicit later authorization.
-- Visible task creation is one-shot. Provisional and ready IDs remain separate,
+- Visible task creation is one-shot. The host's provisional ID is bounded
+  opaque evidence stored verbatim; provisional and ready IDs remain separate,
   and the ready identity must expose the exact launch nonce in its initial
   host-visible user turn.
-- Objective delivery is an at-most-once release handshake whose exact contract,
-  runtime, common directory, and ready task must be accepted before work.
+- Objective delivery is an at-most-once release handshake accepted only from
+  the exact persisted pristine executor worktree and reserved branch, through
+  the run-bound runtime, for the exact contract, common directory, and ready
+  task.
 - Terminal receipt v3 derives `unchanged`, `clean-commit`, or `dirty-blocked`;
   upstream is nullable.
+- A terminal receipt becomes durable only after callback admission matches its
+  accepted release, ready task, baseline, and exact selector evidence. Missing
+  host observation remains null and is never inferred from requested or
+  accepted selectors.
 - The visible-task terminal chain is result -> prepared disposition -> integration or
   no-change -> content-addressed PASS combined verification -> finalized
   disposition/internal consumption -> reconciled archive -> cleanup plan ->

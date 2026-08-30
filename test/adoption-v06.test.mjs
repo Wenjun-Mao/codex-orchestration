@@ -96,7 +96,7 @@ test("adoption plan applies exact runtime, config, policy, and reviewed instruct
   const { commonDir, runtime, plan, packageRoot } = await prepareAdoption(root);
   const v05 = await seedV05Audit(commonDir);
   const runtimeBytes = await readFile(
-    resolve(commonDir, "codex-flow", "v0.6.0", "contexts", `${runtime.runtime_id}.json`),
+    resolve(commonDir, "codex-flow", "v0.6.1", "contexts", `${runtime.runtime_id}.json`),
   );
   await rm(packageRoot, { recursive: true, force: true });
 
@@ -116,7 +116,7 @@ test("adoption plan applies exact runtime, config, policy, and reviewed instruct
   assert.match(await readFile(adoptionInstructionsPath(root), "utf8"), /Review retirement before applying it/);
   assert.deepEqual(await readFile(v05.path), v05.bytes);
   assert.deepEqual(
-    await readFile(resolve(commonDir, "codex-flow", "v0.6.0", "contexts", `${runtime.runtime_id}.json`)),
+    await readFile(resolve(commonDir, "codex-flow", "v0.6.1", "contexts", `${runtime.runtime_id}.json`)),
     runtimeBytes,
   );
 
@@ -154,7 +154,7 @@ test("retirement requires a reviewed plan and deletes only v0.6 tracked adoption
   const { commonDir, runtime, plan } = await prepareAdoption(root);
   const v05 = await seedV05Audit(commonDir);
   await applyAdoptionPlan({ repositoryRoot: root, plan });
-  const runtimePath = resolve(commonDir, "codex-flow", "v0.6.0", "contexts", `${runtime.runtime_id}.json`);
+  const runtimePath = resolve(commonDir, "codex-flow", "v0.6.1", "contexts", `${runtime.runtime_id}.json`);
   const runtimeBytes = await readFile(runtimePath);
 
   const retirement = await planAdoptionRetirement({

@@ -38,7 +38,7 @@ async function fixture(t) {
     cwd: root,
     encoding: "utf8",
   }).trim();
-  const stateRoot = resolve(commonDir, "codex-flow", "v0.6.0");
+  const stateRoot = resolve(commonDir, "codex-flow", "v0.6.1");
   const coordinator = {
     lineage_id: "subagent-operation-lineage",
     thread_id: "subagent-operation-coordinator",

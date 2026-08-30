@@ -15,7 +15,7 @@ Questions and planning remain read-only. Before an actionable run writes
 operational state or creates a native task, disclose:
 
 - the package/runtime source and exact bundle hash;
-- the `.git/codex-flow/v0.6.0/` Git-common state root;
+- the `.git/codex-flow/v0.6.1/` Git-common state root;
 - the repository, baseline, host, coordinator lineage and generation;
 - the proposed workflow revision and path/resource/branch reservation envelope;
 - each task's saved project, visible-task or subagent surface, requested model
@@ -68,16 +68,19 @@ when authority, cost, or instrumentation scope is uncertain.
 Before creation, read [Host operations](../../templates/references/host-operations.md).
 Use `task create prepare|attempt|reconcile|status` around exactly one native
 creation call. Bootstrap includes a cryptographic launch nonce and no objective.
-Record provisional `clientThreadId` and ready task ID separately; accept the
-ready identity only when its initial host-visible turn contains the exact nonce.
-Title or timing similarity never correlates identity. Ambiguity fails closed.
+Record the host's provisional `clientThreadId` verbatim as bounded opaque
+evidence and keep it separate from the ready task ID; never normalize it into
+an internal identifier. Accept the ready identity only when its initial
+host-visible turn contains the exact nonce. Title or timing similarity never
+correlates identity. Ambiguity fails closed.
 
 Reconcile project, requested/accepted/observed model and effort, and the actual
 worktree. Bind a pristine host-created worktree at the exact baseline before
 objective release. Then use `release prepare|reconcile|accept|status`: send the
-prepared prompt at most once and require the executor to accept the exact
-release, contract, runtime, and common directory before work begins. An
-ambiguous send never authorizes blind resend.
+prepared prompt at most once and require the executor to accept from the exact
+persisted pristine worktree, on its reserved branch and baseline, using the
+exact release, contract, run-bound runtime, and common directory. An ambiguous
+send never authorizes blind resend.
 
 ## Monitor and close
 

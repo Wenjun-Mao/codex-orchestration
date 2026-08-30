@@ -8,122 +8,86 @@ import {
   deliverCallbackV06,
   observeCallbackV06,
 } from "../lib/callbacks-v06.mjs";
-import { bindRecipient } from "../lib/recipients.mjs";
 import {
-  recipientBindingDigest,
   terminalCallbackIdForV3,
   validateTerminalReceiptV3,
 } from "../lib/task-results.mjs";
 import { createGitFixture, removeFixture } from "./helpers.mjs";
+import { createAcceptedVisibleTask, terminalReceipt } from "./v06-lifecycle-fixture.mjs";
 
-const digest = (character) => character.repeat(64);
-
-function receipt(commonDir) {
-  const recipient = {
-    lineage_id: "callback-lineage-v06",
-    thread_id: "callback-coordinator-v06",
-    generation: 1,
-  };
-  return validateTerminalReceiptV3({
-    schema_version: 3,
-    recipient: {
-      ...recipient,
-      binding_digest: recipientBindingDigest(recipient),
-    },
-    executor_thread_id: "callback-executor-v06",
-    run_id: "callback-run-v06",
-    runtime_context_digest: digest("b"),
-    configuration_digest: digest("c"),
-    repository_id: "callback-repository-v06",
-    common_dir: commonDir,
-    plan_id: "callback-plan-v06",
-    revision_digest: digest("e"),
-    task_id: "callback-task-v06",
-    task_digest: digest("d"),
-    contract_id: digest("f"),
-    operation_id: "callback-operation-v06",
-    release_id: "callback-release-v06",
-    classification: "PASS",
-    git_outcome: {
-      kind: "unchanged",
-      baseline_revision: "1".repeat(40),
-      final_revision: "1".repeat(40),
-      branch: "codex/callback-v06",
-      upstream: null,
-      cleanliness: "clean",
-    },
-    model_evidence: {
-      configured: { model: "gpt-5.6-terra", reasoning_effort: "medium" },
-      requested: { model: "gpt-5.6-terra", reasoning_effort: "medium" },
-      accepted: { model: "gpt-5.6-terra", reasoning_effort: "medium" },
-      observed: null,
-    },
-    result_or_blocker: "Bounded callback result complete.",
-    next_decision: "Record a coordinator disposition.",
-    accounting: {
-      PRODUCT: 1,
-      CROSS_CUTTING_PRODUCT_FIX: 0,
-      ENVIRONMENT: 0,
-      PROOF_HARNESS: 0,
-    },
-    completed_at: "2026-08-29T12:00:00-04:00",
+function receipt(context) {
+  return terminalReceipt(context, {
+    kind: "unchanged",
+    baseline_revision: context.baseline,
+    final_revision: context.baseline,
+    branch: context.requestedSelectors.worktree.executor_branch,
+    upstream: null,
+    cleanliness: "clean",
   });
+}
+
+function recipient(context) {
+  return {
+    lineage_id: context.coordinator.lineage_id,
+    thread_id: context.coordinator.thread_id,
+    generation: context.coordinator.generation,
+  };
 }
 
 test("v0.6 callback is quiet, durable, and consumable only by a disposition", async () => {
   const root = await createGitFixture("codex-flow-v06-callback-");
-  const stateRoot = resolve(root, ".git", "codex-flow", "v0.6.0");
-  const recipient = {
-    lineage_id: "callback-lineage-v06",
-    thread_id: "callback-coordinator-v06",
-    generation: 1,
-  };
   try {
-    await bindRecipient({ stateRoot, recipient });
-    const payload = receipt(resolve(root, ".git"));
+    const context = await createAcceptedVisibleTask(root, "callback");
+    const payload = receipt(context);
     const delivered = await deliverCallbackV06({
-      stateRoot,
+      stateRoot: context.stateRoot,
       receipt: payload,
       expectedRunId: payload.run_id,
     });
     assert.equal(delivered.status, "persisted");
     assert.equal(delivered.callback_id, terminalCallbackIdForV3(payload));
-    assert.equal((await deliverCallbackV06({ stateRoot, receipt: payload })).status, "already-persisted");
+    assert.equal((await deliverCallbackV06({
+      stateRoot: context.stateRoot,
+      receipt: payload,
+    })).status, "already-persisted");
     const conflicting = validateTerminalReceiptV3({
       ...payload,
       result_or_blocker: "A different result cannot occupy the same released-task terminal slot.",
     });
     assert.equal(terminalCallbackIdForV3(conflicting), delivered.callback_id);
     await assert.rejects(
-      deliverCallbackV06({ stateRoot, receipt: conflicting }),
+      deliverCallbackV06({ stateRoot: context.stateRoot, receipt: conflicting }),
       /collides with immutable callback identity/,
     );
     await assert.rejects(
       consumeCallbackV06({
-        stateRoot,
+        stateRoot: context.stateRoot,
         callbackId: delivered.callback_id,
-        recipient,
+        recipient: recipient(context),
         executorThreadId: payload.executor_thread_id,
         dispositionId: "disposition-v06",
       }),
       /must be observed/,
     );
     assert.equal((await observeCallbackV06({
-      stateRoot,
+      stateRoot: context.stateRoot,
       callbackId: delivered.callback_id,
-      recipient,
+      recipient: recipient(context),
     })).status, "observed");
     await assert.rejects(
       consumeCallbackV06({
-        stateRoot,
+        stateRoot: context.stateRoot,
         callbackId: delivered.callback_id,
-        recipient,
+        recipient: recipient(context),
         executorThreadId: payload.executor_thread_id,
         dispositionId: "disposition-v06",
       }),
       /authoritative persisted disposition/,
     );
-    const status = await callbackStatusV06({ stateRoot, runId: payload.run_id });
+    const status = await callbackStatusV06({
+      stateRoot: context.stateRoot,
+      runId: payload.run_id,
+    });
     assert.equal(status.pending.length, 1);
     assert.equal(status.pending[0].executor_thread_id, payload.executor_thread_id);
     assert.equal(Object.hasOwn(status.pending[0], "executor_id"), false);
@@ -134,20 +98,12 @@ test("v0.6 callback is quiet, durable, and consumable only by a disposition", as
 
 test("v0.6 callback rejects cross-run delivery", async () => {
   const root = await createGitFixture("codex-flow-v06-callback-run-");
-  const stateRoot = resolve(root, ".git", "codex-flow", "v0.6.0");
   try {
-    await bindRecipient({
-      stateRoot,
-      recipient: {
-        lineage_id: "callback-lineage-v06",
-        thread_id: "callback-coordinator-v06",
-        generation: 1,
-      },
-    });
+    const context = await createAcceptedVisibleTask(root, "callback-run");
     await assert.rejects(
       deliverCallbackV06({
-        stateRoot,
-        receipt: receipt(resolve(root, ".git")),
+        stateRoot: context.stateRoot,
+        receipt: receipt(context),
         expectedRunId: "different-run",
       }),
       /does not match the active run/,
@@ -157,25 +113,48 @@ test("v0.6 callback rejects cross-run delivery", async () => {
   }
 });
 
+test("v0.6 callback rejects contradictory selector evidence before journal persistence", async () => {
+  const root = await createGitFixture("codex-flow-v06-callback-selector-");
+  try {
+    const context = await createAcceptedVisibleTask(root, "callback-selector");
+    const valid = receipt(context);
+    const contradictory = validateTerminalReceiptV3({
+      ...valid,
+      model_evidence: {
+        ...valid.model_evidence,
+        observed: {
+          model: context.requestedSelectors.model,
+          reasoning_effort: context.requestedSelectors.reasoning_effort,
+        },
+      },
+    });
+    await assert.rejects(
+      deliverCallbackV06({ stateRoot: context.stateRoot, receipt: contradictory }),
+      /model evidence/,
+    );
+    const status = await callbackStatusV06({
+      stateRoot: context.stateRoot,
+      runId: context.contract.run_id,
+    });
+    assert.deepEqual(status, { pending: [], consumed_count: 0 });
+  } finally {
+    await removeFixture(root);
+  }
+});
+
 test("v0.6 callback rejects a disposition-shaped lookalike with invalid canonical identity", async () => {
   const root = await createGitFixture("codex-flow-v06-callback-lookalike-");
-  const stateRoot = resolve(root, ".git", "codex-flow", "v0.6.0");
-  const recipient = {
-    lineage_id: "callback-lineage-v06",
-    thread_id: "callback-coordinator-v06",
-    generation: 1,
-  };
   try {
-    await bindRecipient({ stateRoot, recipient });
-    const payload = receipt(resolve(root, ".git"));
-    const delivered = await deliverCallbackV06({ stateRoot, receipt: payload });
+    const context = await createAcceptedVisibleTask(root, "callback-lookalike");
+    const payload = receipt(context);
+    const delivered = await deliverCallbackV06({ stateRoot: context.stateRoot, receipt: payload });
     await observeCallbackV06({
-      stateRoot,
+      stateRoot: context.stateRoot,
       callbackId: delivered.callback_id,
-      recipient,
+      recipient: recipient(context),
     });
     const dispositionId = "forged-disposition-lookalike";
-    const dispositionDirectory = resolve(stateRoot, "dispositions", "records");
+    const dispositionDirectory = resolve(context.stateRoot, "dispositions", "records");
     await mkdir(dispositionDirectory, { recursive: true });
     await writeFile(resolve(dispositionDirectory, `${dispositionId}.json`), `${JSON.stringify({
       schema_version: 1,
@@ -209,9 +188,9 @@ test("v0.6 callback rejects a disposition-shaped lookalike with invalid canonica
     }, null, 2)}\n`, "utf8");
     await assert.rejects(
       consumeCallbackV06({
-        stateRoot,
+        stateRoot: context.stateRoot,
         callbackId: delivered.callback_id,
-        recipient,
+        recipient: recipient(context),
         executorThreadId: payload.executor_thread_id,
         dispositionId,
       }),

@@ -21,6 +21,9 @@ release and personal-marketplace package are v0.6.0. A repository may retain
 v0.5.1 consumer authority until its own explicit transition is approved and
 applied.
 
+This editable checkout is the unreleased v0.6.1 development line. It does not
+replace the installed v0.6.0 package or any immutable runtime snapshot.
+
 Editing this checkout never changes an installed plugin or active repository
 runtime. An activated v0.6 run snapshots its exact bundle into the repository's
 Git common directory, so its authority survives task restart, compaction,
@@ -68,7 +71,7 @@ When the user authorizes actionable orchestration, the plugin may activate one
 run after disclosing:
 
 - the exact package/runtime source and bundle hash;
-- the `.git/codex-flow/v0.6.0/` operational state root;
+- the `.git/codex-flow/v0.6.1/` operational state root;
 - repository/common-directory, baseline, host, and coordinator binding;
 - the immutable workflow revision and its path/resource/branch reservation
   envelope;
@@ -121,14 +124,17 @@ contract records. Visible tasks retain the host's supported reasoning range.
 
 A visible task contract authorizes exactly one native creation attempt. The
 bootstrap prompt contains a cryptographic launch nonce and no objective.
-Provisional `clientThreadId` and ready task ID are different identities. The
-ready task is accepted only when its initial host-visible user turn contains
-the exact nonce; title and timing similarity are never enough.
+The host's provisional `clientThreadId` is bounded opaque evidence and is
+stored verbatim; it is never normalized into an internal identifier.
+Provisional and ready task IDs are different identities. The ready task is
+accepted only when its initial host-visible user turn contains the exact nonce;
+title and timing similarity are never enough.
 
 After project/model/effort/worktree reconciliation, the coordinator binds the
 observed pristine worktree at the authenticated baseline. It then prepares one
 release, sends its exact prompt at most once, and requires the executor to
-accept the exact release, contract, runtime, and common directory before work.
+accept from that exact persisted worktree and reserved branch using the exact
+release, contract, run-bound runtime, and common directory before work.
 Ambiguous creation or release fails closed rather than authorizing retry or
 substitution.
 
@@ -136,6 +142,10 @@ substitution.
 
 Visible-task routine completion writes one terminal-receipt-v3 result to the
 durable Git-common journal. It never direct-messages or Steers the coordinator.
+Before persistence, callback admission matches the receipt to the accepted
+release, ready task, baseline, and exact selector evidence. A host-unobserved
+model remains null; requested or accepted values are never relabeled as
+observed evidence.
 Native waits and task finals are liveness signals only; they do not authorize
 integration. Native subagents complete through their separate operation lane.
 

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
-import { readFile, realpath } from "node:fs/promises";
+import { execFileSync, spawnSync } from "node:child_process";
+import { cp, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import test from "node:test";
 import {
@@ -26,9 +27,11 @@ import {
 } from "../lib/workflow-journal-v06.mjs";
 import {
   activateV06FixtureRun,
+  assertSuccess,
   createGitFixture,
   packageRoot,
   removeFixture,
+  runCli,
 } from "./helpers.mjs";
 
 const START = Date.parse("2026-08-29T22:00:00.000Z");
@@ -77,8 +80,8 @@ async function fixture() {
     tasks: [task()],
   });
   const runId = "release-run";
-  const stateRoot = resolve(commonDir, "codex-flow", "v0.6.0");
-  const { authority } = await activateV06FixtureRun({
+  const stateRoot = resolve(commonDir, "codex-flow", "v0.6.1");
+  const { authority, runtime } = await activateV06FixtureRun({
     root,
     runId,
     plan,
@@ -113,7 +116,7 @@ async function fixture() {
     worktree: {
       mode: "host-worktree",
       starting_revision: revision,
-      starting_branch: "codex/v0.6",
+      starting_branch: "main",
       executor_branch: "codex/release-visible-task",
       path: null,
     },
@@ -128,9 +131,11 @@ async function fixture() {
     root,
     commonDir,
     revision,
+    runId,
     stateRoot,
     coordinator,
     authority,
+    runtime,
     plan,
     contract,
     requestedSelectors,
@@ -138,7 +143,7 @@ async function fixture() {
   };
 }
 
-async function makeReady(context) {
+async function makeReady(context, { observedWorktreePath = null } = {}) {
   const attempt = await recordVisibleTaskCreationAttempt({
     stateRoot: context.stateRoot,
     operationId: context.operationId,
@@ -168,7 +173,18 @@ async function makeReady(context) {
         worktree: context.requestedSelectors.worktree,
         accepted_at: new Date(START + 1_500).toISOString(),
       },
-      observed: null,
+      observed: observedWorktreePath === null
+        ? null
+        : {
+          project_id: null,
+          model: null,
+          reasoning_effort: null,
+          worktree: {
+            ...context.requestedSelectors.worktree,
+            path: observedWorktreePath,
+          },
+          observed_at: new Date(START + 2_000).toISOString(),
+        },
     },
     now: START + 2_000,
   });
@@ -365,6 +381,147 @@ test("rejected-before-send is terminal and cannot be accepted", async () => {
       /cannot be accepted/,
     );
   } finally {
+    await removeFixture(context.root);
+  }
+});
+
+test("release acceptance authenticates the exact linked executor worktree", async () => {
+  const context = await fixture();
+  const worktreeParent = await mkdtemp(resolve(tmpdir(), "codex-flow-v06-release-linked-"));
+  const worktreePath = resolve(worktreeParent, "executor");
+  try {
+    execFileSync("git", [
+      "worktree", "add", "-q", "-b",
+      context.requestedSelectors.worktree.executor_branch,
+      worktreePath,
+      context.requestedSelectors.worktree.starting_branch,
+    ], { cwd: context.root });
+    const observedWorktreePath = await realpath(worktreePath);
+    await makeReady(context, { observedWorktreePath });
+    const prepared = await prepareTaskRelease({
+      stateRoot: context.stateRoot,
+      taskContract: context.contract,
+      operationId: context.operationId,
+      now: START + 3_000,
+    });
+    await reconcileTaskRelease({
+      stateRoot: context.stateRoot,
+      releaseId: prepared.release_id,
+      outcome: "sent",
+      now: START + 4_000,
+    });
+    const requestPath = resolve(worktreeParent, "release accept's request.json");
+    await writeFile(requestPath, `${JSON.stringify({
+      run_id: context.runId,
+      release_id: prepared.release_id,
+      ready_thread_id: prepared.ready_thread_id,
+      contract_id: prepared.contract_id,
+      runtime_context_digest: prepared.runtime_context_digest,
+      common_dir: context.commonDir,
+      accepted_at: new Date(START + 5_000).toISOString(),
+    })}\n`, "utf8");
+    const acceptArgs = [
+      "release", "accept", "--run-id", context.runId,
+      "--file", requestPath, "--json",
+    ];
+    const wrongCheckout = runCli(acceptArgs, { cwd: context.root });
+    assert.notEqual(wrongCheckout.status, 0);
+    assert.match(wrongCheckout.stderr, /exact persisted executor worktree/);
+    assert.equal((await taskReleaseStatus({
+      stateRoot: context.stateRoot,
+      releaseId: prepared.release_id,
+    })).acceptance, null);
+
+    const reconcilePath = resolve(worktreeParent, "release-reconcile.json");
+    await writeFile(reconcilePath, `${JSON.stringify({
+      run_id: context.runId,
+      release_id: prepared.release_id,
+      outcome: "sent",
+      reconciled_at: new Date(START + 4_000).toISOString(),
+    })}\n`, "utf8");
+    const coordinatorOnlyMutation = runCli([
+      "release", "reconcile", "--run-id", context.runId,
+      "--file", reconcilePath, "--json",
+    ], { cwd: observedWorktreePath });
+    assert.equal(coordinatorOnlyMutation.status, 73);
+    assert.match(coordinatorOnlyMutation.stderr, /active run\/runtime\/repository authority/);
+
+    execFileSync("git", ["switch", "--quiet", "--detach", context.revision], {
+      cwd: observedWorktreePath,
+    });
+    const wrongBranch = runCli(acceptArgs, { cwd: observedWorktreePath });
+    assert.equal(wrongBranch.status, 73);
+    assert.match(wrongBranch.stderr, /wrong branch/);
+    execFileSync("git", ["commit", "--quiet", "--allow-empty", "-m", "release baseline drift"], {
+      cwd: observedWorktreePath,
+    });
+    const wrongBaseline = runCli(acceptArgs, { cwd: observedWorktreePath });
+    assert.equal(wrongBaseline.status, 73);
+    assert.match(wrongBaseline.stderr, /exact task baseline/);
+    execFileSync("git", [
+      "switch", "--quiet", context.requestedSelectors.worktree.executor_branch,
+    ], { cwd: observedWorktreePath });
+
+    execFileSync("git", ["config", "status.showUntrackedFiles", "no"], {
+      cwd: observedWorktreePath,
+    });
+    const driftPath = resolve(observedWorktreePath, "untracked-release-drift.txt");
+    await writeFile(driftPath, "drift\n", "utf8");
+    const dirtyWorktree = runCli(acceptArgs, { cwd: observedWorktreePath });
+    assert.notEqual(dirtyWorktree.status, 0);
+    assert.match(dirtyWorktree.stderr, /must be pristine/);
+    await rm(driftPath);
+    assert.equal((await taskReleaseStatus({
+      stateRoot: context.stateRoot,
+      releaseId: prepared.release_id,
+    })).acceptance, null);
+
+    const mismatchedPackage = resolve(worktreeParent, "mismatched-package");
+    for (const path of ["bin", "lib", "schemas", "templates/roles", "templates/references"]) {
+      await cp(resolve(packageRoot, path), resolve(mismatchedPackage, path), { recursive: true });
+    }
+    await writeFile(
+      resolve(mismatchedPackage, "templates", "references", "bundle-mismatch-sentinel.md"),
+      "This file deliberately changes only the executing test bundle.\n",
+      "utf8",
+    );
+    const mismatched = spawnSync(process.execPath, [
+      resolve(mismatchedPackage, "bin", "codex-flow.mjs"),
+      ...acceptArgs,
+    ], { cwd: observedWorktreePath, encoding: "utf8" });
+    assert.equal(mismatched.status, 73);
+    assert.match(mismatched.stderr, /executing_bundle_sha256=[0-9a-f]{64}/);
+    assert.match(
+      mismatched.stderr,
+      new RegExp(`run_bound_bundle_sha256=${context.runtime.bundle.bundle_sha256}`),
+    );
+    assert.equal((await taskReleaseStatus({
+      stateRoot: context.stateRoot,
+      releaseId: prepared.release_id,
+    })).acceptance, null);
+
+    const boundCli = resolve(
+      context.stateRoot,
+      "runtimes",
+      context.runtime.bundle.bundle_sha256,
+      "files",
+      "bin",
+      "codex-flow.mjs",
+    );
+    assert.match(mismatched.stderr, new RegExp(boundCli.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    const recovery = mismatched.stderr.match(/^recovery_command=(.+)$/m);
+    assert.notEqual(recovery, null);
+    const accepted = spawnSync("/bin/zsh", ["-c", recovery[1]], {
+      cwd: observedWorktreePath,
+      encoding: "utf8",
+    });
+    assertSuccess(accepted, "linked-worktree release acceptance");
+    assert.equal(JSON.parse(accepted.stdout).status, "accepted");
+  } finally {
+    execFileSync("git", ["worktree", "remove", "--force", worktreePath], {
+      cwd: context.root,
+    });
+    await rm(worktreeParent, { recursive: true, force: true });
     await removeFixture(context.root);
   }
 });

@@ -1,7 +1,7 @@
 # Task Lifecycle
 
 1. **Activate:** snapshot the exact runtime under
-   `.git/codex-flow/v0.6.0/runtimes/<bundle-sha256>/`; bind repository/common
+   `.git/codex-flow/v0.6.1/runtimes/<bundle-sha256>/`; bind repository/common
    directory, host, coordinator lineage/generation, configuration/policy, and
    the path/resource/branch reservation envelope to an explicit run ID.
 2. **Plan:** persist a content-addressed workflow revision with dependency DAG,
@@ -9,19 +9,22 @@
    and instrument roles.
    Generate every task contract from that revision.
 3. **Create:** for visible work, prepare one native call, bootstrap with the
-   launch nonce, and preserve provisional and ready identities separately. For
+   launch nonce, record the host's provisional ID verbatim as bounded opaque
+   evidence, and preserve provisional and ready identities separately. For
    subagents, use the separate read-only `prepare -> attempt -> reconcile ->
    complete -> dispose` lifecycle; an accepted subagent operation closes that lane
    with unchanged-Git proof and skips steps 4 through 10 below.
 4. **Bind and release:** reconcile selector evidence, bind the exact pristine
-   worktree/baseline, send the prepared objective once, and require exact
-   executor acceptance.
+   worktree/baseline, send the prepared objective once, and require acceptance
+   from that persisted worktree and reserved branch through the exact
+   run-bound runtime.
 5. **Execute:** stay inside the generated contract and attempt the named direct
    outcome. Supporting instrumentation returns one bounded checkpoint only.
 6. **Signal visible-task results:** routine completion persists one
-   terminal-receipt-v3 journal result without messaging; urgent
-   blocker/approval/high-risk drift persists before one identified interrupt
-   attempt.
+   terminal-receipt-v3 journal result without messaging. Admission first
+   matches its release, ready task, baseline, and exact selector evidence;
+   unavailable host observation remains null. Urgent blocker/approval/high-risk
+   drift persists before one identified interrupt attempt.
 7. **Select and dispose:** native waits and finals provide liveness only. The
    coordinator authenticates and observes the exact journaled result, then
    prepares its durable disposition. If release was durably rejected before

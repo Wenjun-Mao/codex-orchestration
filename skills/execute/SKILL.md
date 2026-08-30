@@ -13,6 +13,9 @@ work. Wait until the coordinator sends the generated contract, then use
 `release accept` to authenticate the exact ready task ID, release ID, contract
 ID, runtime/configuration, Git common directory, coordinator
 binding, and bound worktree. Do not act on an unreleased or ambiguous prompt.
+If the executing bundle differs from the run-bound snapshot, use the single
+exact recovery command printed by `release accept`; it preserves the same
+request while switching to the authenticated content-addressed CLI.
 
 Remain inside the contract's objective, dependency state, read/write paths,
 resources, baseline, and verification scope. Preserve sibling and user changes.
@@ -33,7 +36,10 @@ At terminal state, derive Git outcome mechanically as `unchanged`,
 `clean-commit`, or `dirty-blocked`; an upstream may be null. Persist exactly
 one terminal-receipt-v3 result with `callback deliver`. Ordinary completion
 must not call direct messaging or Steer. Do not treat the task's final text as
-the receipt or hand-author hashes that the runtime derives.
+the receipt or hand-author hashes that the runtime derives. Copy model evidence
+from the release and creation records exactly: when the host did not expose a
+complete observed model/effort pair, keep `observed` null rather than inferring
+it from configured, requested, or accepted selectors.
 
 Read [Stop policy](../../templates/references/stop-policy.md) when authority or
 scope changes. Results must exclude secrets, raw logs/transcripts, user data,

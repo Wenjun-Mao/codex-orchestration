@@ -20,4 +20,6 @@ drift, prepare its one identified direct interrupt attempt, make only the
 returned native call, and reconcile the result. Routine terminal
 completion never calls messaging or Steer. Derive Git outcome as `unchanged`,
 `clean-commit`, or `dirty-blocked`, allow null upstream, and persist exactly one
-terminal-receipt-v3 result in the journal. Task final text is liveness only.
+terminal-receipt-v3 result in the journal. Copy selector evidence exactly;
+host-unobserved model/effort remains null and is never inferred from requested
+or accepted values. Task final text is liveness only.

@@ -87,7 +87,7 @@ async function acceptedAuthority({
     parent_revision_digest: null,
     tasks: [task()],
   });
-  const stateRoot = resolve(commonDir, "codex-flow", "v0.6.0");
+  const stateRoot = resolve(commonDir, "codex-flow", "v0.6.1");
   const runId = "disposition-run-v06";
   const { run } = await activateV06FixtureRun({
     root,
@@ -325,18 +325,15 @@ test("accepted no-change disposition finalizes, consumes, and unblocks once", as
   }
 });
 
-test("disposition preparation fails closed on ready-task, baseline, selector, and recipient drift", async () => {
+test("callback admission fails closed on ready-task, baseline, selector, and recipient drift", async () => {
   const variants = [
     {
-      label: "ready task",
       build: (context) => ({
         payload: receipt(context, { identity: { executor_thread_id: "different-executor-v06" } }),
-        observingRecipient: recipient,
       }),
       pattern: /Accepted release executor_thread_id/,
     },
     {
-      label: "baseline",
       build: (context) => {
         const baselineReceipt = receipt(context);
         return {
@@ -348,13 +345,11 @@ test("disposition preparation fails closed on ready-task, baseline, selector, an
               final_revision: "4".repeat(40),
             },
           }),
-          observingRecipient: recipient,
         };
       },
       pattern: /Git baseline/,
     },
     {
-      label: "selector",
       build: (context) => ({
         payload: receipt(context, {
           modelEvidence: {
@@ -364,12 +359,10 @@ test("disposition preparation fails closed on ready-task, baseline, selector, an
             observed: null,
           },
         }),
-        observingRecipient: recipient,
       }),
       pattern: /model evidence/,
     },
     {
-      label: "recipient",
       build: async (context) => {
         const alternate = {
           lineage_id: "alternate-disposition-lineage",
@@ -387,11 +380,6 @@ test("disposition preparation fails closed on ready-task, baseline, selector, an
         });
         return {
           payload: receipt(context, { identity: { recipient: alternate } }),
-          observingRecipient: {
-            lineage_id: alternate.lineage_id,
-            thread_id: alternate.thread_id,
-            generation: alternate.generation,
-          },
         };
       },
       pattern: /coordinator_binding/,
@@ -401,21 +389,10 @@ test("disposition preparation fails closed on ready-task, baseline, selector, an
     const context = await acceptedAuthority();
     try {
       const built = await variant.build(context);
-      const delivered = await deliverCallbackV06({
-        stateRoot: context.stateRoot,
-        receipt: built.payload,
-      });
-      await observeCallbackV06({
-        stateRoot: context.stateRoot,
-        callbackId: delivered.callback_id,
-        recipient: built.observingRecipient,
-      });
       await assert.rejects(
-        prepareTaskDisposition({
+        deliverCallbackV06({
           stateRoot: context.stateRoot,
-          callbackId: delivered.callback_id,
-          decision: "accepted-no-change",
-          reason: `Reject ${variant.label} authority drift.`,
+          receipt: built.payload,
         }),
         variant.pattern,
       );
