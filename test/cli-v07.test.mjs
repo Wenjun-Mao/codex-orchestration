@@ -106,6 +106,7 @@ test("v0.7 help exposes no bare callback consume or predecessor commands", () =>
   const help = runCli(["--help"]);
   assertSuccess(help, "v0.7 help");
   assert.match(help.stdout, /callback deliver\|observe --run-id/);
+  assert.match(help.stdout, /task create prepare\|attempt\|reconcile\|bind --run-id/);
   assert.match(help.stdout, /urgent persist\|attempt\|reconcile\|observe\|consume\|expire --run-id/);
   assert.match(help.stdout, /cleanup plan --run-id/);
   assert.match(help.stdout, /unplug plan/);
@@ -138,7 +139,7 @@ test("v0.7 activation requires a clean start when an incompatible namespace rema
   assert.match(result.stderr, /Clean start required before activation/);
   assert.match(result.stderr, /codex-flow unplug plan/);
   await assert.rejects(
-    stat(resolve(root, ".git", "codex-flow", "v0.7.4", "runs", "lifecycle.json")),
+    stat(resolve(root, ".git", "codex-flow", "v0.7.5", "runs", "lifecycle.json")),
     { code: "ENOENT" },
   );
 });
@@ -158,7 +159,7 @@ test("v0.7 activation cannot race an in-progress unplug", async (t) => {
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /unplug is already in progress/i);
   await assert.rejects(
-    stat(resolve(root, ".git", "codex-flow", "v0.7.4", "runs", "lifecycle.json")),
+    stat(resolve(root, ".git", "codex-flow", "v0.7.5", "runs", "lifecycle.json")),
     { code: "ENOENT" },
   );
 });
@@ -272,14 +273,14 @@ test("v0.7 no-change verification uses the observed linked executor worktree fro
     ]);
   });
 
+  const baseline = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+  execFileSync("git", [
+    "worktree", "add", "--detach", linkedWorktree, baseline,
+  ], { cwd: root });
+  linkedWorktreeCreated = true;
   const context = await createAcceptedVisibleTask(root, "verification-linked", {
     observedWorktreePath: linkedWorktree,
   });
-  execFileSync("git", [
-    "worktree", "add", "-b", context.requestedSelectors.worktree.executor_branch,
-    linkedWorktree, context.baseline,
-  ], { cwd: root });
-  linkedWorktreeCreated = true;
   const canonicalLinkedWorktree = await realpath(linkedWorktree);
   assert.equal(execFileSync("git", ["rev-parse", "--show-toplevel"], {
     cwd: linkedWorktree,
@@ -392,7 +393,7 @@ test("v0.7 no-change verification uses the observed linked executor worktree fro
     "--file", requestPath, "--json",
   ], { cwd: root });
   assert.notEqual(dirtySubject.status, 0);
-  assert.match(dirtySubject.stderr, /exact clean requested revision and branch/);
+  assert.match(dirtySubject.stderr, /must be pristine before objective release/);
   await rm(resolve(linkedWorktree, "unexpected-verification-dirt.txt"));
 
   execFileSync("git", ["switch", "--quiet", "--detach", context.baseline], {
@@ -403,7 +404,7 @@ test("v0.7 no-change verification uses the observed linked executor worktree fro
     "--file", requestPath, "--json",
   ], { cwd: root });
   assert.notEqual(wrongBranchSubject.status, 0);
-  assert.match(wrongBranchSubject.stderr, /exact clean requested revision and branch/);
+  assert.match(wrongBranchSubject.stderr, /wrong branch or detached/);
   execFileSync("git", [
     "switch", "--quiet", context.requestedSelectors.worktree.executor_branch,
   ], { cwd: linkedWorktree });
@@ -415,7 +416,7 @@ test("v0.7 no-change verification uses the observed linked executor worktree fro
     "--file", requestPath, "--json",
   ], { cwd: root });
   assert.notEqual(missingSubject.status, 0);
-  assert.match(missingSubject.stderr, /Persisted task release worktree path does not exist/);
+  assert.match(missingSubject.stderr, /Observed host worktree path does not exist/);
 
   const verificationStatus = runCli([
     "verification", "status", "--run-id", context.contract.run_id, "--json",
@@ -535,8 +536,8 @@ test("run activation needs no tracked setup and replays the same disclosed autho
   const context = await activatedFixture(t, "activation");
   await assert.rejects(stat(resolve(context.root, ".codex", "orchestration")), /ENOENT/);
   assert.equal(context.result.status, "admitted");
-  assert.equal(context.result.state_authority.namespace, "v0.7.4");
-  assert.match(context.result.state_authority.state_root, /\.git\/codex-flow\/v0\.7\.4$/);
+  assert.equal(context.result.state_authority.namespace, "v0.7.5");
+  assert.match(context.result.state_authority.state_root, /\.git\/codex-flow\/v0\.7\.5$/);
   assert.equal(context.result.repository_authority.cleanliness, "clean");
   assert.equal(context.result.workflow_authority.run_id, context.runId);
   assert.equal(context.result.model_routing[0].model, "gpt-5.6-terra");
@@ -594,7 +595,7 @@ test("run activation rejects a workflow outside its reservation envelope before 
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /outside the admitted run fence envelope/);
   await assert.rejects(
-    stat(resolve(root, ".git", "codex-flow", "v0.7.4")),
+    stat(resolve(root, ".git", "codex-flow", "v0.7.5")),
     (error) => error?.code === "ENOENT",
   );
 });
@@ -675,7 +676,7 @@ test("a second active run is refused before acquiring orphan runtime or workflow
   const contextsRoot = resolve(
     context.result.state_authority.git_common_dir,
     "codex-flow",
-    "v0.7.4",
+    "v0.7.5",
     "contexts",
   );
   const beforeContexts = await readdir(contextsRoot);
@@ -798,6 +799,11 @@ test("task creation and release expose each native host payload at most once", a
   assert.equal(repeatedAttempt.dispatch_permitted, false);
   assert.equal(Object.hasOwn(repeatedAttempt, "host_request"), false);
 
+  const executorPath = resolve(context.requests, "visible-executor");
+  execFileSync("git", ["worktree", "add", "--detach", executorPath, context.revision], {
+    cwd: context.root,
+  });
+  const observedExecutorPath = await realpath(executorPath);
   const readyThreadId = "ready-cli-v07-thread";
   const reconcilePath = await requestFile(context.requests, "task-reconcile", {
     run_id: context.runId,
@@ -818,7 +824,13 @@ test("task creation and release expose each native host payload at most once", a
         ...requestedSelectors,
         accepted_at: "2026-08-29T20:00:04.000Z",
       },
-      observed: null,
+      observed: {
+        project_id: requestedSelectors.project_id,
+        model: requestedSelectors.model,
+        reasoning_effort: requestedSelectors.reasoning_effort,
+        worktree: { ...requestedSelectors.worktree, path: observedExecutorPath },
+        observed_at: "2026-08-29T20:00:05.000Z",
+      },
     },
     reconciled_at: "2026-08-29T20:00:05.000Z",
   });
@@ -828,6 +840,18 @@ test("task creation and release expose each native host payload at most once", a
   ], { cwd: context.root });
   assertSuccess(reconcileResult, "visible-task ready reconciliation");
   assert.equal(JSON.parse(reconcileResult.stdout).status, "ready-unreleased");
+
+  const bindPath = await requestFile(context.requests, "task-bind", {
+    run_id: context.runId,
+    operation_id: prepared.operation_id,
+    bound_at: "2026-08-29T20:00:05.500Z",
+  });
+  const bindResult = runCli([
+    "task", "create", "bind", "--run-id", context.runId,
+    "--file", bindPath, "--json",
+  ], { cwd: context.root });
+  assertSuccess(bindResult, "visible-task worktree bind");
+  assert.equal(JSON.parse(bindResult.stdout).release_permitted, true);
 
   const releasePath = await requestFile(context.requests, "release-prepare", {
     run_id: context.runId,

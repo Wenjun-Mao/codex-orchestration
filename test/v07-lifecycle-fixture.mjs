@@ -8,6 +8,7 @@ import {
   reconcileTaskRelease,
 } from "../lib/release-lifecycle.mjs";
 import {
+  bindVisibleTaskWorktree,
   prepareVisibleTaskCreation,
   reconcileVisibleTaskCreation,
   recordVisibleTaskCreationAttempt,
@@ -63,7 +64,7 @@ export async function createAcceptedVisibleTask(root, suffix, {
   observedWorktreePath = null,
 } = {}) {
   const commonDir = await realpath(resolve(root, ".git"));
-  const stateRoot = resolve(commonDir, "codex-flow", "v0.7.4");
+  const stateRoot = resolve(commonDir, "codex-flow", "v0.7.5");
   const baseline = git(root, ["rev-parse", "HEAD"]);
   const coordinator = requestedCoordinator === null
     ? {
@@ -126,13 +127,21 @@ export async function createAcceptedVisibleTask(root, suffix, {
     project_id: `lifecycle-project-${suffix}`,
     model: contract.task.model,
     reasoning_effort: contract.task.reasoning_effort,
-    worktree: {
-      mode: "host-worktree",
-      starting_revision: baseline,
-      starting_branch: "main",
-      executor_branch: executorBranch,
-      path: null,
-    },
+    worktree: observedWorktreePath === null
+      ? {
+        mode: "local",
+        starting_revision: baseline,
+        starting_branch: null,
+        executor_branch: null,
+        path: root,
+      }
+      : {
+        mode: "host-worktree",
+        starting_revision: baseline,
+        starting_branch: "main",
+        executor_branch: executorBranch,
+        path: null,
+      },
   };
   const creation = await prepareVisibleTaskCreation({
     stateRoot,
@@ -148,7 +157,7 @@ export async function createAcceptedVisibleTask(root, suffix, {
     now: BASE_TIME + 1_000,
   });
   const readyThreadId = `lifecycle-executor-${suffix}`;
-  await reconcileVisibleTaskCreation({
+  let finalCreation = await reconcileVisibleTaskCreation({
     stateRoot,
     operationId: creation.operation_id,
     outcome: "ready",
@@ -183,6 +192,13 @@ export async function createAcceptedVisibleTask(root, suffix, {
     },
     now: BASE_TIME + 2_000,
   });
+  if (observedWorktreePath !== null) {
+    finalCreation = await bindVisibleTaskWorktree({
+      stateRoot,
+      operationId: creation.operation_id,
+      now: BASE_TIME + 2_500,
+    });
+  }
   const preparedRelease = await prepareTaskRelease({
     stateRoot,
     taskContract: contract,
@@ -214,7 +230,7 @@ export async function createAcceptedVisibleTask(root, suffix, {
     contract,
     requestedSelectors,
     observedWorktreePath,
-    creation,
+    creation: finalCreation,
     readyThreadId,
     release,
   };

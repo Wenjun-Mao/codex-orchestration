@@ -22,7 +22,6 @@ import {
   runLifecyclePath,
   validateRunLifecycleState,
 } from "../lib/run-lifecycle.mjs";
-import { validateVisibleTaskCreationRecord } from "../lib/task-creation-v07.mjs";
 import { runCombinedVerification } from "../lib/verifications-v07.mjs";
 import { createGitFixture, removeFixture } from "./helpers.mjs";
 import { createAcceptedVisibleTask, terminalReceipt } from "./v07-lifecycle-fixture.mjs";
@@ -63,36 +62,6 @@ function archivedObservation(threadId) {
   };
 }
 
-async function persistObservedWorktree(context, worktreePath) {
-  const path = resolve(
-    context.stateRoot,
-    "visible-task-creations",
-    "records",
-    `${context.creation.operation_id}.json`,
-  );
-  const raw = JSON.parse(await readFile(path, "utf8"));
-  const canonicalPath = await realpath(worktreePath);
-  const record = validateVisibleTaskCreationRecord({
-    ...raw,
-    selector_evidence: {
-      ...raw.selector_evidence,
-      observed: {
-        project_id: context.requestedSelectors.project_id,
-        model: context.requestedSelectors.model,
-        reasoning_effort: context.requestedSelectors.reasoning_effort,
-        worktree: {
-          ...context.requestedSelectors.worktree,
-          path: canonicalPath,
-        },
-        observed_at: raw.updated_at,
-      },
-    },
-  });
-  await writeFile(path, `${JSON.stringify(record, null, 2)}\n`, "utf8");
-  context.creation = record;
-  return canonicalPath;
-}
-
 async function fileSnapshot(root) {
   const entries = [];
   async function walk(directory, relative = "") {
@@ -113,14 +82,15 @@ async function completedArchiveFixture(root, remoteRoot) {
   git(resolve(remoteRoot, ".."), ["init", "--bare", "--quiet", remoteRoot]);
   git(root, ["remote", "add", "origin", remoteRoot]);
   const branch = "codex/cleanup-v07-candidate";
+  const worktreeParent = await mkdtemp(resolve(tmpdir(), "codex-flow-v07-cleanup-worktree-"));
+  const worktreePath = resolve(worktreeParent, "executor");
+  git(root, ["worktree", "add", "-q", "--detach", worktreePath, "main"]);
+  const originalPath = await realpath(worktreePath);
   const context = await createAcceptedVisibleTask(root, "cleanup-plan", {
     coordinator: recipient,
     executorBranch: branch,
+    observedWorktreePath: originalPath,
   });
-  const worktreeParent = await mkdtemp(resolve(tmpdir(), "codex-flow-v07-cleanup-worktree-"));
-  const worktreePath = resolve(worktreeParent, "executor");
-  git(root, ["worktree", "add", "-q", "-b", branch, worktreePath, "main"]);
-  const originalPath = await persistObservedWorktree(context, worktreePath);
   git(worktreePath, ["push", "-q", "-u", "origin", branch]);
   const upstream = git(worktreePath, ["rev-parse", "--abbrev-ref", "@{upstream}"]);
   const payload = terminalReceipt(context, {

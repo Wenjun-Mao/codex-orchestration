@@ -47,7 +47,7 @@ function signal(overrides = {}) {
 }
 
 function stateRoot(root) {
-  return resolve(root, ".git", "codex-flow", "v0.7.4");
+  return resolve(root, ".git", "codex-flow", "v0.7.5");
 }
 
 async function fixture(prefix) {

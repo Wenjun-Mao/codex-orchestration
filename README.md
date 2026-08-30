@@ -23,7 +23,7 @@ readers, mutators, migration paths, retirement commands, tracked adoption, and
 test fixtures are not packaged in v0.7.
 
 v0.7 carries forward the proven cross-task behavior from v0.6.5 under new
-`codex-flow-v07-*` identities and the exact `.git/codex-flow/v0.7.4/`
+`codex-flow-v07-*` identities and the exact `.git/codex-flow/v0.7.5/`
 namespace. It adds a bounded foreign-active-run sentinel so a live predecessor
 run blocks admission instead of being silently ignored or migrated.
 
@@ -94,7 +94,7 @@ When the user authorizes actionable orchestration, the plugin may activate one
 run after disclosing:
 
 - the exact package/runtime source and bundle hash;
-- the `.git/codex-flow/v0.7.4/` operational state root;
+- the `.git/codex-flow/v0.7.5/` operational state root;
 - repository/common-directory, baseline, host, and coordinator binding;
 - the immutable workflow revision and its path/resource/branch reservation
   envelope;
@@ -167,7 +167,11 @@ accepted only when its initial host-visible user turn contains the exact nonce;
 title and timing similarity are never enough.
 
 After project/model/effort/worktree reconciliation, the coordinator binds the
-observed pristine worktree at the authenticated baseline. It then prepares one
+observed pristine worktree at the authenticated baseline with `task create
+bind`. The command persists content-addressed intent before attaching a
+detached worktree to the reserved branch, rejects the active coordinator root
+as an executor path, and exact replay recovers either side of that Git switch
+while recording the actual completion time. It then prepares one
 release, sends its exact prompt at most once, and requires the executor to
 accept from that exact persisted worktree and reserved branch using the exact
 release, contract, run-bound runtime, and common directory before work.
@@ -273,7 +277,7 @@ lifecycle is organized around these command families:
 ```text
 run activate|status|resume|rebind|audit|close|abandon
 workflow create|revise|status|contract
-task create prepare|attempt|reconcile|status
+task create prepare|attempt|reconcile|bind|status
 subagent prepare|attempt|reconcile|complete|dispose|status
 release prepare|reconcile|accept|status
 callback deliver|observe|status
@@ -325,6 +329,8 @@ defines detached Codex App worktree eligibility within that contract, and
 root-file inventory plus v1 crash-resume compatibility, and
 [ADR 0034](docs/adr/0034-host-managed-turn-diff-ref-authority.md) classifies
 Codex App turn-diff capture refs as non-authoritative unplug observations.
+[ADR 0035](docs/adr/0035-detached-host-worktree-bind-checkpoint.md) defines the
+durable detached-worktree binding checkpoint before objective release.
 
 ## Source and distribution
 

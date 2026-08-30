@@ -78,7 +78,7 @@ async function fixture({
     generation: 1,
   };
   coordinator.binding_digest = coordinatorBindingDigest(coordinator);
-  const stateRoot = resolve(commonDir, "codex-flow", "v0.7.4");
+  const stateRoot = resolve(commonDir, "codex-flow", "v0.7.5");
   const runId = "run-visible-task";
   const snapshot = gitSnapshot(root);
   const bundleSource = await loadRuntimeBundleSource({ packageRoot });
@@ -194,6 +194,7 @@ test("one-shot visible creation binds provisional and ready identities through t
     assert.match(prepared.operation_id, /^visible-task-operation-v1-[0-9a-f]{64}$/);
     const {
       attempt_permitted: _attemptPermitted,
+      binding_permitted: _bindingPermitted,
       release_permitted: _releasePermitted,
       reconciliation_open: _reconciliationOpen,
       ...durablePrepared
@@ -279,7 +280,8 @@ test("one-shot visible creation binds provisional and ready identities through t
       now: START + 2_000,
     });
     assert.equal(ready.status, "ready-unreleased");
-    assert.equal(ready.release_permitted, true);
+    assert.equal(ready.binding_permitted, false);
+    assert.equal(ready.release_permitted, false);
     assert.equal(ready.ready.thread_id, "ready-thread-1");
     assert.notEqual(ready.provisional.client_thread_id, ready.ready.thread_id);
     assert.equal(ready.selector_evidence.accepted.model, "gpt-5.6-terra");
@@ -746,6 +748,12 @@ test("visible task creation schema preserves provisional/ready distinction and f
   assert.equal(schema.properties.operation_id.pattern.startsWith("^visible-task-operation-v1-"), true);
   assert.equal(schema.required.includes("contract_id"), true);
   assert.equal(schema.required.includes("selector_rationale"), true);
+  assert.equal(schema.required.includes("worktree_binding"), true);
+  assert.equal(
+    schema.$defs.worktreeBinding.properties.binding_id.pattern,
+    "^worktree-binding-v1-[0-9a-f]{64}$",
+  );
+  assert.deepEqual(schema.$defs.worktreeBinding.properties.state.enum, ["prepared", "completed"]);
   assert.equal(Object.hasOwn(schema.properties, "task_contract_id"), false);
   assert.equal(
     schema.$defs.provisional.properties.client_thread_id.$ref,

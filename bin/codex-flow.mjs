@@ -102,6 +102,7 @@ import {
   subagentOperationStatus,
 } from "../lib/subagent-operations-v07.mjs";
 import {
+  bindVisibleTaskWorktree,
   preflightVisibleTaskBranchReservations,
   prepareVisibleTaskCreation,
   reconcileVisibleTaskCreation,
@@ -137,7 +138,7 @@ Usage:
   codex-flow run audit --run-id ID [--json]
   codex-flow workflow create|revise|contract --run-id ID --file request.json [--json]
   codex-flow workflow status --run-id ID --plan-id ID [--json]
-  codex-flow task create prepare|attempt|reconcile --run-id ID --file request.json [--json]
+  codex-flow task create prepare|attempt|reconcile|bind --run-id ID --file request.json [--json]
   codex-flow task create status --run-id ID --operation-id ID [--json]
   codex-flow subagent prepare|attempt|reconcile|complete|dispose --run-id ID --file request.json [--json]
   codex-flow subagent status --run-id ID --operation-id ID [--json]
@@ -211,7 +212,14 @@ function shellArgument(value) {
   return `'${String(value).replaceAll("'", `'\\''`)}'`;
 }
 
-async function assertRunBoundRuntimeExecution({ git, runId, requestFile, runtime }) {
+async function assertRunBoundRuntimeExecution({
+  git,
+  runId,
+  requestFile,
+  runtime,
+  command = ["release", "accept"],
+  label = "Release acceptance",
+}) {
   const runBoundDigest = runtime.bundle.bundle_sha256;
   const boundBundleRoot = resolve(
     git.stateRoot,
@@ -229,8 +237,7 @@ async function assertRunBoundRuntimeExecution({ git, runId, requestFile, runtime
   const recovery = [
     process.execPath,
     boundCli,
-    "release",
-    "accept",
+    ...command,
     "--run-id",
     runId,
     "--file",
@@ -238,7 +245,7 @@ async function assertRunBoundRuntimeExecution({ git, runId, requestFile, runtime
     "--json",
   ].map(shellArgument).join(" ");
   throw new CliError([
-    "Release acceptance must use the exact run-bound runtime.",
+    `${label} must use the exact run-bound runtime.`,
     `executing_bundle_sha256=${executing.bundle.bundle_sha256}`,
     `run_bound_bundle_sha256=${runBoundDigest}`,
     `runtime_context_digest=${runtimeContextHash(runtime)}`,
@@ -608,7 +615,7 @@ async function commandRunV07(args) {
         bundle_sha256: runtime.bundle.bundle_sha256,
       },
       state_authority: {
-        namespace: "v0.7.4",
+        namespace: "v0.7.5",
         state_root: git.stateRoot,
         git_common_dir: git.commonDir,
       },
@@ -802,7 +809,7 @@ function taskAttemptView(result) {
     : base;
 }
 
-async function commandTaskCreateV07(args) {
+async function commandTaskCreateV07(args, mutationAuthority = null) {
   const [subcommand, ...rest] = args;
   const values = parseV07Options(rest, { "operation-id": { type: "string" } });
   const git = v07Repository();
@@ -830,8 +837,9 @@ async function commandTaskCreateV07(args) {
         "selector_evidence", "reason_code", "reconciled_at",
       ],
     },
+    bind: { required: ["operation_id"], optional: ["bound_at"] },
   };
-  if (!shapes[subcommand]) throw new CliError("task create requires prepare, attempt, reconcile, or status");
+  if (!shapes[subcommand]) throw new CliError("task create requires prepare, attempt, reconcile, bind, or status");
   const { runId, request } = await runScopedRequest(values, `task create ${subcommand}`, shapes[subcommand]);
   let result;
   if (subcommand === "prepare") {
@@ -853,7 +861,7 @@ async function commandTaskCreateV07(args) {
       timeoutSeconds: request.timeout_seconds ?? 300,
       now: commandNow(request, "attempted_at"),
     });
-  } else {
+  } else if (subcommand === "reconcile") {
     await visibleTaskAuthority(git, request.operation_id, runId);
     result = await reconcileVisibleTaskCreation({
       stateRoot: git.stateRoot,
@@ -866,17 +874,35 @@ async function commandTaskCreateV07(args) {
       reasonCode: request.reason_code ?? null,
       now: commandNow(request, "reconciled_at"),
     });
+  } else {
+    if (mutationAuthority === null) {
+      throw new CliError("Worktree binding requires coordinator-owned active mutation authority", 73);
+    }
+    await assertRunBoundRuntimeExecution({
+      git,
+      runId,
+      requestFile: values.file,
+      runtime: mutationAuthority.runtime,
+      command: ["task", "create", "bind"],
+      label: "Worktree binding",
+    });
+    await visibleTaskAuthority(git, request.operation_id, runId);
+    result = await bindVisibleTaskWorktree({
+      stateRoot: git.stateRoot,
+      operationId: request.operation_id,
+      now: commandNow(request, "bound_at"),
+    });
   }
   assertRunIdentity(result, runId, "visible-task creation");
   v07Output(subcommand === "attempt" ? taskAttemptView(result) : result);
 }
 
-async function commandTaskV07(args) {
+async function commandTaskV07(args, mutationAuthority = null) {
   const [subcommand, ...rest] = args;
   if (subcommand !== "create") {
     throw new CliError("Legacy task packet/operation commands are not v0.7 authority; use workflow and task create");
   }
-  return commandTaskCreateV07(rest);
+  return commandTaskCreateV07(rest, mutationAuthority);
 }
 
 async function commandSubagentV07(args) {
@@ -1507,7 +1533,7 @@ function isV07RunBoundMutation(command, args) {
   const subcommand = args[0];
   if (command === "workflow") return ["create", "revise", "contract"].includes(subcommand);
   if (command === "task") {
-    return subcommand === "create" && ["prepare", "attempt", "reconcile"].includes(args[1]);
+    return subcommand === "create" && ["prepare", "attempt", "reconcile", "bind"].includes(args[1]);
   }
   if (command === "subagent") {
     return ["prepare", "attempt", "reconcile", "complete", "dispose"].includes(subcommand);

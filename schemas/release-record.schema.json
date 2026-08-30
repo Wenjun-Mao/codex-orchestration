@@ -8,7 +8,7 @@
     "runtime_context_digest", "configuration_digest", "repository_id",
     "common_dir", "coordinator_binding", "plan_id", "revision_digest",
     "task_id", "task_digest", "contract_id", "operation_id",
-    "ready_thread_id", "task_contract", "prompt_digest", "prompt_length",
+    "ready_thread_id", "worktree_binding_id", "task_contract", "prompt_digest", "prompt_length",
     "delivery", "acceptance", "prepared_at", "updated_at"
   ],
   "properties": {
@@ -31,6 +31,15 @@
     "contract_id": { "$ref": "#/$defs/digest" },
     "operation_id": { "$ref": "#/$defs/safeId" },
     "ready_thread_id": { "$ref": "#/$defs/safeId256" },
+    "worktree_binding_id": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "string",
+          "pattern": "^worktree-binding-v1-[0-9a-f]{64}$"
+        }
+      ]
+    },
     "task_contract": {
       "$ref": "https://private.local/codex-flow/generated-task-contract.schema.json"
     },

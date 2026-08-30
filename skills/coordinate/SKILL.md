@@ -15,7 +15,7 @@ Questions and planning remain read-only. Before an actionable run writes
 operational state or creates a native task, disclose:
 
 - the package/runtime source and exact bundle hash;
-- the `.git/codex-flow/v0.7.4/` Git-common state root;
+- the `.git/codex-flow/v0.7.5/` Git-common state root;
 - the repository, baseline, host, coordinator lineage and generation;
 - the proposed workflow revision and path/resource/branch reservation envelope;
 - each task's saved project, visible-task or subagent surface, requested model
@@ -80,7 +80,7 @@ when authority, cost, or instrumentation scope is uncertain.
 ## Create and release visible tasks
 
 Before creation, read [Host operations](../../templates/references/host-operations.md).
-Use `task create prepare|attempt|reconcile|status` around exactly one native
+Use `task create prepare|attempt|reconcile|bind|status` around exactly one native
 creation call. Bootstrap includes a cryptographic launch nonce and no objective.
 Record the host's provisional `clientThreadId` verbatim as bounded opaque
 evidence and keep it separate from the ready task ID; never normalize it into
@@ -89,8 +89,12 @@ host-visible turn contains the exact nonce. Title or timing similarity never
 correlates identity. Ambiguity fails closed.
 
 Reconcile project, requested/accepted/observed model and effort, and the actual
-worktree. Bind a pristine host-created worktree at the exact baseline before
-objective release. Then use `release prepare|reconcile|accept|status`: send the
+worktree. Run coordinator-owned `task create bind` to persist exact intent,
+attach the detached pristine worktree to its reserved branch, and reread its
+path, common directory, baseline, branch, and cleanliness before objective
+release. The executor path must not be the active runtime coordinator root;
+recovery preserves intent time and records its actual completion time. Then use
+`release prepare|reconcile|accept|status`: send the
 prepared prompt at most once and require the executor to accept from the exact
 persisted pristine worktree, on its reserved branch and baseline, using the
 exact release, contract, run-bound runtime, and common directory. An ambiguous

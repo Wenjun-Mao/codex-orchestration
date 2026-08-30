@@ -46,6 +46,7 @@ import {
   recordSubagentCoordinatorDisposition,
 } from "../lib/subagent-operations-v07.mjs";
 import {
+  bindVisibleTaskWorktree,
   prepareVisibleTaskCreation,
   reconcileVisibleTaskCreation,
   recordVisibleTaskCreationAttempt,
@@ -180,7 +181,7 @@ async function runFixture(t, suffix, task, { branchFences = [] } = {}) {
   const root = await createGitFixture(`codex-flow-v07-run-audit-${suffix}-`);
   t.after(() => removeFixture(root));
   const commonDir = await realpath(resolve(root, ".git"));
-  const stateRoot = resolve(commonDir, "codex-flow", "v0.7.4");
+  const stateRoot = resolve(commonDir, "codex-flow", "v0.7.5");
   const baseline = git(root, ["rev-parse", "HEAD"]);
   const coordinator = {
     lineage_id: `audit-lineage-${suffix}`,
@@ -402,7 +403,7 @@ async function prepareHostVisible(context, suffix, { executorBranch, worktreePat
     timeoutSeconds: 300,
     now: at(6_000),
   });
-  git(context.root, ["worktree", "add", "-q", "-b", executorBranch, worktreePath, "main"]);
+  git(context.root, ["worktree", "add", "-q", "--detach", worktreePath, context.baseline]);
   const observedPath = await realpath(worktreePath);
   const readyThreadId = `audit-executor-${suffix}`;
   await reconcileVisibleTaskCreation({
@@ -434,7 +435,12 @@ async function prepareHostVisible(context, suffix, { executorBranch, worktreePat
     },
     now: at(7_000),
   });
-  return { creation, requested, attempt, readyThreadId, observedPath };
+  const boundCreation = await bindVisibleTaskWorktree({
+    stateRoot: context.stateRoot,
+    operationId: creation.operation_id,
+    now: at(7_500),
+  });
+  return { creation: boundCreation, requested, attempt, readyThreadId, observedPath };
 }
 
 async function acceptRelease(context, visible, suffix) {

@@ -20,7 +20,6 @@ import {
   reconcileSerialIntegration,
 } from "../lib/integration-v07.mjs";
 import { bindRecipient } from "../lib/recipients.mjs";
-import { validateVisibleTaskCreationRecord } from "../lib/task-creation-v07.mjs";
 import { runCombinedVerification } from "../lib/verifications-v07.mjs";
 import { createGitFixture, removeFixture } from "./helpers.mjs";
 import { createAcceptedVisibleTask, terminalReceipt } from "./v07-lifecycle-fixture.mjs";
@@ -68,37 +67,6 @@ async function acceptedRelease(root, suffix, options = {}) {
   return { ...context, releaseId: context.release.release_id };
 }
 
-async function persistObservedHostWorktree(context, worktreePath) {
-  const canonicalPath = await realpath(worktreePath);
-  const recordPath = resolve(
-    context.stateRoot,
-    "visible-task-creations",
-    "records",
-    `${context.creation.operation_id}.json`,
-  );
-  const record = JSON.parse(await readFile(recordPath, "utf8"));
-  const observed = {
-    project_id: context.requestedSelectors.project_id,
-    model: context.requestedSelectors.model,
-    reasoning_effort: context.requestedSelectors.reasoning_effort,
-    worktree: {
-      ...context.requestedSelectors.worktree,
-      path: canonicalPath,
-    },
-    observed_at: record.updated_at,
-  };
-  const updated = validateVisibleTaskCreationRecord({
-    ...record,
-    selector_evidence: {
-      ...record.selector_evidence,
-      observed,
-    },
-  });
-  await writeFile(recordPath, `${JSON.stringify(updated, null, 2)}\n`, "utf8");
-  context.creation = updated;
-  return canonicalPath;
-}
-
 function receipt(release, gitOutcome, classification = "PASS") {
   const payload = terminalReceipt(release, gitOutcome, { classification });
   const observed = release.creation.selector_evidence.observed;
@@ -141,18 +109,13 @@ async function observedDisposition({
 }
 
 async function noChangeAuthority(root, suffix) {
-  const stateRoot = resolve(root, ".git", "codex-flow", "v0.7.4");
-  const release = await acceptedRelease(root, suffix);
+  const stateRoot = resolve(root, ".git", "codex-flow", "v0.7.5");
   const worktreeParent = await mkdtemp(resolve(tmpdir(), "codex-flow-v07-archive-observed-"));
   const worktreePath = resolve(worktreeParent, "executor");
-  git(root, [
-    "worktree", "add", "-q", "-b",
-    release.requestedSelectors.worktree.executor_branch,
-    worktreePath,
-    "main",
-  ]);
-  const observedWorktreePath = await persistObservedHostWorktree(release, worktreePath);
   const baseline = git(root, ["rev-parse", "HEAD"]);
+  git(root, ["worktree", "add", "-q", "--detach", worktreePath, baseline]);
+  const observedWorktreePath = await realpath(worktreePath);
+  const release = await acceptedRelease(root, suffix, { observedWorktreePath });
   const payload = receipt(release, {
     kind: "unchanged",
     baseline_revision: baseline,
@@ -258,19 +221,17 @@ test("clean no-change visible task archives only after setter and independent ob
   }
 });
 
-test("host-worktree archive fails closed without its persisted observed path", async () => {
+test("local task archive does not claim host-managed worktree authority", async () => {
   const root = await createGitFixture("codex-flow-v07-archive-unobserved-");
   try {
-    const stateRoot = resolve(root, ".git", "codex-flow", "v0.7.4");
+    const stateRoot = resolve(root, ".git", "codex-flow", "v0.7.5");
     const release = await acceptedRelease(root, "unobserved");
-    const executorBranch = release.requestedSelectors.worktree.executor_branch;
-    git(root, ["checkout", "-q", "-b", executorBranch]);
     const baseline = git(root, ["rev-parse", "HEAD"]);
     const payload = receipt(release, {
       kind: "unchanged",
       baseline_revision: baseline,
       final_revision: baseline,
-      branch: executorBranch,
+      branch: "main",
       upstream: null,
       cleanliness: "clean",
     });
@@ -289,14 +250,13 @@ test("host-worktree archive fails closed without its persisted observed path", a
       decision: "accepted-no-change",
       verificationId: verification.verification_id,
     });
-    await assert.rejects(
-      prepareTaskArchive({
-        stateRoot,
-        dispositionId: disposition.disposition_id,
-        taskObservation: activeObservation(release.readyThreadId),
-      }),
-      /requires the exact persisted host-observed worktree path/,
-    );
+    const prepared = await prepareTaskArchive({
+      stateRoot,
+      dispositionId: disposition.disposition_id,
+      taskObservation: activeObservation(release.readyThreadId),
+    });
+    assert.equal(prepared.worktree.management, "none");
+    assert.equal(prepared.worktree.path, null);
   } finally {
     await removeFixture(root);
   }
@@ -310,15 +270,15 @@ test("integrated host-worktree task remains visible until the clean worktree is 
     await writeFile(resolve(root, ".gitignore"), "*.ignored\n", "utf8");
     git(root, ["add", ".gitignore"]);
     git(root, ["commit", "--quiet", "-m", "ignore generated archive artifacts"]);
-    const stateRoot = resolve(root, ".git", "codex-flow", "v0.7.4");
-    const release = await acceptedRelease(root, "integrated", {
-      executorBranch: "codex/archive-integrated",
-      task: { write_paths: ["archive-result.txt"] },
-    });
+    const stateRoot = resolve(root, ".git", "codex-flow", "v0.7.5");
     const baseline = git(root, ["rev-parse", "HEAD"]);
     const executorBranch = "codex/archive-integrated";
-    git(root, ["worktree", "add", "-q", "-b", executorBranch, worktreePath, "main"]);
-    await persistObservedHostWorktree(release, worktreePath);
+    git(root, ["worktree", "add", "-q", "--detach", worktreePath, baseline]);
+    const release = await acceptedRelease(root, "integrated", {
+      executorBranch,
+      observedWorktreePath: await realpath(worktreePath),
+      task: { write_paths: ["archive-result.txt"] },
+    });
     await writeFile(resolve(worktreePath, "archive-result.txt"), "integrated\n", "utf8");
     git(worktreePath, ["add", "archive-result.txt"]);
     git(worktreePath, ["commit", "--quiet", "-m", "archive integration result"]);
@@ -449,7 +409,7 @@ test("blocked and ambiguous archive outcomes remain visible", async () => {
   const blockedRoot = await createGitFixture("codex-flow-v07-archive-blocked-");
   const ambiguousRoot = await createGitFixture("codex-flow-v07-archive-ambiguous-");
   try {
-    const blockedState = resolve(blockedRoot, ".git", "codex-flow", "v0.7.4");
+    const blockedState = resolve(blockedRoot, ".git", "codex-flow", "v0.7.5");
     const blockedRelease = await acceptedRelease(blockedRoot, "blocked");
     const baseline = git(blockedRoot, ["rev-parse", "HEAD"]);
     const blockedPayload = receipt(blockedRelease, {

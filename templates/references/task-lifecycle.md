@@ -1,7 +1,7 @@
 # Task Lifecycle
 
 1. **Activate:** snapshot the exact runtime under
-   `.git/codex-flow/v0.7.4/runtimes/<bundle-sha256>/`; bind repository/common
+   `.git/codex-flow/v0.7.5/runtimes/<bundle-sha256>/`; bind repository/common
    directory, host, coordinator lineage/generation, configuration/policy, and
    the path/resource/branch reservation envelope to an explicit run ID.
 2. **Plan:** persist a content-addressed workflow revision with dependency DAG,
@@ -14,8 +14,12 @@
    subagents, use the separate read-only `prepare -> attempt -> reconcile ->
    complete -> dispose` lifecycle; an accepted subagent operation closes that lane
    with unchanged-Git proof and skips steps 4 through 10 below.
-4. **Bind and release:** reconcile selector evidence, bind the exact pristine
-   worktree/baseline, send the prepared objective once, and require acceptance
+4. **Bind and release:** reconcile selector evidence, run coordinator-owned
+   `task create bind` so content-addressed intent precedes the detached
+   worktree branch switch, reject the active coordinator root as the executor,
+   preserve intent time while recording actual recovery completion, and
+   live-reauthenticate completed binding during
+   `release prepare`, send the prepared objective once, and require acceptance
    from that persisted worktree and reserved branch through the exact
    run-bound runtime.
 5. **Execute:** stay inside the generated contract and attempt the named direct

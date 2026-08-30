@@ -8,7 +8,9 @@ This document summarizes the breaking v0.7 authority established by
 [ADR 0032](adr/0032-detached-codex-app-worktree-unplug.md), with opaque-state
 planning refined by [ADR 0033](adr/0033-opaque-root-state-unplug-plans.md) and
 host-ref identity refined by
-[ADR 0034](adr/0034-host-managed-turn-diff-ref-authority.md).
+[ADR 0034](adr/0034-host-managed-turn-diff-ref-authority.md), and detached
+worktree binding refined by
+[ADR 0035](adr/0035-detached-host-worktree-bind-checkpoint.md).
 
 ## Retained cross-task authority
 
@@ -41,7 +43,7 @@ durable result journal or coordinator disposition.
 
 - Read-only questions and plans require no repository setup.
 - An authorized actionable request may progressively activate one explicit run
-  under `.git/codex-flow/v0.7.4/`, with an exact runtime snapshot and
+  under `.git/codex-flow/v0.7.5/`, with an exact runtime snapshot and
   disclosure before external task creation.
 - Activation writes no tracked setup, adoption, instructions, or `AGENTS.md`.
 - A bounded sibling-namespace sentinel checks Git-common state at admission.
@@ -60,7 +62,12 @@ durable result journal or coordinator disposition.
 - A selector rejected before any native identity consumes the one-shot
   operation and may authorize exactly one content-addressed child revision with
   new selectors. Ambiguity or any native identity remains fail-closed.
-- Objective delivery is an at-most-once release accepted only from the exact
+- A ready host-worktree task persists content-addressed binding intent before
+  the detached worktree is attached to its reserved branch. Both interruption
+  windows recover only from that exact intent, preserve preparation chronology,
+  and reject the active runtime coordinator root as an executor target.
+- Objective delivery is an at-most-once release prepared only after fresh live
+  authentication of completed binding and accepted only from the exact
   persisted pristine executor worktree, reserved branch, run-bound runtime,
   common directory, and generated contract.
 - Terminal receipt v3 derives `unchanged`, `clean-commit`, or
@@ -80,6 +87,11 @@ durable result journal or coordinator disposition.
   repository plan after exact task-archive evidence.
 
 ## Clean predecessor boundary
+
+The editable authority is `0.7.5-dev.0`. It uses the
+`.git/codex-flow/v0.7.5/` namespace and does not migrate, reinterpret, delete,
+or overwrite accepted v0.7.4 state or content-addressed runtime snapshots under
+`.git/codex-flow/v0.7.4/`.
 
 No predecessor reader, mutator, migration, retirement, or tracked-adoption
 command is packaged in v0.7. The active CLI, runtime bundle, schemas, skills,

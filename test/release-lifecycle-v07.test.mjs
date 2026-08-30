@@ -12,6 +12,7 @@ import {
   validateReleaseRecord,
 } from "../lib/release-lifecycle.mjs";
 import {
+  bindVisibleTaskWorktree,
   prepareVisibleTaskCreation,
   reconcileVisibleTaskCreation,
   recordVisibleTaskCreationAttempt,
@@ -60,7 +61,7 @@ function task(overrides = {}) {
   };
 }
 
-async function fixture() {
+async function fixture({ hostWorktree = false } = {}) {
   const root = await createGitFixture("codex-flow-v07-release-");
   const commonDir = await realpath(resolve(root, ".git"));
   const revision = execFileSync("git", ["rev-parse", "HEAD"], {
@@ -81,7 +82,7 @@ async function fixture() {
     tasks: [task()],
   });
   const runId = "release-run";
-  const stateRoot = resolve(commonDir, "codex-flow", "v0.7.4");
+  const stateRoot = resolve(commonDir, "codex-flow", "v0.7.5");
   const { authority, runtime } = await activateV07FixtureRun({
     root,
     runId,
@@ -114,13 +115,21 @@ async function fixture() {
     project_id: "release-saved-project",
     model: contract.task.model,
     reasoning_effort: contract.task.reasoning_effort,
-    worktree: {
-      mode: "host-worktree",
-      starting_revision: revision,
-      starting_branch: "main",
-      executor_branch: "codex/release-visible-task",
-      path: null,
-    },
+    worktree: hostWorktree
+      ? {
+        mode: "host-worktree",
+        starting_revision: revision,
+        starting_branch: "main",
+        executor_branch: "codex/release-visible-task",
+        path: null,
+      }
+      : {
+        mode: "local",
+        starting_revision: revision,
+        starting_branch: null,
+        executor_branch: null,
+        path: root,
+      },
   };
   const creation = await prepareVisibleTaskCreation({
     stateRoot,
@@ -387,18 +396,20 @@ test("rejected-before-send is terminal and cannot be accepted", async () => {
 });
 
 test("release acceptance authenticates the exact linked executor worktree", async () => {
-  const context = await fixture();
+  const context = await fixture({ hostWorktree: true });
   const worktreeParent = await mkdtemp(resolve(tmpdir(), "codex-flow-v07-release-linked-"));
   const worktreePath = resolve(worktreeParent, "executor");
   try {
-    execFileSync("git", [
-      "worktree", "add", "-q", "-b",
-      context.requestedSelectors.worktree.executor_branch,
-      worktreePath,
-      context.requestedSelectors.worktree.starting_branch,
-    ], { cwd: context.root });
+    execFileSync("git", ["worktree", "add", "-q", "--detach", worktreePath, context.revision], {
+      cwd: context.root,
+    });
     const observedWorktreePath = await realpath(worktreePath);
     await makeReady(context, { observedWorktreePath });
+    await bindVisibleTaskWorktree({
+      stateRoot: context.stateRoot,
+      operationId: context.operationId,
+      now: START + 2_500,
+    });
     const prepared = await prepareTaskRelease({
       stateRoot: context.stateRoot,
       taskContract: context.contract,
@@ -533,7 +544,12 @@ test("release schema exposes only canonical identity names and exact acceptance 
     "run_id", "runtime_context_digest", "configuration_digest", "repository_id",
     "common_dir", "coordinator_binding", "plan_id", "revision_digest",
     "task_id", "task_digest", "contract_id", "operation_id", "ready_thread_id",
+    "worktree_binding_id",
   ]) assert.equal(schema.required.includes(field), true);
+  assert.equal(
+    schema.properties.worktree_binding_id.oneOf[1].pattern,
+    "^worktree-binding-v1-[0-9a-f]{64}$",
+  );
   for (const retired of ["revision_id", "task_contract_digest", "runtime_digest", "config_digest"]) {
     assert.equal(Object.hasOwn(schema.properties, retired), false);
   }

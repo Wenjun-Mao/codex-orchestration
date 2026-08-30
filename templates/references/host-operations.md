@@ -20,9 +20,14 @@ bounded and separate requested, accepted, and observed evidence.
 5. Reconcile requested, host-accepted, and independently observed project,
    model, reasoning, visibility, and worktree evidence. A non-null observed
    mismatch or missing nonce is ambiguous and blocks release.
-6. Bind the host-observed pristine worktree in the same clone/common directory
-   at the exact baseline and claim only the contract's branch.
-7. Prepare release, send its exact prompt at most once, and reconcile the host
+6. Run coordinator-owned `task create bind`. Persist its content-addressed
+   path/common-directory/branch/baseline intent before attaching the detached
+   pristine worktree to the reserved branch; only exact receipt-backed replay
+   may recover an already attached branch. Reject the active runtime
+   coordinator root as the executor path and timestamp recovered completion at
+   the recovery command, never at the earlier prepared intent.
+7. Prepare release only after live reauthentication of completed binding, send
+   its exact prompt at most once, and reconcile the host
    call. Require the executor to accept the exact release, contract, runtime,
    common directory, and ready task before implementation.
 

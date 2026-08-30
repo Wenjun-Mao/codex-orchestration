@@ -9,7 +9,8 @@
     "common_dir", "coordinator_binding", "plan_id", "revision_digest",
     "task_id", "task_digest", "contract_id", "task_title", "selector_rationale",
     "launch_nonce", "bootstrap_digest", "selector_evidence", "status",
-    "attempt", "provisional", "ready", "resolution", "prepared_at", "updated_at"
+    "attempt", "provisional", "ready", "resolution", "worktree_binding",
+    "prepared_at", "updated_at"
   ],
   "properties": {
     "schema_version": { "const": 1 },
@@ -52,6 +53,9 @@
     "resolution": {
       "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/resolution" }]
     },
+    "worktree_binding": {
+      "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/worktreeBinding" }]
+    },
     "prepared_at": { "$ref": "#/$defs/timestamp" },
     "updated_at": { "$ref": "#/$defs/timestamp" }
   },
@@ -63,7 +67,8 @@
           "attempt": { "type": "null" },
           "provisional": { "type": "null" },
           "ready": { "type": "null" },
-          "resolution": { "type": "null" }
+          "resolution": { "type": "null" },
+          "worktree_binding": { "type": "null" }
         }
       }
     },
@@ -74,7 +79,8 @@
           "attempt": { "$ref": "#/$defs/attempt" },
           "provisional": { "type": "null" },
           "ready": { "type": "null" },
-          "resolution": { "type": "null" }
+          "resolution": { "type": "null" },
+          "worktree_binding": { "type": "null" }
         }
       }
     },
@@ -85,7 +91,8 @@
           "attempt": { "$ref": "#/$defs/attempt" },
           "provisional": { "$ref": "#/$defs/provisional" },
           "ready": { "type": "null" },
-          "resolution": { "type": "null" }
+          "resolution": { "type": "null" },
+          "worktree_binding": { "type": "null" }
         }
       }
     },
@@ -109,7 +116,8 @@
         "properties": {
           "attempt": { "$ref": "#/$defs/attempt" },
           "ready": { "type": "null" },
-          "resolution": { "$ref": "#/$defs/resolution" }
+          "resolution": { "$ref": "#/$defs/resolution" },
+          "worktree_binding": { "type": "null" }
         }
       }
     }
@@ -181,6 +189,46 @@
           ]
         }
       }
+    },
+    "worktreeBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version", "kind", "binding_id", "operation_id", "worktree_path",
+        "common_dir", "executor_branch", "baseline_revision", "state",
+        "prepared_at", "bound_at"
+      ],
+      "properties": {
+        "schema_version": { "const": 1 },
+        "kind": { "const": "codex-flow-v07-worktree-binding" },
+        "binding_id": {
+          "type": "string",
+          "pattern": "^worktree-binding-v1-[0-9a-f]{64}$"
+        },
+        "operation_id": {
+          "type": "string",
+          "pattern": "^visible-task-operation-v1-[0-9a-f]{64}$"
+        },
+        "worktree_path": { "type": "string", "minLength": 1, "maxLength": 2048 },
+        "common_dir": { "type": "string", "minLength": 1, "maxLength": 2048 },
+        "executor_branch": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "baseline_revision": { "$ref": "#/$defs/revision" },
+        "state": { "enum": ["prepared", "completed"] },
+        "prepared_at": { "$ref": "#/$defs/timestamp" },
+        "bound_at": {
+          "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/timestamp" }]
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "state": { "const": "prepared" } } },
+          "then": { "properties": { "bound_at": { "type": "null" } } }
+        },
+        {
+          "if": { "properties": { "state": { "const": "completed" } } },
+          "then": { "properties": { "bound_at": { "$ref": "#/$defs/timestamp" } } }
+        }
+      ]
     },
     "requestedSelectors": {
       "type": "object",
