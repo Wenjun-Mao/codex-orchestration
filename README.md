@@ -16,39 +16,31 @@ See [Mission and product boundary](docs/mission.md) for the durable charter.
 ## Current authority
 
 This public repository is the editing authority and remains `UNLICENSED`;
-public visibility does not grant an open-source license. The current v0.7
-documentation surface describes the approved contract; the source/runtime
-provenance remains the accepted v0.6.5 package. A repository may retain
-v0.5.1 consumer authority until its own explicit transition is approved and
-applied.
+public visibility does not grant an open-source license. v0.7 is the sole
+current package, runtime, schema, skill, and operational-state authority.
+Earlier releases remain source-history and immutable-tag evidence only; their
+readers, mutators, migration paths, retirement commands, tracked adoption, and
+test fixtures are not packaged in v0.7.
 
-The v0.7 surface retains the v0.6.5 runtime contract, including the Codex App
-compatibility fixes from v0.6.1, plugin-only instruction authority, deliberate
-model routing, and bounded selector-rejection replanning. It keeps no-change
-verification coordinator-owned while checking the persisted executor
-worktree, then keeps terminal run audits anchored to coordinator Git authority
-after that executor worktree is archived. Archive preparation now distinguishes
-ignored generated output from tracked or ordinary untracked source risk.
+v0.7 carries forward the proven cross-task behavior from v0.6.5 under new
+`codex-flow-v07-*` identities and the exact `.git/codex-flow/v0.7.0/`
+namespace. It adds a bounded foreign-active-run sentinel so a live predecessor
+run blocks admission instead of being silently ignored or migrated.
 
 Editing this checkout never changes an installed plugin or active repository
 runtime. An activated v0.7 run snapshots its exact bundle into the repository's
 Git common directory, so its authority survives task restart, compaction,
-plugin upgrade, and plugin removal. v0.7 does not read, migrate, or delete
-retained v0.5 operational state.
+plugin upgrade, and plugin removal. Apart from the bounded lifecycle sentinel,
+v0.7 does not read, import, migrate, retire, or delete predecessor operational
+state.
 
 ### Instruction authority
 
 The installed plugin skills are the sole live instruction authority for v0.7
-operation. Ordinary activation and optional tracked adoption neither read nor
-write `AGENTS.md`, and they do not create, require, validate, or load a tracked
-`INSTRUCTIONS.md`. An adoption preserves only the exact runtime bundle,
-configuration, and structured policy for the active run; it is not a second
-prompt source.
-
-This does not rewrite history: an accepted v0.5.1 repository can still be
-verified read-only and explicitly retired through its isolated legacy contract.
-Only that legacy retirement may remove the exact old managed `AGENTS.md` block
-it authenticates. It never edits externally attested instructions.
+operation. Activation never reads or writes `AGENTS.md`, and v0.7 creates,
+requires, validates, or loads neither tracked orchestration instructions nor a
+tracked adoption. Repository-local instructions remain the repository's own
+authority, not plugin-managed state.
 
 ## Layered architecture
 
@@ -81,17 +73,17 @@ worktrees, branches, callbacks, integration, archive, or cleanup.
 
 ### Progressive run activation
 
-Questions, explanations, audits, and plans are read-only. A repository no
-longer needs `.codex/orchestration/` before it can use the v0.7 source. The
-currently installed v0.5.1 package still uses its accepted setup gate, and
-tracked v0.5 authority must be explicitly retired before v0.7 can activate in
-that repository.
+Questions, explanations, audits, and plans are read-only. A repository needs
+no `.codex/orchestration/` setup before it can use v0.7. Actionable activation
+fails closed if the bounded sibling-namespace sentinel finds another active
+Codex Flow run; that run must be completed or abandoned under its own runtime
+before v0.7 starts.
 
 When the user authorizes actionable orchestration, the plugin may activate one
 run after disclosing:
 
 - the exact package/runtime source and bundle hash;
-- the `.git/codex-flow/v0.7/` operational state root;
+- the `.git/codex-flow/v0.7.0/` operational state root;
 - repository/common-directory, baseline, host, and coordinator binding;
 - the immutable workflow revision and its path/resource/branch reservation
   envelope;
@@ -252,31 +244,9 @@ The first request is read-only. An actionable request routes through
 repository setup. External task creation remains visible in the disclosed
 plan.
 
-After a clean repository has an active v0.7 run, permanent tracked adoption is
-a separate explicit promotion choice for team policy, portable clones, or
-headless operation:
-
-```text
-Promote this active Codex Flow v0.7 runtime to permanent tracked adoption.
-Plan retirement of this repository's tracked v0.7 adoption, but do not apply it.
-```
-
-The setup skill uses read-only `adopt plan` followed by an exact reviewed
-`adopt apply`, both bound to the named active run. Tracked adoption stores that
-run's same runtime/configuration/structured-policy semantics under
-`.codex/orchestration/v0.7/`; it is not a second engine or instruction source.
-It does not create a tracked `INSTRUCTIONS.md` or touch `AGENTS.md`.
-`adopt retire-plan` and `retire-apply` retire only a tracked v0.7 adoption.
-Accepted tracked v0.5.1 uses
-the separate run-independent `adopt legacy-retire-plan|legacy-retire-apply`
-contract. Planning is read-only; applying still requires review of the exact
-unchanged plan and leaves the v0.5.1 tag, cache, tasks, Git-common evidence,
-branches, and worktrees untouched. It makes no commit and does not activate
-v0.7.
-
 ## Public CLI families
 
-The v0.7 CLI surface is pre-release; use `codex-flow --help` for exact flags. Its public
+Use `codex-flow --help` for exact flags. The v0.7 public
 lifecycle is organized around these command families:
 
 ```text
@@ -292,7 +262,6 @@ verification run|status
 integration prepare|verification-request|reconcile|status
 archive prepare|reconcile|status
 cleanup plan
-adopt plan|apply|status|retire-plan|retire-apply|legacy-retire-plan|legacy-retire-apply
 ```
 
 There is no public bare callback-consume command. Consumption is an internal
@@ -302,30 +271,28 @@ exactly-once consequence of finalizing an authoritative disposition.
 unchanged. `cleanup plan` is read-only; this development boundary exposes no
 cleanup-apply command.
 
-## Permanent adoption and headless use
+## Package execution
 
-The installed plugin is normal package authority. Its setup skill resolves and
-runs the bundled CLI and snapshots exact managed files; users should not supply
-a source checkout or manually copy runtime files.
-
-For a headless package invocation, Node.js 20.11 or newer and Git are required.
-No third-party npm packages are used. Run `adopt plan` first, review the exact
-tracked write set and runtime hashes, then apply only that unchanged plan.
+The installed plugin is normal package authority. Run-scoped activation
+snapshots the exact bundled runtime into Git-common state; users should not
+supply a source checkout or manually copy runtime files. A headless package
+invocation requires Node.js 20.11 or newer and Git. No third-party npm packages
+are used, and no tracked setup or adoption command exists.
 
 ## Pre-release compatibility and retained history
 
-v0.7 is intentionally breaking. It has no v0.5 compatibility reader, dual
-execution path, or state migration. Retained v0.5 records remain independently
-auditable in their exact namespace. Historical v0.5 schemas, examples, and
-field tests are not v0.7 operating authority. Earlier ADRs remain useful
+v0.7 is intentionally breaking. It has no predecessor compatibility reader,
+dual execution path, operational-state migration, retirement command, or
+tracked adoption. Predecessor state remains outside v0.7 authority; immutable
+source tags and Git history remain the audit route. Earlier ADRs remain useful
 decision evidence where a later ADR supersedes their mechanism.
 
-The accepted v0.5.1 boundary remains documented in
-[v0.5.1 orchestration coverage](docs/coverage-v0.5.1.md). The v0.7 development
-boundary is summarized in [v0.7 orchestration coverage](docs/coverage-v0.7.md).
+The current boundary is summarized in
+[v0.7 orchestration coverage](docs/coverage-v0.7.md).
 [ADR 0015](docs/adr/0015-progressive-run-activation-authority.md) defines
 progressive activation and [ADR 0016](docs/adr/0016-content-addressed-workflow-and-native-boundary.md)
-defines workflow identity and the native-task boundary.
+defines workflow identity and the native-task boundary. [ADR 0029](docs/adr/0029-v070-clean-authority-cutover.md)
+defines the clean predecessor-free package cutover.
 
 ## Source and distribution
 
@@ -344,6 +311,6 @@ npm run validate
 npm run pack:check
 ```
 
-Source validation checks schemas, skills, package metadata, examples, and
-managed runtime files. Release, installation, pilot contact, and cleanup of
-retained audit state are separate approval checkpoints.
+Source validation checks current schemas, skills, package metadata, examples,
+and runtime files. Release, installation, pilot contact, and deletion of
+retained local operational state remain separate approval checkpoints.

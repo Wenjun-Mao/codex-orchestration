@@ -28,5 +28,5 @@ source record and proves that no live executor ref, attached worktree, retained
 visible task, or unresolved reservation remains. A prior audit cannot authorize
 close after state drift. Explicit abandonment keeps the complete admitted
 path/resource/branch envelope durable; a later run may proceed only when its
-plan is disjoint. v0.7 does not prune runtime snapshots or import/remove
-retained v0.5 evidence.
+plan is disjoint. v0.7 does not prune runtime snapshots or inspect, import,
+migrate, retire, or remove predecessor operational records.

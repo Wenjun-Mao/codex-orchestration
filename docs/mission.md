@@ -197,12 +197,10 @@ mission.
 
 ## Version relationship
 
-This charter guides the v0.7 boundary and later development. It does not change
-the accepted v0.5.1 runtime, install a development package, migrate operational
-state, or claim that every promise is already satisfied. v0.7 may plan and,
-after separate approval, apply exact retirement of accepted tracked v0.5.1
-authority while byte-preserving its package/cache, tag, tasks, Git resources,
-and Git-common evidence. That transition makes a repository setup-free; it
-does not itself activate v0.7 or change the installed plugin. Versioned schemas,
-runtime behavior, and compatibility decisions remain explicit implementation
-checkpoints.
+This charter guides v0.7 and later development. v0.7 is a clean authority
+boundary: it packages no predecessor reader, mutator, migration, retirement,
+tracked adoption, or plugin-managed instruction path. Earlier releases remain
+immutable source-tag and Git-history evidence only. A bounded lifecycle
+sentinel blocks admission while another version still has an active run, but
+v0.7 never imports or normalizes that run. Versioned schemas, runtime behavior,
+and compatibility decisions remain explicit implementation checkpoints.

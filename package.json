@@ -1,6 +1,6 @@
 {
   "name": "@wjmao/codex-flow",
-  "version": "0.6.5",
+  "version": "0.7.0-dev.0",
   "description": "Dependency-free repository tooling for coordinated Codex task workflows.",
   "private": true,
   "type": "module",
@@ -8,9 +8,8 @@
     "codex-flow": "./bin/codex-flow.mjs"
   },
   "scripts": {
-    "test": "npm run test:v06 && npm run test:v05.1",
-    "test:v06": "node --test --test-concurrency=1 test/*-v06.test.mjs test/recipient.test.mjs test/release-identity.test.mjs",
-    "test:v05.1": "node scripts/test-accepted-v05.mjs",
+    "test": "npm run test:v07",
+    "test:v07": "node --test --test-concurrency=1 test/*-v07.test.mjs test/recipient.test.mjs test/release-identity.test.mjs",
     "validate": "node scripts/validate.mjs",
     "prepack": "node scripts/release-identity.mjs",
     "pack:check": "npm pack --dry-run"
@@ -26,7 +25,9 @@
     "examples/",
     "skills/",
     "templates/",
-    "docs/",
+    "docs/adr/",
+    "docs/coverage-v0.7.md",
+    "docs/mission.md",
     "README.md"
   ],
   "license": "UNLICENSED"

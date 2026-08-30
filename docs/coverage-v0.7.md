@@ -1,22 +1,26 @@
 # Codex Orchestration v0.7 boundary
 
-Status: current v0.7 documentation boundary.
+Status: current v0.7 package and runtime boundary.
 
-This document summarizes the v0.7 contract established by
+This document summarizes the breaking v0.7 authority established by
 [ADR 0015](adr/0015-progressive-run-activation-authority.md) through
-[ADR 0028](adr/0028-archive-cleanliness-excludes-ignored-output.md).
-The accepted v0.6.5 source/runtime package is retained as non-operational
-provenance; this document is the current v0.7 contract surface.
+[ADR 0029](adr/0029-v070-clean-authority-cutover.md).
 
 ## Retained cross-task authority
 
-- Authenticated repository baseline, coordinator lineage, path/resource/branch
-  reservation envelopes, and DAG-ordered shared-resource gates.
-- Explicit requested/accepted/observed model and reasoning evidence.
+- Authenticated repository baseline, coordinator lineage, and path, resource,
+  and branch reservation envelopes.
+- One content-addressed workflow DAG with generated task contracts.
+- Explicit configured, requested, accepted, observed, and unavailable model and
+  reasoning evidence.
+- One-shot visible-task creation with opaque provisional identity and
+  nonce-authenticated ready identity.
 - Quiet durable routine results and separately journaled urgent interrupts.
 - Exactly-once coordinator disposition, serial Git integration, combined
-  verification, archive reconciliation, and deterministic read-only cleanup
-  planning. v0.7 does not apply Git deletion.
+  verification, archive reconciliation, terminal run audit, and deterministic
+  read-only cleanup planning.
+- Native subagents as a separate bounded read-only lane with explicit selectors
+  and unchanged-Git disposal proof.
 
 ## Native primitives consumed directly
 
@@ -24,89 +28,91 @@ provenance; this document is the current v0.7 contract surface.
 - Native model/reasoning selection and host-managed worktrees.
 - Native messaging, waiting, Handoff, status, archive, and managed-worktree
   lifecycle.
-- Native subagents as a separate read-only supporting surface.
+- Native subagents for read-only supporting work.
 
 Native waits and task finals provide liveness only. They do not replace the
 durable result journal or coordinator disposition.
 
-## Breaking redesign
+## Current v0.7 contract
 
-- A read-only question or plan never requires tracked repository setup.
+- Read-only questions and plans require no repository setup.
 - An authorized actionable request may progressively activate one explicit run
-  under `.git/codex-flow/v0.7/`, with an exact runtime snapshot and disclosure
-  before external task creation.
-- Permanent tracked adoption is optional and uses the same engine. Existing
-  tracked v0.5 authority must be explicitly retired; its evidence is preserved
-  and never imported.
-- One content-addressed workflow generates all task contracts. Immutable
-  revisions bind run, runtime/configuration, repository/common directory,
-  coordinator, baseline, dependencies, ownership, and model routing.
-- Every task states primary outcome, causal question, cheapest safe direct
-  attempt, and instrument role. A supporting instrument must lead immediately
-  to its direct attempt or pause/replan; another supporting checkpoint needs
-  explicit later authorization.
-- Visible task creation is one-shot. The host's provisional ID is bounded
-  opaque evidence stored verbatim; provisional and ready IDs remain separate,
-  and the ready identity must expose the exact launch nonce in its initial
-  host-visible user turn.
-- Objective delivery is an at-most-once release handshake accepted only from
-  the exact persisted pristine executor worktree and reserved branch, through
-  the run-bound runtime, for the exact contract, common directory, and ready
-  task.
-- Terminal receipt v3 derives `unchanged`, `clean-commit`, or `dirty-blocked`;
-  upstream is nullable.
-- A terminal receipt becomes durable only after callback admission matches its
-  accepted release, ready task, baseline, and exact selector evidence. Missing
-  host observation remains null and is never inferred from requested or
-  accepted selectors.
-- The visible-task terminal chain is result -> prepared disposition -> integration or
+  under `.git/codex-flow/v0.7.0/`, with an exact runtime snapshot and
+  disclosure before external task creation.
+- Activation writes no tracked setup, adoption, instructions, or `AGENTS.md`.
+- A bounded foreign-active-run sentinel checks sibling version namespaces at
+  admission. A non-null foreign `active_run_id` blocks v0.7; malformed,
+  symlinked, oversized, or excessively numerous sibling lifecycle namespaces
+  fail closed.
+- Immutable workflow revisions bind run, runtime/configuration, repository and
+  common directory, coordinator, baseline, dependencies, ownership, exclusive
+  resources, and model routing.
+- Every task states primary outcome, nullable causal question, cheapest safe
+  direct attempt, and instrument role. Supporting instrumentation must lead to
+  the direct attempt or pause/replan after one checkpoint.
+- Every native call uses explicit model and reasoning selectors. Native
+  subagents also use bounded `fork_turns`; full-history inheritance and Ultra
+  are forbidden for that lane.
+- A selector rejected before any native identity consumes the one-shot
+  operation and may authorize exactly one content-addressed child revision with
+  new selectors. Ambiguity or any native identity remains fail-closed.
+- Objective delivery is an at-most-once release accepted only from the exact
+  persisted pristine executor worktree, reserved branch, run-bound runtime,
+  common directory, and generated contract.
+- Terminal receipt v3 derives `unchanged`, `clean-commit`, or
+  `dirty-blocked`; upstream is nullable and missing host selector observation
+  remains null.
+- Routine visible-task completion writes only the Git-common callback journal.
+  Urgent blockers persist before one bounded direct interrupt attempt.
+- The terminal chain is result -> prepared disposition -> integration or
   no-change -> content-addressed PASS combined verification -> finalized
   disposition/internal consumption -> reconciled archive -> cleanup plan ->
-  independently resolved Git refs/worktrees. Cleanup application is a later
-  checkpoint.
-- Native subagents instead close through `complete` and accepted `dispose`
-  records with unchanged-Git evidence; they never enter the visible-task
-  callback/integration/archive chain.
-- Archive preparation treats tracked and ordinary untracked changes as source
-  risk but permits Git-ignored generated output to remain until the host removes
-  the worktree.
+  independently resolved Git refs and worktrees -> terminal run audit.
+- Archive cleanliness treats tracked and ordinary untracked changes as source
+  risk while permitting ignored generated output.
+- Cleanup remains read-only: v0.7 derives exact eligibility but does not delete
+  branches, worktrees, refs, runtime snapshots, or operational journals.
+
+## Clean predecessor boundary
+
+No predecessor reader, mutator, migration, retirement, or tracked-adoption
+command is packaged in v0.7. The active CLI, runtime bundle, schemas, skills,
+tests, examples, and package documentation use only v07 identities.
+
+Predecessor versions remain available through immutable source tags and Git
+history, not through the current artifact. Their operational namespaces are not
+imported or normalized into v0.7. The only cross-version read is the bounded
+foreign-active-run sentinel's minimal sibling `runs/lifecycle.json` check at
+admission.
+
+A predecessor run must be completed or explicitly abandoned under its own
+snapshotted runtime before v0.7 can activate. Deleting old local journals is a
+separate, exact, user-approved post-acceptance action; v0.7 never does it.
 
 ## Retired mechanisms
 
-- Mandatory `.codex/orchestration/` setup as the delegation entry gate.
+- Mandatory `.codex/orchestration/` setup as a delegation gate.
+- Tracked runtime adoption and plugin-managed instruction files.
+- Any plugin read or write of `AGENTS.md`.
+- Predecessor verification, retirement, migration, and mutator commands.
 - Independently authored parallel plans and task packets.
 - Title/time correlation of asynchronous task creation.
 - Blind creation or release retry after ambiguity.
-- Direct message/Steer for routine completion.
+- Direct message or Steer for routine completion.
 - Task-final, UI-state, raw-digest, or branch-name integration authority.
 - Visible-task Git/callback lifecycle for native subagents.
-- Full-history native-subagent forks paired with explicit model/effort
-  overrides; bounded forks preserve current host selector compatibility.
-- v0.5 TTL leases and caller-authored operation fences in the v0.7 runtime.
-- Git cleanup apply; v0.7 exposes a read-only exact-state plan only.
-- Public bare callback consumption.
-- v0.5 compatibility readers or operational-state migration.
+- Full-history native-subagent forks paired with explicit selector overrides.
+- Caller-authored leases and operation fences from predecessor protocols.
+- Public bare callback consumption and Git cleanup application.
 
-## Tracked-authority transition boundary
+## Verification authority
 
-- Tracked v0.7 adoption promotes the exact runtime of an already active run;
-  it is not a standalone initial setup engine.
-- `adopt retire-plan|retire-apply` retires a tracked v0.7 adoption only.
-- `adopt legacy-retire-plan|legacy-retire-apply` handles accepted tracked
-  v0.5.1 through a separate exact plan/apply. It removes only predecessor-owned
-  tracked authority, never applies automatically, and leaves the repository
-  eligible for setup-free v0.7 activation.
-- The v0.5.1 tag, package/cache identity, tasks, Git state, branches, worktrees,
-  and `.git/codex-flow/v0.5.1/` evidence remain byte-preserved. No predecessor
-  record is imported into v0.7.
-- Other predecessor versions and run-independent initial tracked-v0.7 adoption
-  remain deferred.
+`npm run test:v07` runs the current v0.7 runtime suite plus shared recipient,
+release-identity, and selector contracts. `npm test` aliases that current
+suite; it does not execute predecessor code from historical tags.
 
-Accepted v0.5.1 tests run only from its immutable tag; predecessor fixtures are
-not shipped as active v0.7 package authority.
-`npm run test:v06` runs the active v0.7 suite plus shared recipient,
-urgent-signal, and release-identity contracts. `npm run test:v05.1` authenticates
-the immutable accepted tag/commit, extracts it outside the repository, and runs
-its complete predecessor suite against its own CLI. `npm test` runs both
-version-authoritative suites; it does not execute historical v0.5 mutation
-tests against the breaking v0.7 CLI.
+`npm run validate` enforces the exact current schema/example inventory,
+predecessor-free package surface, skill and template markers, version/state
+namespace parity, zero third-party dependencies, and release identity.
+`npm run pack:check` inspects the exact npm artifact. Plugin and skill
+validation are additional release gates.

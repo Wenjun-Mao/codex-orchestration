@@ -1,6 +1,6 @@
 ---
 name: index
-description: Route Codex Flow questions, run-scoped orchestration, permanent adoption, result integration, and cleanup. Use when the user asks about or wants to use Codex Flow, or when work may benefit from multiple separate Codex tasks. Do not invoke merely because one task has several local steps.
+description: Route Codex Flow questions, run-scoped orchestration, result integration, and cleanup. Use when the user asks about or wants to use Codex Flow, or when work may benefit from multiple separate Codex tasks. Do not invoke merely because one task has several local steps.
 ---
 
 # Codex Orchestration Router
@@ -15,10 +15,9 @@ Route by intent before inspecting or changing repository state.
   without tracked setup, after disclosing the exact runtime, Git-common state,
   workflow revision, model routing, and proposed external task creation. Every
   native model choice must include a durable selector rationale.
-- For permanent tracked team/headless policy, use
-  `codex-orchestration:setup` only when the user explicitly asks to adopt,
-  install, or retire Codex Flow, including an accepted v0.5.1-to-setup-free
-  transition.
+- v0.7 has no tracked setup, adoption, predecessor-retirement, or `AGENTS.md`
+  mutation route. Ordinary actionable use activates only explicit Git-common
+  run state through the coordinate skill.
 - Inside a released visible executor task, use
   `codex-orchestration:execute`.
 - For durable results, dispositions, integration or no-change proof, combined

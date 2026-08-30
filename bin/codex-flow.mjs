@@ -859,7 +859,7 @@ async function commandTaskCreateV07(args) {
 async function commandTaskV07(args) {
   const [subcommand, ...rest] = args;
   if (subcommand !== "create") {
-    throw new CliError("v0.5 task packet/operation commands are not v0.7 authority; use workflow and task create");
+    throw new CliError("Legacy task packet/operation commands are not v0.7 authority; use workflow and task create");
   }
   return commandTaskCreateV07(rest);
 }

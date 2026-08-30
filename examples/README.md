@@ -6,5 +6,6 @@ and lifecycle records. Do not copy or hand-author operation IDs, nonce evidence,
 callback IDs, dispositions, integration records, verification hashes, or
 archive records; those derive their authority from persisted state.
 
-Accepted v0.5.1 examples remain available from its immutable tag. They are not
-shipped as current package authority and must not be used to author a new run.
+Predecessor examples remain available only from their immutable source tags.
+They are not shipped as current package authority and must not be used to
+author a new run.

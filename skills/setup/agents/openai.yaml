@@ -1,6 +1,0 @@
-interface:
-  display_name: "Adopt or Retire Codex Flow"
-  short_description: "Plan exact Codex Flow adoption or retirement."
-  default_prompt: "Use $codex-orchestration:setup to plan an exact Codex Flow adoption or retirement for this repository."
-policy:
-  allow_implicit_invocation: true

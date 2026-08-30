@@ -5,7 +5,7 @@ import { access, readdir, readFile } from "node:fs/promises";
 import { basename, resolve } from "node:path";
 import { PACKAGE_VERSION } from "../lib/core.mjs";
 import { CODEX_FLOW_STATE_NAMESPACE } from "../lib/git.mjs";
-import { V06_RUNTIME_DIRECTORY } from "../lib/runtime-context.mjs";
+import { V07_RUNTIME_DIRECTORY } from "../lib/runtime-context.mjs";
 import {
   createWorkflowPlanRevision,
   validateWorkflowPlanRevision,
@@ -13,24 +13,20 @@ import {
 import { validateReleaseIdentity } from "./release-identity.mjs";
 
 const root = resolve(import.meta.dirname, "..");
-const EXPECTED_PACKAGE_VERSION = "0.6.5";
+const EXPECTED_PACKAGE_VERSION = "0.7.0-dev.0";
 
-// ACTIVE V0.6 SCHEMA REGISTRY INSERTION POINT:
+// ACTIVE V0.7 SCHEMA REGISTRY INSERTION POINT:
 // add every new operating schema here in the same change that introduces it.
-const ACTIVE_V06_SCHEMA_NAMES = Object.freeze([
+const ACTIVE_V07_SCHEMA_NAMES = Object.freeze([
   "runtime-bundle",
   "runtime-context",
   "run-fence",
   "run-activation",
-  "run-audit-v06",
+  "run-audit-v07",
   "urgent-signal",
-  "urgent-record-v06",
-  "adoption-manifest",
-  "adoption-plan",
-  "adoption-retirement-plan",
-  "legacy-retirement-plan",
+  "urgent-record-v07",
   "workflow-plan",
-  "workflow-journal-v06",
+  "workflow-journal-v07",
   "generated-task-contract",
   "subagent-operation",
   "visible-task-creation",
@@ -41,10 +37,10 @@ const ACTIVE_V06_SCHEMA_NAMES = Object.freeze([
   "verification-record",
   "integration-record",
   "archive-operation",
-  "cleanup-plan-v06",
+  "cleanup-plan-v07",
 ]);
 
-const ACTIVE_V06_EXAMPLES = new Set(["v0.6-workflow-draft.json"]);
+const ACTIVE_V07_EXAMPLES = new Set(["v0.7-workflow-draft.json"]);
 
 async function walk(path) {
   const result = [];
@@ -77,7 +73,7 @@ function assertMarkers(source, markers, label) {
   const normalizedSource = normalizeMarker(source);
   for (const marker of markers) {
     if (!normalizedSource.includes(normalizeMarker(marker))) {
-      throw new Error(`${label} is missing current v0.6 contract: ${marker}`);
+      throw new Error(`${label} is missing current v0.7 contract: ${marker}`);
     }
   }
 }
@@ -204,14 +200,14 @@ function compileActiveSchemas(schemas) {
 const packageJson = JSON.parse(await readRequired("package.json"));
 const plugin = JSON.parse(await readRequired(".codex-plugin/plugin.json"));
 if (PACKAGE_VERSION !== EXPECTED_PACKAGE_VERSION) {
-  throw new Error(`v0.6 source must identify as ${EXPECTED_PACKAGE_VERSION}`);
+  throw new Error(`v0.7 development source must identify as ${EXPECTED_PACKAGE_VERSION}`);
 }
 if (packageJson.version !== PACKAGE_VERSION || plugin.version !== PACKAGE_VERSION) {
   throw new Error("Package, plugin, and runtime versions must match");
 }
 const releaseCore = PACKAGE_VERSION.split("-", 1)[0].split("+", 1)[0];
 const expectedStateNamespace = `v${releaseCore}`;
-if (CODEX_FLOW_STATE_NAMESPACE !== expectedStateNamespace || V06_RUNTIME_DIRECTORY !== expectedStateNamespace) {
+if (CODEX_FLOW_STATE_NAMESPACE !== expectedStateNamespace || V07_RUNTIME_DIRECTORY !== expectedStateNamespace) {
   throw new Error(
     `Runtime state must use exact namespace ${expectedStateNamespace}, not package prerelease identity`,
   );
@@ -223,7 +219,7 @@ if (packageJson.license !== "UNLICENSED" || plugin.license !== packageJson.licen
 }
 const requiredPackageFiles = [
   ".codex-plugin/", "bin/", "lib/", "schemas/", "examples/", "skills/",
-  "templates/", "docs/", "README.md",
+  "templates/", "docs/adr/", "docs/coverage-v0.7.md", "docs/mission.md", "README.md",
 ];
 for (const path of requiredPackageFiles) {
   if (!packageJson.files.includes(path)) throw new Error(`Published package is missing required path: ${path}`);
@@ -257,6 +253,15 @@ for (const path of [
   "schemas/task-operation.schema.json",
   "schemas/task-packet.schema.json",
   "test/urgent-signal.test.mjs",
+  "lib/adoption-v06.mjs",
+  "lib/legacy-retirement-v06.mjs",
+  "lib/legacy-v05-readonly.mjs",
+  "schemas/adoption-manifest.schema.json",
+  "schemas/adoption-plan.schema.json",
+  "schemas/adoption-retirement-plan.schema.json",
+  "schemas/legacy-retirement-plan.schema.json",
+  "scripts/test-accepted-v05.mjs",
+  "skills/setup",
 ]) {
   try {
     await access(resolve(root, path));
@@ -300,7 +305,7 @@ const schemaDirectory = resolve(root, "schemas");
 const schemaFiles = (await readdir(schemaDirectory, { withFileTypes: true }))
   .filter((entry) => entry.isFile() && entry.name.endsWith(".schema.json"))
   .map((entry) => entry.name);
-const registeredSchemaNames = new Set(ACTIVE_V06_SCHEMA_NAMES);
+const registeredSchemaNames = new Set(ACTIVE_V07_SCHEMA_NAMES);
 assertExactInventory(schemaFiles.map(schemaNameFromFile), registeredSchemaNames, "Schema authority");
 
 const parsedSchemas = new Map();
@@ -308,7 +313,7 @@ for (const file of schemaFiles) {
   const name = schemaNameFromFile(file);
   parsedSchemas.set(name, JSON.parse(await readRequired(`schemas/${file}`)));
 }
-const activeSchemas = new Map(ACTIVE_V06_SCHEMA_NAMES.map((name) => [name, parsedSchemas.get(name)]));
+const activeSchemas = new Map(ACTIVE_V07_SCHEMA_NAMES.map((name) => [name, parsedSchemas.get(name)]));
 compileActiveSchemas(activeSchemas);
 
 const exampleDirectory = resolve(root, "examples");
@@ -317,41 +322,35 @@ const exampleJsonFiles = (await readdir(exampleDirectory, { withFileTypes: true 
   .map((entry) => entry.name);
 assertExactInventory(
   exampleJsonFiles,
-  ACTIVE_V06_EXAMPLES,
+  ACTIVE_V07_EXAMPLES,
   "Example authority",
 );
-const workflowDraft = JSON.parse(await readRequired("examples/v0.6-workflow-draft.json"));
+const workflowDraft = JSON.parse(await readRequired("examples/v0.7-workflow-draft.json"));
 if (Object.hasOwn(workflowDraft, "revision_digest")) {
-  throw new Error("The v0.6 workflow example must remain a user-authored draft, not a runtime record");
+  throw new Error("The v0.7 workflow example must remain a user-authored draft, not a runtime record");
 }
 const workflowRevision = createWorkflowPlanRevision(workflowDraft);
 validateWorkflowPlanRevision(workflowRevision);
 if (!workflowRevision.tasks.some((task) => task.execution_kind === "task-thread")
   || !workflowRevision.tasks.some((task) => task.execution_kind === "subagent")) {
-  throw new Error("The v0.6 workflow example must cover both native task surfaces");
+  throw new Error("The v0.7 workflow example must cover both native task surfaces");
 }
 const examplesReadme = await readRequired("examples/README.md");
 assertMarkers(examplesReadme, [
-  "v0.6-workflow-draft.json` is the only user-authored v0.6 example",
-  "Accepted v0.5.1 examples remain available from its immutable tag",
+  "v0.7-workflow-draft.json` is the only user-authored v0.7 example",
+  "Predecessor examples remain available only from their immutable source tags",
 ], "examples/README.md");
-assertMarkers(await readRequired("docs/coverage-v0.6.md"), [
-  "Accepted v0.5.1 tests run only from its immutable tag",
-  "not shipped as active v0.6 package authority",
-], "docs/coverage-v0.6.md");
+assertMarkers(await readRequired("docs/coverage-v0.7.md"), [
+  "No predecessor reader, mutator, migration, retirement, or tracked-adoption command is packaged",
+  "bounded foreign-active-run sentinel",
+  "npm run test:v07",
+], "docs/coverage-v0.7.md");
 
 const skillContracts = new Map([
   ["index", [
     "A repository does not need `.codex/orchestration/` to discuss or plan Codex Flow",
-    "progressively activate one v0.6 run without tracked setup",
+    "progressively activate one v0.7 run without tracked setup",
     "Native subagents are a distinct, read-only supporting lane",
-  ]],
-  ["setup", [
-    "installed plugin containing this skill as package authority",
-    "Permanent adoption is optional",
-    "Ordinary activation and adoption never read, write, validate, or require any `AGENTS.md`",
-    "adopt plan|apply|status",
-    "adopt retire-plan|retire-apply",
   ]],
   ["coordinate", [
     "include the explicit `run_id` in every stateful operation",
@@ -372,7 +371,7 @@ const skillContracts = new Map([
   ["cleanup", [
     "Name the exact `run_id`",
     "cleanup plan --run-id",
-    "v0.6 exposes no cleanup apply command",
+    "v0.7 exposes no cleanup apply command",
     "complete admitted path/resource/branch envelope durable",
   ]],
 ]);
@@ -382,43 +381,6 @@ for (const [skillName, markers] of skillContracts) {
     throw new Error(`Invalid skill entrypoint: ${skillName}`);
   }
   assertMarkers(skill, markers, `skills/${skillName}/SKILL.md`);
-}
-
-const setupMetadata = await readRequired("skills/setup/agents/openai.yaml");
-assertMarkers(setupMetadata, [
-  "allow_implicit_invocation: true",
-  "$codex-orchestration:setup",
-], "skills/setup/agents/openai.yaml");
-const setupResolver = await readRequired("skills/setup/scripts/resolve-plugin-root.mjs");
-assertMarkers(setupResolver, [
-  'resolve(import.meta.dirname, "../../..")',
-  "packageMetadata.version !== PACKAGE_VERSION",
-  "pluginMetadata.version !== PACKAGE_VERSION",
-], "skills/setup/scripts/resolve-plugin-root.mjs");
-const setupReferences = new Map([
-  ["new-repository.md", [
-    ".codex/orchestration/v0.6/",
-    "First activate a named v0.6 run",
-    "adoption promotes that run's runtime and cannot bootstrap one",
-    "It must not propose `INSTRUCTIONS.md`, `AGENTS.md`, or another instruction authority",
-    "Run `adopt apply --run-id ...` only for that exact unchanged plan",
-    "Adoption does not authorize additional task creation",
-  ]],
-  ["existing-repository.md", [
-    "never retroactively assumes authority for earlier tasks",
-    "Use `adopt legacy-retire-plan` without a run ID",
-    "Use `legacy-retire-apply` only with that exact unchanged plan",
-    "`adopt retire-plan|retire-apply` remains specific to tracked v0.6 adoption",
-    "Reject any ordinary adoption plan that reads or writes `AGENTS.md`",
-    "Pre-adoption tasks finish under their original contract",
-  ]],
-]);
-for (const [name, markers] of setupReferences) {
-  assertMarkers(
-    await readRequired(`skills/setup/references/${name}`),
-    markers,
-    `skills/setup/references/${name}`,
-  );
 }
 
 if (!Array.isArray(plugin.interface?.defaultPrompt)
@@ -452,7 +414,7 @@ const templateContracts = new Map([
     "persist the signal before one identified interrupt attempt",
   ]],
   ["templates/references/task-lifecycle.md", [
-    ".git/codex-flow/v0.6.5/runtimes/<bundle-sha256>/",
+    ".git/codex-flow/v0.7.0/runtimes/<bundle-sha256>/",
     "terminal-receipt-v3 journal result without messaging",
     "content-addressed PASS verification and integration/no-change records",
     "Every stateful command names the run explicitly",
@@ -481,5 +443,5 @@ try {
 
 console.log(
   `codex-orchestration ${PACKAGE_VERSION} source contracts validated `
-  + `(${ACTIVE_V06_SCHEMA_NAMES.length} active v0.6 schemas; state ${CODEX_FLOW_STATE_NAMESPACE})`,
+  + `(${ACTIVE_V07_SCHEMA_NAMES.length} active v0.7 schemas; state ${CODEX_FLOW_STATE_NAMESPACE})`,
 );
