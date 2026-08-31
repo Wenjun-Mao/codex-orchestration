@@ -93,7 +93,7 @@ durable result journal or coordinator disposition.
 
 ## Clean predecessor boundary
 
-The editable authority is `0.7.6-dev.0`. It uses the
+The accepted authority is `0.7.6`. It uses the
 `.git/codex-flow/v0.7.6/` namespace and does not migrate, reinterpret, delete,
 or overwrite accepted v0.7.5 state or content-addressed runtime snapshots under
 `.git/codex-flow/v0.7.5/`.
