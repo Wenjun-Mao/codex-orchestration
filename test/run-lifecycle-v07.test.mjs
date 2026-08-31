@@ -354,7 +354,7 @@ test("foreign active-run sentinel blocks admission and bounds foreign namespace 
   await assert.rejects(
     foreignActiveRunCollisions({
       gitCommonDirectory: commonDir,
-      currentNamespace: "v0.7.5",
+      currentNamespace: "v0.7.6",
     }),
     /exceeds 32 namespaces/,
   );
@@ -371,7 +371,7 @@ test("clean-start guard rejects even terminal incompatible namespaces", async (t
   await assert.rejects(
     assertNoIncompatibleFlowNamespace({
       gitCommonDirectory: commonDir,
-      currentNamespace: "v0.7.5",
+      currentNamespace: "v0.7.6",
     }),
     /Clean start required before activation.*v0\.7\.0/,
   );
@@ -432,7 +432,7 @@ test("run admission binds a persisted root workflow to its path and resource env
     }],
   });
   await createWorkflowJournal({
-    stateRoot: resolve(commonDir, "codex-flow", "v0.7.5"),
+    stateRoot: resolve(commonDir, "codex-flow", "v0.7.6"),
     runId: "run-root-envelope",
     planId: workflow.plan_id,
     planRevision: workflow,
@@ -478,7 +478,7 @@ test("runtime reads retain the exact bundle after the plugin source disappears",
     context: runtime,
     bundleSource,
   });
-  assert.match(acquired.bundle_root, /codex-flow\/v0\.7\.5\/runtimes\/[0-9a-f]{64}\/files$/);
+  assert.match(acquired.bundle_root, /codex-flow\/v0\.7\.6\/runtimes\/[0-9a-f]{64}\/files$/);
   await stat(resolve(acquired.bundle_root, "bin", "codex-flow.mjs"));
   await rm(packageRoot, { recursive: true, force: true });
   const read = await readRuntimeContext({

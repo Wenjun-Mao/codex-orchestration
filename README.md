@@ -23,7 +23,7 @@ readers, mutators, migration paths, retirement commands, tracked adoption, and
 test fixtures are not packaged in v0.7.
 
 v0.7 carries forward the proven cross-task behavior from v0.6.5 under new
-`codex-flow-v07-*` identities and the exact `.git/codex-flow/v0.7.5/`
+`codex-flow-v07-*` identities and the exact `.git/codex-flow/v0.7.6/`
 namespace. It adds a bounded foreign-active-run sentinel so a live predecessor
 run blocks admission instead of being silently ignored or migrated.
 
@@ -94,7 +94,7 @@ When the user authorizes actionable orchestration, the plugin may activate one
 run after disclosing:
 
 - the exact package/runtime source and bundle hash;
-- the `.git/codex-flow/v0.7.5/` operational state root;
+- the `.git/codex-flow/v0.7.6/` operational state root;
 - repository/common-directory, baseline, host, and coordinator binding;
 - the immutable workflow revision and its path/resource/branch reservation
   envelope;
@@ -236,8 +236,12 @@ reconciled task archive, reviewed cleanup plan and branch/worktree proof
 Task final text, branch names, UI status, and caller-supplied raw digests are
 never proof. Git outcome is derived as `unchanged`, `clean-commit`, or
 `dirty-blocked`; upstream is nullable. Dirty or attention-needed tasks remain
-visible and keep the run from closing. Archive and Git cleanup are separate
-actions. v0.7 can derive a deterministic read-only cleanup plan and verify that
+visible and keep the run from closing. Native archive acceptance is
+asynchronous: an archived task may enter
+`archived-awaiting-worktree-reclamation` until its exact managed path is
+absent. That state never replays archive, and cleanup and closure remain
+blocked. Archive and Git cleanup are separate actions. v0.7 can derive a
+deterministic read-only cleanup plan and verify that
 refs/worktrees are resolved; ordinary run cleanup does not apply deletions.
 The separate repository-scoped `unplug` lifecycle can apply an explicitly
 approved clean-start plan after every named task has been archived. It removes
@@ -330,7 +334,9 @@ root-file inventory plus v1 crash-resume compatibility, and
 [ADR 0034](docs/adr/0034-host-managed-turn-diff-ref-authority.md) classifies
 Codex App turn-diff capture refs as non-authoritative unplug observations.
 [ADR 0035](docs/adr/0035-detached-host-worktree-bind-checkpoint.md) defines the
-durable detached-worktree binding checkpoint before objective release.
+durable detached-worktree binding checkpoint before objective release, and
+[ADR 0036](docs/adr/0036-asynchronous-archive-worktree-reclamation.md) separates
+archived visibility from asynchronous host-managed worktree removal.
 
 ## Source and distribution
 

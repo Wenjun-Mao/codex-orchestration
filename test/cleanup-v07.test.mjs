@@ -78,7 +78,7 @@ async function fileSnapshot(root) {
   return entries;
 }
 
-async function completedArchiveFixture(root, remoteRoot) {
+async function completedArchiveFixture(root, remoteRoot, { reclamationPending = false } = {}) {
   git(resolve(remoteRoot, ".."), ["init", "--bare", "--quiet", remoteRoot]);
   git(root, ["remote", "add", "origin", remoteRoot]);
   const branch = "codex/cleanup-v07-candidate";
@@ -142,8 +142,10 @@ async function completedArchiveFixture(root, remoteRoot) {
     verificationId: verification.verification_id,
     now: CLOCK + 40,
   });
-  git(root, ["worktree", "remove", worktreePath]);
-  await rm(worktreeParent, { recursive: true, force: true });
+  if (!reclamationPending) {
+    git(root, ["worktree", "remove", worktreePath]);
+    await rm(worktreeParent, { recursive: true, force: true });
+  }
   const preparedArchive = await prepareTaskArchive({
     stateRoot: context.stateRoot,
     dispositionId: disposition.disposition_id,
@@ -151,7 +153,7 @@ async function completedArchiveFixture(root, remoteRoot) {
     hostId: "local",
     now: CLOCK + 50,
   });
-  await reconcileTaskArchive({
+  const archive = await reconcileTaskArchive({
     stateRoot: context.stateRoot,
     archiveId: preparedArchive.archive_id,
     attemptId: preparedArchive.host_intent.attempt_id,
@@ -159,8 +161,50 @@ async function completedArchiveFixture(root, remoteRoot) {
     observation: archivedObservation(context.readyThreadId),
     now: CLOCK + 60,
   });
-  return { ...context, branch, upstream, originalPath, archiveId: preparedArchive.archive_id };
+  return {
+    ...context,
+    branch,
+    upstream,
+    originalPath,
+    archiveId: preparedArchive.archive_id,
+    archive,
+    worktreeParent,
+  };
 }
+
+test("v0.7 cleanup remains ineligible while archived worktree reclamation is pending", async () => {
+  const root = await createGitFixture("codex-flow-v07-cleanup-reclamation-");
+  const remoteParent = await mkdtemp(resolve(tmpdir(), "codex-flow-v07-cleanup-reclamation-remote-"));
+  const remoteRoot = resolve(remoteParent, "origin.git");
+  let context = null;
+  try {
+    context = await completedArchiveFixture(root, remoteRoot, { reclamationPending: true });
+    assert.equal(context.archive.state, "archived-awaiting-worktree-reclamation");
+    assert.equal(context.archive.observation.worktree_state, "present");
+    const plan = await cleanupPlanV07({
+      stateRoot: context.stateRoot,
+      runId: context.contract.run_id,
+    });
+    const [item] = plan.items;
+    assert.equal(item.classification, "awaiting-archive");
+    assert.equal(item.candidate, false);
+    assert.equal(item.archive.state, "archived-awaiting-worktree-reclamation");
+    assert.equal(item.archive.worktree_state, "present");
+    assert.ok(item.reason_codes.includes("archive-not-completed"));
+    assert.ok(item.reason_codes.includes("archive-worktree-not-absent"));
+  } finally {
+    if (context && await realpath(context.originalPath).catch(() => null)) {
+      try {
+        git(root, ["worktree", "remove", "--force", context.originalPath]);
+      } catch {
+        // Temporary fixture teardown only.
+      }
+    }
+    if (context) await rm(context.worktreeParent, { recursive: true, force: true });
+    await removeFixture(root);
+    await rm(remoteParent, { recursive: true, force: true });
+  }
+});
 
 test("v0.7 cleanup plan is deterministic, read-only, and blocks closure until exact candidate cleanup", async () => {
   const root = await createGitFixture("codex-flow-v07-cleanup-plan-");

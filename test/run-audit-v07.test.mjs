@@ -181,7 +181,7 @@ async function runFixture(t, suffix, task, { branchFences = [] } = {}) {
   const root = await createGitFixture(`codex-flow-v07-run-audit-${suffix}-`);
   t.after(() => removeFixture(root));
   const commonDir = await realpath(resolve(root, ".git"));
-  const stateRoot = resolve(commonDir, "codex-flow", "v0.7.5");
+  const stateRoot = resolve(commonDir, "codex-flow", "v0.7.6");
   const baseline = git(root, ["rev-parse", "HEAD"]);
   const coordinator = {
     lineage_id: `audit-lineage-${suffix}`,
@@ -1170,7 +1170,6 @@ test("archived host-worktree no-change proof leaves coordinator authority at act
     executorThreadId: visible.readyThreadId,
     verificationId: verification.verification_id,
   });
-  git(context.root, ["worktree", "remove", worktreePath]);
   const archive = await prepareTaskArchive({
     stateRoot: context.stateRoot,
     dispositionId: completedDisposition.disposition_id,
@@ -1183,18 +1182,35 @@ test("archived host-worktree no-change proof leaves coordinator authority at act
     },
     hostId: "local",
   });
+  const archivedTaskObservation = {
+    execution_kind: "task-thread",
+    thread_id: visible.readyThreadId,
+    source: "host-observed",
+    active_visible: false,
+    archived_visible: true,
+  };
+  const pendingArchive = await reconcileTaskArchive({
+    stateRoot: context.stateRoot,
+    archiveId: archive.archive_id,
+    attemptId: archive.host_intent.attempt_id,
+    outcome: "accepted",
+    observation: archivedTaskObservation,
+  });
+  assert.equal(pendingArchive.state, "archived-awaiting-worktree-reclamation");
+  const pending = await audit(context, 119_000);
+  assert(blockerCodes(pending).has("archive-incomplete"));
+  assert.match(
+    pending.audit.blockers.find((blocker) => blocker.code === "archive-incomplete").detail,
+    /worktree reclamation remains pending/,
+  );
+
+  git(context.root, ["worktree", "remove", worktreePath]);
   await reconcileTaskArchive({
     stateRoot: context.stateRoot,
     archiveId: archive.archive_id,
     attemptId: archive.host_intent.attempt_id,
     outcome: "accepted",
-    observation: {
-      execution_kind: "task-thread",
-      thread_id: visible.readyThreadId,
-      source: "host-observed",
-      active_visible: false,
-      archived_visible: true,
-    },
+    observation: archivedTaskObservation,
   });
 
   const retained = await audit(context, 120_000);

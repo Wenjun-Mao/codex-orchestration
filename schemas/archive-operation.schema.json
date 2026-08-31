@@ -104,7 +104,7 @@
           "required": ["task", "worktree_state", "observed_at"],
           "properties": {
             "task": { "$ref": "#/$defs/taskObservation" },
-            "worktree_state": { "enum": ["not-applicable", "absent"] },
+            "worktree_state": { "enum": ["not-applicable", "present", "absent"] },
             "observed_at": { "$ref": "#/$defs/timestamp" }
           }
         }
@@ -112,7 +112,8 @@
     },
     "state": {
       "enum": [
-        "prepared", "accepted-awaiting-observation", "completed",
+        "prepared", "accepted-awaiting-observation",
+        "archived-awaiting-worktree-reclamation", "completed",
         "rejected-before-send", "ambiguous"
       ]
     },

@@ -10,7 +10,9 @@ planning refined by [ADR 0033](adr/0033-opaque-root-state-unplug-plans.md) and
 host-ref identity refined by
 [ADR 0034](adr/0034-host-managed-turn-diff-ref-authority.md), and detached
 worktree binding refined by
-[ADR 0035](adr/0035-detached-host-worktree-bind-checkpoint.md).
+[ADR 0035](adr/0035-detached-host-worktree-bind-checkpoint.md), and asynchronous
+archive reclamation represented by
+[ADR 0036](adr/0036-asynchronous-archive-worktree-reclamation.md).
 
 ## Retained cross-task authority
 
@@ -43,7 +45,7 @@ durable result journal or coordinator disposition.
 
 - Read-only questions and plans require no repository setup.
 - An authorized actionable request may progressively activate one explicit run
-  under `.git/codex-flow/v0.7.5/`, with an exact runtime snapshot and
+  under `.git/codex-flow/v0.7.6/`, with an exact runtime snapshot and
   disclosure before external task creation.
 - Activation writes no tracked setup, adoption, instructions, or `AGENTS.md`.
 - A bounded sibling-namespace sentinel checks Git-common state at admission.
@@ -81,6 +83,9 @@ durable result journal or coordinator disposition.
   independently resolved Git refs and worktrees -> terminal run audit.
 - Archive cleanliness treats tracked and ordinary untracked changes as source
   risk while permitting ignored generated output.
+- Archived visibility may precede host-managed worktree removal. That interval
+  is durably `archived-awaiting-worktree-reclamation`; it never replays archive
+  and blocks cleanup and closure until the exact path is absent.
 - Ordinary run cleanup remains read-only: v0.7 derives exact eligibility but
   does not expose a run-scoped cleanup mutation. The separate clean-start
   `unplug` lifecycle may apply only its unchanged, explicitly approved
@@ -88,10 +93,10 @@ durable result journal or coordinator disposition.
 
 ## Clean predecessor boundary
 
-The accepted authority is `0.7.5`. It uses the
-`.git/codex-flow/v0.7.5/` namespace and does not migrate, reinterpret, delete,
-or overwrite accepted v0.7.4 state or content-addressed runtime snapshots under
-`.git/codex-flow/v0.7.4/`.
+The editable authority is `0.7.6-dev.0`. It uses the
+`.git/codex-flow/v0.7.6/` namespace and does not migrate, reinterpret, delete,
+or overwrite accepted v0.7.5 state or content-addressed runtime snapshots under
+`.git/codex-flow/v0.7.5/`.
 
 No predecessor reader, mutator, migration, retirement, or tracked-adoption
 command is packaged in v0.7. The active CLI, runtime bundle, schemas, skills,

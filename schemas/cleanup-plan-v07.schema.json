@@ -213,14 +213,15 @@
       "properties": {
         "state": {
           "enum": [
-            "prepared", "accepted-awaiting-observation", "completed",
+            "prepared", "accepted-awaiting-observation",
+            "archived-awaiting-worktree-reclamation", "completed",
             "rejected-before-send", "ambiguous"
           ]
         },
         "worktree_state": {
           "oneOf": [
             { "type": "null" },
-            { "enum": ["not-applicable", "absent"] }
+            { "enum": ["not-applicable", "present", "absent"] }
           ]
         }
       }

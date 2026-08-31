@@ -2,6 +2,10 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import test from "node:test";
+import {
+  archiveIdFor,
+  validateArchiveOperation,
+} from "../lib/archive-lifecycle.mjs";
 import { validateCallbackRecordV07 } from "../lib/callbacks-v07.mjs";
 import { sha256, stableStringify } from "../lib/core.mjs";
 import {
@@ -140,6 +144,78 @@ function integrationRecord(overrides = {}) {
   return draft;
 }
 
+function pendingArchiveRecord(overrides = {}) {
+  const draft = {
+    schema_version: 1,
+    kind: "codex-flow-v07-task-archive-operation",
+    archive_id: "pending",
+    run_id: "parity-run-v07",
+    runtime_context_digest: digest("a"),
+    configuration_digest: digest("b"),
+    repository_id: "parity-repository-v07",
+    common_dir: "/tmp/parity-repository/.git",
+    coordinator_binding: coordinator("archive-coordinator-v07"),
+    plan_id: "parity-plan-v07",
+    revision_digest: digest("c"),
+    task_id: "parity-task-v07",
+    task_digest: digest("d"),
+    contract_id: digest("e"),
+    operation_id: "parity-operation-v07",
+    release_id: "parity-release-v07",
+    executor_thread_id: "parity-executor-v07",
+    callback_id: "parity-callback-v07",
+    disposition_id: "parity-disposition-v07",
+    decision: "accepted-no-change",
+    task: {
+      execution_kind: "task-thread",
+      thread_id: "parity-executor-v07",
+      source: "host-observed",
+      active_visible: true,
+      archived_visible: false,
+    },
+    host_intent: {
+      action: "set-thread-archived",
+      attempt_id: "pending",
+      thread_id: "parity-executor-v07",
+      host_id: "local",
+      archived: true,
+    },
+    git_resolution: {
+      kind: "unchanged",
+      integration_id: null,
+      verification_id: `verification-v1-${digest("f")}`,
+      verification_digest: digest("1"),
+    },
+    worktree: {
+      management: "host-managed",
+      path: "/tmp/parity-repository-worktree",
+      prepared_state: "present-clean",
+    },
+    setter: {
+      outcome: "accepted",
+      reconciled_at: "2026-08-30T01:00:02.000Z",
+    },
+    observation: {
+      task: {
+        execution_kind: "task-thread",
+        thread_id: "parity-executor-v07",
+        source: "host-observed",
+        active_visible: false,
+        archived_visible: true,
+      },
+      worktree_state: "present",
+      observed_at: "2026-08-30T01:00:03.000Z",
+    },
+    state: "archived-awaiting-worktree-reclamation",
+    prepared_at: "2026-08-30T01:00:01.000Z",
+    updated_at: "2026-08-30T01:00:03.000Z",
+    ...overrides,
+  };
+  draft.archive_id = archiveIdFor(draft);
+  draft.host_intent.attempt_id = `archive-attempt-v1-${sha256(draft.archive_id)}`;
+  return draft;
+}
+
 test("active v0.7 schemas match direct runtime timestamp, thread, and task-surface boundaries", async () => {
   const [
     integrationSchema,
@@ -148,6 +224,7 @@ test("active v0.7 schemas match direct runtime timestamp, thread, and task-surfa
     dispositionSchema,
     callbackSchema,
     workflowJournalSchema,
+    archiveSchema,
   ] =
     await Promise.all([
       schema("integration-record.schema.json"),
@@ -156,6 +233,7 @@ test("active v0.7 schemas match direct runtime timestamp, thread, and task-surfa
       schema("task-disposition.schema.json"),
       schema("callback-record.schema.json"),
       schema("workflow-journal-v07.schema.json"),
+      schema("archive-operation.schema.json"),
     ]);
 
   assert.equal(integrationSchema.properties.executor_thread_id.$ref, "#/$defs/threadId");
@@ -207,6 +285,20 @@ test("active v0.7 schemas match direct runtime timestamp, thread, and task-surfa
   assert.deepEqual(operationKindsFor("subagent"), [null, "subagent-operation"]);
   assert.equal(operationKindsFor("task-thread").includes("subagent-operation"), false);
   assert.equal(operationKindsFor("subagent").includes("visible-task-creation"), false);
+  assert(archiveSchema.properties.state.enum.includes("archived-awaiting-worktree-reclamation"));
+  assert(archiveSchema.properties.observation.oneOf[1].properties.worktree_state.enum.includes("present"));
+
+  const pendingArchive = pendingArchiveRecord();
+  assert.deepEqual(validateArchiveOperation(pendingArchive), pendingArchive);
+  assert.throws(
+    () => validateArchiveOperation(pendingArchiveRecord({
+      observation: {
+        ...pendingArchive.observation,
+        worktree_state: "absent",
+      },
+    })),
+    /requires the exact host-managed worktree to remain present/,
+  );
 
   const integration = integrationRecord();
   assert.deepEqual(validateIntegrationRecordV07(integration), integration);

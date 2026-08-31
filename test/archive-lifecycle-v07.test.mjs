@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import test from "node:test";
@@ -108,8 +108,8 @@ async function observedDisposition({
   return { delivered, disposition: completed };
 }
 
-async function noChangeAuthority(root, suffix) {
-  const stateRoot = resolve(root, ".git", "codex-flow", "v0.7.5");
+async function noChangeAuthority(root, suffix, { retainWorktree = false } = {}) {
+  const stateRoot = resolve(root, ".git", "codex-flow", "v0.7.6");
   const worktreeParent = await mkdtemp(resolve(tmpdir(), "codex-flow-v07-archive-observed-"));
   const worktreePath = resolve(worktreeParent, "executor");
   const baseline = git(root, ["rev-parse", "HEAD"]);
@@ -139,9 +139,18 @@ async function noChangeAuthority(root, suffix) {
     decision: "accepted-no-change",
     verificationId: verification.verification_id,
   });
-  git(root, ["worktree", "remove", worktreePath]);
-  await rm(worktreeParent, { recursive: true, force: true });
-  return { stateRoot, release, payload, disposition, worktreePath: observedWorktreePath };
+  if (!retainWorktree) {
+    git(root, ["worktree", "remove", worktreePath]);
+    await rm(worktreeParent, { recursive: true, force: true });
+  }
+  return {
+    stateRoot,
+    release,
+    payload,
+    disposition,
+    worktreePath: observedWorktreePath,
+    worktreeParent,
+  };
 }
 
 test("clean no-change visible task archives only after setter and independent observation", async () => {
@@ -224,7 +233,7 @@ test("clean no-change visible task archives only after setter and independent ob
 test("local task archive does not claim host-managed worktree authority", async () => {
   const root = await createGitFixture("codex-flow-v07-archive-unobserved-");
   try {
-    const stateRoot = resolve(root, ".git", "codex-flow", "v0.7.5");
+    const stateRoot = resolve(root, ".git", "codex-flow", "v0.7.6");
     const release = await acceptedRelease(root, "unobserved");
     const baseline = git(root, ["rev-parse", "HEAD"]);
     const payload = receipt(release, {
@@ -262,7 +271,7 @@ test("local task archive does not claim host-managed worktree authority", async 
   }
 });
 
-test("integrated host-worktree task remains visible until the clean worktree is absent", async () => {
+test("archived host-worktree task waits durably for asynchronous reclamation", async () => {
   const root = await createGitFixture("codex-flow-v07-archive-integrated-");
   const worktreeParent = await mkdtemp(resolve(tmpdir(), "codex-flow-v07-archive-worktree-"));
   const worktreePath = resolve(worktreeParent, "executor");
@@ -270,7 +279,7 @@ test("integrated host-worktree task remains visible until the clean worktree is 
     await writeFile(resolve(root, ".gitignore"), "*.ignored\n", "utf8");
     git(root, ["add", ".gitignore"]);
     git(root, ["commit", "--quiet", "-m", "ignore generated archive artifacts"]);
-    const stateRoot = resolve(root, ".git", "codex-flow", "v0.7.5");
+    const stateRoot = resolve(root, ".git", "codex-flow", "v0.7.6");
     const baseline = git(root, ["rev-parse", "HEAD"]);
     const executorBranch = "codex/archive-integrated";
     git(root, ["worktree", "add", "-q", "--detach", worktreePath, baseline]);
@@ -372,16 +381,40 @@ test("integrated host-worktree task remains visible until the clean worktree is 
       attemptId: prepared.host_intent.attempt_id,
       outcome: "accepted",
     });
-    await assert.rejects(
-      reconcileTaskArchive({
+    const pending = await reconcileTaskArchive({
+      stateRoot,
+      archiveId: prepared.archive_id,
+      attemptId: prepared.host_intent.attempt_id,
+      outcome: "accepted",
+      observation: archivedObservation(release.readyThreadId),
+    });
+    assert.equal(pending.state, "archived-awaiting-worktree-reclamation");
+    assert.equal(pending.call_required, false);
+    assert.equal(pending.keep_visible, false);
+    assert.equal(pending.observation.worktree_state, "present");
+    assert.deepEqual(
+      await reconcileTaskArchive({
         stateRoot,
         archiveId: prepared.archive_id,
         attemptId: prepared.host_intent.attempt_id,
         outcome: "accepted",
         observation: archivedObservation(release.readyThreadId),
       }),
-      /worktree still exists/,
+      pending,
     );
+    assert.deepEqual(
+      await reconcileTaskArchive({
+        stateRoot,
+        archiveId: prepared.archive_id,
+        attemptId: prepared.host_intent.attempt_id,
+        outcome: "accepted",
+      }),
+      pending,
+    );
+    assert.equal((await taskArchiveStatus({
+      stateRoot,
+      archiveId: prepared.archive_id,
+    })).state, "archived-awaiting-worktree-reclamation");
     git(root, ["worktree", "remove", worktreePath]);
     const completed = await reconcileTaskArchive({
       stateRoot,
@@ -391,7 +424,20 @@ test("integrated host-worktree task remains visible until the clean worktree is 
       observation: archivedObservation(release.readyThreadId),
     });
     assert.equal(completed.state, "completed");
+    assert.equal(completed.keep_visible, false);
     assert.equal(completed.observation.worktree_state, "absent");
+    await mkdir(worktreePath);
+    await assert.rejects(
+      reconcileTaskArchive({
+        stateRoot,
+        archiveId: prepared.archive_id,
+        attemptId: prepared.host_intent.attempt_id,
+        outcome: "accepted",
+        observation: archivedObservation(release.readyThreadId),
+      }),
+      /postcondition is no longer true/,
+    );
+    await rm(worktreePath, { recursive: true, force: true });
   } finally {
     if (await realpath(worktreePath).catch(() => null)) {
       try {
@@ -408,8 +454,9 @@ test("integrated host-worktree task remains visible until the clean worktree is 
 test("blocked and ambiguous archive outcomes remain visible", async () => {
   const blockedRoot = await createGitFixture("codex-flow-v07-archive-blocked-");
   const ambiguousRoot = await createGitFixture("codex-flow-v07-archive-ambiguous-");
+  let ambiguousAuthority = null;
   try {
-    const blockedState = resolve(blockedRoot, ".git", "codex-flow", "v0.7.5");
+    const blockedState = resolve(blockedRoot, ".git", "codex-flow", "v0.7.6");
     const blockedRelease = await acceptedRelease(blockedRoot, "blocked");
     const baseline = git(blockedRoot, ["rev-parse", "HEAD"]);
     const blockedPayload = receipt(blockedRelease, {
@@ -435,7 +482,10 @@ test("blocked and ambiguous archive outcomes remain visible", async () => {
       /must remain visible/,
     );
 
-    const ambiguous = await noChangeAuthority(ambiguousRoot, "ambiguous");
+    const ambiguous = await noChangeAuthority(ambiguousRoot, "ambiguous", {
+      retainWorktree: true,
+    });
+    ambiguousAuthority = ambiguous;
     await bindRecipient({ stateRoot: ambiguous.stateRoot, recipient });
     const prepared = await prepareTaskArchive({
       stateRoot: ambiguous.stateRoot,
@@ -467,9 +517,32 @@ test("blocked and ambiguous archive outcomes remain visible", async () => {
       outcome: "ambiguous",
       observation: archivedObservation(ambiguous.release.readyThreadId),
     });
-    assert.equal(observedAfterAmbiguity.state, "completed");
+    assert.equal(observedAfterAmbiguity.state, "archived-awaiting-worktree-reclamation");
     assert.equal(observedAfterAmbiguity.keep_visible, false);
+    assert.equal(observedAfterAmbiguity.observation.worktree_state, "present");
+    git(ambiguousRoot, ["worktree", "remove", ambiguous.worktreePath]);
+    const completedAfterAmbiguity = await reconcileTaskArchive({
+      stateRoot: ambiguous.stateRoot,
+      archiveId: prepared.archive_id,
+      attemptId: prepared.host_intent.attempt_id,
+      outcome: "ambiguous",
+      observation: archivedObservation(ambiguous.release.readyThreadId),
+    });
+    assert.equal(completedAfterAmbiguity.state, "completed");
+    assert.equal(completedAfterAmbiguity.observation.worktree_state, "absent");
+    await rm(ambiguous.worktreeParent, { recursive: true, force: true });
+    ambiguousAuthority = null;
   } finally {
+    if (ambiguousAuthority !== null) {
+      if (await realpath(ambiguousAuthority.worktreePath).catch(() => null)) {
+        try {
+          git(ambiguousRoot, ["worktree", "remove", "--force", ambiguousAuthority.worktreePath]);
+        } catch {
+          // Fixture cleanup only; the assertion path reports the causal failure.
+        }
+      }
+      await rm(ambiguousAuthority.worktreeParent, { recursive: true, force: true });
+    }
     await removeFixture(blockedRoot);
     await removeFixture(ambiguousRoot);
   }
