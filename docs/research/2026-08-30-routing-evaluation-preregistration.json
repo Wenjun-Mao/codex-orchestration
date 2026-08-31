@@ -10,17 +10,19 @@
   "claims_boundary": {
     "primary_outcome": "Determine whether deliberately selected Terra workers can preserve accepted outcome quality while improving total efficiency over one Sol task on two bounded retrospective cases.",
     "causal_question": "Does a cheaper single task or a Sol-coordinated Terra pair improve the quality-efficiency trade-off on work that is explicitly admitted for its execution surface?",
-    "cheapest_safe_direct_attempt": "After a fresh v0.7.5 authority check, run only the two scheduled blind cases and their three frozen arms with no new telemetry or routing behavior.",
+    "cheapest_safe_direct_attempt": "After a fresh v0.7.6 authority check, run only the two scheduled blind cases and their three frozen arms with no new telemetry or routing behavior.",
     "may_promote_package_policy": false,
     "reason": "The historical outcomes helped shape Codex Flow and are not independent held-out product evidence. This checkpoint tests feasibility and protocol discipline only."
   },
   "runtime_preconditions": {
     "codex_app_restart_required": true,
     "fresh_controller_task_required": true,
-    "accepted_plugin_version": "0.7.5",
-    "accepted_source_commit": "ad80e9357cecca691002413e31c9904cc20d9c85",
-    "accepted_source_tag": "v0.7.5",
-    "advertised_skill_version_must_equal": "0.7.5",
+    "accepted_plugin_version": "0.7.6",
+    "accepted_source_commit": "1e4a825df878ec05d7a971cddb3984ce3f4b2b52",
+    "accepted_source_tag": "v0.7.6",
+    "accepted_cache_path": "/Users/wjmao/.codex/plugins/cache/personal/codex-orchestration/0.7.6",
+    "accepted_bundle_sha256": "5d9f88167432c8939cf2ffa254796d671deb72dbef62f7813c434c59754d4ce7",
+    "advertised_skill_version_must_equal": "0.7.6",
     "installed_cache_must_equal_artifact": true,
     "active_codex_flow_runs": 0,
     "explicit_visible_task_creation_authorization_required": true,
@@ -79,7 +81,7 @@
       "writes_allowed": false
     },
     "sol_coord_two_terra_visible": {
-      "shape": "One fresh Sol-high coordinator uses exactly two Terra-high user-visible tasks according to the case-specific DAG and ownership, then integrates and verifies serially through v0.7.5.",
+      "shape": "One fresh Sol-high coordinator uses exactly two Terra-high user-visible tasks according to the case-specific DAG and ownership, then integrates and verifies serially through v0.7.6.",
       "candidate_agent_threads": 3,
       "surface": "visible-task",
       "writes_allowed": true
@@ -308,7 +310,7 @@
     }
   ],
   "stopping_rules": [
-    "Stop before launch if the fresh v0.7.5 authority check fails, any required selector is unsupported, a source archive digest differs, the imported baseline is dirty, or visible-task authorization is absent.",
+    "Stop before launch if the fresh v0.7.6 authority check fails, any required selector is unsupported, a source archive digest differs, the imported baseline is dirty, or visible-task authorization is absent.",
     "An exact selector rejection before native identity terminates that arm with no replan. Ambiguity or any provisional, ready-task, or agent identity also forbids retry or substitution.",
     "Stop a coordinated arm on ownership collision, required approval, high-risk drift, or an unrecoverable source or host blocker; use only the existing urgent path where warranted.",
     "Treat the 60-minute limit as containment, not a performance target. Preserve timeout and host-liveness evidence separately.",
