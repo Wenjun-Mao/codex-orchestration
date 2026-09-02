@@ -506,6 +506,7 @@ test("explicit private resolution binds the exact provisional ID to delegated bo
       provisionalClientThreadId,
     );
     const request = recovered.reconcile_request;
+    assert.equal(Object.hasOwn(request, "reconciled_at"), false);
     const ready = await reconcileVisibleTaskCreation({
       stateRoot: context.stateRoot,
       operationId: request.operation_id,
@@ -515,7 +516,7 @@ test("explicit private resolution binds the exact provisional ID to delegated bo
       initialTurn: request.initial_turn,
       privateResolution: request.private_resolution,
       selectorEvidence: request.selector_evidence,
-      now: Date.parse(request.reconciled_at),
+      now: START + 2_000,
     });
     assert.equal(ready.status, "ready-unreleased");
     assert.equal(ready.ready.initial_turn.source, "codex-app-private-delegation-v1");
@@ -697,7 +698,7 @@ test("only exact expired ambiguity recovers from timely private host evidence", 
       initialTurn: request.initial_turn,
       privateResolution: request.private_resolution,
       selectorEvidence: request.selector_evidence,
-      now: Date.parse(request.reconciled_at),
+      now: START + 9_000,
     });
     assert.equal(ready.status, "ready-unreleased");
     assert.equal(ready.operation_id, prepared.operation_id);
@@ -708,7 +709,7 @@ test("only exact expired ambiguity recovers from timely private host evidence", 
       expiredResolutionDigest,
     );
     assert.equal(ready.late_private_recovery.source, "codex-app-private-state-v1");
-    assert.equal(ready.late_private_recovery.recovered_at, request.reconciled_at);
+    assert.equal(ready.late_private_recovery.recovered_at, new Date(START + 9_000).toISOString());
     assert.equal(ready.attempt_permitted, false);
     assert.equal(ready.reconciliation_open, false);
     const tampered = JSON.parse(await readFile(resolve(
@@ -850,7 +851,7 @@ test("exact expiry may durably add a timely source-authenticated provisional ide
         },
         observed: request.selector_evidence.observed,
       },
-      now: Date.parse(request.reconciled_at),
+      now: START + 309_000,
     }), /source creation event/);
     const ready = await reconcileVisibleTaskCreation({
       stateRoot: context.stateRoot,
@@ -861,7 +862,7 @@ test("exact expiry may durably add a timely source-authenticated provisional ide
       initialTurn: request.initial_turn,
       privateResolution: request.private_resolution,
       selectorEvidence: request.selector_evidence,
-      now: Date.parse(request.reconciled_at),
+      now: START + 309_000,
     });
     assert.equal(ready.status, "ready-unreleased");
     assert.equal(ready.provisional.client_thread_id, provisionalClientThreadId);

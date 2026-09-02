@@ -37,10 +37,12 @@ private-host provenance, and fails closed. The v0.7.8 candidate permits delayed
 processing when the exact source `create_thread` completion,
 initial-delegation, and observed-selector host timestamps fall inside the
 bounded creation window. The source event can authenticate and atomically
-persist the provisional identity and accepted selectors after expiry. It may
-recover only the exact persisted window-expiry ambiguity while preserving that
-resolution and the original one-shot attempt. It is never a silent fallback
-and will be retired when Codex App exposes an equivalent public resolver.
+persist the provisional identity, accepted selectors, and ready identity after
+expiry. It may recover only the exact persisted window-expiry ambiguity while
+preserving that resolution and the original one-shot attempt. It never creates
+or retries, is never a silent fallback, and will be retired when Codex App
+exposes an equivalent public resolver. Visible-task lifecycle transition times
+are runtime-owned; callers provide host-event timestamps only as evidence.
 
 Actionable activation also requires a clean namespace boundary: any retained
 incompatible Flow namespace blocks and points to the repository-scoped
@@ -357,7 +359,9 @@ archived visibility from asynchronous host-managed worktree removal, and
 temporary, explicit private task-ID resolver and its public-host exit condition.
 [ADR 0038](docs/adr/0038-host-event-time-and-private-archive-evidence.md)
 defines event-time-safe creation reconciliation and authenticated private
-archive evidence for archive and unplug recovery.
+archive evidence for archive and unplug recovery. [ADR 0039](docs/adr/0039-runtime-owned-visible-task-clocks.md)
+makes visible-task lifecycle clocks runtime-owned so caller timestamps cannot
+invalidate real host-event ordering.
 
 ## Source and distribution
 

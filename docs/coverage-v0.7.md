@@ -16,7 +16,9 @@ archive reclamation represented by
 private task-ID correlation bounded by
 [ADR 0037](adr/0037-explicit-private-task-id-resolution.md), and event-time-safe
 creation plus private archive evidence defined by
-[ADR 0038](adr/0038-host-event-time-and-private-archive-evidence.md).
+[ADR 0038](adr/0038-host-event-time-and-private-archive-evidence.md), and
+runtime-owned visible-task transition clocks defined by
+[ADR 0039](adr/0039-runtime-owned-visible-task-clocks.md).
 
 ## Retained cross-task authority
 
@@ -33,8 +35,8 @@ creation plus private archive evidence defined by
   nonce-bearing delegation must agree. The create completion,
   initial-delegation, and observed-selector host timestamps—not later private
   processing—must be inside the window. The source event may authenticate and
-  atomically persist the provisional identity and accepted selectors. Compact
-  private provenance is persisted. Only an exact durable
+  atomically persist the provisional identity, accepted selectors, and matching
+  ready identity. Compact private provenance is persisted. Only an exact durable
   `reconciliation-window-expired` ambiguity may recover through that private
   proof, while preserving the original resolution and one-shot attempt. No
   title/timing correlation, retry, or other terminal-state recovery is allowed.
@@ -176,6 +178,8 @@ state bytes remain fail-closed authority.
 - Independently authored parallel plans and task packets.
 - Title/time correlation of asynchronous task creation.
 - Blind creation or release retry after ambiguity.
+- Caller-authored visible-task prepare, attempt, reconciliation, or binding
+  clocks.
 - Direct message or Steer for routine completion.
 - Task-final, UI-state, raw-digest, or branch-name integration authority.
 - Visible-task Git/callback lifecycle for native subagents.

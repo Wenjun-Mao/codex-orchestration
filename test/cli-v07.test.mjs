@@ -122,6 +122,8 @@ test("v0.7 help exposes no bare callback consume or predecessor commands", () =>
   assert.match(privateHelp.stdout, /Read-only temporary Codex App compatibility adapter/);
   assert.match(privateHelp.stdout, /--run-id ID --operation-id ID/);
   assert.match(privateHelp.stdout, /exact persisted\s+reconciliation-window-expired ambiguity/);
+  assert.match(privateHelp.stdout, /previously unjournaled provisional, accepted-selector, and ready\s+evidence/);
+  assert.match(privateHelp.stdout, /never creates or retries a task/);
   assert.match(privateHelp.stdout, /preserves the original resolution and one-shot attempt/);
   assert.doesNotMatch(privateHelp.stderr, /ERR_PARSE_ARGS_UNKNOWN_OPTION|at parseArgs/);
 
@@ -774,12 +776,23 @@ test("task creation and release expose each native host payload at most once", a
       path: null,
     },
   };
-  const preparePath = await requestFile(context.requests, "task-prepare", {
+  const prepareRequest = {
     run_id: context.runId,
     task_contract: contract,
     requested_selectors: requestedSelectors,
-    prepared_at: "2026-08-29T20:00:02.000Z",
+  };
+  const rejectedPreparePath = await requestFile(context.requests, "task-prepare-clock", {
+    ...prepareRequest,
+    prepared_at: "2099-01-01T00:00:00.000Z",
   });
+  const rejectedPrepare = runCli([
+    "task", "create", "prepare", "--run-id", context.runId,
+    "--file", rejectedPreparePath, "--json",
+  ], { cwd: context.root });
+  assert.notEqual(rejectedPrepare.status, 0);
+  assert.match(rejectedPrepare.stderr, /field is not allowed: prepared_at/);
+
+  const preparePath = await requestFile(context.requests, "task-prepare", prepareRequest);
   const preparedResult = runCli([
     "task", "create", "prepare", "--run-id", context.runId,
     "--file", preparePath, "--json",
@@ -787,13 +800,24 @@ test("task creation and release expose each native host payload at most once", a
   assertSuccess(preparedResult, "visible-task prepare");
   const prepared = JSON.parse(preparedResult.stdout);
 
-  const attemptPath = await requestFile(context.requests, "task-attempt", {
+  const attemptRequest = {
     run_id: context.runId,
     operation_id: prepared.operation_id,
     host_session_id: "desktop-session-one-shot",
     timeout_seconds: 300,
-    attempted_at: "2026-08-29T20:00:03.000Z",
+  };
+  const rejectedAttemptPath = await requestFile(context.requests, "task-attempt-clock", {
+    ...attemptRequest,
+    attempted_at: "2099-01-01T00:00:00.000Z",
   });
+  const rejectedAttempt = runCli([
+    "task", "create", "attempt", "--run-id", context.runId,
+    "--file", rejectedAttemptPath, "--json",
+  ], { cwd: context.root });
+  assert.notEqual(rejectedAttempt.status, 0);
+  assert.match(rejectedAttempt.stderr, /field is not allowed: attempted_at/);
+
+  const attemptPath = await requestFile(context.requests, "task-attempt", attemptRequest);
   const attemptedResult = runCli([
     "task", "create", "attempt", "--run-id", context.runId,
     "--file", attemptPath, "--json",
@@ -805,6 +829,15 @@ test("task creation and release expose each native host payload at most once", a
   assert.equal(attempted.host_request.reasoning_effort, "xhigh");
   assert.match(attempted.host_request.prompt, /CODEX_FLOW_LAUNCH_NONCE=[0-9a-f]{64}/);
   assert.equal((attempted.host_request.prompt.match(/CODEX_FLOW_LAUNCH_NONCE=/g) ?? []).length, 1);
+
+  const creationStatus = runCli([
+    "task", "create", "status", "--run-id", context.runId,
+    "--operation-id", prepared.operation_id, "--json",
+  ], { cwd: context.root });
+  assertSuccess(creationStatus, "visible-task creation status");
+  const persistedAttempt = JSON.parse(creationStatus.stdout);
+  assert(Date.parse(persistedAttempt.attempt.started_at) >= Date.parse(prepared.prepared_at));
+  const hostObservedAt = new Date().toISOString();
 
   const repeatedAttemptResult = runCli([
     "task", "create", "attempt", "--run-id", context.runId,
@@ -821,7 +854,7 @@ test("task creation and release expose each native host payload at most once", a
   });
   const observedExecutorPath = await realpath(executorPath);
   const readyThreadId = "ready-cli-v07-thread";
-  const reconcilePath = await requestFile(context.requests, "task-reconcile", {
+  const reconcileRequest = {
     run_id: context.runId,
     operation_id: prepared.operation_id,
     outcome: "ready",
@@ -833,23 +866,34 @@ test("task creation and release expose each native host payload at most once", a
       turn_index: 1,
       role: "user",
       content: attempted.host_request.prompt,
-      observed_at: "2026-08-29T20:00:05.000Z",
+      observed_at: hostObservedAt,
     },
     selector_evidence: {
       accepted: {
         ...requestedSelectors,
-        accepted_at: "2026-08-29T20:00:04.000Z",
+        accepted_at: hostObservedAt,
       },
       observed: {
         project_id: requestedSelectors.project_id,
         model: requestedSelectors.model,
         reasoning_effort: requestedSelectors.reasoning_effort,
         worktree: { ...requestedSelectors.worktree, path: observedExecutorPath },
-        observed_at: "2026-08-29T20:00:05.000Z",
+        observed_at: hostObservedAt,
       },
     },
-    reconciled_at: "2026-08-29T20:00:05.000Z",
+  };
+  const rejectedReconcilePath = await requestFile(context.requests, "task-reconcile-clock", {
+    ...reconcileRequest,
+    reconciled_at: "2099-01-01T00:00:00.000Z",
   });
+  const rejectedReconcile = runCli([
+    "task", "create", "reconcile", "--run-id", context.runId,
+    "--file", rejectedReconcilePath, "--json",
+  ], { cwd: context.root });
+  assert.notEqual(rejectedReconcile.status, 0);
+  assert.match(rejectedReconcile.stderr, /field is not allowed: reconciled_at/);
+
+  const reconcilePath = await requestFile(context.requests, "task-reconcile", reconcileRequest);
   const reconcileResult = runCli([
     "task", "create", "reconcile", "--run-id", context.runId,
     "--file", reconcilePath, "--json",
@@ -857,11 +901,22 @@ test("task creation and release expose each native host payload at most once", a
   assertSuccess(reconcileResult, "visible-task ready reconciliation");
   assert.equal(JSON.parse(reconcileResult.stdout).status, "ready-unreleased");
 
-  const bindPath = await requestFile(context.requests, "task-bind", {
+  const bindRequest = {
     run_id: context.runId,
     operation_id: prepared.operation_id,
-    bound_at: "2026-08-29T20:00:05.500Z",
+  };
+  const rejectedBindPath = await requestFile(context.requests, "task-bind-clock", {
+    ...bindRequest,
+    bound_at: "2099-01-01T00:00:00.000Z",
   });
+  const rejectedBind = runCli([
+    "task", "create", "bind", "--run-id", context.runId,
+    "--file", rejectedBindPath, "--json",
+  ], { cwd: context.root });
+  assert.notEqual(rejectedBind.status, 0);
+  assert.match(rejectedBind.stderr, /field is not allowed: bound_at/);
+
+  const bindPath = await requestFile(context.requests, "task-bind", bindRequest);
   const bindResult = runCli([
     "task", "create", "bind", "--run-id", context.runId,
     "--file", bindPath, "--json",
@@ -873,7 +928,7 @@ test("task creation and release expose each native host payload at most once", a
     run_id: context.runId,
     task_contract: contract,
     operation_id: prepared.operation_id,
-    prepared_at: "2026-08-29T20:00:06.000Z",
+    prepared_at: new Date().toISOString(),
   });
   const releaseResult = runCli([
     "release", "prepare", "--run-id", context.runId, "--file", releasePath, "--json",
@@ -897,7 +952,7 @@ test("task creation and release expose each native host payload at most once", a
     run_id: context.runId,
     release_id: release.release_id,
     outcome: "rejected-before-send",
-    reconciled_at: "2026-08-29T20:00:07.000Z",
+    reconciled_at: new Date().toISOString(),
   });
   const rejectedReleaseResult = runCli([
     "release", "reconcile", "--run-id", context.runId,
@@ -910,7 +965,7 @@ test("task creation and release expose each native host payload at most once", a
     run_id: context.runId,
     release_id: release.release_id,
     reason: "The native host refused the one allowed objective delivery.",
-    cancelled_at: "2026-08-29T20:00:08.000Z",
+    cancelled_at: new Date().toISOString(),
   });
   const cancelResult = runCli([
     "disposition", "cancel", "--run-id", context.runId,

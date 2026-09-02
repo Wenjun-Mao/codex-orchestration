@@ -65,8 +65,9 @@ This supersedes ADR 0037's processing-time-only deadline rule.
 
 - Late recovery is admissible only from an exact expired ambiguity through the
   private source-event, binding, and child-session evidence path. The resolver
-  may atomically add the source-authenticated provisional identity and accepted
-  selectors; title, recency, and timing correlation remain forbidden.
+  may atomically add the source-authenticated provisional identity, accepted
+  selectors, and matching ready identity; title, recency, and timing
+  correlation remain forbidden.
 - A host event at or after the deadline still fails closed.
 - Archive and unplug private observations are explicit read-only commands, not
   automatic fallbacks from public host APIs.

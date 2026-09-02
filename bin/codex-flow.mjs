@@ -177,15 +177,18 @@ const PRIVATE_RESOLUTION_HELP = `codex-flow ${PACKAGE_VERSION} task create resol
 Usage:
   codex-flow task create resolve-private --run-id ID --operation-id ID [--json]
 
-Read-only temporary Codex App compatibility adapter. It requires a recorded
-provisional identity in either an open creation or its exact persisted
+Read-only temporary Codex App compatibility adapter. It accepts a recorded
+provisional identity in an open creation or its exact persisted
 reconciliation-window-expired ambiguity, reads the exact private App binding
 and matching initial task session from CODEX_HOME (or ~/.codex), and emits one
-reconcile_request. The authenticated host event timestamps must be within the
-bounded reconciliation window even when this command runs later. The expiry
-exception preserves the original resolution and one-shot attempt; every other
-terminal Flow state remains closed. It never changes App files. Missing,
-changing, or contradictory private evidence fails closed.
+reconcile_request. In the expiry case, predeadline source events may
+authenticate previously unjournaled provisional, accepted-selector, and ready
+evidence. Authenticated host event timestamps must be within the bounded
+reconciliation window even when this command runs later. The expiry exception
+preserves the original resolution and one-shot attempt; every other terminal
+Flow state remains closed. It never creates or retries a task, and never
+changes App files. Missing, changing, or contradictory private evidence fails
+closed.
 `;
 
 function helpFor(command, args) {
@@ -867,19 +870,19 @@ async function commandTaskCreateV07(args, mutationAuthority = null) {
     return;
   }
   const shapes = {
-    prepare: { required: ["task_contract", "requested_selectors"], optional: ["prepared_at"] },
+    prepare: { required: ["task_contract", "requested_selectors"] },
     attempt: {
       required: ["operation_id", "host_session_id"],
-      optional: ["timeout_seconds", "attempted_at"],
+      optional: ["timeout_seconds"],
     },
     reconcile: {
       required: ["operation_id", "outcome"],
       optional: [
         "provisional_client_thread_id", "ready_thread_id", "initial_turn",
-        "private_resolution", "selector_evidence", "reason_code", "reconciled_at",
+        "private_resolution", "selector_evidence", "reason_code",
       ],
     },
-    bind: { required: ["operation_id"], optional: ["bound_at"] },
+    bind: { required: ["operation_id"] },
   };
   if (!shapes[subcommand]) {
     throw new CliError("task create requires prepare, attempt, resolve-private, reconcile, bind, or status");
@@ -894,7 +897,7 @@ async function commandTaskCreateV07(args, mutationAuthority = null) {
       stateRoot: git.stateRoot,
       taskContract: request.task_contract,
       requestedSelectors: request.requested_selectors,
-      now: commandNow(request, "prepared_at"),
+      now: Date.now(),
     });
   } else if (subcommand === "attempt") {
     await visibleTaskAuthority(git, request.operation_id, runId);
@@ -903,7 +906,7 @@ async function commandTaskCreateV07(args, mutationAuthority = null) {
       operationId: request.operation_id,
       hostSessionId: request.host_session_id,
       timeoutSeconds: request.timeout_seconds ?? 300,
-      now: commandNow(request, "attempted_at"),
+      now: Date.now(),
     });
   } else if (subcommand === "reconcile") {
     await visibleTaskAuthority(git, request.operation_id, runId);
@@ -917,7 +920,7 @@ async function commandTaskCreateV07(args, mutationAuthority = null) {
       privateResolution: request.private_resolution ?? null,
       selectorEvidence: request.selector_evidence ?? null,
       reasonCode: request.reason_code ?? null,
-      now: commandNow(request, "reconciled_at"),
+      now: Date.now(),
     });
   } else {
     if (mutationAuthority === null) {
@@ -935,7 +938,7 @@ async function commandTaskCreateV07(args, mutationAuthority = null) {
     result = await bindVisibleTaskWorktree({
       stateRoot: git.stateRoot,
       operationId: request.operation_id,
-      now: commandNow(request, "bound_at"),
+      now: Date.now(),
     });
   }
   assertRunIdentity(result, runId, "visible-task creation");

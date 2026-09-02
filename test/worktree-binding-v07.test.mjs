@@ -247,7 +247,6 @@ test("real detached worktree binds through the CLI before prepare and accept", a
     await writeFile(requestPath, `${JSON.stringify({
       run_id: context.runId,
       operation_id: context.operationId,
-      bound_at: new Date(CLOCK + 2_500).toISOString(),
     })}\n`, "utf8");
     const boundResult = runCli([
       "task", "create", "bind", "--run-id", context.runId,

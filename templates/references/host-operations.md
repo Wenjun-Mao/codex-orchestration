@@ -10,7 +10,10 @@ bounded and separate requested, accepted, and observed evidence.
    project, requested model/reasoning and selector rationale, placement, and
    unclaimed executor branch.
 2. Prepare and start exactly one creation attempt. Use the generated bootstrap
-   prompt, which contains a cryptographic launch nonce but no objective.
+   prompt, which contains a cryptographic launch nonce but no objective. The
+   runtime owns the prepare, attempt, reconciliation, and binding timestamps;
+   do not supply lifecycle clock fields in task-create requests. Preserve host
+   event timestamps only as host evidence.
 3. Make one native creation call with the actual project, model, reasoning, and
    starting-state selectors. Prompt text does not configure selectors.
 4. If the host returns `clientThreadId`, record it only as provisional. Prefer
@@ -23,11 +26,12 @@ bounded and separate requested, accepted, and observed evidence.
    request with private-host provenance. Never invoke it silently. It may
    resolve an open provisional record or the exact window-expiry ambiguity; in
    the latter case, source evidence may authenticate a provisional identity
-   that was not yet journaled. The source `create_thread` completion, initial
-   delegation, and observed-selector event timestamps must be inside the
-   reconciliation window; later private-evidence processing does not alter
-   those host facts. The source event may authenticate the provisional identity
-   and accepted selectors atomically.
+   that was not yet journaled, together with accepted selectors and ready
+   identity. The source `create_thread` completion, initial delegation, and
+   observed-selector event timestamps must be inside the reconciliation window;
+   later private-evidence processing does not alter those host facts. The source
+   event may authenticate the provisional identity and accepted selectors
+   atomically. The adapter only reads evidence: it never creates or retries.
    Missing, malformed, duplicate, or contradictory private evidence remains
    unresolved ambiguity. Title, recency, and timing are never correlation
    authority.

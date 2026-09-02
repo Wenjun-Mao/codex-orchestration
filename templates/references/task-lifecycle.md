@@ -17,6 +17,8 @@
    Reconcile the source create completion, initial delegation, and observed
    selectors by exact host event time, not by delayed private-evidence
    processing time; events at or after the bounded deadline remain ineligible.
+   The runtime owns lifecycle transition timestamps; callers provide no
+   task-create clock fields, only authenticated host-event evidence.
    Only exact source-session evidence may add a provisional identity after a
    durable window-expiry ambiguity.
 4. **Bind and release:** reconcile selector evidence, run coordinator-owned

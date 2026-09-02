@@ -83,7 +83,9 @@ when authority, cost, or instrumentation scope is uncertain.
 Before creation, read [Host operations](../../templates/references/host-operations.md).
 Use `task create prepare|attempt|resolve-private|reconcile|bind|status` around
 exactly one native creation call. Bootstrap includes a cryptographic launch
-nonce and no objective.
+nonce and no objective. The runtime owns task-create transition timestamps;
+do not supply lifecycle clock fields. Preserve timestamps only when they are
+authenticated host-event evidence.
 Record the host's provisional `clientThreadId` verbatim as bounded opaque
 evidence and keep it separate from the ready task ID; never normalize it into
 an internal identifier. If the current App supplies only that provisional ID
@@ -102,7 +104,8 @@ exact source `create_thread` completion, initial delegation, and
 observed-selector host timestamps must be inside the bounded window even if
 their private evidence is processed later. The source event may authenticate
 and atomically persist a provisional identity and accepted selectors that were
-not journaled before an exact window-expiry ambiguity.
+not journaled before an exact window-expiry ambiguity, including the matching
+ready identity. The adapter reads evidence only; it never creates or retries.
 
 Accept the ready identity only when the exact bootstrap digest, launch nonce,
 ready ID, selector evidence, and placement agree. Direct ready IDs retain the
