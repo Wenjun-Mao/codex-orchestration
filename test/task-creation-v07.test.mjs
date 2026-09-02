@@ -559,7 +559,7 @@ test("title and timing similarity never recover a ready task without exact initi
   }
 });
 
-test("first ready reconciliation is rejected when the open window reaches its deadline", async () => {
+test("late ready reconciliation accepts host evidence observed within its deadline", async () => {
   const context = await fixture();
   try {
     const prepared = await prepareVisibleTaskCreation({
@@ -575,8 +575,7 @@ test("first ready reconciliation is rejected when the open window reaches its de
       timeoutSeconds: 5,
       now: START,
     });
-    await assert.rejects(
-      reconcileVisibleTaskCreation({
+    const ready = await reconcileVisibleTaskCreation({
         stateRoot: context.stateRoot,
         operationId: prepared.operation_id,
         outcome: "ready",
@@ -595,16 +594,66 @@ test("first ready reconciliation is rejected when the open window reaches its de
           observed: null,
         },
         now: START + 5_000,
-      }),
-      /not reconciled within the bounded reconciliation window/,
-    );
-    const expired = await visibleTaskCreationStatus({
+      });
+    assert.equal(ready.status, "ready-unreleased");
+    const status = await visibleTaskCreationStatus({
       stateRoot: context.stateRoot,
       operationId: prepared.operation_id,
       now: START + 5_000,
     });
-    assert.equal(expired.status, "ambiguous");
-    assert.equal(expired.resolution.reason_code, "reconciliation-window-expired");
+    assert.equal(status.status, "ready-unreleased");
+    assert.equal(status.reconciliation_open, false);
+  } finally {
+    await removeFixture(context.root);
+  }
+});
+
+test("late ready reconciliation rejects host evidence observed at the deadline", async () => {
+  const context = await fixture();
+  try {
+    const prepared = await prepareVisibleTaskCreation({
+      stateRoot: context.stateRoot,
+      taskContract: context.contract,
+      requestedSelectors: context.requested,
+      now: START,
+    });
+    const attempt = await recordVisibleTaskCreationAttempt({
+      stateRoot: context.stateRoot,
+      operationId: prepared.operation_id,
+      hostSessionId: "late-event-session",
+      timeoutSeconds: 5,
+      now: START,
+    });
+    await assert.rejects(
+      reconcileVisibleTaskCreation({
+        stateRoot: context.stateRoot,
+        operationId: prepared.operation_id,
+        outcome: "ready",
+        readyThreadId: "ready-after-deadline",
+        initialTurn: {
+          source: "host-observed",
+          thread_id: "ready-after-deadline",
+          turn_id: "turn-at-deadline",
+          turn_index: 1,
+          role: "user",
+          content: attempt.bootstrap,
+          observed_at: new Date(START + 5_000).toISOString(),
+        },
+        selectorEvidence: {
+          accepted: acceptedSelectors(context.requested),
+          observed: null,
+        },
+        now: START + 9_000,
+      }),
+      /not observed within the bounded reconciliation window/,
+    );
+    const status = await visibleTaskCreationStatus({
+      stateRoot: context.stateRoot,
+      operationId: prepared.operation_id,
+      now: START + 9_000,
+    });
+    assert.equal(status.status, "attempting");
+    assert.equal(status.reconciliation_open, false);
   } finally {
     await removeFixture(context.root);
   }
@@ -670,8 +719,8 @@ test("a generated visible-task contract authorizes exactly one native creation a
       operationId: prepared.operation_id,
       now: START + 31_000,
     });
-    assert.equal(expired.status, "ambiguous");
-    assert.equal(expired.resolution.reason_code, "reconciliation-window-expired");
+    assert.equal(expired.status, "attempting");
+    assert.equal(expired.reconciliation_open, false);
     assert.equal(expired.attempt_permitted, false);
   } finally {
     await removeFixture(context.root);

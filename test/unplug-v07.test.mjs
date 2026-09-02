@@ -6,6 +6,7 @@ import { resolve } from "node:path";
 import test from "node:test";
 import {
   assertNoUnplugInProgressV07,
+  observePrivateUnplugV07,
   unplugApplyV07,
   unplugPlanV07,
   validateUnplugPlanV07,
@@ -37,6 +38,25 @@ async function pathExists(path) {
     if (error?.code === "ENOENT") return false;
     throw error;
   }
+}
+
+async function writePrivateArchiveSession(codexHome, threadId) {
+  const archiveDirectory = resolve(codexHome, "archived_sessions");
+  await mkdir(archiveDirectory, { recursive: true });
+  const session = {
+    timestamp: "2026-09-02T12:00:00.000Z",
+    type: "session_meta",
+    payload: {
+      id: threadId,
+      cwd: resolve(codexHome, "worktrees", "unplug-task"),
+      thread_source: "agent_created_thread",
+      cli_version: "0.152.0",
+    },
+  };
+  await writeFile(
+    resolve(archiveDirectory, `rollout-fixture-${threadId}.jsonl`),
+    `${JSON.stringify(session)}\n`,
+  );
 }
 
 async function namespace(common, name = "v0.7.0", activeRunId = null) {
@@ -711,6 +731,40 @@ test("structured archive evidence must exactly prove every planned task", async 
     });
     assert.equal(receipt.residue, false);
   } finally {
+    await cleanupFixture(fixture);
+  }
+});
+
+test("private archive evidence authenticates unplug when the public archive index is stale", async () => {
+  const fixture = await worktreeFixture("codex-flow-unplug-private-archive-");
+  const codexHome = await mkdtemp(resolve(tmpdir(), "codex-flow-unplug-private-home-"));
+  try {
+    await namespace(fixture.common);
+    const plan = await unplugPlanV07({
+      repositoryPath: fixture.root,
+      resources: resources(fixture, { includeTask: true }),
+    });
+    await writePrivateArchiveSession(codexHome, "01a-test-visible-task");
+    const observed = await observePrivateUnplugV07({ plan, codexHome });
+    const evidence = observed.archive_evidence["executor-task"];
+    assert.equal(evidence.source, "codex-app-private-archive-session-v1");
+    assert.equal(evidence.private_observation.thread_id, "01a-test-visible-task");
+
+    const forged = structuredClone(observed.archive_evidence);
+    forged["executor-task"].private_observation.binding_digest = "f".repeat(64);
+    await assert.rejects(
+      unplugApplyV07({ repositoryPath: fixture.root, plan, archiveEvidence: forged }),
+      /binding_digest is invalid/,
+    );
+
+    const receipt = await unplugApplyV07({
+      repositoryPath: fixture.root,
+      plan,
+      archiveEvidence: observed.archive_evidence,
+    });
+    assert.equal(receipt.residue, false);
+  } finally {
+    await rm(codexHome, { recursive: true, force: true });
     await cleanupFixture(fixture);
   }
 });

@@ -147,17 +147,59 @@
     },
     "timestamp": { "type": "string", "format": "date-time", "maxLength": 64 },
     "taskObservation": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "execution_kind", "thread_id", "source", "active_visible", "archived_visible"
+          ],
+          "properties": {
+            "execution_kind": { "const": "task-thread" },
+            "thread_id": { "$ref": "#/$defs/threadId" },
+            "source": { "const": "host-observed" },
+            "active_visible": { "type": "boolean" },
+            "archived_visible": { "type": "boolean" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "execution_kind", "thread_id", "source", "active_visible", "archived_visible",
+            "private_observation"
+          ],
+          "properties": {
+            "execution_kind": { "const": "task-thread" },
+            "thread_id": { "$ref": "#/$defs/threadId" },
+            "source": { "const": "codex-app-private-archive-session-v1" },
+            "active_visible": { "const": false },
+            "archived_visible": { "const": true },
+            "private_observation": { "$ref": "#/$defs/privateArchiveObservation" }
+          }
+        }
+      ]
+    },
+    "privateArchiveObservation": {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "execution_kind", "thread_id", "source", "active_visible", "archived_visible"
+        "schema_version", "kind", "source", "thread_id", "binding_digest", "session_digest",
+        "active_session_absent", "app_version", "host_cli_version", "observed_at"
       ],
       "properties": {
-        "execution_kind": { "const": "task-thread" },
+        "schema_version": { "const": 1 },
+        "kind": { "const": "codex-flow-v07-private-archive-observation" },
+        "source": { "const": "codex-app-private-archive-session-v1" },
         "thread_id": { "$ref": "#/$defs/threadId" },
-        "source": { "const": "host-observed" },
-        "active_visible": { "type": "boolean" },
-        "archived_visible": { "type": "boolean" }
+        "binding_digest": { "$ref": "#/$defs/digest" },
+        "session_digest": { "$ref": "#/$defs/digest" },
+        "active_session_absent": { "const": true },
+        "app_version": { "type": "null" },
+        "host_cli_version": {
+          "oneOf": [{ "type": "null" }, { "type": "string", "minLength": 1, "maxLength": 64 }]
+        },
+        "observed_at": { "$ref": "#/$defs/timestamp" }
       }
     }
   }

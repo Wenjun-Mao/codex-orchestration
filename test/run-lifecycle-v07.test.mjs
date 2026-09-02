@@ -7,6 +7,7 @@ import {
   buildRuntimeContext,
   loadRuntimeBundleSource,
   readRuntimeContext,
+  V07_RUNTIME_DIRECTORY,
 } from "../lib/runtime-context.mjs";
 import {
   abandonRun,
@@ -478,7 +479,10 @@ test("runtime reads retain the exact bundle after the plugin source disappears",
     context: runtime,
     bundleSource,
   });
-  assert.match(acquired.bundle_root, /codex-flow\/v0\.7\.7\/runtimes\/[0-9a-f]{64}\/files$/);
+  assert.match(
+    acquired.bundle_root,
+    new RegExp(`codex-flow/${V07_RUNTIME_DIRECTORY.replaceAll(".", "\\.")}/runtimes/[0-9a-f]{64}/files$`),
+  );
   await stat(resolve(acquired.bundle_root, "bin", "codex-flow.mjs"));
   await rm(packageRoot, { recursive: true, force: true });
   const read = await readRuntimeContext({

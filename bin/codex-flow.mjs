@@ -42,6 +42,7 @@ import {
   urgentSignalStatusV07,
 } from "../lib/urgent-signals-v07.mjs";
 import {
+  observePrivateTaskArchive,
   prepareTaskArchive,
   reconcileTaskArchive,
   taskArchiveStatus,
@@ -157,7 +158,7 @@ Usage:
   codex-flow verification status --run-id ID [--verification-id ID] [--json]
   codex-flow integration prepare|verification-request|reconcile --run-id ID --file request.json [--json]
   codex-flow integration status --run-id ID --integration-id ID [--json]
-  codex-flow archive prepare|reconcile --run-id ID --file request.json [--json]
+  codex-flow archive prepare|reconcile|observe-private --run-id ID --file request.json [--json]
   codex-flow archive status --run-id ID --archive-id ID [--json]
   codex-flow cleanup plan --run-id ID [--json]
   codex-flow unplug plan [--file request.json] [--json]
@@ -179,8 +180,10 @@ Usage:
 Read-only temporary Codex App compatibility adapter. It requires an open
 provisional visible-task creation record, reads the exact private App binding
 and matching initial task session from CODEX_HOME (or ~/.codex), and emits one
-reconcile_request. It never changes App files or reopens terminal Flow state.
-Missing, changing, or contradictory private evidence fails closed.
+reconcile_request. The authenticated host event timestamps must be within the
+bounded reconciliation window even when this command runs later. It never
+changes App files or reopens terminal Flow state. Missing, changing, or
+contradictory private evidence fails closed.
 `;
 
 function helpFor(command, args) {
@@ -1478,6 +1481,19 @@ async function commandArchiveV07(args) {
     v07Output(assertRunIdentity(result, runId, "task archive"));
     return;
   }
+  if (subcommand === "observe-private") {
+    if (!values.file) throw new CliError("archive observe-private requires --file <request.json>");
+    const runId = explicitRunId(values);
+    const request = await readJsonInput(values.file);
+    requireExactFields(request, { required: ["archive_id"] }, "archive observe-private request");
+    await archiveAuthority(git, request.archive_id, runId);
+    const result = await observePrivateTaskArchive({
+      stateRoot: git.stateRoot,
+      archiveId: request.archive_id,
+    });
+    v07Output(assertRunIdentity(result, runId, "private task archive observation"));
+    return;
+  }
   const shapes = {
     prepare: {
       required: ["disposition_id", "task_observation"],
@@ -1488,7 +1504,7 @@ async function commandArchiveV07(args) {
       optional: ["observation", "reconciled_at"],
     },
   };
-  if (!shapes[subcommand]) throw new CliError("archive requires prepare, reconcile, or status");
+  if (!shapes[subcommand]) throw new CliError("archive requires prepare, reconcile, observe-private, or status");
   const { runId, request } = await runScopedRequest(values, `archive ${subcommand}`, shapes[subcommand]);
   const result = subcommand === "prepare"
     ? await (async () => {

@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import test from "node:test";
 import {
+  observePrivateTaskArchive,
   prepareTaskArchive,
   reconcileTaskArchive,
   taskArchiveStatus,
@@ -57,6 +58,25 @@ function archivedObservation(threadId) {
     active_visible: false,
     archived_visible: true,
   };
+}
+
+async function writePrivateArchiveSession(codexHome, threadId) {
+  const archiveDirectory = resolve(codexHome, "archived_sessions");
+  await mkdir(archiveDirectory, { recursive: true });
+  const session = {
+    timestamp: "2026-09-02T12:00:00.000Z",
+    type: "session_meta",
+    payload: {
+      id: threadId,
+      cwd: resolve(codexHome, "worktrees", "archive-task"),
+      thread_source: "agent_created_thread",
+      cli_version: "0.152.0",
+    },
+  };
+  await writeFile(
+    resolve(archiveDirectory, `rollout-fixture-${threadId}.jsonl`),
+    `${JSON.stringify(session)}\n`,
+  );
 }
 
 async function acceptedRelease(root, suffix, options = {}) {
@@ -226,6 +246,59 @@ test("clean no-change visible task archives only after setter and independent ob
       archiveId: prepared.archive_id,
     })).state, "completed");
   } finally {
+    await removeFixture(root);
+  }
+});
+
+test("private archive observation completes archival when public task indexing is stale", async () => {
+  const root = await createGitFixture("codex-flow-v07-private-archive-lifecycle-");
+  const codexHome = await mkdtemp(resolve(tmpdir(), "codex-flow-v07-private-archive-home-"));
+  try {
+    const authority = await noChangeAuthority(root, "private-observation");
+    await bindRecipient({ stateRoot: authority.stateRoot, recipient });
+    const prepared = await prepareTaskArchive({
+      stateRoot: authority.stateRoot,
+      dispositionId: authority.disposition.disposition_id,
+      taskObservation: activeObservation(authority.release.readyThreadId),
+    });
+    await reconcileTaskArchive({
+      stateRoot: authority.stateRoot,
+      archiveId: prepared.archive_id,
+      attemptId: prepared.host_intent.attempt_id,
+      outcome: "accepted",
+    });
+    await writePrivateArchiveSession(codexHome, authority.release.readyThreadId);
+    const observed = await observePrivateTaskArchive({
+      stateRoot: authority.stateRoot,
+      archiveId: prepared.archive_id,
+      codexHome,
+    });
+    assert.equal(observed.private_host_surface, true);
+    assert.equal(observed.observation.source, "codex-app-private-archive-session-v1");
+    const completed = await reconcileTaskArchive({
+      stateRoot: authority.stateRoot,
+      archiveId: prepared.archive_id,
+      attemptId: prepared.host_intent.attempt_id,
+      outcome: "accepted",
+      observation: observed.observation,
+    });
+    assert.equal(completed.state, "completed");
+    assert.equal(completed.observation.task.private_observation.thread_id, authority.release.readyThreadId);
+
+    const forged = structuredClone(observed.observation);
+    forged.private_observation.binding_digest = "f".repeat(64);
+    await assert.rejects(
+      reconcileTaskArchive({
+        stateRoot: authority.stateRoot,
+        archiveId: prepared.archive_id,
+        attemptId: prepared.host_intent.attempt_id,
+        outcome: "accepted",
+        observation: forged,
+      }),
+      /binding_digest is invalid/,
+    );
+  } finally {
+    await rm(codexHome, { recursive: true, force: true });
     await removeFixture(root);
   }
 });

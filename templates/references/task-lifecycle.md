@@ -14,6 +14,9 @@
    subagents, use the separate read-only `prepare -> attempt -> reconcile ->
    complete -> dispose` lifecycle; an accepted subagent operation closes that lane
    with unchanged-Git proof and skips steps 4 through 10 below.
+   Reconcile exact host event evidence by its recorded event time, not by a
+   delayed coordinator processing time; evidence at or after the bounded
+   deadline remains ineligible.
 4. **Bind and release:** reconcile selector evidence, run coordinator-owned
    `task create bind` so content-addressed intent precedes the detached
    worktree branch switch, reject the active coordinator root as the executor,
@@ -42,7 +45,9 @@
 10. **Archive and clean:** reconcile native archive only after the full proof
     chain. Archived task visibility may precede asynchronous host-managed
     worktree reclamation; persist that interval without replaying archive, and
-    complete only after the exact path is absent. Derive the separate
+    complete only after the exact path is absent. If the public archived-task
+    index lags, use explicit digest-bound private archive observation rather
+    than inferring status. Derive the separate
     exact-state cleanup plan and independently resolve branch/worktree state;
     v0.7 does not apply Git deletion.
 11. **Audit and close:** persist a content-addressed `run audit` over every

@@ -20,11 +20,12 @@ bounded and separate requested, accepted, and observed evidence.
    changing either, requires the App's forward and reverse ID mappings to
    agree, and authenticates the exact bootstrap inside the initial
    `create_thread` delegation. It returns a complete ready-reconciliation
-   request with private-host provenance. Never invoke it silently, outside the
-   open reconciliation window, or for a creation record that is not already
-   provisional. Missing, malformed, or contradictory private evidence remains
-   unresolved ambiguity. Title, recency, and timing are never correlation
-   authority.
+   request with private-host provenance. Never invoke it silently or for a
+   creation record that is not already provisional. Its authenticated initial
+   turn and selector event timestamps must be inside the reconciliation window;
+   later coordinator processing does not alter those facts. Missing, malformed,
+   or contradictory private evidence remains unresolved ambiguity. Title,
+   recency, and timing are never correlation authority.
 5. Reconcile requested, host-accepted, and independently observed project,
    model, reasoning, visibility, and worktree evidence. A non-null observed
    mismatch or missing nonce is ambiguous and blocks release.
@@ -39,9 +40,10 @@ bounded and separate requested, accepted, and observed evidence.
    call. Require the executor to accept the exact release, contract, runtime,
    common directory, and ready task before implementation.
 
-A timeout is ambiguous. Inspect state through the bounded reconciliation window
-but never issue a second create or blind release resend for the same contract.
-The temporary private adapter does not reopen an expired or terminal operation.
+An unresolved operation reports its ordinary reconciliation window as closed at
+the deadline, but may still reconcile exact host evidence recorded before that
+deadline. It never permits a second create or blind release resend for the same
+contract. The temporary private adapter does not reopen a terminal operation.
 A session/control failure is durable evidence, not permission to substitute a
 subagent or local task.
 
@@ -65,4 +67,7 @@ eligible only after accepted terminal disposition, integration or no-change
 proof, authoritative PASS combined verification, internal callback
 consumption, and managed-worktree reconciliation. The worktree path comes from
 the persisted creation record, never caller input. Preserve ambiguous archive
-state and leave blocked/attention-needed tasks visible.
+state and leave blocked/attention-needed tasks visible. When the public
+archived-task index lags, `archive observe-private` emits a digest-bound proof
+for the exact archived session and absent active counterpart; reconcile that
+result without bypassing managed-worktree reclamation.

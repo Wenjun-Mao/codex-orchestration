@@ -188,7 +188,7 @@ test("private resolver fails closed on absent, disagreeing, or malformed binding
   });
 });
 
-test("private resolver rejects altered bootstrap, selector drift, and a closed window", async (suite) => {
+test("private resolver rejects altered bootstrap and selector drift while preserving event-time evidence", async (suite) => {
   await suite.test("altered bootstrap", async () => {
     const context = await fixture({ delegation: delegationOutput(`${BOOTSTRAP}extra`) });
     try {
@@ -207,13 +207,12 @@ test("private resolver rejects altered bootstrap, selector drift, and a closed w
     }
   });
 
-  await suite.test("closed window", async () => {
+  await suite.test("late processing", async () => {
     const context = await fixture();
     try {
-      await assert.rejects(
-        () => resolveFixture(context, { now: START + 300_000 }),
-        /resolution window is closed/,
-      );
+      const result = await resolveFixture(context, { now: START + 300_000 });
+      assert.equal(result.initial_turn.observed_at, "2026-09-02T02:33:33.998Z");
+      assert.equal(result.resolution.resolved_at, new Date(START + 300_000).toISOString());
     } finally {
       await rm(context.codexHome, { recursive: true, force: true });
     }

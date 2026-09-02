@@ -108,9 +108,11 @@ test("v0.7 help exposes no bare callback consume or predecessor commands", () =>
   assert.match(help.stdout, /callback deliver\|observe --run-id/);
   assert.match(help.stdout, /task create prepare\|attempt\|reconcile\|bind --run-id/);
   assert.match(help.stdout, /task create resolve-private --run-id/);
+  assert.match(help.stdout, /archive prepare\|reconcile\|observe-private --run-id/);
   assert.match(help.stdout, /urgent persist\|attempt\|reconcile\|observe\|consume\|expire --run-id/);
   assert.match(help.stdout, /cleanup plan --run-id/);
   assert.match(help.stdout, /unplug plan/);
+  assert.match(help.stdout, /unplug observe-private/);
   assert.match(help.stdout, /unplug apply/);
   assert.doesNotMatch(help.stdout, /callback consume/);
   assert.doesNotMatch(help.stdout, /legacy-v05|adopt/);

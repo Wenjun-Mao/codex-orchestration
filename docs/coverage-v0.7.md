@@ -14,7 +14,9 @@ worktree binding refined by
 archive reclamation represented by
 [ADR 0036](adr/0036-asynchronous-archive-worktree-reclamation.md), and temporary
 private task-ID correlation bounded by
-[ADR 0037](adr/0037-explicit-private-task-id-resolution.md).
+[ADR 0037](adr/0037-explicit-private-task-id-resolution.md), and event-time-safe
+creation plus private archive evidence defined by
+[ADR 0038](adr/0038-host-event-time-and-private-archive-evidence.md).
 
 ## Retained cross-task authority
 
@@ -26,10 +28,11 @@ private task-ID correlation bounded by
 - One-shot visible-task creation with opaque provisional identity and
   nonce-authenticated ready identity.
 - An explicitly invoked, read-only `task create resolve-private` compatibility
-  adapter for provisional-only App results while the reconciliation window is
-  open. Exact forward/reverse bindings, session identity, selector context, and
-  nonce-bearing delegation must agree; compact private provenance is persisted.
-  No title, timing, retry, or terminal-state recovery is allowed.
+  adapter for provisional-only App results. Exact forward/reverse bindings,
+  session identity, selector context, and nonce-bearing delegation must agree;
+  the host event timestamps, not later coordinator processing, must be inside
+  the reconciliation window. Compact private provenance is persisted. No title,
+  timing, retry, or terminal-state recovery is allowed.
 - Quiet durable routine results and separately journaled urgent interrupts.
 - Exactly-once coordinator disposition, serial Git integration, combined
   verification, archive reconciliation, terminal run audit, and deterministic
@@ -93,6 +96,10 @@ durable result journal or coordinator disposition.
 - Archived visibility may precede host-managed worktree removal. That interval
   is durably `archived-awaiting-worktree-reclamation`; it never replays archive
   and blocks cleanup and closure until the exact path is absent.
+- When the public archived-task index lags, explicit `archive observe-private`
+  and repository-scoped `unplug observe-private` can provide compact,
+  digest-bound proof of the exact archived session and absent active
+  counterpart. They do not bypass worktree reclamation or approval.
 - Ordinary run cleanup remains read-only: v0.7 derives exact eligibility but
   does not expose a run-scoped cleanup mutation. The separate clean-start
   `unplug` lifecycle may apply only its unchanged, explicitly approved

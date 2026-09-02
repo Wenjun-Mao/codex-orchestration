@@ -33,8 +33,10 @@ v0.7.7 also includes an explicit temporary
 provisional `clientThreadId` without exposing its ready task ID through the
 public task catalog. The adapter is local and read-only: it requires agreeing
 App bindings and the exact nonce-bearing initial delegation, records compact
-private-host provenance, and fails closed. It is never a silent fallback and
-will be retired when Codex App exposes an equivalent public resolver.
+private-host provenance, and fails closed. Its exact host event timestamps,
+rather than delayed coordinator processing, must fall inside the bounded
+creation window. It is never a silent fallback and will be retired when Codex
+App exposes an equivalent public resolver.
 
 Actionable activation also requires a clean namespace boundary: any retained
 incompatible Flow namespace blocks and points to the repository-scoped
@@ -291,6 +293,7 @@ lifecycle is organized around these command families:
 run activate|status|resume|rebind|audit|close|abandon
 workflow create|revise|status|contract
 task create prepare|attempt|reconcile|bind|status
+task create resolve-private
 subagent prepare|attempt|reconcile|complete|dispose|status
 release prepare|reconcile|accept|status
 callback deliver|observe|status
@@ -298,9 +301,9 @@ urgent persist|attempt|reconcile|observe|consume|expire|status
 disposition prepare|finalize|cancel|status
 verification run|status
 integration prepare|verification-request|reconcile|status
-archive prepare|reconcile|status
+archive prepare|reconcile|observe-private|status
 cleanup plan
-unplug plan|apply
+unplug plan|observe-private|apply
 ```
 
 There is no public bare callback-consume command. Consumption is an internal
@@ -348,6 +351,9 @@ durable detached-worktree binding checkpoint before objective release, and
 archived visibility from asynchronous host-managed worktree removal, and
 [ADR 0037](docs/adr/0037-explicit-private-task-id-resolution.md) defines the
 temporary, explicit private task-ID resolver and its public-host exit condition.
+[ADR 0038](docs/adr/0038-host-event-time-and-private-archive-evidence.md)
+defines event-time-safe creation reconciliation and authenticated private
+archive evidence for archive and unplug recovery.
 
 ## Source and distribution
 

@@ -88,14 +88,15 @@ Record the host's provisional `clientThreadId` verbatim as bounded opaque
 evidence and keep it separate from the ready task ID; never normalize it into
 an internal identifier. If the current App supplies only that provisional ID
 and no public resolver is available, explicitly disclose and run
-`task create resolve-private` during the still-open window. This temporary,
-read-only adapter requires the App's exact forward/reverse binding plus the
-matching initial `create_thread` delegation and emits a complete
+`task create resolve-private` when its exact host event evidence is available.
+This temporary, read-only adapter requires the App's exact forward/reverse
+binding plus the matching initial `create_thread` delegation and emits a complete
 `reconcile_request`; persist that request in temporary storage outside the
 repository and submit it unchanged to `task create reconcile`. Never infer from
 title, recency, worktree, or timing, never invoke the adapter silently, and
 never use it to reopen terminal v0.7 state. Missing or contradictory private
-evidence fails closed.
+evidence fails closed. The initial turn and selector timestamps must be inside
+the bounded window even if the coordinator processes the request later.
 
 Accept the ready identity only when the exact bootstrap digest, launch nonce,
 ready ID, selector evidence, and placement agree. Direct ready IDs retain the

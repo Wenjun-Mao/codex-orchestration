@@ -26,14 +26,16 @@ branch names, and caller-supplied digests are not result authority.
 5. Use `disposition finalize` only after the runtime reloads and matches those
    authoritative records. Finalization performs any internal result
    consumption exactly once.
-6. Use `archive prepare|reconcile|status` only after the accepted disposition,
+6. Use `archive prepare|reconcile|observe-private|status` only after the accepted disposition,
    integration or no-change proof, PASS combined verification, internal
    callback consumption, and exact executor Git resolution are durable. The
    archive worktree path is derived from persisted creation evidence, never
    supplied by the caller. Native archive acceptance is asynchronous: archived
    visibility may produce `archived-awaiting-worktree-reclamation` while the
-   exact host-managed path remains. Do not replay the host archive call or
-   delete the path. Reconcile the same attempt and archived observation later;
+   exact host-managed path remains. If the public archived-task index is stale,
+   use explicit `archive observe-private` and reconcile its digest-bound result.
+   Do not replay the host archive call or delete the path. Reconcile the same
+   attempt and archived observation later;
    cleanup and closure remain blocked until exact absence completes it.
 
 Rejected or blocked work receives an explicit durable disposition and remains

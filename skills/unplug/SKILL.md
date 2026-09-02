@@ -38,14 +38,18 @@ when only opaque Flow state remains. Keep request JSON outside the repository
 when zero repository residue is the user's outcome.
 
 Archive every task named by the plan through the App and reconcile its observed
-archived state before local cleanup. If a task cannot be archived, its state is
+archived state before local cleanup. If the public archived-task index is
+stale, use the explicit read-only `unplug observe-private` command against the
+unchanged exact plan; it emits compact digest-bound evidence for one archived
+session and no active counterpart. If a task cannot be archived, its state is
 ambiguous, or the plan changes, stop and report the blocker; do not remove
 state that may still authorize work.
 
 For apply, bind each planned task resource to exact structured App evidence:
-`{thread_id, archived: true, observed_at, source: "codex-app"}`. The evidence
-map must cover every planned task ID and no other entry. A successful setter
-call without reconciled archive observation is not enough.
+`{thread_id, archived: true, observed_at, source: "codex-app"}` or the
+unchanged `unplug observe-private` result. The evidence map must cover every
+planned task ID and no other entry. A successful setter call without reconciled
+archive observation is not enough.
 
 ## Apply only an approved exact plan
 
