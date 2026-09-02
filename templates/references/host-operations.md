@@ -20,13 +20,17 @@ bounded and separate requested, accepted, and observed evidence.
    changing either, requires the App's forward and reverse ID mappings to
    agree, and authenticates the exact bootstrap inside the initial
    `create_thread` delegation. It returns a complete ready-reconciliation
-   request with private-host provenance. Never invoke it silently or for a
-   creation record that lacks a provisional identity. Its authenticated
-   provisional identity, initial turn, and selector event timestamps must be
-   inside the reconciliation window; later coordinator processing does not
-   alter those facts. Missing, malformed, or contradictory private evidence
-   remains unresolved ambiguity. Title, recency, and timing are never
-   correlation authority.
+   request with private-host provenance. Never invoke it silently. It may
+   resolve an open provisional record or the exact window-expiry ambiguity; in
+   the latter case, source evidence may authenticate a provisional identity
+   that was not yet journaled. The source `create_thread` completion, initial
+   delegation, and observed-selector event timestamps must be inside the
+   reconciliation window; later private-evidence processing does not alter
+   those host facts. The source event may authenticate the provisional identity
+   and accepted selectors atomically.
+   Missing, malformed, duplicate, or contradictory private evidence remains
+   unresolved ambiguity. Title, recency, and timing are never correlation
+   authority.
 5. Reconcile requested, host-accepted, and independently observed project,
    model, reasoning, visibility, and worktree evidence. A non-null observed
    mismatch or missing nonce is ambiguous and blocks release.

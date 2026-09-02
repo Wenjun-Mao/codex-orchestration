@@ -28,17 +28,19 @@ v0.7.8-rc.1. v0.7 carries forward the proven cross-task behavior from v0.6.5 und
 namespace. It adds a bounded foreign-active-run sentinel so a live predecessor
 run blocks admission instead of being silently ignored or migrated.
 
-v0.7.7 also includes an explicit temporary
+v0.7.7 introduced an explicit temporary
 `task create resolve-private` adapter for a Codex App regression that returns a
 provisional `clientThreadId` without exposing its ready task ID through the
 public task catalog. The adapter is local and read-only: it requires agreeing
 App bindings and the exact nonce-bearing initial delegation, records compact
-private-host provenance, and fails closed. Its exact host event timestamps,
-rather than delayed coordinator processing, must fall inside the bounded
-creation window. It may recover only the exact persisted window-expiry
-ambiguity while preserving that resolution and the original one-shot attempt.
-It is never a silent fallback and will be retired when Codex App exposes an
-equivalent public resolver.
+private-host provenance, and fails closed. The v0.7.8 candidate permits delayed
+processing when the exact source `create_thread` completion,
+initial-delegation, and observed-selector host timestamps fall inside the
+bounded creation window. The source event can authenticate and atomically
+persist the provisional identity and accepted selectors after expiry. It may
+recover only the exact persisted window-expiry ambiguity while preserving that
+resolution and the original one-shot attempt. It is never a silent fallback
+and will be retired when Codex App exposes an equivalent public resolver.
 
 Actionable activation also requires a clean namespace boundary: any retained
 incompatible Flow namespace blocks and points to the repository-scoped

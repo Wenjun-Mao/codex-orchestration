@@ -29,13 +29,15 @@ creation plus private archive evidence defined by
   nonce-authenticated ready identity.
 - An explicitly invoked, read-only `task create resolve-private` compatibility
   adapter for provisional-only App results. Exact forward/reverse bindings,
-  session identity, selector context, and nonce-bearing delegation must agree;
-  the host event timestamps, not later coordinator processing, must be inside
-  the reconciliation window. Compact private provenance is persisted. Only an
-  exact durable `reconciliation-window-expired` ambiguity may recover through
-  that private proof, while preserving the original resolution and one-shot
-  attempt. No title/timing correlation, retry, or other terminal-state recovery
-  is allowed.
+  source-session create completion, session identity, selector context, and
+  nonce-bearing delegation must agree. The create completion,
+  initial-delegation, and observed-selector host timestamps—not later private
+  processing—must be inside the window. The source event may authenticate and
+  atomically persist the provisional identity and accepted selectors. Compact
+  private provenance is persisted. Only an exact durable
+  `reconciliation-window-expired` ambiguity may recover through that private
+  proof, while preserving the original resolution and one-shot attempt. No
+  title/timing correlation, retry, or other terminal-state recovery is allowed.
 - Quiet durable routine results and separately journaled urgent interrupts.
 - Exactly-once coordinator disposition, serial Git integration, combined
   verification, archive reconciliation, terminal run audit, and deterministic

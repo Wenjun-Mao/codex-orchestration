@@ -176,6 +176,7 @@ async function seedPrivateTaskEvidence({
   attempt,
   provisionalClientThreadId,
   readyThreadId,
+  provisionalObservedAt = START + 1_000,
   delegationObservedAt = START + 1_700,
   selectorObservedAt = START + 1_600,
 }) {
@@ -190,6 +191,60 @@ async function seedPrivateTaskEvidence({
   );
   const sessionDirectory = resolve(codexHome, "sessions", "2026", "08", "29");
   await mkdir(sessionDirectory, { recursive: true });
+  const sourceThreadId = context.contract.coordinator_binding.thread_id;
+  const sourceRows = [
+    {
+      timestamp: new Date(START + 100).toISOString(),
+      type: "session_meta",
+      payload: { id: sourceThreadId },
+    },
+    {
+      timestamp: new Date(provisionalObservedAt).toISOString(),
+      type: "event_msg",
+      payload: {
+        type: "item_completed",
+        thread_id: sourceThreadId,
+        item: {
+          type: "McpToolCall",
+          status: "completed",
+          server: "codex_app",
+          tool: "create_thread",
+          arguments: {
+            prompt: attempt.bootstrap,
+            title: context.contract.task.title,
+            model: context.requested.model,
+            thinking: context.requested.reasoning_effort,
+            target: {
+              type: "project",
+              projectId: context.requested.project_id,
+              environment: {
+                type: context.requested.worktree.mode === "host-worktree" ? "worktree" : "local",
+                ...(context.requested.worktree.mode === "host-worktree"
+                  ? {
+                    startingState: {
+                      type: "branch",
+                      branchName: context.requested.worktree.starting_branch,
+                    },
+                  }
+                  : {}),
+              },
+            },
+          },
+          result: {
+            content: [{
+              type: "text",
+              text: JSON.stringify({ clientThreadId: provisionalClientThreadId, hostId: "local" }),
+            }],
+            isError: false,
+          },
+        },
+      },
+    },
+  ];
+  await writeFile(
+    resolve(sessionDirectory, `rollout-fixture-${sourceThreadId}.jsonl`),
+    `${sourceRows.map((row) => JSON.stringify(row)).join("\n")}\n`,
+  );
   const turnId = `private-initial-turn-${readyThreadId}`;
   const delegation = [
     "<codex_delegation>",
@@ -424,10 +479,10 @@ test("explicit private resolution binds the exact provisional ID to delegated bo
       outcome: "provisional",
       provisionalClientThreadId,
       selectorEvidence: {
-        accepted: acceptedSelectors(context.requested),
+        accepted: acceptedSelectors(context.requested, START + 1_200),
         observed: null,
       },
-      now: START + 1_000,
+      now: START + 1_200,
     });
 
     await seedPrivateTaskEvidence({
@@ -603,10 +658,10 @@ test("only exact expired ambiguity recovers from timely private host evidence", 
       outcome: "provisional",
       provisionalClientThreadId,
       selectorEvidence: {
-        accepted: acceptedSelectors(context.requested),
+        accepted: acceptedSelectors(context.requested, START + 1_200),
         observed: null,
       },
-      now: START + 1_000,
+      now: START + 1_200,
     });
     await seedPrivateTaskEvidence({
       codexHome,
@@ -738,6 +793,89 @@ test("expired creation rejects direct host evidence even when its event was time
   }
 });
 
+test("exact expiry may durably add a timely source-authenticated provisional identity", async () => {
+  const context = await fixture();
+  const codexHome = await mkdtemp(resolve(tmpdir(), "codex-flow-late-first-provisional-"));
+  const provisionalClientThreadId = "client-new-thread:late-first-provisional";
+  const readyThreadId = "ready-late-first-provisional";
+  try {
+    const prepared = await prepareVisibleTaskCreation({
+      stateRoot: context.stateRoot,
+      taskContract: context.contract,
+      requestedSelectors: context.requested,
+      now: START,
+    });
+    const attempt = await recordVisibleTaskCreationAttempt({
+      stateRoot: context.stateRoot,
+      operationId: prepared.operation_id,
+      hostSessionId: "late-first-provisional-session",
+      now: START,
+    });
+    await seedPrivateTaskEvidence({
+      codexHome,
+      context,
+      attempt,
+      provisionalClientThreadId,
+      readyThreadId,
+      provisionalObservedAt: START + 1_200,
+      selectorObservedAt: START + 1_600,
+      delegationObservedAt: START + 1_700,
+    });
+    const expired = await visibleTaskCreationStatus({
+      stateRoot: context.stateRoot,
+      operationId: prepared.operation_id,
+      now: START + 300_000,
+    });
+    assert.equal(expired.status, "ambiguous");
+    assert.equal(expired.provisional, null);
+    const resolved = await resolvePrivateVisibleTaskCreation({
+      stateRoot: context.stateRoot,
+      operationId: prepared.operation_id,
+      codexHome,
+      now: START + 309_000,
+    });
+    const request = resolved.reconcile_request;
+    await assert.rejects(reconcileVisibleTaskCreation({
+      stateRoot: context.stateRoot,
+      operationId: request.operation_id,
+      outcome: request.outcome,
+      provisionalClientThreadId: request.provisional_client_thread_id,
+      readyThreadId: request.ready_thread_id,
+      initialTurn: request.initial_turn,
+      privateResolution: request.private_resolution,
+      selectorEvidence: {
+        accepted: {
+          ...request.selector_evidence.accepted,
+          accepted_at: new Date(START + 1_300).toISOString(),
+        },
+        observed: request.selector_evidence.observed,
+      },
+      now: Date.parse(request.reconciled_at),
+    }), /source creation event/);
+    const ready = await reconcileVisibleTaskCreation({
+      stateRoot: context.stateRoot,
+      operationId: request.operation_id,
+      outcome: request.outcome,
+      provisionalClientThreadId: request.provisional_client_thread_id,
+      readyThreadId: request.ready_thread_id,
+      initialTurn: request.initial_turn,
+      privateResolution: request.private_resolution,
+      selectorEvidence: request.selector_evidence,
+      now: Date.parse(request.reconciled_at),
+    });
+    assert.equal(ready.status, "ready-unreleased");
+    assert.equal(ready.provisional.client_thread_id, provisionalClientThreadId);
+    assert.equal(ready.provisional.observed_at, new Date(START + 1_200).toISOString());
+    assert.equal(ready.provisional.recorded_at, new Date(START + 309_000).toISOString());
+    assert.equal(ready.private_resolution.provisional_observed_at, ready.provisional.observed_at);
+    assert.deepEqual(ready.resolution, expired.resolution);
+    assert.equal(ready.late_private_recovery !== null, true);
+  } finally {
+    await rm(codexHome, { recursive: true, force: true });
+    await removeFixture(context.root);
+  }
+});
+
 test("late private recovery rejects deadline events, other ambiguity, and missing provisional identity", async (t) => {
   await t.test("event at deadline", async () => {
     const context = await fixture();
@@ -862,7 +1000,7 @@ test("late private recovery rejects deadline events, other ambiguity, and missin
         operationId: prepared.operation_id,
         codexHome: resolve(context.root, ".codex-home-missing"),
         now: START + 6_000,
-      }), /exact expired ambiguity/);
+      }), /Codex App sessions root is unavailable/);
       const status = await visibleTaskCreationStatus({
         stateRoot: context.stateRoot,
         operationId: prepared.operation_id,
@@ -1247,10 +1385,26 @@ test("visible task creation schema preserves provisional/ready distinction and f
   const readyRule = schema.allOf.find(
     (rule) => rule.if?.properties?.status?.const === "ready-unreleased",
   );
-  assert.equal(readyRule.then.oneOf.length, 2);
+  assert.equal(readyRule.then.oneOf.length, 3);
+  assert.equal(readyRule.then.oneOf[0].properties.private_resolution.type, "null");
+  assert.equal(
+    readyRule.then.oneOf[0].properties.ready.allOf[1]
+      .properties.initial_turn.properties.source.const,
+    "host-observed",
+  );
   assert.equal(readyRule.then.oneOf[0].properties.resolution.type, "null");
   assert.equal(
-    readyRule.then.oneOf[1].properties.resolution.allOf[1].properties.reason_code.const,
+    readyRule.then.oneOf[1].properties.provisional.$ref,
+    "#/$defs/provisional",
+  );
+  assert.equal(readyRule.then.oneOf[1].properties.late_private_recovery.type, "null");
+  assert.equal(readyRule.then.oneOf[1].properties.resolution.type, "null");
+  assert.equal(
+    readyRule.then.oneOf[2].properties.provisional.$ref,
+    "#/$defs/provisional",
+  );
+  assert.equal(
+    readyRule.then.oneOf[2].properties.resolution.allOf[1].properties.reason_code.const,
     "reconciliation-window-expired",
   );
   assert.deepEqual(

@@ -14,9 +14,11 @@
    subagents, use the separate read-only `prepare -> attempt -> reconcile ->
    complete -> dispose` lifecycle; an accepted subagent operation closes that lane
    with unchanged-Git proof and skips steps 4 through 10 below.
-   Reconcile exact host event evidence by its recorded event time, not by a
-   delayed coordinator processing time; evidence at or after the bounded
-   deadline remains ineligible.
+   Reconcile the source create completion, initial delegation, and observed
+   selectors by exact host event time, not by delayed private-evidence
+   processing time; events at or after the bounded deadline remain ineligible.
+   Only exact source-session evidence may add a provisional identity after a
+   durable window-expiry ambiguity.
 4. **Bind and release:** reconcile selector evidence, run coordinator-owned
    `task create bind` so content-addressed intent precedes the detached
    worktree branch switch, reject the active coordinator root as the executor,

@@ -119,12 +119,64 @@
         "oneOf": [
           {
             "properties": {
+              "ready": {
+                "allOf": [
+                  { "$ref": "#/$defs/ready" },
+                  {
+                    "properties": {
+                      "initial_turn": {
+                        "properties": {
+                          "source": { "const": "host-observed" }
+                        }
+                      }
+                    }
+                  }
+                ]
+              },
+              "private_resolution": { "type": "null" },
               "late_private_recovery": { "type": "null" },
               "resolution": { "type": "null" }
             }
           },
           {
             "properties": {
+              "provisional": { "$ref": "#/$defs/provisional" },
+              "ready": {
+                "allOf": [
+                  { "$ref": "#/$defs/ready" },
+                  {
+                    "properties": {
+                      "initial_turn": {
+                        "properties": {
+                          "source": { "const": "codex-app-private-delegation-v1" }
+                        }
+                      }
+                    }
+                  }
+                ]
+              },
+              "private_resolution": { "$ref": "#/$defs/privateResolution" },
+              "late_private_recovery": { "type": "null" },
+              "resolution": { "type": "null" }
+            }
+          },
+          {
+            "properties": {
+              "provisional": { "$ref": "#/$defs/provisional" },
+              "ready": {
+                "allOf": [
+                  { "$ref": "#/$defs/ready" },
+                  {
+                    "properties": {
+                      "initial_turn": {
+                        "properties": {
+                          "source": { "const": "codex-app-private-delegation-v1" }
+                        }
+                      }
+                    }
+                  }
+                ]
+              },
               "private_resolution": { "$ref": "#/$defs/privateResolution" },
               "late_private_recovery": { "$ref": "#/$defs/latePrivateRecovery" },
               "resolution": {
@@ -346,9 +398,10 @@
     "provisional": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["client_thread_id", "recorded_at"],
+      "required": ["client_thread_id", "observed_at", "recorded_at"],
       "properties": {
         "client_thread_id": { "$ref": "#/$defs/provisionalHostId" },
+        "observed_at": { "$ref": "#/$defs/timestamp" },
         "recorded_at": { "$ref": "#/$defs/timestamp" }
       }
     },
@@ -387,7 +440,8 @@
       "additionalProperties": false,
       "required": [
         "schema_version", "kind", "source", "provisional_client_thread_id",
-        "ready_thread_id", "binding_digest", "state_digest", "session_digest",
+        "provisional_observed_at", "host_id", "ready_thread_id", "binding_digest", "state_digest",
+        "source_session_digest", "accepted_selector_digest", "session_digest",
         "app_version", "app_release_family", "host_cli_version", "resolved_at"
       ],
       "properties": {
@@ -395,9 +449,13 @@
         "kind": { "const": "codex-flow-v07-private-task-resolution" },
         "source": { "const": "codex-app-private-state-v1" },
         "provisional_client_thread_id": { "$ref": "#/$defs/provisionalHostId" },
+        "provisional_observed_at": { "$ref": "#/$defs/timestamp" },
+        "host_id": { "const": "local" },
         "ready_thread_id": { "$ref": "#/$defs/hostId" },
         "binding_digest": { "$ref": "#/$defs/digest" },
         "state_digest": { "$ref": "#/$defs/digest" },
+        "source_session_digest": { "$ref": "#/$defs/digest" },
+        "accepted_selector_digest": { "$ref": "#/$defs/digest" },
         "session_digest": { "$ref": "#/$defs/digest" },
         "app_version": { "type": "null" },
         "app_release_family": { "$ref": "#/$defs/nullableText" },

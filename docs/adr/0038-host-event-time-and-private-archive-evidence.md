@@ -20,13 +20,17 @@ required public-index visibility. Unplug had the same availability gap.
 
 ## Decision
 
-Creation keeps the bounded window as an event-evidence admission rule. Exact
-host timestamps for the provisional identity, accepted selectors, observed
-selectors, and the nonce-bearing initial turn must fall within the window.
+Creation keeps the bounded window as an event-evidence admission rule. The
+coordinator's private session provides an exact timestamped `create_thread`
+completion that binds the bootstrap, title, target, selectors, returned local
+host, and provisional `clientThreadId`. The child session separately binds the
+nonce-bearing initial delegation and observed selector context. Those host
+events must fall within the window even when their private evidence is
+processed later.
 When coordinator processing reaches the deadline first, status durably records
 the exact `reconciliation-window-expired` ambiguity. Only that ambiguity may
 later become ready, only through the existing authenticated private resolver,
-and only when its host event timestamps were strictly inside the original
+and only when its host-timestamped evidence was strictly inside the original
 window. The ready record preserves the original resolution plus a digest-bound
 `late_private_recovery`; the operation, attempt, and create call do not change.
 All other terminal outcomes and direct host-only late reconciliation remain
@@ -59,9 +63,10 @@ This supersedes ADR 0037's processing-time-only deadline rule.
 
 ## Consequences and guardrails
 
-- Late recovery is admissible only from exact expired ambiguity through the
-  private binding/session evidence path; title, recency, and timing correlation
-  remain forbidden.
+- Late recovery is admissible only from an exact expired ambiguity through the
+  private source-event, binding, and child-session evidence path. The resolver
+  may atomically add the source-authenticated provisional identity and accepted
+  selectors; title, recency, and timing correlation remain forbidden.
 - A host event at or after the deadline still fails closed.
 - Archive and unplug private observations are explicit read-only commands, not
   automatic fallbacks from public host APIs.

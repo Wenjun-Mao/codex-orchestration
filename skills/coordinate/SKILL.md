@@ -98,8 +98,11 @@ never use it to reopen terminal v0.7 state except the exact persisted
 `reconciliation-window-expired` ambiguity. That one recovery retains the
 original expiry evidence and the same one-shot operation; it never authorizes a
 second create. Missing or contradictory private evidence fails closed. The
-provisional identity, initial turn, and selector timestamps must be inside the
-bounded window even if the coordinator processes the request later.
+exact source `create_thread` completion, initial delegation, and
+observed-selector host timestamps must be inside the bounded window even if
+their private evidence is processed later. The source event may authenticate
+and atomically persist a provisional identity and accepted selectors that were
+not journaled before an exact window-expiry ambiguity.
 
 Accept the ready identity only when the exact bootstrap digest, launch nonce,
 ready ID, selector evidence, and placement agree. Direct ready IDs retain the
