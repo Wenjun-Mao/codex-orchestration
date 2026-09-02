@@ -94,9 +94,12 @@ binding plus the matching initial `create_thread` delegation and emits a complet
 `reconcile_request`; persist that request in temporary storage outside the
 repository and submit it unchanged to `task create reconcile`. Never infer from
 title, recency, worktree, or timing, never invoke the adapter silently, and
-never use it to reopen terminal v0.7 state. Missing or contradictory private
-evidence fails closed. The initial turn and selector timestamps must be inside
-the bounded window even if the coordinator processes the request later.
+never use it to reopen terminal v0.7 state except the exact persisted
+`reconciliation-window-expired` ambiguity. That one recovery retains the
+original expiry evidence and the same one-shot operation; it never authorizes a
+second create. Missing or contradictory private evidence fails closed. The
+provisional identity, initial turn, and selector timestamps must be inside the
+bounded window even if the coordinator processes the request later.
 
 Accept the ready identity only when the exact bootstrap digest, launch nonce,
 ready ID, selector evidence, and placement agree. Direct ready IDs retain the

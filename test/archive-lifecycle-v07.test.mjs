@@ -303,6 +303,56 @@ test("private archive observation completes archival when public task indexing i
   }
 });
 
+test("private archive evidence does not bypass host-managed worktree reclamation", async () => {
+  const root = await createGitFixture("codex-flow-v07-private-archive-worktree-");
+  const codexHome = await mkdtemp(resolve(tmpdir(), "codex-flow-v07-private-archive-worktree-home-"));
+  let authority = null;
+  try {
+    authority = await noChangeAuthority(root, "private-worktree", { retainWorktree: true });
+    await bindRecipient({ stateRoot: authority.stateRoot, recipient });
+    const prepared = await prepareTaskArchive({
+      stateRoot: authority.stateRoot,
+      dispositionId: authority.disposition.disposition_id,
+      taskObservation: activeObservation(authority.release.readyThreadId),
+    });
+    await reconcileTaskArchive({
+      stateRoot: authority.stateRoot,
+      archiveId: prepared.archive_id,
+      attemptId: prepared.host_intent.attempt_id,
+      outcome: "accepted",
+    });
+    await writePrivateArchiveSession(codexHome, authority.release.readyThreadId);
+    const observed = await observePrivateTaskArchive({
+      stateRoot: authority.stateRoot,
+      archiveId: prepared.archive_id,
+      codexHome,
+    });
+    const pending = await reconcileTaskArchive({
+      stateRoot: authority.stateRoot,
+      archiveId: prepared.archive_id,
+      attemptId: prepared.host_intent.attempt_id,
+      outcome: "accepted",
+      observation: observed.observation,
+    });
+    assert.equal(pending.state, "archived-awaiting-worktree-reclamation");
+    assert.equal(pending.keep_visible, false);
+    assert.equal(pending.observation.worktree_state, "present");
+  } finally {
+    if (authority !== null && await realpath(authority.worktreePath).catch(() => null)) {
+      try {
+        git(root, ["worktree", "remove", "--force", authority.worktreePath]);
+      } catch {
+        // Fixture cleanup only; the assertion path reports the causal failure.
+      }
+    }
+    if (authority !== null) {
+      await rm(authority.worktreeParent, { recursive: true, force: true });
+    }
+    await rm(codexHome, { recursive: true, force: true });
+    await removeFixture(root);
+  }
+});
+
 test("local task archive does not claim host-managed worktree authority", async () => {
   const root = await createGitFixture("codex-flow-v07-archive-unobserved-");
   try {

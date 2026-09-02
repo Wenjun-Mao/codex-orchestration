@@ -121,6 +121,8 @@ test("v0.7 help exposes no bare callback consume or predecessor commands", () =>
   assertSuccess(privateHelp, "private resolver scoped help");
   assert.match(privateHelp.stdout, /Read-only temporary Codex App compatibility adapter/);
   assert.match(privateHelp.stdout, /--run-id ID --operation-id ID/);
+  assert.match(privateHelp.stdout, /exact persisted\s+reconciliation-window-expired ambiguity/);
+  assert.match(privateHelp.stdout, /preserves the original resolution and one-shot attempt/);
   assert.doesNotMatch(privateHelp.stderr, /ERR_PARSE_ARGS_UNKNOWN_OPTION|at parseArgs/);
 
   const familyHelp = runCli(["release", "prepare", "--help"]);

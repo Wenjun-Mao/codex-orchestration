@@ -33,6 +33,7 @@ import {
 } from "../lib/runtime-context.mjs";
 import { admitRun, buildFencePlan } from "../lib/run-lifecycle.mjs";
 import { gitSnapshot } from "../lib/git.mjs";
+import { sha256, stableStringify } from "../lib/core.mjs";
 
 const START = Date.parse("2026-08-29T20:00:00.000Z");
 
@@ -167,6 +168,81 @@ function acceptedSelectors(requested, at = START + 500) {
     worktree: requested.worktree,
     accepted_at: new Date(at).toISOString(),
   };
+}
+
+async function seedPrivateTaskEvidence({
+  codexHome,
+  context,
+  attempt,
+  provisionalClientThreadId,
+  readyThreadId,
+  delegationObservedAt = START + 1_700,
+  selectorObservedAt = START + 1_600,
+}) {
+  const atom = {
+    "client-thread-bindings-v1": { [provisionalClientThreadId]: readyThreadId },
+    [`thread-client-id-v1:${encodeURIComponent(`local:${readyThreadId}`)}`]: provisionalClientThreadId,
+    "electron:last-seen-changelog-release-family": "26.727",
+  };
+  await writeFile(
+    resolve(codexHome, ".codex-global-state.json"),
+    JSON.stringify({ "electron-persisted-atom-state": atom }),
+  );
+  const sessionDirectory = resolve(codexHome, "sessions", "2026", "08", "29");
+  await mkdir(sessionDirectory, { recursive: true });
+  const turnId = `private-initial-turn-${readyThreadId}`;
+  const delegation = [
+    "<codex_delegation>",
+    `  <source_thread_id>${context.contract.coordinator_binding.thread_id}</source_thread_id>`,
+    `  <input>${attempt.bootstrap}</input>`,
+    "</codex_delegation>",
+  ].join("\n");
+  const rows = [
+    {
+      timestamp: new Date(START + 1_500).toISOString(),
+      type: "session_meta",
+      payload: {
+        id: readyThreadId,
+        thread_source: "agent_created_thread",
+        cwd: resolve(codexHome, "worktrees", "private", "repository"),
+        cli_version: "0.152.0",
+        git: { commit_hash: context.revision },
+      },
+    },
+    {
+      timestamp: new Date(START + 1_500).toISOString(),
+      type: "event_msg",
+      payload: { type: "task_started", turn_id: turnId },
+    },
+    {
+      timestamp: new Date(selectorObservedAt).toISOString(),
+      type: "turn_context",
+      payload: {
+        turn_id: turnId,
+        model: context.requested.model,
+        effort: context.requested.reasoning_effort,
+      },
+    },
+    {
+      timestamp: new Date(delegationObservedAt).toISOString(),
+      type: "response_item",
+      payload: {
+        type: "function_call_output",
+        namespace: "codex_app",
+        name: "create_thread",
+        output: delegation,
+      },
+    },
+    {
+      timestamp: new Date(Math.max(delegationObservedAt, selectorObservedAt) + 100).toISOString(),
+      type: "event_msg",
+      payload: { type: "task_complete", turn_id: turnId },
+    },
+  ];
+  await writeFile(
+    resolve(sessionDirectory, `rollout-fixture-${readyThreadId}.jsonl`),
+    `${rows.map((row) => JSON.stringify(row)).join("\n")}\n`,
+  );
 }
 
 async function visibleCreationStateFiles(stateRoot) {
@@ -354,70 +430,13 @@ test("explicit private resolution binds the exact provisional ID to delegated bo
       now: START + 1_000,
     });
 
-    const atom = {
-      "client-thread-bindings-v1": { [provisionalClientThreadId]: readyThreadId },
-      [`thread-client-id-v1:${encodeURIComponent(`local:${readyThreadId}`)}`]: provisionalClientThreadId,
-      "electron:last-seen-changelog-release-family": "26.727",
-    };
-    await writeFile(
-      resolve(codexHome, ".codex-global-state.json"),
-      JSON.stringify({ "electron-persisted-atom-state": atom }),
-    );
-    const sessionDirectory = resolve(codexHome, "sessions", "2026", "08", "29");
-    await mkdir(sessionDirectory, { recursive: true });
-    const turnId = "private-initial-turn";
-    const delegation = [
-      "<codex_delegation>",
-      `  <source_thread_id>${context.contract.coordinator_binding.thread_id}</source_thread_id>`,
-      `  <input>${attempt.bootstrap}</input>`,
-      "</codex_delegation>",
-    ].join("\n");
-    const rows = [
-      {
-        timestamp: new Date(START + 1_500).toISOString(),
-        type: "session_meta",
-        payload: {
-          id: readyThreadId,
-          thread_source: "agent_created_thread",
-          cwd: resolve(codexHome, "worktrees", "private", "repository"),
-          cli_version: "0.152.0",
-          git: { commit_hash: context.revision },
-        },
-      },
-      {
-        timestamp: new Date(START + 1_500).toISOString(),
-        type: "event_msg",
-        payload: { type: "task_started", turn_id: turnId },
-      },
-      {
-        timestamp: new Date(START + 1_600).toISOString(),
-        type: "turn_context",
-        payload: {
-          turn_id: turnId,
-          model: context.requested.model,
-          effort: context.requested.reasoning_effort,
-        },
-      },
-      {
-        timestamp: new Date(START + 1_700).toISOString(),
-        type: "response_item",
-        payload: {
-          type: "function_call_output",
-          namespace: "codex_app",
-          name: "create_thread",
-          output: delegation,
-        },
-      },
-      {
-        timestamp: new Date(START + 1_800).toISOString(),
-        type: "event_msg",
-        payload: { type: "task_complete", turn_id: turnId },
-      },
-    ];
-    await writeFile(
-      resolve(sessionDirectory, `rollout-fixture-${readyThreadId}.jsonl`),
-      `${rows.map((row) => JSON.stringify(row)).join("\n")}\n`,
-    );
+    await seedPrivateTaskEvidence({
+      codexHome,
+      context,
+      attempt,
+      provisionalClientThreadId,
+      readyThreadId,
+    });
 
     const recovered = await resolvePrivateVisibleTaskCreation({
       stateRoot: context.stateRoot,
@@ -559,8 +578,11 @@ test("title and timing similarity never recover a ready task without exact initi
   }
 });
 
-test("late ready reconciliation accepts host evidence observed within its deadline", async () => {
+test("only exact expired ambiguity recovers from timely private host evidence", async () => {
   const context = await fixture();
+  const codexHome = await mkdtemp(resolve(tmpdir(), "codex-flow-private-late-ready-"));
+  const provisionalClientThreadId = "client-new-thread:late-private-resolution";
+  const readyThreadId = "ready-private-task-late";
   try {
     const prepared = await prepareVisibleTaskCreation({
       stateRoot: context.stateRoot,
@@ -575,40 +597,96 @@ test("late ready reconciliation accepts host evidence observed within its deadli
       timeoutSeconds: 5,
       now: START,
     });
-    const ready = await reconcileVisibleTaskCreation({
-        stateRoot: context.stateRoot,
-        operationId: prepared.operation_id,
-        outcome: "ready",
-        readyThreadId: "ready-at-deadline",
-        initialTurn: {
-          source: "host-observed",
-          thread_id: "ready-at-deadline",
-          turn_id: "turn-before-deadline",
-          turn_index: 1,
-          role: "user",
-          content: attempt.bootstrap,
-          observed_at: new Date(START + 4_000).toISOString(),
-        },
-        selectorEvidence: {
-          accepted: acceptedSelectors(context.requested),
-          observed: null,
-        },
-        now: START + 5_000,
-      });
-    assert.equal(ready.status, "ready-unreleased");
-    const status = await visibleTaskCreationStatus({
+    await reconcileVisibleTaskCreation({
+      stateRoot: context.stateRoot,
+      operationId: prepared.operation_id,
+      outcome: "provisional",
+      provisionalClientThreadId,
+      selectorEvidence: {
+        accepted: acceptedSelectors(context.requested),
+        observed: null,
+      },
+      now: START + 1_000,
+    });
+    await seedPrivateTaskEvidence({
+      codexHome,
+      context,
+      attempt,
+      provisionalClientThreadId,
+      readyThreadId,
+      selectorObservedAt: START + 3_500,
+      delegationObservedAt: START + 4_000,
+    });
+    const expired = await visibleTaskCreationStatus({
       stateRoot: context.stateRoot,
       operationId: prepared.operation_id,
       now: START + 5_000,
     });
-    assert.equal(status.status, "ready-unreleased");
-    assert.equal(status.reconciliation_open, false);
+    assert.equal(expired.status, "ambiguous");
+    assert.equal(expired.resolution.reason_code, "reconciliation-window-expired");
+    const expiredResolutionDigest = sha256(stableStringify(expired.resolution));
+
+    const recovered = await resolvePrivateVisibleTaskCreation({
+      stateRoot: context.stateRoot,
+      operationId: prepared.operation_id,
+      codexHome,
+      now: START + 9_000,
+    });
+    const request = recovered.reconcile_request;
+    const ready = await reconcileVisibleTaskCreation({
+      stateRoot: context.stateRoot,
+      operationId: request.operation_id,
+      outcome: request.outcome,
+      provisionalClientThreadId: request.provisional_client_thread_id,
+      readyThreadId: request.ready_thread_id,
+      initialTurn: request.initial_turn,
+      privateResolution: request.private_resolution,
+      selectorEvidence: request.selector_evidence,
+      now: Date.parse(request.reconciled_at),
+    });
+    assert.equal(ready.status, "ready-unreleased");
+    assert.equal(ready.operation_id, prepared.operation_id);
+    assert.equal(ready.attempt.attempt_id, attempt.attempt.attempt_id);
+    assert.deepEqual(ready.resolution, expired.resolution);
+    assert.equal(
+      ready.late_private_recovery.expired_resolution_digest,
+      expiredResolutionDigest,
+    );
+    assert.equal(ready.late_private_recovery.source, "codex-app-private-state-v1");
+    assert.equal(ready.late_private_recovery.recovered_at, request.reconciled_at);
+    assert.equal(ready.attempt_permitted, false);
+    assert.equal(ready.reconciliation_open, false);
+    const tampered = JSON.parse(await readFile(resolve(
+      context.stateRoot,
+      "visible-task-creations",
+      "records",
+      `${prepared.operation_id}.json`,
+    ), "utf8"));
+    tampered.late_private_recovery.expired_resolution_digest = "f".repeat(64);
+    assert.throws(
+      () => validateVisibleTaskCreationRecord(tampered),
+      /does not bind the exact expired reconciliation evidence/,
+    );
+
+    const replay = await reconcileVisibleTaskCreation({
+      stateRoot: context.stateRoot,
+      operationId: request.operation_id,
+      outcome: request.outcome,
+      provisionalClientThreadId: request.provisional_client_thread_id,
+      readyThreadId: request.ready_thread_id,
+      initialTurn: request.initial_turn,
+      privateResolution: request.private_resolution,
+      selectorEvidence: request.selector_evidence,
+      now: START + 20_000,
+    });
+    assert.deepEqual(replay.late_private_recovery, ready.late_private_recovery);
   } finally {
+    await rm(codexHome, { recursive: true, force: true });
     await removeFixture(context.root);
   }
 });
 
-test("late ready reconciliation rejects host evidence observed at the deadline", async () => {
+test("expired creation rejects direct host evidence even when its event was timely", async () => {
   const context = await fixture();
   try {
     const prepared = await prepareVisibleTaskCreation({
@@ -633,11 +711,11 @@ test("late ready reconciliation rejects host evidence observed at the deadline",
         initialTurn: {
           source: "host-observed",
           thread_id: "ready-after-deadline",
-          turn_id: "turn-at-deadline",
+          turn_id: "turn-before-deadline",
           turn_index: 1,
           role: "user",
           content: attempt.bootstrap,
-          observed_at: new Date(START + 5_000).toISOString(),
+          observed_at: new Date(START + 4_000).toISOString(),
         },
         selectorEvidence: {
           accepted: acceptedSelectors(context.requested),
@@ -645,18 +723,157 @@ test("late ready reconciliation rejects host evidence observed at the deadline",
         },
         now: START + 9_000,
       }),
-      /not observed within the bounded reconciliation window/,
+      /recover only from authenticated private task evidence/,
     );
     const status = await visibleTaskCreationStatus({
       stateRoot: context.stateRoot,
       operationId: prepared.operation_id,
       now: START + 9_000,
     });
-    assert.equal(status.status, "attempting");
+    assert.equal(status.status, "ambiguous");
+    assert.equal(status.resolution.reason_code, "reconciliation-window-expired");
     assert.equal(status.reconciliation_open, false);
   } finally {
     await removeFixture(context.root);
   }
+});
+
+test("late private recovery rejects deadline events, other ambiguity, and missing provisional identity", async (t) => {
+  await t.test("event at deadline", async () => {
+    const context = await fixture();
+    const codexHome = await mkdtemp(resolve(tmpdir(), "codex-flow-private-deadline-"));
+    try {
+      const prepared = await prepareVisibleTaskCreation({
+        stateRoot: context.stateRoot,
+        taskContract: context.contract,
+        requestedSelectors: context.requested,
+        now: START,
+      });
+      const attempt = await recordVisibleTaskCreationAttempt({
+        stateRoot: context.stateRoot,
+        operationId: prepared.operation_id,
+        hostSessionId: "private-deadline-session",
+        timeoutSeconds: 5,
+        now: START,
+      });
+      const provisionalClientThreadId = "client-new-thread:private-deadline";
+      await reconcileVisibleTaskCreation({
+        stateRoot: context.stateRoot,
+        operationId: prepared.operation_id,
+        outcome: "provisional",
+        provisionalClientThreadId,
+        selectorEvidence: {
+          accepted: acceptedSelectors(context.requested),
+          observed: null,
+        },
+        now: START + 1_000,
+      });
+      await seedPrivateTaskEvidence({
+        codexHome,
+        context,
+        attempt,
+        provisionalClientThreadId,
+        readyThreadId: "ready-private-deadline",
+        selectorObservedAt: START + 4_000,
+        delegationObservedAt: START + 5_000,
+      });
+      await assert.rejects(resolvePrivateVisibleTaskCreation({
+        stateRoot: context.stateRoot,
+        operationId: prepared.operation_id,
+        codexHome,
+        now: START + 9_000,
+      }), /falls outside the open reconciliation window/);
+      const status = await visibleTaskCreationStatus({
+        stateRoot: context.stateRoot,
+        operationId: prepared.operation_id,
+        now: START + 10_000,
+      });
+      assert.equal(status.status, "ambiguous");
+      assert.equal(status.resolution.reason_code, "reconciliation-window-expired");
+    } finally {
+      await rm(codexHome, { recursive: true, force: true });
+      await removeFixture(context.root);
+    }
+  });
+
+  await t.test("non-expiry ambiguity", async () => {
+    const context = await fixture();
+    try {
+      const prepared = await prepareVisibleTaskCreation({
+        stateRoot: context.stateRoot,
+        taskContract: context.contract,
+        requestedSelectors: context.requested,
+        now: START,
+      });
+      await recordVisibleTaskCreationAttempt({
+        stateRoot: context.stateRoot,
+        operationId: prepared.operation_id,
+        hostSessionId: "private-other-ambiguity",
+        timeoutSeconds: 30,
+        now: START,
+      });
+      await reconcileVisibleTaskCreation({
+        stateRoot: context.stateRoot,
+        operationId: prepared.operation_id,
+        outcome: "provisional",
+        provisionalClientThreadId: "client-new-thread:other-ambiguity",
+        selectorEvidence: {
+          accepted: acceptedSelectors(context.requested),
+          observed: null,
+        },
+        now: START + 1_000,
+      });
+      await reconcileVisibleTaskCreation({
+        stateRoot: context.stateRoot,
+        operationId: prepared.operation_id,
+        outcome: "ambiguous",
+        reasonCode: "identity-evidence-missing",
+        now: START + 2_000,
+      });
+      await assert.rejects(resolvePrivateVisibleTaskCreation({
+        stateRoot: context.stateRoot,
+        operationId: prepared.operation_id,
+        codexHome: resolve(context.root, ".codex-home-missing"),
+        now: START + 3_000,
+      }), /exact expired ambiguity/);
+    } finally {
+      await removeFixture(context.root);
+    }
+  });
+
+  await t.test("no provisional identity", async () => {
+    const context = await fixture();
+    try {
+      const prepared = await prepareVisibleTaskCreation({
+        stateRoot: context.stateRoot,
+        taskContract: context.contract,
+        requestedSelectors: context.requested,
+        now: START,
+      });
+      await recordVisibleTaskCreationAttempt({
+        stateRoot: context.stateRoot,
+        operationId: prepared.operation_id,
+        hostSessionId: "private-no-provisional",
+        timeoutSeconds: 5,
+        now: START,
+      });
+      await assert.rejects(resolvePrivateVisibleTaskCreation({
+        stateRoot: context.stateRoot,
+        operationId: prepared.operation_id,
+        codexHome: resolve(context.root, ".codex-home-missing"),
+        now: START + 6_000,
+      }), /exact expired ambiguity/);
+      const status = await visibleTaskCreationStatus({
+        stateRoot: context.stateRoot,
+        operationId: prepared.operation_id,
+        now: START + 7_000,
+      });
+      assert.equal(status.status, "ambiguous");
+      assert.equal(status.provisional, null);
+    } finally {
+      await removeFixture(context.root);
+    }
+  });
 });
 
 test("a generated visible-task contract authorizes exactly one native creation attempt", async () => {
@@ -719,7 +936,8 @@ test("a generated visible-task contract authorizes exactly one native creation a
       operationId: prepared.operation_id,
       now: START + 31_000,
     });
-    assert.equal(expired.status, "attempting");
+    assert.equal(expired.status, "ambiguous");
+    assert.equal(expired.resolution.reason_code, "reconciliation-window-expired");
     assert.equal(expired.reconciliation_open, false);
     assert.equal(expired.attempt_permitted, false);
   } finally {
@@ -1016,7 +1234,25 @@ test("visible task creation schema preserves provisional/ready distinction and f
   assert.equal(schema.required.includes("selector_rationale"), true);
   assert.equal(schema.required.includes("worktree_binding"), true);
   assert.equal(schema.required.includes("private_resolution"), true);
+  assert.equal(schema.required.includes("late_private_recovery"), true);
   assert.equal(schema.$defs.privateResolution.properties.app_version.type, "null");
+  assert.equal(
+    schema.$defs.latePrivateRecovery.properties.kind.const,
+    "codex-flow-v07-late-private-visible-task-recovery",
+  );
+  assert.equal(
+    schema.$defs.latePrivateRecovery.properties.source.const,
+    "codex-app-private-state-v1",
+  );
+  const readyRule = schema.allOf.find(
+    (rule) => rule.if?.properties?.status?.const === "ready-unreleased",
+  );
+  assert.equal(readyRule.then.oneOf.length, 2);
+  assert.equal(readyRule.then.oneOf[0].properties.resolution.type, "null");
+  assert.equal(
+    readyRule.then.oneOf[1].properties.resolution.allOf[1].properties.reason_code.const,
+    "reconciliation-window-expired",
+  );
   assert.deepEqual(
     schema.$defs.initialTurn.properties.source.enum,
     ["host-observed", "codex-app-private-delegation-v1"],

@@ -31,8 +31,11 @@ creation plus private archive evidence defined by
   adapter for provisional-only App results. Exact forward/reverse bindings,
   session identity, selector context, and nonce-bearing delegation must agree;
   the host event timestamps, not later coordinator processing, must be inside
-  the reconciliation window. Compact private provenance is persisted. No title,
-  timing, retry, or terminal-state recovery is allowed.
+  the reconciliation window. Compact private provenance is persisted. Only an
+  exact durable `reconciliation-window-expired` ambiguity may recover through
+  that private proof, while preserving the original resolution and one-shot
+  attempt. No title/timing correlation, retry, or other terminal-state recovery
+  is allowed.
 - Quiet durable routine results and separately journaled urgent interrupts.
 - Exactly-once coordinator disposition, serial Git integration, combined
   verification, archive reconciliation, terminal run audit, and deterministic

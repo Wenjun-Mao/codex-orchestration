@@ -21,11 +21,12 @@ bounded and separate requested, accepted, and observed evidence.
    agree, and authenticates the exact bootstrap inside the initial
    `create_thread` delegation. It returns a complete ready-reconciliation
    request with private-host provenance. Never invoke it silently or for a
-   creation record that is not already provisional. Its authenticated initial
-   turn and selector event timestamps must be inside the reconciliation window;
-   later coordinator processing does not alter those facts. Missing, malformed,
-   or contradictory private evidence remains unresolved ambiguity. Title,
-   recency, and timing are never correlation authority.
+   creation record that lacks a provisional identity. Its authenticated
+   provisional identity, initial turn, and selector event timestamps must be
+   inside the reconciliation window; later coordinator processing does not
+   alter those facts. Missing, malformed, or contradictory private evidence
+   remains unresolved ambiguity. Title, recency, and timing are never
+   correlation authority.
 5. Reconcile requested, host-accepted, and independently observed project,
    model, reasoning, visibility, and worktree evidence. A non-null observed
    mismatch or missing nonce is ambiguous and blocks release.
@@ -40,12 +41,15 @@ bounded and separate requested, accepted, and observed evidence.
    call. Require the executor to accept the exact release, contract, runtime,
    common directory, and ready task before implementation.
 
-An unresolved operation reports its ordinary reconciliation window as closed at
-the deadline, but may still reconcile exact host evidence recorded before that
-deadline. It never permits a second create or blind release resend for the same
-contract. The temporary private adapter does not reopen a terminal operation.
-A session/control failure is durable evidence, not permission to substitute a
-subagent or local task.
+At the deadline, an unresolved operation durably becomes exact
+`reconciliation-window-expired` ambiguity. Only that terminal outcome may
+recover, only through the explicit private adapter, and only from authenticated
+host events recorded strictly before the deadline. Recovery retains the expiry
+resolution and adds a digest-bound recovery record to the same operation and
+attempt. It never permits a second create or blind release resend for the same
+contract. Every other terminal outcome remains closed. A session/control
+failure is durable evidence, not permission to substitute a subagent or local
+task.
 
 An exact host rejection of the requested selector before any provisional or
 ready identity, accepted selector evidence, or observed host object exists is

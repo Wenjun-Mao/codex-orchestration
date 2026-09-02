@@ -21,12 +21,16 @@ required public-index visibility. Unplug had the same availability gap.
 ## Decision
 
 Creation keeps the bounded window as an event-evidence admission rule. Exact
-host timestamps for accepted selectors, observed selectors, and the
-nonce-bearing initial turn must fall within the window. Reconciliation and
-private-resolution processing may occur later, provided those persisted facts
-remain valid. Status reports that the ordinary window is closed but does not
-rewrite an unresolved operation; an explicit ambiguous result remains the
-fail-closed terminal outcome when qualifying host evidence is unavailable.
+host timestamps for the provisional identity, accepted selectors, observed
+selectors, and the nonce-bearing initial turn must fall within the window.
+When coordinator processing reaches the deadline first, status durably records
+the exact `reconciliation-window-expired` ambiguity. Only that ambiguity may
+later become ready, only through the existing authenticated private resolver,
+and only when its host event timestamps were strictly inside the original
+window. The ready record preserves the original resolution plus a digest-bound
+`late_private_recovery`; the operation, attempt, and create call do not change.
+All other terminal outcomes and direct host-only late reconciliation remain
+fail-closed.
 
 `archive observe-private` is a read-only, run-bound observer for a dispatched
 archive with an accepted or ambiguous setter result. It emits a task
@@ -55,8 +59,9 @@ This supersedes ADR 0037's processing-time-only deadline rule.
 
 ## Consequences and guardrails
 
-- Late evidence is admissible only from the existing exact host evidence paths;
-  title, recency, and timing correlation remain forbidden.
+- Late recovery is admissible only from exact expired ambiguity through the
+  private binding/session evidence path; title, recency, and timing correlation
+  remain forbidden.
 - A host event at or after the deadline still fails closed.
 - Archive and unplug private observations are explicit read-only commands, not
   automatic fallbacks from public host APIs.

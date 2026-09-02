@@ -177,13 +177,15 @@ const PRIVATE_RESOLUTION_HELP = `codex-flow ${PACKAGE_VERSION} task create resol
 Usage:
   codex-flow task create resolve-private --run-id ID --operation-id ID [--json]
 
-Read-only temporary Codex App compatibility adapter. It requires an open
-provisional visible-task creation record, reads the exact private App binding
+Read-only temporary Codex App compatibility adapter. It requires a recorded
+provisional identity in either an open creation or its exact persisted
+reconciliation-window-expired ambiguity, reads the exact private App binding
 and matching initial task session from CODEX_HOME (or ~/.codex), and emits one
 reconcile_request. The authenticated host event timestamps must be within the
-bounded reconciliation window even when this command runs later. It never
-changes App files or reopens terminal Flow state. Missing, changing, or
-contradictory private evidence fails closed.
+bounded reconciliation window even when this command runs later. The expiry
+exception preserves the original resolution and one-shot attempt; every other
+terminal Flow state remains closed. It never changes App files. Missing,
+changing, or contradictory private evidence fails closed.
 `;
 
 function helpFor(command, args) {

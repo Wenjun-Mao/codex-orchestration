@@ -35,8 +35,10 @@ public task catalog. The adapter is local and read-only: it requires agreeing
 App bindings and the exact nonce-bearing initial delegation, records compact
 private-host provenance, and fails closed. Its exact host event timestamps,
 rather than delayed coordinator processing, must fall inside the bounded
-creation window. It is never a silent fallback and will be retired when Codex
-App exposes an equivalent public resolver.
+creation window. It may recover only the exact persisted window-expiry
+ambiguity while preserving that resolution and the original one-shot attempt.
+It is never a silent fallback and will be retired when Codex App exposes an
+equivalent public resolver.
 
 Actionable activation also requires a clean namespace boundary: any retained
 incompatible Flow namespace blocks and points to the repository-scoped

@@ -9,7 +9,8 @@
     "common_dir", "coordinator_binding", "plan_id", "revision_digest",
     "task_id", "task_digest", "contract_id", "task_title", "selector_rationale",
     "launch_nonce", "bootstrap_digest", "selector_evidence", "status",
-    "attempt", "provisional", "ready", "private_resolution", "resolution", "worktree_binding",
+    "attempt", "provisional", "ready", "private_resolution", "late_private_recovery",
+    "resolution", "worktree_binding",
     "prepared_at", "updated_at"
   ],
   "properties": {
@@ -53,6 +54,9 @@
     "private_resolution": {
       "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/privateResolution" }]
     },
+    "late_private_recovery": {
+      "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/latePrivateRecovery" }]
+    },
     "resolution": {
       "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/resolution" }]
     },
@@ -71,6 +75,7 @@
           "provisional": { "type": "null" },
           "ready": { "type": "null" },
           "private_resolution": { "type": "null" },
+          "late_private_recovery": { "type": "null" },
           "resolution": { "type": "null" },
           "worktree_binding": { "type": "null" }
         }
@@ -84,6 +89,7 @@
           "provisional": { "type": "null" },
           "ready": { "type": "null" },
           "private_resolution": { "type": "null" },
+          "late_private_recovery": { "type": "null" },
           "resolution": { "type": "null" },
           "worktree_binding": { "type": "null" }
         }
@@ -97,6 +103,7 @@
           "provisional": { "$ref": "#/$defs/provisional" },
           "ready": { "type": "null" },
           "private_resolution": { "type": "null" },
+          "late_private_recovery": { "type": "null" },
           "resolution": { "type": "null" },
           "worktree_binding": { "type": "null" }
         }
@@ -107,9 +114,33 @@
       "then": {
         "properties": {
           "attempt": { "$ref": "#/$defs/attempt" },
-          "ready": { "$ref": "#/$defs/ready" },
-          "resolution": { "type": "null" }
-        }
+          "ready": { "$ref": "#/$defs/ready" }
+        },
+        "oneOf": [
+          {
+            "properties": {
+              "late_private_recovery": { "type": "null" },
+              "resolution": { "type": "null" }
+            }
+          },
+          {
+            "properties": {
+              "private_resolution": { "$ref": "#/$defs/privateResolution" },
+              "late_private_recovery": { "$ref": "#/$defs/latePrivateRecovery" },
+              "resolution": {
+                "allOf": [
+                  { "$ref": "#/$defs/resolution" },
+                  {
+                    "properties": {
+                      "outcome": { "const": "ambiguous" },
+                      "reason_code": { "const": "reconciliation-window-expired" }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        ]
       }
     },
     {
@@ -123,6 +154,7 @@
           "attempt": { "$ref": "#/$defs/attempt" },
           "ready": { "type": "null" },
           "private_resolution": { "type": "null" },
+          "late_private_recovery": { "type": "null" },
           "resolution": { "$ref": "#/$defs/resolution" },
           "worktree_binding": { "type": "null" }
         }
@@ -371,6 +403,20 @@
         "app_release_family": { "$ref": "#/$defs/nullableText" },
         "host_cli_version": { "$ref": "#/$defs/nullableText" },
         "resolved_at": { "$ref": "#/$defs/timestamp" }
+      }
+    },
+    "latePrivateRecovery": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version", "kind", "source", "expired_resolution_digest", "recovered_at"
+      ],
+      "properties": {
+        "schema_version": { "const": 1 },
+        "kind": { "const": "codex-flow-v07-late-private-visible-task-recovery" },
+        "source": { "const": "codex-app-private-state-v1" },
+        "expired_resolution_digest": { "$ref": "#/$defs/digest" },
+        "recovered_at": { "$ref": "#/$defs/timestamp" }
       }
     },
     "resolution": {
