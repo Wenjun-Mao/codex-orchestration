@@ -22,8 +22,8 @@ Earlier releases remain source-history and immutable-tag evidence only; their
 readers, mutators, migration paths, retirement commands, tracked adoption, and
 test fixtures are not packaged in v0.7.
 
-The accepted public release remains v0.7.7 while this checkout develops
-v0.7.8. v0.7 carries forward the proven cross-task behavior from v0.6.5 under
+The accepted public release remains v0.7.7 while this checkout validates
+v0.7.8-rc.1. v0.7 carries forward the proven cross-task behavior from v0.6.5 under
 `codex-flow-v07-*` identities and the exact `.git/codex-flow/v0.7.8/`
 namespace. It adds a bounded foreign-active-run sentinel so a live predecessor
 run blocks admission instead of being silently ignored or migrated.
