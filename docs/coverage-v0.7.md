@@ -115,7 +115,7 @@ durable result journal or coordinator disposition.
 ## Clean predecessor boundary
 
 The accepted public authority remains `0.7.7` while the release-candidate
-checkout is `0.7.8-rc.1`. The candidate runtime uses the `.git/codex-flow/v0.7.8/`
+checkout is `0.7.8-rc.2`. The candidate runtime uses the `.git/codex-flow/v0.7.8/`
 namespace and does not migrate, reinterpret, delete,
 or overwrite accepted v0.7.6 state or content-addressed runtime snapshots under
 `.git/codex-flow/v0.7.6/`.
