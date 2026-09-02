@@ -13,7 +13,7 @@ import {
 import { validateReleaseIdentity } from "./release-identity.mjs";
 
 const root = resolve(import.meta.dirname, "..");
-const EXPECTED_PACKAGE_VERSION = "0.7.6";
+const EXPECTED_PACKAGE_VERSION = "0.7.7-dev.0";
 
 // ACTIVE V0.7 SCHEMA REGISTRY INSERTION POINT:
 // add every new operating schema here in the same change that introduces it.
@@ -346,6 +346,7 @@ assertMarkers(await readRequired("docs/coverage-v0.7.md"), [
   "No predecessor reader, mutator, migration, retirement, or tracked-adoption command is packaged",
   "bounded foreign-active-run sentinel",
   "content-addressed binding intent",
+  "task create resolve-private",
   "npm run test:v07",
 ], "docs/coverage-v0.7.md");
 
@@ -360,6 +361,7 @@ const skillContracts = new Map([
     "There is no requirement for tracked `.codex/orchestration/`",
     "Use `workflow create|revise|status|contract`",
     "coordinator-owned `task create bind`",
+    "`task create resolve-private`",
     "Visible-task routine completion must stay quiet and journal-only",
   ]],
   ["execute", [
@@ -426,7 +428,7 @@ const templateContracts = new Map([
     "persist the signal before one identified interrupt attempt",
   ]],
   ["templates/references/task-lifecycle.md", [
-    ".git/codex-flow/v0.7.6/runtimes/<bundle-sha256>/",
+    ".git/codex-flow/v0.7.7/runtimes/<bundle-sha256>/",
     "content-addressed intent precedes the detached",
     "terminal-receipt-v3 journal result without messaging",
     "content-addressed PASS verification and integration/no-change records",

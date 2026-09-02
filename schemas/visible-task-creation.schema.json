@@ -9,7 +9,7 @@
     "common_dir", "coordinator_binding", "plan_id", "revision_digest",
     "task_id", "task_digest", "contract_id", "task_title", "selector_rationale",
     "launch_nonce", "bootstrap_digest", "selector_evidence", "status",
-    "attempt", "provisional", "ready", "resolution", "worktree_binding",
+    "attempt", "provisional", "ready", "private_resolution", "resolution", "worktree_binding",
     "prepared_at", "updated_at"
   ],
   "properties": {
@@ -50,6 +50,9 @@
     "ready": {
       "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/ready" }]
     },
+    "private_resolution": {
+      "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/privateResolution" }]
+    },
     "resolution": {
       "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/resolution" }]
     },
@@ -67,6 +70,7 @@
           "attempt": { "type": "null" },
           "provisional": { "type": "null" },
           "ready": { "type": "null" },
+          "private_resolution": { "type": "null" },
           "resolution": { "type": "null" },
           "worktree_binding": { "type": "null" }
         }
@@ -79,6 +83,7 @@
           "attempt": { "$ref": "#/$defs/attempt" },
           "provisional": { "type": "null" },
           "ready": { "type": "null" },
+          "private_resolution": { "type": "null" },
           "resolution": { "type": "null" },
           "worktree_binding": { "type": "null" }
         }
@@ -91,6 +96,7 @@
           "attempt": { "$ref": "#/$defs/attempt" },
           "provisional": { "$ref": "#/$defs/provisional" },
           "ready": { "type": "null" },
+          "private_resolution": { "type": "null" },
           "resolution": { "type": "null" },
           "worktree_binding": { "type": "null" }
         }
@@ -116,6 +122,7 @@
         "properties": {
           "attempt": { "$ref": "#/$defs/attempt" },
           "ready": { "type": "null" },
+          "private_resolution": { "type": "null" },
           "resolution": { "$ref": "#/$defs/resolution" },
           "worktree_binding": { "type": "null" }
         }
@@ -321,11 +328,13 @@
         "launch_nonce", "content_digest", "observed_at"
       ],
       "properties": {
-        "source": { "const": "host-observed" },
+        "source": {
+          "enum": ["host-observed", "codex-app-private-delegation-v1"]
+        },
         "thread_id": { "$ref": "#/$defs/hostId" },
         "turn_id": { "$ref": "#/$defs/hostId" },
         "turn_index": { "const": 1 },
-        "role": { "const": "user" },
+        "role": { "enum": ["user", "delegation"] },
         "launch_nonce": { "$ref": "#/$defs/digest" },
         "content_digest": { "$ref": "#/$defs/digest" },
         "observed_at": { "$ref": "#/$defs/timestamp" }
@@ -339,6 +348,29 @@
         "thread_id": { "$ref": "#/$defs/hostId" },
         "initial_turn": { "$ref": "#/$defs/initialTurn" },
         "recorded_at": { "$ref": "#/$defs/timestamp" }
+      }
+    },
+    "privateResolution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version", "kind", "source", "provisional_client_thread_id",
+        "ready_thread_id", "binding_digest", "state_digest", "session_digest",
+        "app_version", "app_release_family", "host_cli_version", "resolved_at"
+      ],
+      "properties": {
+        "schema_version": { "const": 1 },
+        "kind": { "const": "codex-flow-v07-private-task-resolution" },
+        "source": { "const": "codex-app-private-state-v1" },
+        "provisional_client_thread_id": { "$ref": "#/$defs/provisionalHostId" },
+        "ready_thread_id": { "$ref": "#/$defs/hostId" },
+        "binding_digest": { "$ref": "#/$defs/digest" },
+        "state_digest": { "$ref": "#/$defs/digest" },
+        "session_digest": { "$ref": "#/$defs/digest" },
+        "app_version": { "type": "null" },
+        "app_release_family": { "$ref": "#/$defs/nullableText" },
+        "host_cli_version": { "$ref": "#/$defs/nullableText" },
+        "resolved_at": { "$ref": "#/$defs/timestamp" }
       }
     },
     "resolution": {

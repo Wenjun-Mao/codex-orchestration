@@ -23,9 +23,17 @@ readers, mutators, migration paths, retirement commands, tracked adoption, and
 test fixtures are not packaged in v0.7.
 
 v0.7 carries forward the proven cross-task behavior from v0.6.5 under new
-`codex-flow-v07-*` identities and the exact `.git/codex-flow/v0.7.6/`
+`codex-flow-v07-*` identities and the exact `.git/codex-flow/v0.7.7/`
 namespace. It adds a bounded foreign-active-run sentinel so a live predecessor
 run blocks admission instead of being silently ignored or migrated.
+
+The current development checkpoint also includes an explicit temporary
+`task create resolve-private` adapter for a Codex App regression that returns a
+provisional `clientThreadId` without exposing its ready task ID through the
+public task catalog. The adapter is local and read-only: it requires agreeing
+App bindings and the exact nonce-bearing initial delegation, records compact
+private-host provenance, and fails closed. It is never a silent fallback and
+will be retired when Codex App exposes an equivalent public resolver.
 
 Actionable activation also requires a clean namespace boundary: any retained
 incompatible Flow namespace blocks and points to the repository-scoped
@@ -94,7 +102,7 @@ When the user authorizes actionable orchestration, the plugin may activate one
 run after disclosing:
 
 - the exact package/runtime source and bundle hash;
-- the `.git/codex-flow/v0.7.6/` operational state root;
+- the `.git/codex-flow/v0.7.7/` operational state root;
 - repository/common-directory, baseline, host, and coordinator binding;
 - the immutable workflow revision and its path/resource/branch reservation
   envelope;
@@ -336,7 +344,9 @@ Codex App turn-diff capture refs as non-authoritative unplug observations.
 [ADR 0035](docs/adr/0035-detached-host-worktree-bind-checkpoint.md) defines the
 durable detached-worktree binding checkpoint before objective release, and
 [ADR 0036](docs/adr/0036-asynchronous-archive-worktree-reclamation.md) separates
-archived visibility from asynchronous host-managed worktree removal.
+archived visibility from asynchronous host-managed worktree removal, and
+[ADR 0037](docs/adr/0037-explicit-private-task-id-resolution.md) defines the
+temporary, explicit private task-ID resolver and its public-host exit condition.
 
 ## Source and distribution
 

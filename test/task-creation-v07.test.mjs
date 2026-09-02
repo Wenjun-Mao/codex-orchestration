@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { readFile, readdir, realpath, unlink, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, realpath, rm, unlink, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import test from "node:test";
 import {
@@ -8,6 +9,7 @@ import {
   prepareVisibleTaskCreation,
   reconcileVisibleTaskCreation,
   recordVisibleTaskCreationAttempt,
+  resolvePrivateVisibleTaskCreation,
   validateVisibleTaskCreationRecord,
   visibleTaskCreationStatus,
 } from "../lib/task-creation-v07.mjs";
@@ -78,7 +80,7 @@ async function fixture({
     generation: 1,
   };
   coordinator.binding_digest = coordinatorBindingDigest(coordinator);
-  const stateRoot = resolve(commonDir, "codex-flow", "v0.7.6");
+  const stateRoot = resolve(commonDir, "codex-flow", "v0.7.7");
   const runId = "run-visible-task";
   const snapshot = gitSnapshot(root);
   const bundleSource = await loadRuntimeBundleSource({ packageRoot });
@@ -321,6 +323,170 @@ test("one-shot visible creation binds provisional and ready identities through t
   }
 });
 
+test("explicit private resolution binds the exact provisional ID to delegated bootstrap evidence", async () => {
+  const context = await fixture();
+  const codexHome = await mkdtemp(resolve(tmpdir(), "codex-flow-private-ready-"));
+  const provisionalClientThreadId = "client-new-thread:private-resolution-fixture";
+  const readyThreadId = "ready-private-task-1";
+  try {
+    const prepared = await prepareVisibleTaskCreation({
+      stateRoot: context.stateRoot,
+      taskContract: context.contract,
+      requestedSelectors: context.requested,
+      now: START,
+    });
+    const attempt = await recordVisibleTaskCreationAttempt({
+      stateRoot: context.stateRoot,
+      operationId: prepared.operation_id,
+      hostSessionId: "private-resolution-session",
+      timeoutSeconds: 300,
+      now: START,
+    });
+    await reconcileVisibleTaskCreation({
+      stateRoot: context.stateRoot,
+      operationId: prepared.operation_id,
+      outcome: "provisional",
+      provisionalClientThreadId,
+      selectorEvidence: {
+        accepted: acceptedSelectors(context.requested),
+        observed: null,
+      },
+      now: START + 1_000,
+    });
+
+    const atom = {
+      "client-thread-bindings-v1": { [provisionalClientThreadId]: readyThreadId },
+      [`thread-client-id-v1:${encodeURIComponent(`local:${readyThreadId}`)}`]: provisionalClientThreadId,
+      "electron:last-seen-changelog-release-family": "26.727",
+    };
+    await writeFile(
+      resolve(codexHome, ".codex-global-state.json"),
+      JSON.stringify({ "electron-persisted-atom-state": atom }),
+    );
+    const sessionDirectory = resolve(codexHome, "sessions", "2026", "08", "29");
+    await mkdir(sessionDirectory, { recursive: true });
+    const turnId = "private-initial-turn";
+    const delegation = [
+      "<codex_delegation>",
+      `  <source_thread_id>${context.contract.coordinator_binding.thread_id}</source_thread_id>`,
+      `  <input>${attempt.bootstrap}</input>`,
+      "</codex_delegation>",
+    ].join("\n");
+    const rows = [
+      {
+        timestamp: new Date(START + 1_500).toISOString(),
+        type: "session_meta",
+        payload: {
+          id: readyThreadId,
+          thread_source: "agent_created_thread",
+          cwd: resolve(codexHome, "worktrees", "private", "repository"),
+          cli_version: "0.152.0",
+          git: { commit_hash: context.revision },
+        },
+      },
+      {
+        timestamp: new Date(START + 1_500).toISOString(),
+        type: "event_msg",
+        payload: { type: "task_started", turn_id: turnId },
+      },
+      {
+        timestamp: new Date(START + 1_600).toISOString(),
+        type: "turn_context",
+        payload: {
+          turn_id: turnId,
+          model: context.requested.model,
+          effort: context.requested.reasoning_effort,
+        },
+      },
+      {
+        timestamp: new Date(START + 1_700).toISOString(),
+        type: "response_item",
+        payload: {
+          type: "function_call_output",
+          namespace: "codex_app",
+          name: "create_thread",
+          output: delegation,
+        },
+      },
+      {
+        timestamp: new Date(START + 1_800).toISOString(),
+        type: "event_msg",
+        payload: { type: "task_complete", turn_id: turnId },
+      },
+    ];
+    await writeFile(
+      resolve(sessionDirectory, `rollout-fixture-${readyThreadId}.jsonl`),
+      `${rows.map((row) => JSON.stringify(row)).join("\n")}\n`,
+    );
+
+    const recovered = await resolvePrivateVisibleTaskCreation({
+      stateRoot: context.stateRoot,
+      operationId: prepared.operation_id,
+      codexHome,
+      now: START + 2_000,
+    });
+    assert.equal(recovered.private_host_surface, true);
+    assert.equal(recovered.reconcile_request.ready_thread_id, readyThreadId);
+    assert.equal(
+      recovered.reconcile_request.private_resolution.provisional_client_thread_id,
+      provisionalClientThreadId,
+    );
+    const request = recovered.reconcile_request;
+    const ready = await reconcileVisibleTaskCreation({
+      stateRoot: context.stateRoot,
+      operationId: request.operation_id,
+      outcome: request.outcome,
+      provisionalClientThreadId: request.provisional_client_thread_id,
+      readyThreadId: request.ready_thread_id,
+      initialTurn: request.initial_turn,
+      privateResolution: request.private_resolution,
+      selectorEvidence: request.selector_evidence,
+      now: Date.parse(request.reconciled_at),
+    });
+    assert.equal(ready.status, "ready-unreleased");
+    assert.equal(ready.ready.initial_turn.source, "codex-app-private-delegation-v1");
+    assert.equal(ready.private_resolution.ready_thread_id, readyThreadId);
+    const stored = JSON.parse(await readFile(resolve(
+      context.stateRoot,
+      "visible-task-creations",
+      "records",
+      `${prepared.operation_id}.json`,
+    ), "utf8"));
+    stored.private_resolution.state_digest = "f".repeat(64);
+    assert.throws(
+      () => validateVisibleTaskCreationRecord(stored),
+      /private task resolution binding_digest is invalid/i,
+    );
+    const unavailableVersion = JSON.parse(await readFile(resolve(
+      context.stateRoot,
+      "visible-task-creations",
+      "records",
+      `${prepared.operation_id}.json`,
+    ), "utf8"));
+    unavailableVersion.private_resolution.app_version = "26.831.20005";
+    assert.throws(
+      () => validateVisibleTaskCreationRecord(unavailableVersion),
+      /cannot claim an unavailable exact App version/,
+    );
+
+    const replay = await reconcileVisibleTaskCreation({
+      stateRoot: context.stateRoot,
+      operationId: request.operation_id,
+      outcome: request.outcome,
+      provisionalClientThreadId: request.provisional_client_thread_id,
+      readyThreadId: request.ready_thread_id,
+      initialTurn: request.initial_turn,
+      privateResolution: request.private_resolution,
+      selectorEvidence: request.selector_evidence,
+      now: START + 400_000,
+    });
+    assert.equal(replay.updated_at, ready.updated_at);
+  } finally {
+    await rm(codexHome, { recursive: true, force: true });
+    await removeFixture(context.root);
+  }
+});
+
 test("title and timing similarity never recover a ready task without exact initial-turn nonce evidence", async () => {
   const context = await fixture();
   try {
@@ -388,6 +554,57 @@ test("title and timing similarity never recover a ready task without exact initi
       operationId: prepared.operation_id,
       now: START + 3_000,
     })).status, "ambiguous");
+  } finally {
+    await removeFixture(context.root);
+  }
+});
+
+test("first ready reconciliation is rejected when the open window reaches its deadline", async () => {
+  const context = await fixture();
+  try {
+    const prepared = await prepareVisibleTaskCreation({
+      stateRoot: context.stateRoot,
+      taskContract: context.contract,
+      requestedSelectors: context.requested,
+      now: START,
+    });
+    const attempt = await recordVisibleTaskCreationAttempt({
+      stateRoot: context.stateRoot,
+      operationId: prepared.operation_id,
+      hostSessionId: "deadline-session",
+      timeoutSeconds: 5,
+      now: START,
+    });
+    await assert.rejects(
+      reconcileVisibleTaskCreation({
+        stateRoot: context.stateRoot,
+        operationId: prepared.operation_id,
+        outcome: "ready",
+        readyThreadId: "ready-at-deadline",
+        initialTurn: {
+          source: "host-observed",
+          thread_id: "ready-at-deadline",
+          turn_id: "turn-before-deadline",
+          turn_index: 1,
+          role: "user",
+          content: attempt.bootstrap,
+          observed_at: new Date(START + 4_000).toISOString(),
+        },
+        selectorEvidence: {
+          accepted: acceptedSelectors(context.requested),
+          observed: null,
+        },
+        now: START + 5_000,
+      }),
+      /not reconciled within the bounded reconciliation window/,
+    );
+    const expired = await visibleTaskCreationStatus({
+      stateRoot: context.stateRoot,
+      operationId: prepared.operation_id,
+      now: START + 5_000,
+    });
+    assert.equal(expired.status, "ambiguous");
+    assert.equal(expired.resolution.reason_code, "reconciliation-window-expired");
   } finally {
     await removeFixture(context.root);
   }
@@ -749,6 +966,12 @@ test("visible task creation schema preserves provisional/ready distinction and f
   assert.equal(schema.required.includes("contract_id"), true);
   assert.equal(schema.required.includes("selector_rationale"), true);
   assert.equal(schema.required.includes("worktree_binding"), true);
+  assert.equal(schema.required.includes("private_resolution"), true);
+  assert.equal(schema.$defs.privateResolution.properties.app_version.type, "null");
+  assert.deepEqual(
+    schema.$defs.initialTurn.properties.source.enum,
+    ["host-observed", "codex-app-private-delegation-v1"],
+  );
   assert.equal(
     schema.$defs.worktreeBinding.properties.binding_id.pattern,
     "^worktree-binding-v1-[0-9a-f]{64}$",

@@ -5,9 +5,10 @@ description: Activate and coordinate one Codex Flow run across separate visible 
 
 # Coordinate Codex Work
 
-Use the installed plugin's bundled v0.7 CLI. Inspect its current `--help` for
-exact flags; use the public command families named below and include the
-explicit `run_id` in every stateful operation.
+Use the installed plugin's bundled v0.7 CLI. Inspect top-level `--help` for the
+current command inventory and the scoped `task create resolve-private --help`
+for that temporary adapter; use the public command families named below and
+include the explicit `run_id` in every stateful operation.
 
 ## Activate with disclosure
 
@@ -15,7 +16,7 @@ Questions and planning remain read-only. Before an actionable run writes
 operational state or creates a native task, disclose:
 
 - the package/runtime source and exact bundle hash;
-- the `.git/codex-flow/v0.7.6/` Git-common state root;
+- the `.git/codex-flow/v0.7.7/` Git-common state root;
 - the repository, baseline, host, coordinator lineage and generation;
 - the proposed workflow revision and path/resource/branch reservation envelope;
 - each task's saved project, visible-task or subagent surface, requested model
@@ -80,13 +81,26 @@ when authority, cost, or instrumentation scope is uncertain.
 ## Create and release visible tasks
 
 Before creation, read [Host operations](../../templates/references/host-operations.md).
-Use `task create prepare|attempt|reconcile|bind|status` around exactly one native
-creation call. Bootstrap includes a cryptographic launch nonce and no objective.
+Use `task create prepare|attempt|resolve-private|reconcile|bind|status` around
+exactly one native creation call. Bootstrap includes a cryptographic launch
+nonce and no objective.
 Record the host's provisional `clientThreadId` verbatim as bounded opaque
 evidence and keep it separate from the ready task ID; never normalize it into
-an internal identifier. Accept the ready identity only when its initial
-host-visible turn contains the exact nonce. Title or timing similarity never
-correlates identity. Ambiguity fails closed.
+an internal identifier. If the current App supplies only that provisional ID
+and no public resolver is available, explicitly disclose and run
+`task create resolve-private` during the still-open window. This temporary,
+read-only adapter requires the App's exact forward/reverse binding plus the
+matching initial `create_thread` delegation and emits a complete
+`reconcile_request`; persist that request in temporary storage outside the
+repository and submit it unchanged to `task create reconcile`. Never infer from
+title, recency, worktree, or timing, never invoke the adapter silently, and
+never use it to reopen terminal v0.7 state. Missing or contradictory private
+evidence fails closed.
+
+Accept the ready identity only when the exact bootstrap digest, launch nonce,
+ready ID, selector evidence, and placement agree. Direct ready IDs retain the
+ordinary host-observed initial-turn path. Private resolution is discovery and
+bootstrap-delivery evidence, not proof of later Git binding.
 
 Reconcile project, requested/accepted/observed model and effort, and the actual
 worktree. Run coordinator-owned `task create bind` to persist exact intent,

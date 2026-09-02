@@ -13,10 +13,18 @@ bounded and separate requested, accepted, and observed evidence.
    prompt, which contains a cryptographic launch nonce but no objective.
 3. Make one native creation call with the actual project, model, reasoning, and
    starting-state selectors. Prompt text does not configure selectors.
-4. If the host returns `clientThreadId`, record it only as provisional. Recover
-   a ready task ID through the bounded host surface, then read its initial
-   host-visible user turn. The exact nonce, role, turn position, and ready task
-   ID must match. Title, recency, and timing are never correlation authority.
+4. If the host returns `clientThreadId`, record it only as provisional. Prefer
+   an official bounded host resolver. While the current App exposes no such
+   resolver, `task create resolve-private` is the explicit temporary adapter:
+   it reads the exact local App binding and matching task session without
+   changing either, requires the App's forward and reverse ID mappings to
+   agree, and authenticates the exact bootstrap inside the initial
+   `create_thread` delegation. It returns a complete ready-reconciliation
+   request with private-host provenance. Never invoke it silently, outside the
+   open reconciliation window, or for a creation record that is not already
+   provisional. Missing, malformed, or contradictory private evidence remains
+   unresolved ambiguity. Title, recency, and timing are never correlation
+   authority.
 5. Reconcile requested, host-accepted, and independently observed project,
    model, reasoning, visibility, and worktree evidence. A non-null observed
    mismatch or missing nonce is ambiguous and blocks release.
@@ -33,6 +41,7 @@ bounded and separate requested, accepted, and observed evidence.
 
 A timeout is ambiguous. Inspect state through the bounded reconciliation window
 but never issue a second create or blind release resend for the same contract.
+The temporary private adapter does not reopen an expired or terminal operation.
 A session/control failure is durable evidence, not permission to substitute a
 subagent or local task.
 

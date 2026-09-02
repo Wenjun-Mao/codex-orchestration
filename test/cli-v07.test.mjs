@@ -107,12 +107,24 @@ test("v0.7 help exposes no bare callback consume or predecessor commands", () =>
   assertSuccess(help, "v0.7 help");
   assert.match(help.stdout, /callback deliver\|observe --run-id/);
   assert.match(help.stdout, /task create prepare\|attempt\|reconcile\|bind --run-id/);
+  assert.match(help.stdout, /task create resolve-private --run-id/);
   assert.match(help.stdout, /urgent persist\|attempt\|reconcile\|observe\|consume\|expire --run-id/);
   assert.match(help.stdout, /cleanup plan --run-id/);
   assert.match(help.stdout, /unplug plan/);
   assert.match(help.stdout, /unplug apply/);
   assert.doesNotMatch(help.stdout, /callback consume/);
   assert.doesNotMatch(help.stdout, /legacy-v05|adopt/);
+
+  const privateHelp = runCli(["task", "create", "resolve-private", "--help"]);
+  assertSuccess(privateHelp, "private resolver scoped help");
+  assert.match(privateHelp.stdout, /Read-only temporary Codex App compatibility adapter/);
+  assert.match(privateHelp.stdout, /--run-id ID --operation-id ID/);
+  assert.doesNotMatch(privateHelp.stderr, /ERR_PARSE_ARGS_UNKNOWN_OPTION|at parseArgs/);
+
+  const familyHelp = runCli(["release", "prepare", "--help"]);
+  assertSuccess(familyHelp, "generic scoped help");
+  assert.match(familyHelp.stdout, /codex-flow release prepare\|reconcile\|accept/);
+  assert.doesNotMatch(familyHelp.stderr, /ERR_PARSE_ARGS_UNKNOWN_OPTION|at parseArgs/);
 
   const consume = runCli(["callback", "consume", "--run-id", "run-cli-help"]);
   assert.notEqual(consume.status, 0);
@@ -139,7 +151,7 @@ test("v0.7 activation requires a clean start when an incompatible namespace rema
   assert.match(result.stderr, /Clean start required before activation/);
   assert.match(result.stderr, /codex-flow unplug plan/);
   await assert.rejects(
-    stat(resolve(root, ".git", "codex-flow", "v0.7.6", "runs", "lifecycle.json")),
+    stat(resolve(root, ".git", "codex-flow", "v0.7.7", "runs", "lifecycle.json")),
     { code: "ENOENT" },
   );
 });
@@ -159,7 +171,7 @@ test("v0.7 activation cannot race an in-progress unplug", async (t) => {
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /unplug is already in progress/i);
   await assert.rejects(
-    stat(resolve(root, ".git", "codex-flow", "v0.7.6", "runs", "lifecycle.json")),
+    stat(resolve(root, ".git", "codex-flow", "v0.7.7", "runs", "lifecycle.json")),
     { code: "ENOENT" },
   );
 });
@@ -536,8 +548,8 @@ test("run activation needs no tracked setup and replays the same disclosed autho
   const context = await activatedFixture(t, "activation");
   await assert.rejects(stat(resolve(context.root, ".codex", "orchestration")), /ENOENT/);
   assert.equal(context.result.status, "admitted");
-  assert.equal(context.result.state_authority.namespace, "v0.7.6");
-  assert.match(context.result.state_authority.state_root, /\.git\/codex-flow\/v0\.7\.6$/);
+  assert.equal(context.result.state_authority.namespace, "v0.7.7");
+  assert.match(context.result.state_authority.state_root, /\.git\/codex-flow\/v0\.7\.7$/);
   assert.equal(context.result.repository_authority.cleanliness, "clean");
   assert.equal(context.result.workflow_authority.run_id, context.runId);
   assert.equal(context.result.model_routing[0].model, "gpt-5.6-terra");
@@ -595,7 +607,7 @@ test("run activation rejects a workflow outside its reservation envelope before 
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /outside the admitted run fence envelope/);
   await assert.rejects(
-    stat(resolve(root, ".git", "codex-flow", "v0.7.6")),
+    stat(resolve(root, ".git", "codex-flow", "v0.7.7")),
     (error) => error?.code === "ENOENT",
   );
 });
@@ -676,7 +688,7 @@ test("a second active run is refused before acquiring orphan runtime or workflow
   const contextsRoot = resolve(
     context.result.state_authority.git_common_dir,
     "codex-flow",
-    "v0.7.6",
+    "v0.7.7",
     "contexts",
   );
   const beforeContexts = await readdir(contextsRoot);

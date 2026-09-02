@@ -107,6 +107,7 @@ import {
   prepareVisibleTaskCreation,
   reconcileVisibleTaskCreation,
   recordVisibleTaskCreationAttempt,
+  resolvePrivateVisibleTaskCreation,
   validateVisibleTaskCreationRecord,
   visibleTaskCreationStatus,
 } from "../lib/task-creation-v07.mjs";
@@ -139,6 +140,7 @@ Usage:
   codex-flow workflow create|revise|contract --run-id ID --file request.json [--json]
   codex-flow workflow status --run-id ID --plan-id ID [--json]
   codex-flow task create prepare|attempt|reconcile|bind --run-id ID --file request.json [--json]
+  codex-flow task create resolve-private --run-id ID --operation-id ID [--json]
   codex-flow task create status --run-id ID --operation-id ID [--json]
   codex-flow subagent prepare|attempt|reconcile|complete|dispose --run-id ID --file request.json [--json]
   codex-flow subagent status --run-id ID --operation-id ID [--json]
@@ -166,6 +168,25 @@ state change. Native App calls remain external: the CLI emits one exact host
 request when dispatch is permitted, then journals the separately reconciled
 outcome.
 `;
+
+const PRIVATE_RESOLUTION_HELP = `codex-flow ${PACKAGE_VERSION} task create resolve-private
+
+Usage:
+  codex-flow task create resolve-private --run-id ID --operation-id ID [--json]
+
+Read-only temporary Codex App compatibility adapter. It requires an open
+provisional visible-task creation record, reads the exact private App binding
+and matching initial task session from CODEX_HOME (or ~/.codex), and emits one
+reconcile_request. It never changes App files or reopens terminal Flow state.
+Missing, changing, or contradictory private evidence fails closed.
+`;
+
+function helpFor(command, args) {
+  if (command === "task" && args[0] === "create" && args[1] === "resolve-private") {
+    return PRIVATE_RESOLUTION_HELP;
+  }
+  return HELP;
+}
 
 function parse(options, args = process.argv.slice(2), allowPositionals = true) {
   return parseArgs({ args, options, allowPositionals, strict: true });
@@ -615,7 +636,7 @@ async function commandRunV07(args) {
         bundle_sha256: runtime.bundle.bundle_sha256,
       },
       state_authority: {
-        namespace: "v0.7.6",
+        namespace: "v0.7.7",
         state_root: git.stateRoot,
         git_common_dir: git.commonDir,
       },
@@ -824,6 +845,20 @@ async function commandTaskCreateV07(args, mutationAuthority = null) {
     v07Output(assertRunIdentity(result, runId, "visible-task creation"));
     return;
   }
+  if (subcommand === "resolve-private") {
+    const runId = explicitRunId(values);
+    const operationId = requireText(values["operation-id"], "--operation-id", {
+      max: 128,
+      safeId: true,
+    });
+    await visibleTaskAuthority(git, operationId, runId);
+    const result = await resolvePrivateVisibleTaskCreation({
+      stateRoot: git.stateRoot,
+      operationId,
+    });
+    v07Output(assertRunIdentity(result, runId, "private visible-task resolution"));
+    return;
+  }
   const shapes = {
     prepare: { required: ["task_contract", "requested_selectors"], optional: ["prepared_at"] },
     attempt: {
@@ -834,12 +869,14 @@ async function commandTaskCreateV07(args, mutationAuthority = null) {
       required: ["operation_id", "outcome"],
       optional: [
         "provisional_client_thread_id", "ready_thread_id", "initial_turn",
-        "selector_evidence", "reason_code", "reconciled_at",
+        "private_resolution", "selector_evidence", "reason_code", "reconciled_at",
       ],
     },
     bind: { required: ["operation_id"], optional: ["bound_at"] },
   };
-  if (!shapes[subcommand]) throw new CliError("task create requires prepare, attempt, reconcile, bind, or status");
+  if (!shapes[subcommand]) {
+    throw new CliError("task create requires prepare, attempt, resolve-private, reconcile, bind, or status");
+  }
   const { runId, request } = await runScopedRequest(values, `task create ${subcommand}`, shapes[subcommand]);
   let result;
   if (subcommand === "prepare") {
@@ -870,6 +907,7 @@ async function commandTaskCreateV07(args, mutationAuthority = null) {
       provisionalClientThreadId: request.provisional_client_thread_id ?? null,
       readyThreadId: request.ready_thread_id ?? null,
       initialTurn: request.initial_turn ?? null,
+      privateResolution: request.private_resolution ?? null,
       selectorEvidence: request.selector_evidence ?? null,
       reasonCode: request.reason_code ?? null,
       now: commandNow(request, "reconciled_at"),
@@ -1581,6 +1619,10 @@ async function main() {
   const [command, ...args] = process.argv.slice(2);
   if (!command || command === "help" || command === "--help" || command === "-h") {
     console.log(HELP);
+    return;
+  }
+  if (args.includes("--help") || args.includes("-h") || args.includes("help")) {
+    console.log(helpFor(command, args));
     return;
   }
   if (command === "--version" || command === "version") {
