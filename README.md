@@ -22,8 +22,8 @@ Earlier releases remain source-history and immutable-tag evidence only; their
 readers, mutators, migration paths, retirement commands, tracked adoption, and
 test fixtures are not packaged in v0.7.
 
-The accepted public release remains v0.7.7 while this checkout validates
-v0.7.8-rc.2. v0.7 carries forward the proven cross-task behavior from v0.6.5 under
+The accepted public release is v0.7.8. v0.7 carries forward the proven
+cross-task behavior from v0.6.5 under
 `codex-flow-v07-*` identities and the exact `.git/codex-flow/v0.7.8/`
 namespace. It adds a bounded foreign-active-run sentinel so a live predecessor
 run blocks admission instead of being silently ignored or migrated.
@@ -33,7 +33,7 @@ v0.7.7 introduced an explicit temporary
 provisional `clientThreadId` without exposing its ready task ID through the
 public task catalog. The adapter is local and read-only: it requires agreeing
 App bindings and the exact nonce-bearing initial delegation, records compact
-private-host provenance, and fails closed. The v0.7.8 candidate permits delayed
+private-host provenance, and fails closed. v0.7.8 permits delayed
 processing when the exact source `create_thread` completion,
 initial-delegation, and observed-selector host timestamps fall inside the
 bounded creation window. The source event can authenticate and atomically

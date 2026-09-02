@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted for the v0.7.8 development checkpoint.
+Accepted for v0.7.8.
 
 ## Context
 
