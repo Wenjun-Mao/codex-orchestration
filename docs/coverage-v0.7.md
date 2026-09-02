@@ -52,7 +52,7 @@ durable result journal or coordinator disposition.
 
 - Read-only questions and plans require no repository setup.
 - An authorized actionable request may progressively activate one explicit run
-  under `.git/codex-flow/v0.7.7/`, with an exact runtime snapshot and
+  under `.git/codex-flow/v0.7.8/`, with an exact runtime snapshot and
   disclosure before external task creation.
 - Activation writes no tracked setup, adoption, instructions, or `AGENTS.md`.
 - A bounded sibling-namespace sentinel checks Git-common state at admission.
@@ -100,8 +100,9 @@ durable result journal or coordinator disposition.
 
 ## Clean predecessor boundary
 
-The accepted authority is `0.7.7`. It uses the
-`.git/codex-flow/v0.7.7/` namespace and does not migrate, reinterpret, delete,
+The accepted public authority remains `0.7.7` while the editable checkout is
+`0.7.8-dev.0`. The development runtime uses the `.git/codex-flow/v0.7.8/`
+namespace and does not migrate, reinterpret, delete,
 or overwrite accepted v0.7.6 state or content-addressed runtime snapshots under
 `.git/codex-flow/v0.7.6/`.
 

@@ -22,6 +22,7 @@ import {
 } from "../lib/foreign-active-run-sentinel.mjs";
 import {
   assertNoUnplugInProgressV07,
+  observePrivateUnplugV07,
   unplugApplyV07,
   unplugPlanV07,
 } from "../lib/unplug-v07.mjs";
@@ -160,6 +161,7 @@ Usage:
   codex-flow archive status --run-id ID --archive-id ID [--json]
   codex-flow cleanup plan --run-id ID [--json]
   codex-flow unplug plan [--file request.json] [--json]
+  codex-flow unplug observe-private --file request.json [--json]
   codex-flow unplug apply --file request.json [--json]
 
 Every run-scoped command requires an explicit --run-id. Complex mutations read
@@ -636,7 +638,7 @@ async function commandRunV07(args) {
         bundle_sha256: runtime.bundle.bundle_sha256,
       },
       state_authority: {
-        namespace: "v0.7.7",
+        namespace: "v0.7.8",
         state_root: git.stateRoot,
         git_common_dir: git.commonDir,
       },
@@ -1533,8 +1535,8 @@ async function commandCleanupV07(args) {
 
 async function commandUnplugV07(args) {
   const [subcommand, ...rest] = args;
-  if (!["plan", "apply"].includes(subcommand)) {
-    throw new CliError("unplug requires plan or apply");
+  if (!["plan", "observe-private", "apply"].includes(subcommand)) {
+    throw new CliError("unplug requires plan, observe-private, or apply");
   }
   const values = parseV07Options(rest);
   if (values["run-id"] !== undefined) {
@@ -1548,6 +1550,13 @@ async function commandUnplugV07(args) {
       repositoryPath: process.cwd(),
       resources: request.resources,
     }));
+    return;
+  }
+  if (subcommand === "observe-private") {
+    if (!values.file) throw new CliError("unplug observe-private requires --file <request.json>");
+    const request = await readJsonInput(values.file);
+    requireExactFields(request, { required: ["plan"] }, "unplug observe-private request");
+    v07Output(await observePrivateUnplugV07({ plan: request.plan }));
     return;
   }
   if (!values.file) throw new CliError("unplug apply requires --file <request.json>");
