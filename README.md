@@ -27,7 +27,7 @@ v0.7 carries forward the proven cross-task behavior from v0.6.5 under new
 namespace. It adds a bounded foreign-active-run sentinel so a live predecessor
 run blocks admission instead of being silently ignored or migrated.
 
-The current development checkpoint also includes an explicit temporary
+v0.7.7 also includes an explicit temporary
 `task create resolve-private` adapter for a Codex App regression that returns a
 provisional `clientThreadId` without exposing its ready task ID through the
 public task catalog. The adapter is local and read-only: it requires agreeing
