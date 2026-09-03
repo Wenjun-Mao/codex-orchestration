@@ -1,6 +1,6 @@
 {
   "name": "codex-orchestration",
-  "version": "0.7.8",
+  "version": "0.8.0-dev.0",
   "description": "Orchestrate visible Codex tasks with explicit model routing, bounded ownership, and quiet durable results.",
   "author": {
     "name": "Wenjun Mao"
@@ -11,14 +11,15 @@
   "interface": {
     "displayName": "Codex Orchestration",
     "shortDescription": "Orchestrate visible Codex tasks safely.",
-    "longDescription": "Use one coordinator to plan and govern multiple user-visible Codex tasks with explicit model routing, bounded ownership, reconciled host operations, quiet durable results, serial integration, audited closure, and a clean per-repository unplug path.",
+    "longDescription": "Use one coordinator to plan and govern multiple user-visible Codex executor tasks with explicit model routing, bounded ownership, quiet durable results, audited integration, clean unplug, and bounded release refresh for long-lived coordinators.",
     "developerName": "Wenjun Mao",
     "category": "Productivity",
-    "capabilities": ["Multi-task planning", "Model routing", "Durable result coordination", "Clean repository unplug"],
+    "capabilities": ["Multi-task planning", "Model routing", "Durable result coordination", "Long-lived coordinator refresh", "Clean repository unplug"],
     "defaultPrompt": [
-      "Plan this work across separate Terra executor tasks.",
-      "Run this workflow with one Sol coordinator and Terra tasks.",
+      "Plan this work across separate executor tasks with deliberate model routing.",
+      "Run this workflow with one coordinator and explicitly selected executor models.",
       "Review and integrate the journaled task results.",
+      "Refresh this long-lived coordinator onto the loaded plugin release.",
       "Unplug Codex Flow cleanly from this repository."
     ]
   }

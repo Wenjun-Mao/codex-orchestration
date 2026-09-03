@@ -1,7 +1,7 @@
 # Task Lifecycle
 
 1. **Activate:** snapshot the exact runtime under
-   `.git/codex-flow/v0.7.8/runtimes/<bundle-sha256>/`; bind repository/common
+   `.git/codex-flow/v0.8.0-dev.0/runtimes/<bundle-sha256>/`; bind repository/common
    directory, host, coordinator lineage/generation, configuration/policy, and
    the path/resource/branch reservation envelope to an explicit run ID.
 2. **Plan:** persist a content-addressed workflow revision with dependency DAG,
@@ -52,8 +52,8 @@
     complete only after the exact path is absent. If the public archived-task
     index lags, use explicit digest-bound private archive observation rather
     than inferring status. Derive the separate
-    exact-state cleanup plan and independently resolve branch/worktree state;
-    v0.7 does not apply Git deletion.
+   exact-state cleanup plan and independently resolve branch/worktree state;
+   v0.8 does not apply ordinary Git deletion.
 11. **Audit and close:** persist a content-addressed `run audit` over every
     current lifecycle record, then close only while that exact terminal proof
     remains current. Abandonment preserves the complete admitted reservation

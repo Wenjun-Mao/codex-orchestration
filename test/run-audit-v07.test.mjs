@@ -166,6 +166,7 @@ async function runtimeBundle(t, suffix) {
     ["bin/codex-flow.mjs", "#!/usr/bin/env node\n"],
     ["lib/runtime.mjs", "export const runtime = true;\n"],
     ["schemas/runtime.schema.json", "{}\n"],
+    ["skills/index/SKILL.md", "---\nname: index\n---\n\nRuntime skill.\n"],
     ["templates/roles/coordinator.md", "Coordinator role.\n"],
     ["templates/references/lifecycle.md", "Lifecycle reference.\n"],
   ]);
@@ -181,7 +182,7 @@ async function runFixture(t, suffix, task, { branchFences = [] } = {}) {
   const root = await createGitFixture(`codex-flow-v07-run-audit-${suffix}-`);
   t.after(() => removeFixture(root));
   const commonDir = await realpath(resolve(root, ".git"));
-  const stateRoot = resolve(commonDir, "codex-flow", "v0.7.8");
+  const stateRoot = resolve(commonDir, "codex-flow", "v0.8.0-dev.0");
   const baseline = git(root, ["rev-parse", "HEAD"]);
   const coordinator = {
     lineage_id: `audit-lineage-${suffix}`,

@@ -75,6 +75,7 @@ import {
 import {
   abandonRun,
   admitRun,
+  admitRunWithRepositoryLockHeld,
   assertWorkflowReservationCovered,
   buildFencePlan,
   fencePlanConflicts,
@@ -84,6 +85,14 @@ import {
   resumeRun,
   withActiveRunMutation,
 } from "../lib/run-lifecycle.mjs";
+import {
+  applyRefresh,
+  authenticateRefreshSkill,
+  consumeRefreshActivation,
+  inspectRefresh,
+  prepareRefresh,
+  refreshStatus,
+} from "../lib/refresh-v08.mjs";
 import {
   acquireRuntimeContext,
   buildRuntimeContext,
@@ -164,6 +173,9 @@ Usage:
   codex-flow unplug plan [--file request.json] [--json]
   codex-flow unplug observe-private --file request.json [--json]
   codex-flow unplug apply --file request.json [--json]
+  codex-flow refresh inspect --invoking-skill PATH [--json]
+  codex-flow refresh prepare|apply --invoking-skill PATH --file request.json [--json]
+  codex-flow refresh status --invoking-skill PATH [--refresh-id ID] [--json]
 
 Every run-scoped command requires an explicit --run-id. Complex mutations read
 one JSON request from --file and reject a mismatched request.run_id before any
@@ -521,10 +533,18 @@ function activationFences(value) {
 async function commandRunV07(args) {
   const [subcommand, ...rest] = args;
   if (subcommand === "activate") {
-    const values = parseV07Options(rest);
+    const values = parseV07Options(rest, { "refresh-id": { type: "string" } });
     const { runId, request } = await runScopedRequest(values, "run activate", {
       required: ["activated_at", "runtime", "workflow", "fences"],
+      optional: ["refresh_id"],
     });
+    const optionRefreshId = values["refresh-id"] ?? null;
+    const requestRefreshId = request.refresh_id ?? null;
+    if (optionRefreshId !== null && requestRefreshId !== null && optionRefreshId !== requestRefreshId) {
+      throw new CliError("run activate --refresh-id does not match request.refresh_id", 73);
+    }
+    const refreshId = optionRefreshId ?? requestRefreshId;
+    if (refreshId !== null) requireText(refreshId, "refresh_id", { max: 128, safeId: true });
     requireExactFields(request.runtime, {
       required: ["config", "policy", "host", "lineage"],
     }, "run activation request.runtime");
@@ -536,14 +556,16 @@ async function commandRunV07(args) {
       throw new CliError("run activate requires a clean authenticated Git worktree", 73);
     }
     await assertNoUnplugInProgressV07({ gitCommonDirectory: git.commonDir });
-    await assertNoForeignActiveRunCollision({
-      gitCommonDirectory: git.commonDir,
-      currentNamespace: V07_RUNTIME_DIRECTORY,
-    });
-    await assertNoIncompatibleFlowNamespace({
-      gitCommonDirectory: git.commonDir,
-      currentNamespace: V07_RUNTIME_DIRECTORY,
-    });
+    if (refreshId === null) {
+      await assertNoForeignActiveRunCollision({
+        gitCommonDirectory: git.commonDir,
+        currentNamespace: V07_RUNTIME_DIRECTORY,
+      });
+      await assertNoIncompatibleFlowNamespace({
+        gitCommonDirectory: git.commonDir,
+        currentNamespace: V07_RUNTIME_DIRECTORY,
+      });
+    }
     const workflow = createWorkflowPlanRevision(request.workflow);
     const fences = activationFences(request.fences);
     assertWorkflowReservationCovered(fences, workflow);
@@ -609,19 +631,35 @@ async function commandRunV07(args) {
         throw new CliError(`Run plan conflicts with retained fences from ${retained.run_id}`, 75);
       }
     }
-    const acquired = await acquireRuntimeContext({
-      gitCommonDirectory: git.commonDir,
-      context: runtime,
-      bundleSource,
+    const prepareTargetState = async () => ({
+      acquired: await acquireRuntimeContext({
+        gitCommonDirectory: git.commonDir,
+        context: runtime,
+        bundleSource,
+      }),
+      journal: await createWorkflowJournal({
+        stateRoot: git.stateRoot,
+        runId,
+        planId: workflow.plan_id,
+        planRevision: workflow,
+        now: Date.parse(activatedAt),
+      }),
     });
-    const journal = await createWorkflowJournal({
-      stateRoot: git.stateRoot,
-      runId,
-      planId: workflow.plan_id,
-      planRevision: workflow,
-      now: Date.parse(activatedAt),
-    });
-    const admitted = await admitRun({
+    const readExistingTargetState = async () => {
+      const acquired = await readRuntimeContext({
+        gitCommonDirectory: git.commonDir,
+        runtimeId: runtime.runtime_id,
+      });
+      return {
+        acquired: { ...acquired, status: "existing" },
+        journal: await workflowJournalStatus({
+          stateRoot: git.stateRoot,
+          runId,
+          planId: workflow.plan_id,
+        }),
+      };
+    };
+    const admissionRequest = {
       gitCommonDirectory: git.commonDir,
       runId,
       runtimeId: runtime.runtime_id,
@@ -629,7 +667,31 @@ async function commandRunV07(args) {
       workflowRevisionDigest: workflow.revision_digest,
       plan: fences,
       admittedAt: activatedAt,
-    });
+    };
+    const refresh = refreshId === null
+      ? null
+      : await consumeRefreshActivation({
+        commonDir: git.commonDir,
+        stateRoot: git.stateRoot,
+        refreshId,
+        runId,
+        runtime,
+        workflow,
+        fences,
+        activatedAt,
+        prepare: prepareTargetState,
+        readExisting: readExistingTargetState,
+        existingRun: existing,
+        admit: (repositoryLockToken) => admitRunWithRepositoryLockHeld({
+          ...admissionRequest,
+          repositoryLockToken,
+        }),
+      });
+    const preparedTarget = refresh === null
+      ? await prepareTargetState()
+      : refresh.prepared;
+    const { acquired, journal } = preparedTarget;
+    const admitted = refresh === null ? await admitRun(admissionRequest) : refresh.admitted;
     const coordinatorRecipient = await bindRunCoordinatorRecipient({
       git,
       run: admitted.run,
@@ -646,7 +708,7 @@ async function commandRunV07(args) {
         bundle_sha256: runtime.bundle.bundle_sha256,
       },
       state_authority: {
-        namespace: "v0.7.8",
+        namespace: V07_RUNTIME_DIRECTORY,
         state_root: git.stateRoot,
         git_common_dir: git.commonDir,
       },
@@ -684,6 +746,7 @@ async function commandRunV07(args) {
         evidence: "configured",
       })),
       host_call_performed: false,
+      refresh_origin: refresh?.origin ?? null,
       run: admitted.run,
     });
     return;
@@ -1597,6 +1660,90 @@ async function commandUnplugV07(args) {
   }));
 }
 
+async function commandRefreshV08(args) {
+  const [subcommand, ...rest] = args;
+  if (!["inspect", "prepare", "apply", "status"].includes(subcommand)) {
+    throw new CliError("refresh requires inspect, prepare, apply, or status");
+  }
+  const values = parseV07Options(rest, {
+    "invoking-skill": { type: "string" },
+    "refresh-id": { type: "string" },
+  });
+  if (values["run-id"] !== undefined) {
+    throw new CliError("refresh is repository-scoped and does not accept --run-id", 64);
+  }
+  const invokingSkillPath = requireText(
+    values["invoking-skill"],
+    "--invoking-skill",
+    { max: 2048 },
+  );
+  requireCanonicalSource();
+  const git = v07Repository();
+  if (subcommand === "inspect") {
+    if (values.file !== undefined || values["refresh-id"] !== undefined) {
+      throw new CliError("refresh inspect accepts only --invoking-skill and --json", 64);
+    }
+    v07Output(await inspectRefresh({
+      commonDir: git.commonDir,
+      currentNamespace: V07_RUNTIME_DIRECTORY,
+      packageRoot,
+      invokingSkillPath,
+    }));
+    return;
+  }
+  const targetAuthority = await authenticateRefreshSkill({ packageRoot, invokingSkillPath });
+  if (subcommand === "status") {
+    if (values.file !== undefined) throw new CliError("refresh status does not accept --file", 64);
+    v07Output(await refreshStatus({
+      commonDir: git.commonDir,
+      refreshId: values["refresh-id"] ?? null,
+    }));
+    return;
+  }
+  if (!values.file) throw new CliError(`refresh ${subcommand} requires --file <request.json>`);
+  const request = await readJsonInput(values.file);
+  if (subcommand === "prepare") {
+    requireExactFields(request, {
+      required: [
+        "source_namespace", "source_run_id", "source_resume", "decisions", "replacements",
+        "target_workflow", "target_fences", "target_coordinator_thread_id",
+      ],
+      optional: [],
+    }, "refresh prepare request");
+    const preparedAt = new Date().toISOString();
+    const fences = activationFences(request.target_fences);
+    v07Output(await prepareRefresh({
+      commonDir: git.commonDir,
+      sourceNamespace: request.source_namespace,
+      sourceRunId: request.source_run_id,
+      sourceResume: request.source_resume,
+      decisions: request.decisions,
+      replacements: request.replacements,
+      targetWorkflow: request.target_workflow,
+      targetFences: fences,
+      targetCoordinatorThreadId: request.target_coordinator_thread_id,
+      targetAuthority,
+      preparedAt,
+      cwd: process.cwd(),
+    }));
+    return;
+  }
+  requireExactFields(request, {
+    required: ["refresh_id", "expected_handoff_digest", "archive_evidence"],
+    optional: [],
+  }, "refresh apply request");
+  if (values["refresh-id"] !== undefined && values["refresh-id"] !== request.refresh_id) {
+    throw new CliError("refresh apply --refresh-id does not match request.refresh_id", 73);
+  }
+  v07Output(await applyRefresh({
+    commonDir: git.commonDir,
+    refreshId: request.refresh_id,
+    expectedHandoffDigest: request.expected_handoff_digest,
+    archiveEvidence: request.archive_evidence,
+    appliedAt: new Date().toISOString(),
+  }));
+}
+
 function isV07RunBoundMutation(command, args) {
   const subcommand = args[0];
   if (command === "workflow") return ["create", "revise", "contract"].includes(subcommand);
@@ -1672,6 +1819,7 @@ async function main() {
   if (command === "archive") return dispatchV07Command(command, args, commandArchiveV07);
   if (command === "cleanup") return commandCleanupV07(args);
   if (command === "unplug") return commandUnplugV07(args);
+  if (command === "refresh") return commandRefreshV08(args);
   throw new CliError(`Unknown command: ${command}\n\n${HELP}`);
 }
 

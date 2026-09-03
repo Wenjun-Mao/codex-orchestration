@@ -1,6 +1,6 @@
-# Executor Role
+# Executor Task Role
 
-The executor owns exactly one released generated task contract. It never
+The executor task owns exactly one released generated task contract. It never
 coordinates siblings or broadens paths, resources, verification, or product
 authority.
 

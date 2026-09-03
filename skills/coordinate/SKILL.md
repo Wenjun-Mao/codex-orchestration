@@ -5,9 +5,13 @@ description: Activate and coordinate one Codex Flow run across separate visible 
 
 # Coordinate Codex Work
 
-Use the installed plugin's bundled v0.7 CLI. Inspect top-level `--help` for the
-current command inventory and the scoped `task create resolve-private --help`
-for that temporary adapter; use the public command families named below and
+Use the installed plugin's bundled v0.8 CLI. The router has already run the
+one-time refresh inspection for this actionable request. If it selected
+`resume-source`, use the immutable source snapshot rather than this loaded CLI;
+if it selected `refresh-ready`, hand off to `codex-orchestration:refresh`.
+Inspect top-level `--help` for the current command inventory and the scoped
+`task create resolve-private --help` for that temporary adapter; use the public
+command families named below and
 include the explicit `run_id` in every stateful operation.
 
 ## Activate with disclosure
@@ -16,7 +20,7 @@ Questions and planning remain read-only. Before an actionable run writes
 operational state or creates a native task, disclose:
 
 - the package/runtime source and exact bundle hash;
-- the `.git/codex-flow/v0.7.8/` Git-common state root;
+- the `.git/codex-flow/v0.8.0-dev.0/` Git-common state root;
 - the repository, baseline, host, coordinator lineage and generation;
 - the proposed workflow revision and path/resource/branch reservation envelope;
 - each task's saved project, visible-task or subagent surface, requested model
@@ -30,7 +34,8 @@ unmentioned external actions. Use
 There is no requirement for tracked `.codex/orchestration/`. Activation must
 snapshot the exact runtime under the exact-version Git-common namespace and
 fail closed on runtime drift, a bounded foreign active-run collision, a second
-v0.7 run, or conflicting retained fences.
+v0.8 run, or conflicting retained fences. Never use this loaded package to
+mutate an active source run from a prior release.
 
 If admission reports an incompatible Flow namespace or requires a clean start,
 do not resume, reinterpret, migrate, or manually delete that state while
@@ -66,10 +71,10 @@ Started or released contracts never change. Only accepted terminal authority
 unblocks dependencies: a completed visible-task disposition or an accepted
 native-subagent operation.
 
-Use visible Codex tasks for independently running or mutating executor work.
+Use visible Codex tasks for independently running or mutating executor-task work.
 Use `subagent prepare|attempt|reconcile|complete|dispose|status` only for
 bounded read-only research/review. `attempt` exposes one native spawn request;
-ambiguous reconciliation never authorizes another spawn. The v0.7 contract
+ambiguous reconciliation never authorizes another spawn. The v0.8 contract
 forbids Ultra and full-history forks so an explicit model/effort override stays
 compatible with the current host. A subagent cannot own writes, enter the
 visible-task lifecycle, or spawn nested subagents.
@@ -96,7 +101,7 @@ binding plus the matching initial `create_thread` delegation and emits a complet
 `reconcile_request`; persist that request in temporary storage outside the
 repository and submit it unchanged to `task create reconcile`. Never infer from
 title, recency, worktree, or timing, never invoke the adapter silently, and
-never use it to reopen terminal v0.7 state except the exact persisted
+never use it to reopen terminal v0.8 state except the exact persisted
 `reconciliation-window-expired` ambiguity. That one recovery retains the
 original expiry evidence and the same one-shot operation; it never authorizes a
 second create. Missing or contradictory private evidence fails closed. The
@@ -116,10 +121,10 @@ Reconcile project, requested/accepted/observed model and effort, and the actual
 worktree. Run coordinator-owned `task create bind` to persist exact intent,
 attach the detached pristine worktree to its reserved branch, and reread its
 path, common directory, baseline, branch, and cleanliness before objective
-release. The executor path must not be the active runtime coordinator root;
+release. The executor-task path must not be the active runtime coordinator root;
 recovery preserves intent time and records its actual completion time. Then use
 `release prepare|reconcile|accept|status`: send the
-prepared prompt at most once and require the executor to accept from the exact
+prepared prompt at most once and require the executor task to accept from the exact
 persisted pristine worktree, on its reserved branch and baseline, using the
 exact release, contract, run-bound runtime, and common directory. An ambiguous
 send never authorizes blind resend.

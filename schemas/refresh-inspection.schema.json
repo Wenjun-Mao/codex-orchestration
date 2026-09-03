@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://private.local/codex-flow/refresh-inspection.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "kind", "route", "mutation_performed", "authority", "reason"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "kind": { "const": "codex-flow-refresh-v1-inspection" },
+    "route": { "enum": ["fresh", "resume-source", "refresh-ready", "blocked"] },
+    "mutation_performed": { "const": false },
+    "authority": { "type": "object" },
+    "reason": {
+      "oneOf": [
+        { "type": "null" },
+        { "type": "string", "minLength": 1, "maxLength": 4000 }
+      ]
+    }
+  }
+}

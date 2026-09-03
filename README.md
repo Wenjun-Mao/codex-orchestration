@@ -16,17 +16,18 @@ See [Mission and product boundary](docs/mission.md) for the durable charter.
 ## Current authority
 
 This public repository is the editing authority and remains `UNLICENSED`;
-public visibility does not grant an open-source license. v0.7 is the sole
+public visibility does not grant an open-source license. v0.8 is the sole
 current package, runtime, schema, skill, and operational-state authority.
-Earlier releases remain source-history and immutable-tag evidence only; their
-readers, mutators, migration paths, retirement commands, tracked adoption, and
-test fixtures are not packaged in v0.7.
+Earlier releases remain source-history and immutable-tag evidence only; v0.8
+packages no general predecessor reader, mutator, migration path, retirement
+command, tracked adoption, or predecessor test fixture. Its only compatibility
+surface is the bounded refresh authority described below.
 
-The accepted public release is v0.7.8. v0.7 carries forward the proven
-cross-task behavior from v0.6.5 under
-`codex-flow-v07-*` identities and the exact `.git/codex-flow/v0.7.8/`
-namespace. It adds a bounded foreign-active-run sentinel so a live predecessor
-run blocks admission instead of being silently ignored or migrated.
+The accepted public release is v0.7.8. The editable checkout is the unreleased
+v0.8.0 development authority. v0.8 carries forward the proven cross-task
+behavior under `codex-flow-v08-*` identities and exact-version Git-common
+namespaces. It retains a bounded foreign-active-run sentinel: ordinary
+activation never silently ignores or migrates a live predecessor run.
 
 v0.7.7 introduced an explicit temporary
 `task create resolve-private` adapter for a Codex App regression that returns a
@@ -46,15 +47,23 @@ are runtime-owned; callers provide host-event timestamps only as evidence.
 
 Actionable activation also requires a clean namespace boundary: any retained
 incompatible Flow namespace blocks and points to the repository-scoped
-`unplug` lifecycle. `unplug plan` is read-only; an exact `unplug apply` requires
-separate approval, proves known tasks archived, removes only authenticated
-eligible local resources, and deletes Flow state last.
+`unplug` lifecycle. The sole cross-release exception is the v0.8 long-lived
+coordinator refresh: after an App skill reload, one coordinator may finish or
+discard its unintegrated executor tasks under the source snapshot and then
+either start exactly the required replacement run or consume to a clean start
+when nothing needs reissue. It is not a hot runtime switch, general predecessor
+migration, or background service. `unplug plan` is
+read-only; an exact `unplug apply` requires separate approval, proves known
+tasks archived, removes only authenticated eligible local resources, and
+deletes Flow state last.
 
 Editing this checkout never changes an installed plugin or active repository
-runtime. An activated v0.7 run snapshots its exact bundle into the repository's
-Git common directory, so its authority survives task restart, compaction,
-plugin upgrade, and plugin removal. The runtime never reads, imports, migrates,
-or executes predecessor authority. The separate version-agnostic `unplug`
+runtime. An activated run snapshots its exact bundle into the repository's Git
+common directory, so its authority survives task restart, compaction, plugin
+upgrade, and plugin removal. An App reload changes only what the coordinator
+can invoke next; an active run continues through its immutable snapshot. The
+bounded refresh lifecycle is the only way a same-task coordinator starts a new
+release after resolving source executor work. The separate version-agnostic `unplug`
 lifecycle inventories retained namespace directories and ordinary root files
 as exact local state. Root files are byte-authenticated but never parsed or
 migrated; all entries are removed only through the reviewed clean-start
@@ -62,8 +71,8 @@ contract.
 
 ### Instruction authority
 
-The installed plugin skills are the sole live instruction authority for v0.7
-operation. Activation never reads or writes `AGENTS.md`, and v0.7 creates,
+The installed plugin skills are the sole live instruction authority for v0.8
+operation. Activation never reads or writes `AGENTS.md`, and v0.8 creates,
 requires, validates, or loads neither tracked orchestration instructions nor a
 tracked adoption. Repository-local instructions remain the repository's own
 authority, not plugin-managed state.
@@ -89,29 +98,29 @@ worktree manager, project system, model selector, task queue, or archive API.
 
 | Surface | Intended use | Codex Orchestration lifecycle |
 | --- | --- | --- |
-| Visible Codex task | Independently running, heterogeneous-model work; required for mutating executor lanes | Creation, nonce correlation, Git binding, release, result, disposition, integration/no-change, verification, archive and cleanup proof |
+| Visible Codex task | Independently running, heterogeneous-model work; required for mutating executor-task lanes | Creation, nonce correlation, Git binding, release, result, disposition, integration/no-change, verification, archive and cleanup proof |
 | Native subagent | Bounded read-only research or review attached to the coordinator task | Explicit model/reasoning with bounded `fork_turns`, result classification, unchanged-Git proof and accept/reject disposition only |
 
 Subagents are never a silent fallback for visible tasks. They cannot own writes,
 worktrees, branches, callbacks, integration, archive, or cleanup.
 
-## v0.7 operating model
+## v0.8 operating model
 
 ### Progressive run activation
 
 Questions, explanations, audits, and plans are read-only. A repository needs
-no `.codex/orchestration/` setup before it can use v0.7. Actionable activation
+no `.codex/orchestration/` setup before it can use v0.8. Actionable activation
 fails closed if the bounded sibling-namespace sentinel finds another active
 Codex Flow run or any incompatible retained namespace. A live run must be
 completed or abandoned under its own runtime. Terminal incompatible state must
-be reviewed and removed through an exact approved `unplug` plan before v0.7
+be reviewed and removed through an exact approved `unplug` plan before v0.8
 starts.
 
 When the user authorizes actionable orchestration, the plugin may activate one
 run after disclosing:
 
 - the exact package/runtime source and bundle hash;
-- the `.git/codex-flow/v0.7.8/` operational state root;
+- the exact-version `.git/codex-flow/v0.8.0-dev.0/` operational state root;
 - repository/common-directory, baseline, host, and coordinator binding;
 - the immutable workflow revision and its path/resource/branch reservation
   envelope;
@@ -148,7 +157,7 @@ Only unstarted tasks and edges may change; started or released contracts do not.
 
 ### Model routing
 
-The coordinator explicitly selects the executor model and reasoning effort in
+The coordinator explicitly selects each executor task's model and reasoning effort in
 the native creation call. Prompt text alone does not configure them. Sol
 coordinating Terra is a useful default shape, not a permanent dependency.
 
@@ -168,7 +177,7 @@ Use the least capable sufficient lane:
 The plugin records configuration, request, host acceptance, and independent
 observation separately. Accepted-but-unobservable selectors remain partial
 evidence; a contradictory observed selector blocks. Native subagents also name
-bounded `fork_turns` explicitly. For native subagents, the v0.7 plugin forbids
+bounded `fork_turns` explicitly. For native subagents, the v0.8 plugin forbids
 Ultra and full-history forks: current full-history forks inherit the parent
 model/effort and cannot accept the explicit heterogeneous selectors this
 contract records. Visible tasks retain the host's supported reasoning range.
@@ -187,9 +196,9 @@ After project/model/effort/worktree reconciliation, the coordinator binds the
 observed pristine worktree at the authenticated baseline with `task create
 bind`. The command persists content-addressed intent before attaching a
 detached worktree to the reserved branch, rejects the active coordinator root
-as an executor path, and exact replay recovers either side of that Git switch
+as an executor-task path, and exact replay recovers either side of that Git switch
 while recording the actual completion time. It then prepares one
-release, sends its exact prompt at most once, and requires the executor to
+release, sends its exact prompt at most once, and requires the executor task to
 accept from that exact persisted worktree and reserved branch using the exact
 release, contract, run-bound runtime, and common directory before work.
 Ambiguous creation or release fails closed rather than authorizing retry or
@@ -257,7 +266,7 @@ visible and keep the run from closing. Native archive acceptance is
 asynchronous: an archived task may enter
 `archived-awaiting-worktree-reclamation` until its exact managed path is
 absent. That state never replays archive, and cleanup and closure remain
-blocked. Archive and Git cleanup are separate actions. v0.7 can derive a
+blocked. Archive and Git cleanup are separate actions. v0.8 can derive a
 deterministic read-only cleanup plan and verify that
 refs/worktrees are resolved; ordinary run cleanup does not apply deletions.
 The separate repository-scoped `unplug` lifecycle can apply an explicitly
@@ -282,21 +291,25 @@ Ask or at-mention the installed Codex Orchestration plugin naturally:
 ```text
 How would Codex Flow split this work across visible tasks?
 Use Codex Flow to run these two independent implementation lanes.
-Use one Terra task for implementation and one read-only subagent for review.
+Use one Terra-high visible executor task for implementation and one explicit
+read-only subagent for review.
 ```
 
-The first request is read-only. An actionable request routes through
-`codex-orchestration:coordinate` and can activate a run without permanent
-repository setup. External task creation remains visible in the disclosed
-plan.
+The first request is read-only. An actionable request first routes through
+`codex-orchestration:refresh`, then either continues an active run through its
+immutable snapshot, performs a bounded refresh handoff, or routes to
+`codex-orchestration:coordinate` for a fresh run. It can activate without
+permanent repository setup. External task creation remains visible in the
+disclosed plan.
 
 ## Public CLI families
 
-Use `codex-flow --help` for exact flags. The v0.7 public
+Use `codex-flow --help` for exact flags. The v0.8 public
 lifecycle is organized around these command families:
 
 ```text
 run activate|status|resume|rebind|audit|close|abandon
+refresh inspect|prepare|apply|status
 workflow create|revise|status|contract
 task create prepare|attempt|reconcile|bind|status
 task create resolve-private
@@ -331,14 +344,18 @@ are used, and no tracked setup or adoption command exists.
 
 ## Pre-release compatibility and retained history
 
-v0.7 is intentionally breaking. It has no predecessor compatibility reader,
-dual execution path, operational-state migration, retirement command, or
-tracked adoption. Predecessor state remains outside v0.7 authority; immutable
-source tags and Git history remain the audit route. Earlier ADRs remain useful
-decision evidence where a later ADR supersedes their mechanism.
+v0.8 preserves the clean authority boundary: it has no general predecessor
+compatibility reader, dual execution path, operational-state migration,
+retirement command, or tracked adoption. Predecessor state remains outside
+ordinary v0.8 authority; immutable source tags and Git history remain the
+audit route. The only exceptions are the exact v0.7.8 same-coordinator adapter
+and the stable self-export contract used by successive v0.8+ source snapshots,
+as described in [ADR 0040](docs/adr/0040-long-lived-coordinator-refresh.md).
+Earlier ADRs remain useful decision evidence where a later ADR supersedes their
+mechanism.
 
 The current boundary is summarized in
-[v0.7 orchestration coverage](docs/coverage-v0.7.md).
+[v0.8 refresh-contract coverage](docs/coverage-v0.8.md).
 [ADR 0015](docs/adr/0015-progressive-run-activation-authority.md) defines
 progressive activation and [ADR 0016](docs/adr/0016-content-addressed-workflow-and-native-boundary.md)
 defines workflow identity and the native-task boundary. [ADR 0029](docs/adr/0029-v070-clean-authority-cutover.md)
@@ -361,7 +378,9 @@ temporary, explicit private task-ID resolver and its public-host exit condition.
 defines event-time-safe creation reconciliation and authenticated private
 archive evidence for archive and unplug recovery. [ADR 0039](docs/adr/0039-runtime-owned-visible-task-clocks.md)
 makes visible-task lifecycle clocks runtime-owned so caller timestamps cannot
-invalidate real host-event ordering.
+invalidate real host-event ordering. [ADR 0040](docs/adr/0040-long-lived-coordinator-refresh.md)
+defines the narrow long-lived coordinator refresh that supersedes ADR 0029 only
+for exact v0.7.8-to-v0.8 and successive v0.8+ same-task cutovers.
 
 ## Source and distribution
 

@@ -23,7 +23,7 @@ host-observed pristine worktree at the authenticated baseline. Send the
 prepared release once and require exact executor acceptance before work.
 
 For a native subagent, require a read-only contract with explicit model,
-reasoning, and bounded `fork_turns`. The v0.7 contract forbids Ultra,
+reasoning, and bounded `fork_turns`. The v0.8 contract forbids Ultra,
 full-history selector overrides, and nested subagent spawning. Do not give it
 worktree, branch, callback, integration, archive, or cleanup ownership.
 
@@ -38,6 +38,6 @@ For each visible-task terminal result, prepare a durable disposition, reconcile
 integration or no-change, run and reload an authoritative PASS
 combined-verification record, finalize the disposition exactly once, and then
 reconcile archival. Dirty or attention-needed work remains visible and keeps
-the run active. Git cleanup is a separate read-only exact-state plan; v0.7 does
+the run active. Git cleanup is a separate read-only exact-state plan; v0.8 does
 not apply deletion. Close only a fully reconciled run; abandonment retains the
 complete admitted path/resource/branch envelope.

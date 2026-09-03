@@ -5,8 +5,9 @@ description: Execute one accepted, generated Codex Flow visible-task contract an
 
 # Execute a Generated Task Contract
 
-Use the exact v0.7 runtime named by the release and include its `run_id` in
-every stateful command.
+Use the exact run-bound runtime named by the release and include its `run_id`
+in every stateful command. A coordinator App reload does not change this
+executor task's authority.
 
 If the first turn contains only a launch nonce bootstrap, do no repository
 work. Wait until the coordinator sends the generated contract, then use

@@ -30,7 +30,7 @@ async function commitFile(root, path, contents, message) {
 
 async function integrationFixture(suffix, { decision = "accepted-for-integration" } = {}) {
   const root = await createGitFixture(`codex-flow-v07-integration-${suffix}-`);
-  const stateRoot = resolve(root, ".git", "codex-flow", "v0.7.8");
+  const stateRoot = resolve(root, ".git", "codex-flow", "v0.8.0-dev.0");
   const baseline = git(root, ["rev-parse", "HEAD"]);
   const executorBranch = `codex/integration-${suffix}`;
   git(root, ["switch", "--quiet", "-c", executorBranch]);

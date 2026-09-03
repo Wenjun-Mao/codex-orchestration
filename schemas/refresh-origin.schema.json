@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://private.local/codex-flow/refresh-origin.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "kind", "refresh_id", "source_digest", "replacement_digest",
+    "target_run_id", "target_runtime_id", "recorded_at", "origin_digest"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "kind": { "const": "codex-flow-refresh-v1-origin" },
+    "refresh_id": { "$ref": "#/$defs/safeId" },
+    "source_digest": { "$ref": "#/$defs/digest" },
+    "replacement_digest": { "$ref": "#/$defs/digest" },
+    "target_run_id": { "$ref": "#/$defs/safeId" },
+    "target_runtime_id": { "$ref": "#/$defs/digest" },
+    "recorded_at": { "$ref": "#/$defs/timestamp" },
+    "origin_digest": { "$ref": "#/$defs/digest" }
+  },
+  "$defs": {
+    "safeId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9_.-]+$" },
+    "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "timestamp": { "type": "string", "maxLength": 64, "format": "date-time" }
+  }
+}

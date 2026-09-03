@@ -1,0 +1,329 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://private.local/codex-flow/refresh-handoff-v1.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "kind", "refresh_id", "state", "intent", "cleanup",
+    "source_retirement", "target_consumption", "updated_at", "handoff_digest"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "kind": { "const": "codex-flow-refresh-v1-handoff" },
+    "refresh_id": { "$ref": "#/$defs/safeId" },
+    "state": { "enum": ["prepared", "archive-observed", "source-retired", "consumed"] },
+    "intent": { "$ref": "#/$defs/intent" },
+    "cleanup": { "type": "array", "maxItems": 256, "items": { "$ref": "#/$defs/cleanup" } },
+    "source_retirement": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/retirement" }] },
+    "target_consumption": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/consumption" }] },
+    "updated_at": { "$ref": "#/$defs/timestamp" },
+    "handoff_digest": { "$ref": "#/$defs/digest" }
+  },
+  "$defs": {
+    "safeId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9_.-]+$" },
+    "threadId": { "type": "string", "minLength": 1, "maxLength": 256, "pattern": "^[A-Za-z0-9_.-]+$" },
+    "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "timestamp": { "type": "string", "maxLength": 64, "format": "date-time" },
+    "absolutePath": { "type": "string", "minLength": 1, "maxLength": 2048, "pattern": "^/" },
+    "tree": {
+      "type": "object", "additionalProperties": false,
+      "required": ["file_count", "byte_count", "tree_digest"],
+      "properties": {
+        "file_count": { "type": "integer", "minimum": 0, "maximum": 8192 },
+        "byte_count": { "type": "integer", "minimum": 0, "maximum": 134217728 },
+        "tree_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "baseline": {
+      "type": "object", "additionalProperties": false,
+      "required": ["root", "common_dir", "branch", "revision", "cleanliness"],
+      "properties": {
+        "root": { "$ref": "#/$defs/absolutePath" },
+        "common_dir": { "$ref": "#/$defs/absolutePath" },
+        "branch": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "revision": { "type": "string", "pattern": "^[0-9a-f]{40,64}$" },
+        "cleanliness": { "enum": ["clean", "dirty"] }
+      }
+    },
+    "coordinator": {
+      "type": "object", "additionalProperties": false,
+      "required": ["lineage_id", "thread_id", "generation"],
+      "properties": {
+        "lineage_id": { "$ref": "#/$defs/safeId" },
+        "thread_id": { "$ref": "#/$defs/threadId" },
+        "generation": { "type": "integer", "minimum": 1, "maximum": 2147483647 }
+      }
+    },
+    "source": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "namespace", "package_version", "adapter", "run_id", "run_status", "runtime_id",
+        "runtime_context_digest", "bundle_sha256", "source_digest", "workflow_plan_id",
+        "workflow_revision_digest", "coordinator", "baseline", "tree"
+      ],
+      "properties": {
+        "namespace": { "$ref": "#/$defs/safeId" },
+        "package_version": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "adapter": { "enum": ["exact-v0.7.8-adapter", "v0.8-source-export"] },
+        "run_id": { "$ref": "#/$defs/safeId" },
+        "run_status": { "enum": ["active", "closed", "abandoned"] },
+        "runtime_id": { "$ref": "#/$defs/digest" },
+        "runtime_context_digest": { "$ref": "#/$defs/digest" },
+        "bundle_sha256": { "$ref": "#/$defs/digest" },
+        "source_digest": { "$ref": "#/$defs/digest" },
+        "workflow_plan_id": { "$ref": "#/$defs/safeId" },
+        "workflow_revision_digest": { "$ref": "#/$defs/digest" },
+        "coordinator": { "$ref": "#/$defs/coordinator" },
+        "baseline": { "$ref": "#/$defs/baseline" },
+        "tree": { "$ref": "#/$defs/tree" }
+      }
+    },
+    "target": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "mode", "package_version", "plugin_version", "package_root", "bundle_sha256", "refresh_skill_sha256",
+        "coordinator_thread_id", "workflow_plan_id", "workflow_revision_digest", "fences_digest", "baseline"
+      ],
+      "properties": {
+        "mode": { "enum": ["replacement-run", "no-replacements"] },
+        "package_version": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "plugin_version": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "package_root": { "$ref": "#/$defs/absolutePath" },
+        "bundle_sha256": { "$ref": "#/$defs/digest" },
+        "refresh_skill_sha256": { "$ref": "#/$defs/digest" },
+        "coordinator_thread_id": { "$ref": "#/$defs/threadId" },
+        "workflow_plan_id": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/safeId" }] },
+        "workflow_revision_digest": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/digest" }] },
+        "fences_digest": { "$ref": "#/$defs/digest" },
+        "baseline": { "$ref": "#/$defs/baseline" }
+      }
+    },
+    "decision": {
+      "type": "object", "additionalProperties": false,
+      "required": ["source_task_id", "disposition", "rationale"],
+      "properties": {
+        "source_task_id": { "$ref": "#/$defs/safeId" },
+        "disposition": { "enum": ["wait", "discard"] },
+        "rationale": { "type": "string", "minLength": 1, "maxLength": 512 }
+      }
+    },
+    "brief": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "title", "execution_kind", "mode", "fork_surface", "read_paths", "write_paths", "shared_resources",
+        "primary_outcome", "causal_question", "cheapest_safe_direct_attempt", "instrument_role",
+        "supporting_authorization", "supporting_follow_up", "brief_digest"
+      ],
+      "properties": {
+        "title": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "execution_kind": { "enum": ["task-thread", "subagent"] },
+        "mode": { "enum": ["read", "write"] },
+        "fork_surface": { "enum": ["visible-task", "bounded-native-subagent"] },
+        "read_paths": { "type": "array", "maxItems": 128, "uniqueItems": true, "items": { "type": "string", "minLength": 1, "maxLength": 512 } },
+        "write_paths": { "type": "array", "maxItems": 128, "uniqueItems": true, "items": { "type": "string", "minLength": 1, "maxLength": 512 } },
+        "shared_resources": { "type": "array", "maxItems": 128, "uniqueItems": true, "items": { "$ref": "#/$defs/safeId" } },
+        "primary_outcome": { "type": "string", "minLength": 1, "maxLength": 2000 },
+        "causal_question": { "oneOf": [{ "type": "null" }, { "type": "string", "minLength": 1, "maxLength": 2000 }] },
+        "cheapest_safe_direct_attempt": { "type": "string", "minLength": 1, "maxLength": 2000 },
+        "instrument_role": { "enum": ["none", "supporting", "primary-deliverable"] },
+        "supporting_authorization": { "$ref": "#/$defs/supportingAuthorization" },
+        "supporting_follow_up": { "$ref": "#/$defs/semanticFollowUp" },
+        "brief_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "supportingAuthorization": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["authorized_revision", "reason"],
+          "properties": {
+            "authorized_revision": { "type": "integer", "minimum": 2, "maximum": 2147483647 },
+            "reason": { "type": "string", "minLength": 1, "maxLength": 512 }
+          }
+        }
+      ]
+    },
+    "semanticFollowUp": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["kind", "target_semantic_digest"],
+          "properties": {
+            "kind": { "const": "direct-attempt" },
+            "target_semantic_digest": { "$ref": "#/$defs/digest" }
+          }
+        },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["kind", "reason"],
+          "properties": {
+            "kind": { "const": "pause-replan" },
+            "reason": { "type": "string", "minLength": 1, "maxLength": 512 }
+          }
+        }
+      ]
+    },
+    "replacement": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "source_task_id", "source_task_digest", "source_contract_id", "source_operation_id",
+        "target_task_id", "dependency_source_task_digests", "brief"
+      ],
+      "properties": {
+        "source_task_id": { "$ref": "#/$defs/safeId" },
+        "source_task_digest": { "$ref": "#/$defs/digest" },
+        "source_contract_id": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/digest" }] },
+        "source_operation_id": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/safeId" }] },
+        "target_task_id": { "$ref": "#/$defs/safeId" },
+        "dependency_source_task_digests": { "type": "array", "maxItems": 128, "uniqueItems": true, "items": { "$ref": "#/$defs/digest" } },
+        "brief": { "$ref": "#/$defs/brief" }
+      }
+    },
+    "intent": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "source", "source_resume", "target", "decisions", "replacements", "replacement_digest",
+        "prepared_at"
+      ],
+      "properties": {
+        "source": { "$ref": "#/$defs/source" },
+        "source_resume": { "$ref": "#/$defs/binding" },
+        "target": { "$ref": "#/$defs/target" },
+        "decisions": { "type": "array", "maxItems": 256, "items": { "$ref": "#/$defs/decision" } },
+        "replacements": { "type": "array", "maxItems": 256, "items": { "$ref": "#/$defs/replacement" } },
+        "replacement_digest": { "$ref": "#/$defs/digest" },
+        "prepared_at": { "$ref": "#/$defs/timestamp" }
+      }
+    },
+    "host": {
+      "type": "object", "additionalProperties": false,
+      "required": ["host_id", "session_id"],
+      "properties": {
+        "host_id": { "$ref": "#/$defs/safeId" },
+        "session_id": { "$ref": "#/$defs/safeId" }
+      }
+    },
+    "lineage": {
+      "type": "object", "additionalProperties": false,
+      "required": ["lineage_id", "thread_id", "generation"],
+      "properties": {
+        "lineage_id": { "$ref": "#/$defs/safeId" },
+        "thread_id": { "$ref": "#/$defs/threadId" },
+        "generation": { "type": "integer", "minimum": 1, "maximum": 2147483647 }
+      }
+    },
+    "binding": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "runtime_context_hash", "bundle_hash", "config_hash", "policy_hash",
+        "repository_hash", "host", "lineage", "generation", "fence_token"
+      ],
+      "properties": {
+        "runtime_context_hash": { "$ref": "#/$defs/digest" },
+        "bundle_hash": { "$ref": "#/$defs/digest" },
+        "config_hash": { "$ref": "#/$defs/digest" },
+        "policy_hash": { "$ref": "#/$defs/digest" },
+        "repository_hash": { "$ref": "#/$defs/digest" },
+        "host": { "$ref": "#/$defs/host" },
+        "lineage": { "$ref": "#/$defs/lineage" },
+        "generation": { "type": "integer", "minimum": 1, "maximum": 2147483647 },
+        "fence_token": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "gitAuthority": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "common_dir", "worktree_path", "branch", "head", "status_digest", "dirty",
+        "worktree_inventory_digest", "upstream", "matching_remote", "tags_at_tip"
+      ],
+      "properties": {
+        "common_dir": { "$ref": "#/$defs/absolutePath" },
+        "worktree_path": { "$ref": "#/$defs/absolutePath" },
+        "branch": { "type": "string", "minLength": 1, "maxLength": 256, "pattern": "^codex/" },
+        "head": { "type": "string", "pattern": "^[0-9a-f]{40,64}$" },
+        "status_digest": { "$ref": "#/$defs/digest" },
+        "dirty": { "type": "boolean" },
+        "worktree_inventory_digest": { "$ref": "#/$defs/digest" },
+        "upstream": { "oneOf": [{ "type": "null" }, { "type": "string", "minLength": 1, "maxLength": 512 }] },
+        "matching_remote": { "oneOf": [{ "type": "null" }, { "type": "string", "minLength": 1, "maxLength": 512 }] },
+        "tags_at_tip": { "type": "array", "maxItems": 128, "uniqueItems": true, "items": { "type": "string", "minLength": 1, "maxLength": 256 } }
+      }
+    },
+    "archiveEvidence": {
+      "type": "object", "additionalProperties": false,
+      "required": ["archive_intent_id", "thread_id", "host_id", "active_visible", "archived_visible", "observed_at"],
+      "properties": {
+        "archive_intent_id": { "$ref": "#/$defs/safeId" },
+        "thread_id": { "$ref": "#/$defs/threadId" },
+        "host_id": { "$ref": "#/$defs/safeId" },
+        "active_visible": { "const": false },
+        "archived_visible": { "const": true },
+        "observed_at": { "$ref": "#/$defs/timestamp" }
+      }
+    },
+    "cleanup": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "source_task_id", "creation_operation_id", "archive_intent_id", "thread_id", "host_id",
+        "git_authority", "archive_evidence",
+        "worktree_removed_at", "branch_deleted_at"
+      ],
+      "properties": {
+        "source_task_id": { "$ref": "#/$defs/safeId" },
+        "creation_operation_id": { "$ref": "#/$defs/safeId" },
+        "archive_intent_id": { "$ref": "#/$defs/safeId" },
+        "thread_id": { "$ref": "#/$defs/threadId" },
+        "host_id": { "$ref": "#/$defs/safeId" },
+        "git_authority": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/gitAuthority" }] },
+        "archive_evidence": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/archiveEvidence" }] },
+        "worktree_removed_at": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/timestamp" }] },
+        "branch_deleted_at": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/timestamp" }] }
+      }
+    },
+    "retirement": {
+      "type": "object", "additionalProperties": false,
+      "required": ["retired_at", "method", "terminal_status", "final_source_tree"],
+      "properties": {
+        "retired_at": { "$ref": "#/$defs/timestamp" },
+        "method": { "enum": ["snapshot-abandon", "already-terminal"] },
+        "terminal_status": { "enum": ["closed", "abandoned"] },
+        "final_source_tree": { "$ref": "#/$defs/tree" }
+      }
+    },
+    "consumption": {
+      "type": "object", "additionalProperties": false,
+      "required": ["mode", "target_run_id", "target_runtime_id", "origin_digest", "consumed_at"],
+      "properties": {
+        "mode": { "enum": ["run-activation", "clean-start"] },
+        "target_run_id": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/safeId" }] },
+        "target_runtime_id": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/digest" }] },
+        "origin_digest": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/digest" }] },
+        "consumed_at": { "$ref": "#/$defs/timestamp" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "mode": { "const": "run-activation" } }, "required": ["mode"] },
+          "then": {
+            "properties": {
+              "target_run_id": { "$ref": "#/$defs/safeId" },
+              "target_runtime_id": { "$ref": "#/$defs/digest" },
+              "origin_digest": { "$ref": "#/$defs/digest" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "mode": { "const": "clean-start" } }, "required": ["mode"] },
+          "then": {
+            "properties": {
+              "target_run_id": { "type": "null" },
+              "target_runtime_id": { "type": "null" },
+              "origin_digest": { "type": "null" }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

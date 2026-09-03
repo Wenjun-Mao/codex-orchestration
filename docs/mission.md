@@ -31,7 +31,7 @@ establish one durable repository workflow across independently running tasks.
 
 Without an orchestration boundary:
 
-- a routine executor message may Steer and interrupt a working coordinator;
+- a routine executor-task message may Steer and interrupt a working coordinator;
 - a result may not be provably connected to the plan and task that authorized
   it;
 - parallel tasks may claim overlapping files or shared resources;
@@ -55,7 +55,7 @@ Lead task authenticates one repository outcome
           +---------+---------+
           |                   |
           v                   v
-   Bounded task A      Bounded task B
+Executor task A    Executor task B
           |                   |
           +---------+---------+
                     |
@@ -89,8 +89,8 @@ waits, task-final events, and notification adapters may provide liveness, but
 they do not become competing integration authorities.
 
 Urgent blockers, approval requests, and high-risk drift use a separate direct
-path. The event is persisted before one bounded interrupt attempt. v0.7 does
-not retry that attempt; host replay or ambiguity cannot authorize duplicate
+path. The event is persisted before one bounded interrupt attempt. The runtime
+does not retry that attempt; host replay or ambiguity cannot authorize duplicate
 coordinator action. Ordinary completion never uses the urgent path.
 
 The durable queue describes non-interrupting, resumable availability; it
@@ -99,9 +99,16 @@ governs the current ordinary-completion authority and any future notification
 adapter. The accepted implementation is a repository journal read by the
 coordinator, not a Codex thread-message queue.
 
+An App skill reload may let the same long-lived coordinator task invoke a newer
+installed plugin, but it never hot-switches an active run. The old run remains
+governed by its immutable repository snapshot until its executor tasks are
+integrated, deliberately discarded through the bounded refresh handoff, or
+otherwise reaches its own terminal lifecycle. A later run starts with a fresh
+coordinator lineage at generation 1, so old callbacks cannot cross the cutover.
+
 ### Bounded delegation
 
-Every executor receives a generated contract with an explicit objective, dependency position, path and
+Every executor task receives a generated contract with an explicit objective, dependency position, path and
 shared-resource ownership, deadline, model request, verification scope, and
 terminal-result contract. A directed acyclic dependency graph identifies which
 tasks may run concurrently and which must wait; dependency cycles are invalid.
@@ -123,14 +130,14 @@ records the request and available evidence; it does not claim a selector was
 observed when the host only accepted it.
 
 Separate, user-visible Codex tasks are the primary surface for independently
-running or mutating executor work. Native subagents are a distinct read-only
+running or mutating executor-task work. Native subagents are a distinct read-only
 supporting lane within the coordinator task; they do not acquire task branches,
 callbacks, integrations, archives, or cleanup state. Neither surface is a
 silent fallback for the other.
 
 ### Safe repository completion
 
-Executor results do not authorize integration merely because a task finishes.
+Executor-task results do not authorize integration merely because a task finishes.
 The coordinator authenticates the durable result and exact Git provenance,
 integrates serially, runs combined verification, records the disposition once,
 and removes state only through a reviewed cleanup contract.
@@ -197,12 +204,22 @@ mission.
 
 ## Version relationship
 
-This charter guides v0.7 and later development. v0.7 is a clean authority
-boundary: it packages no predecessor protocol reader, migration, retirement,
-tracked adoption, or plugin-managed instruction path. Earlier releases remain
-immutable source-tag and Git-history evidence only. A bounded lifecycle
-sentinel blocks admission while another version still has an active run, but
-v0.7 never imports or normalizes that run.
+This charter guides v0.8 and later development. Ordinary activation is a clean
+authority boundary: it packages no general predecessor protocol reader,
+migration, retirement, tracked adoption, or plugin-managed instruction path.
+Earlier releases remain immutable source-tag and Git-history evidence only.
+
+One narrow exception supports a long-lived coordinator after an App skill
+reload. The coordinator may use a bounded refresh handoff to finish or discard
+unintegrated executor tasks from one authenticated source runtime and activate
+one new run. The source snapshot remains the authority for source lifecycle
+work; the target receives only semantic replacement briefs and fresh task,
+selector, Git, and runtime identities. v0.8.0 includes an exact v0.7.8 source
+adapter whose raw legacy records remain governed by byte-authenticated v0.7.8
+reader/validator modules, while successive v0.8+ snapshots parse and export
+their own stable refresh semantics; neither is arbitrary predecessor
+compatibility.
+[ADR 0040](adr/0040-long-lived-coordinator-refresh.md) governs this exception.
 
 When incompatible retained local Flow state prevents a clean start, the
 separate `unplug` lifecycle is deliberately narrower than predecessor support:

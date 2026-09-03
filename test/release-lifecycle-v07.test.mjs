@@ -82,7 +82,7 @@ async function fixture({ hostWorktree = false } = {}) {
     tasks: [task()],
   });
   const runId = "release-run";
-  const stateRoot = resolve(commonDir, "codex-flow", "v0.7.8");
+  const stateRoot = resolve(commonDir, "codex-flow", "v0.8.0-dev.0");
   const { authority, runtime } = await activateV07FixtureRun({
     root,
     runId,
@@ -489,7 +489,7 @@ test("release acceptance authenticates the exact linked executor worktree", asyn
     })).acceptance, null);
 
     const mismatchedPackage = resolve(worktreeParent, "mismatched-package");
-    for (const path of ["bin", "lib", "schemas", "templates/roles", "templates/references"]) {
+    for (const path of ["bin", "lib", "schemas", "skills", "templates/roles", "templates/references"]) {
       await cp(resolve(packageRoot, path), resolve(mismatchedPackage, path), { recursive: true });
     }
     await writeFile(

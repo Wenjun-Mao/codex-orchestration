@@ -2,7 +2,7 @@
 
 import { spawnSync } from "node:child_process";
 import { access, readdir, readFile } from "node:fs/promises";
-import { basename, resolve } from "node:path";
+import { basename, relative, resolve } from "node:path";
 import { PACKAGE_VERSION } from "../lib/core.mjs";
 import { CODEX_FLOW_STATE_NAMESPACE } from "../lib/git.mjs";
 import { V07_RUNTIME_DIRECTORY } from "../lib/runtime-context.mjs";
@@ -13,7 +13,7 @@ import {
 import { validateReleaseIdentity } from "./release-identity.mjs";
 
 const root = resolve(import.meta.dirname, "..");
-const EXPECTED_PACKAGE_VERSION = "0.7.8";
+const EXPECTED_PACKAGE_VERSION = "0.8.0-dev.0";
 
 // ACTIVE V0.7 SCHEMA REGISTRY INSERTION POINT:
 // add every new operating schema here in the same change that introduces it.
@@ -40,6 +40,9 @@ const ACTIVE_V07_SCHEMA_NAMES = Object.freeze([
   "cleanup-plan-v07",
   "unplug-plan-v07",
   "unplug-plan-v07-v2",
+  "refresh-inspection",
+  "refresh-handoff-v1",
+  "refresh-origin",
 ]);
 
 const ACTIVE_V07_EXAMPLES = new Set(["v0.7-workflow-draft.json"]);
@@ -202,16 +205,15 @@ function compileActiveSchemas(schemas) {
 const packageJson = JSON.parse(await readRequired("package.json"));
 const plugin = JSON.parse(await readRequired(".codex-plugin/plugin.json"));
 if (PACKAGE_VERSION !== EXPECTED_PACKAGE_VERSION) {
-  throw new Error(`v0.7 source must identify as ${EXPECTED_PACKAGE_VERSION}`);
+  throw new Error(`v0.8 source must identify as ${EXPECTED_PACKAGE_VERSION}`);
 }
 if (packageJson.version !== PACKAGE_VERSION || plugin.version !== PACKAGE_VERSION) {
   throw new Error("Package, plugin, and runtime versions must match");
 }
-const releaseCore = PACKAGE_VERSION.split("-", 1)[0].split("+", 1)[0];
-const expectedStateNamespace = `v${releaseCore}`;
+const expectedStateNamespace = `v${PACKAGE_VERSION}`;
 if (CODEX_FLOW_STATE_NAMESPACE !== expectedStateNamespace || V07_RUNTIME_DIRECTORY !== expectedStateNamespace) {
   throw new Error(
-    `Runtime state must use exact namespace ${expectedStateNamespace}, not package prerelease identity`,
+    `Runtime state must use exact package namespace ${expectedStateNamespace}`,
   );
 }
 validateReleaseIdentity(root, packageJson);
@@ -221,7 +223,7 @@ if (packageJson.license !== "UNLICENSED" || plugin.license !== packageJson.licen
 }
 const requiredPackageFiles = [
   ".codex-plugin/", "bin/", "lib/", "schemas/", "examples/", "skills/",
-  "templates/", "docs/adr/", "docs/coverage-v0.7.md", "docs/mission.md", "README.md",
+  "templates/", "docs/adr/", "docs/coverage-v0.7.md", "docs/coverage-v0.8.md", "docs/mission.md", "README.md",
 ];
 for (const path of requiredPackageFiles) {
   if (!packageJson.files.includes(path)) throw new Error(`Published package is missing required path: ${path}`);
@@ -292,7 +294,13 @@ for (const modulePath of modules) {
   }
   const dynamicImports = [...source.matchAll(/\bimport\s*\(/g)];
   const literalDynamicImports = [...source.matchAll(/\bimport\s*\(\s*["']([^"']+)["']\s*\)/g)];
-  if (dynamicImports.length !== literalDynamicImports.length) {
+  const moduleRelativePath = relative(root, modulePath);
+  const exactBridgeLoader = ["im", "port(pathToFileURL(resolve(bundleRoot, path)).href)"].join("");
+  const exactLegacyBridge = moduleRelativePath === "lib/refresh-v078-bridge.mjs"
+    && dynamicImports.length === 1
+    && literalDynamicImports.length === 0
+    && source.includes(exactBridgeLoader);
+  if (dynamicImports.length !== literalDynamicImports.length && !exactLegacyBridge) {
     throw new Error(`Nonliteral dynamic import is not allowed in ${modulePath}`);
   }
   for (const match of literalDynamicImports) {
@@ -353,8 +361,17 @@ assertMarkers(await readRequired("docs/coverage-v0.7.md"), [
 const skillContracts = new Map([
   ["index", [
     "A repository does not need `.codex/orchestration/` to discuss or plan Codex Flow",
-    "progressively activate one v0.7 run without tracked setup",
+    "codex-orchestration:refresh` once",
     "Native subagents are a distinct, read-only supporting lane",
+  ]],
+  ["refresh", [
+    "Route once before actionable coordination",
+    "refresh inspect",
+    "Wait",
+    "Discard",
+    "run activate --refresh-id",
+    "exact v0.7.8 adapter",
+    "Do not add recurring preflights, daemons, registries",
   ]],
   ["coordinate", [
     "include the explicit `run_id` in every stateful operation",
@@ -377,7 +394,7 @@ const skillContracts = new Map([
   ["cleanup", [
     "Name the exact `run_id`",
     "cleanup plan --run-id",
-    "v0.7 exposes no cleanup apply command",
+    "v0.8 exposes no cleanup apply command",
     "complete admitted path/resource/branch envelope durable",
   ]],
   ["unplug", [
@@ -397,8 +414,9 @@ for (const [skillName, markers] of skillContracts) {
 }
 
 if (!Array.isArray(plugin.interface?.defaultPrompt)
-  || !plugin.interface.defaultPrompt.some((item) => item.includes("separate Terra executor tasks"))
-  || !plugin.interface.defaultPrompt.some((item) => item.includes("Sol coordinator and Terra tasks"))
+  || !plugin.interface.defaultPrompt.some((item) => item.includes("separate executor tasks"))
+  || !plugin.interface.defaultPrompt.some((item) => item.includes("explicitly selected executor models"))
+  || !plugin.interface.defaultPrompt.some((item) => item.includes("Refresh this long-lived coordinator"))
   || !plugin.interface.defaultPrompt.some((item) => item.includes("journaled task results"))) {
   throw new Error("Plugin interface must expose task orchestration, model routing, and result starter prompts");
 }
@@ -428,7 +446,7 @@ const templateContracts = new Map([
     "persist the signal before one identified interrupt attempt",
   ]],
   ["templates/references/task-lifecycle.md", [
-    ".git/codex-flow/v0.7.8/runtimes/<bundle-sha256>/",
+    ".git/codex-flow/v0.8.0-dev.0/runtimes/<bundle-sha256>/",
     "content-addressed intent precedes the detached",
     "terminal-receipt-v3 journal result without messaging",
     "content-addressed PASS verification and integration/no-change records",
@@ -458,5 +476,5 @@ try {
 
 console.log(
   `codex-orchestration ${PACKAGE_VERSION} source contracts validated `
-  + `(${ACTIVE_V07_SCHEMA_NAMES.length} active v0.7 schemas; state ${CODEX_FLOW_STATE_NAMESPACE})`,
+  + `(${ACTIVE_V07_SCHEMA_NAMES.length} active v0.8 schemas; state ${CODEX_FLOW_STATE_NAMESPACE})`,
 );
