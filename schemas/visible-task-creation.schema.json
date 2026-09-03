@@ -77,7 +77,13 @@
           "private_resolution": { "type": "null" },
           "late_private_recovery": { "type": "null" },
           "resolution": { "type": "null" },
-          "worktree_binding": { "type": "null" }
+          "worktree_binding": { "type": "null" },
+          "selector_evidence": {
+            "properties": {
+              "accepted": { "type": "null" },
+              "observed": { "type": "null" }
+            }
+          }
         }
       }
     },
@@ -91,7 +97,13 @@
           "private_resolution": { "type": "null" },
           "late_private_recovery": { "type": "null" },
           "resolution": { "type": "null" },
-          "worktree_binding": { "type": "null" }
+          "worktree_binding": { "type": "null" },
+          "selector_evidence": {
+            "properties": {
+              "accepted": { "type": "null" },
+              "observed": { "type": "null" }
+            }
+          }
         }
       }
     },
@@ -105,7 +117,12 @@
           "private_resolution": { "type": "null" },
           "late_private_recovery": { "type": "null" },
           "resolution": { "type": "null" },
-          "worktree_binding": { "type": "null" }
+          "worktree_binding": { "type": "null" },
+          "selector_evidence": {
+            "properties": {
+              "observed": { "type": "null" }
+            }
+          }
         }
       }
     },
@@ -208,7 +225,12 @@
           "private_resolution": { "type": "null" },
           "late_private_recovery": { "type": "null" },
           "resolution": { "$ref": "#/$defs/resolution" },
-          "worktree_binding": { "type": "null" }
+          "worktree_binding": { "type": "null" },
+          "selector_evidence": {
+            "properties": {
+              "observed": { "type": "null" }
+            }
+          }
         }
       }
     }

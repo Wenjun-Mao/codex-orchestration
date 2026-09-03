@@ -89,8 +89,16 @@ async function activatedFixture(t, suffix = "base") {
   const activationPath = await requestFile(requests, "activation", activation);
   const first = runCli([
     "run", "activate", "--run-id", runId, "--file", activationPath, "--json",
-  ], { cwd: root });
+  ], {
+    cwd: root,
+    env: { CODEX_THREAD_ID: activation.runtime.lineage.thread_id },
+  });
   assertSuccess(first, "v0.7 run activation");
+  assert.deepEqual(JSON.parse(first.stdout).coordinator_identity, {
+    invoking_thread_id: activation.runtime.lineage.thread_id,
+    source: "codex-environment",
+    matched: true,
+  });
   return {
     root,
     requests,
@@ -157,7 +165,7 @@ test("v0.7 activation requires a clean start when an incompatible namespace rema
   assert.match(result.stderr, /Clean start required before activation/);
   assert.match(result.stderr, /codex-flow unplug plan/);
   await assert.rejects(
-    stat(resolve(root, ".git", "codex-flow", "v0.8.0", "runs", "lifecycle.json")),
+    stat(resolve(root, ".git", "codex-flow", "v0.8.1-dev.0", "runs", "lifecycle.json")),
     { code: "ENOENT" },
   );
 });
@@ -177,7 +185,7 @@ test("v0.7 activation cannot race an in-progress unplug", async (t) => {
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /unplug is already in progress/i);
   await assert.rejects(
-    stat(resolve(root, ".git", "codex-flow", "v0.8.0", "runs", "lifecycle.json")),
+    stat(resolve(root, ".git", "codex-flow", "v0.8.1-dev.0", "runs", "lifecycle.json")),
     { code: "ENOENT" },
   );
 });
@@ -554,8 +562,8 @@ test("run activation needs no tracked setup and replays the same disclosed autho
   const context = await activatedFixture(t, "activation");
   await assert.rejects(stat(resolve(context.root, ".codex", "orchestration")), /ENOENT/);
   assert.equal(context.result.status, "admitted");
-  assert.equal(context.result.state_authority.namespace, "v0.8.0");
-  assert.match(context.result.state_authority.state_root, /\.git\/codex-flow\/v0\.8\.0$/);
+  assert.equal(context.result.state_authority.namespace, "v0.8.1-dev.0");
+  assert.match(context.result.state_authority.state_root, /\.git\/codex-flow\/v0\.8\.1-dev\.0$/);
   assert.equal(context.result.repository_authority.cleanliness, "clean");
   assert.equal(context.result.workflow_authority.run_id, context.runId);
   assert.equal(context.result.model_routing[0].model, "gpt-5.6-terra");
@@ -579,7 +587,10 @@ test("run activation needs no tracked setup and replays the same disclosed autho
   const replay = runCli([
     "run", "activate", "--run-id", context.runId,
     "--file", context.activationPath, "--json",
-  ], { cwd: context.root });
+  ], {
+    cwd: context.root,
+    env: { CODEX_THREAD_ID: context.activation.runtime.lineage.thread_id },
+  });
   assertSuccess(replay, "idempotent v0.7 activation");
   const repeated = JSON.parse(replay.stdout);
   assert.equal(repeated.status, "already-active");
@@ -613,7 +624,64 @@ test("run activation rejects a workflow outside its reservation envelope before 
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /outside the admitted run fence envelope/);
   await assert.rejects(
-    stat(resolve(root, ".git", "codex-flow", "v0.8.0")),
+    stat(resolve(root, ".git", "codex-flow", "v0.8.1-dev.0")),
+    (error) => error?.code === "ENOENT",
+  );
+});
+
+test("run activation rejects a different host current task before it records authority", async (t) => {
+  const root = await createGitFixture("codex-flow-cli-v07-current-task-refusal-");
+  const requests = await mkdtemp(resolve(tmpdir(), "codex-flow-cli-v07-current-task-requests-"));
+  t.after(async () => {
+    await Promise.all([removeFixture(root), rm(requests, { recursive: true, force: true })]);
+  });
+  const request = activationRequest("run-cli-current-task-refusal");
+  const requestPath = await requestFile(requests, "activation", request);
+  const result = runCli([
+    "run", "activate", "--run-id", request.run_id, "--file", requestPath, "--json",
+  ], { cwd: root, env: { CODEX_THREAD_ID: "different-current-task" } });
+  assert.equal(result.status, 73);
+  assert.match(result.stderr, /host's current coordinator task/);
+  await assert.rejects(
+    stat(resolve(root, ".git", "codex-flow", "v0.8.1-dev.0")),
+    (error) => error?.code === "ENOENT",
+  );
+});
+
+test("run activation rejects missing host current-task identity before it records authority", async (t) => {
+  const root = await createGitFixture("codex-flow-cli-v07-missing-current-task-refusal-");
+  const requests = await mkdtemp(resolve(tmpdir(), "codex-flow-cli-v07-missing-current-task-requests-"));
+  t.after(async () => {
+    await Promise.all([removeFixture(root), rm(requests, { recursive: true, force: true })]);
+  });
+  const request = activationRequest("run-cli-missing-current-task-refusal");
+  const requestPath = await requestFile(requests, "activation", request);
+  const result = runCli([
+    "run", "activate", "--run-id", request.run_id, "--file", requestPath, "--json",
+  ], { cwd: root, env: { CODEX_THREAD_ID: "" } });
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /host-exposed current task identity/);
+  await assert.rejects(
+    stat(resolve(root, ".git", "codex-flow", "v0.8.1-dev.0")),
+    (error) => error?.code === "ENOENT",
+  );
+});
+
+test("run activation rejects malformed host current-task identity before it records authority", async (t) => {
+  const root = await createGitFixture("codex-flow-cli-v07-malformed-current-task-refusal-");
+  const requests = await mkdtemp(resolve(tmpdir(), "codex-flow-cli-v07-malformed-current-task-requests-"));
+  t.after(async () => {
+    await Promise.all([removeFixture(root), rm(requests, { recursive: true, force: true })]);
+  });
+  const request = activationRequest("run-cli-malformed-current-task-refusal");
+  const requestPath = await requestFile(requests, "activation", request);
+  const result = runCli([
+    "run", "activate", "--run-id", request.run_id, "--file", requestPath, "--json",
+  ], { cwd: root, env: { CODEX_THREAD_ID: "malformed/current/task" } });
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /host-exposed current task identity/);
+  await assert.rejects(
+    stat(resolve(root, ".git", "codex-flow", "v0.8.1-dev.0")),
     (error) => error?.code === "ENOENT",
   );
 });
@@ -636,9 +704,17 @@ test("run rebind advances the canonical recipient with the same fenced authority
   const path = await requestFile(context.requests, "recipient-rebind", request);
   const first = runCli([
     "run", "rebind", "--run-id", context.runId, "--file", path, "--json",
-  ], { cwd: context.root });
+  ], {
+    cwd: context.root,
+    env: { CODEX_THREAD_ID: context.activation.runtime.lineage.thread_id },
+  });
   assertSuccess(first, "coordinator rebind");
   const rebound = JSON.parse(first.stdout);
+  assert.deepEqual(rebound.coordinator_identity, {
+    invoking_thread_id: context.activation.runtime.lineage.thread_id,
+    source: "codex-environment",
+    matched: true,
+  });
   assert.deepEqual(rebound.run.binding.lineage, request.next.lineage);
 
   const recipientPath = resolve(
@@ -655,13 +731,24 @@ test("run rebind advances the canonical recipient with the same fenced authority
 
   const replay = runCli([
     "run", "rebind", "--run-id", context.runId, "--file", path, "--json",
-  ], { cwd: context.root });
+  ], {
+    cwd: context.root,
+    env: { CODEX_THREAD_ID: context.activation.runtime.lineage.thread_id },
+  });
   assertSuccess(replay, "idempotent coordinator rebind");
   assert.equal(JSON.parse(replay.stdout).run.binding.fence_token, rebound.run.binding.fence_token);
   assert.equal(
     JSON.parse(await readFile(recipientPath, "utf8")).bindings.length,
     2,
   );
+
+  const wrongTaskPath = await requestFile(context.requests, "recipient-wrong-current-task", request);
+  const wrongTaskResult = runCli([
+    "run", "rebind", "--run-id", context.runId, "--file", wrongTaskPath, "--json",
+  ], { cwd: context.root, env: { CODEX_THREAD_ID: "different-current-task" } });
+  assert.equal(wrongTaskResult.status, 73);
+  assert.match(wrongTaskResult.stderr, /host's current coordinator task/);
+  assert.equal(JSON.parse(await readFile(recipientPath, "utf8")).bindings.length, 2);
 
   const stale = structuredClone(request);
   stale.next.lineage.thread_id = "cli-v07-coordinator-forged";
@@ -694,7 +781,7 @@ test("a second active run is refused before acquiring orphan runtime or workflow
   const contextsRoot = resolve(
     context.result.state_authority.git_common_dir,
     "codex-flow",
-    "v0.8.0",
+    "v0.8.1-dev.0",
     "contexts",
   );
   const beforeContexts = await readdir(contextsRoot);
@@ -705,7 +792,10 @@ test("a second active run is refused before acquiring orphan runtime or workflow
   const result = runCli([
     "run", "activate", "--run-id", conflicting.run_id,
     "--file", conflictingPath, "--json",
-  ], { cwd: context.root });
+  ], {
+    cwd: context.root,
+    env: { CODEX_THREAD_ID: conflicting.runtime.lineage.thread_id },
+  });
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /different v0\.7 run is already active/);
   assert.deepEqual(await readdir(contextsRoot), beforeContexts);

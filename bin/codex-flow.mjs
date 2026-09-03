@@ -452,6 +452,22 @@ function recipientMatchesLineage(status, lineage) {
     && status.current.generation === lineage.generation;
 }
 
+function assertCurrentCoordinatorTask(lineage, operation) {
+  const currentTaskId = requireText(
+    process.env.CODEX_THREAD_ID ?? "",
+    `${operation} host-exposed current task identity`,
+    { max: 128, safeId: true },
+  );
+  if (currentTaskId !== lineage.thread_id) {
+    throw new CliError(`${operation} must run from the host's current coordinator task`, 73);
+  }
+  return {
+    invoking_thread_id: currentTaskId,
+    source: "codex-environment",
+    matched: true,
+  };
+}
+
 async function bindRunCoordinatorRecipient({ git, run, lineage }) {
   const recipient = await bindRecipient({
     stateRoot: git.stateRoot,
@@ -484,6 +500,12 @@ async function rebindRunCoordinatorRecipient({ git, runId, resume, next, rebound
   if (!resumeIsCurrent && !exactReplay) {
     throw new CliError("resume fence does not match the active run binding", 73);
   }
+  const coordinatorIdentity = assertCurrentCoordinatorTask({
+    thread_id: requireText(resume.lineage?.thread_id, "run rebind resume coordinator thread_id", {
+      max: 128,
+      safeId: true,
+    }),
+  }, "run rebind");
   if (
     nextLineage.lineage_id !== resume.lineage?.lineage_id
     || nextLineage.generation !== resume.lineage?.generation + 1
@@ -518,7 +540,11 @@ async function rebindRunCoordinatorRecipient({ git, runId, resume, next, rebound
     fenceToken: resume.fence_token,
     nextFenceToken: result.run.binding.fence_token,
   });
-  return { ...result, coordinator_recipient: reboundRecipient.recipient };
+  return {
+    ...result,
+    coordinator_identity: coordinatorIdentity,
+    coordinator_recipient: reboundRecipient.recipient,
+  };
 }
 
 function activationFences(value) {
@@ -571,11 +597,6 @@ async function commandRunV07(args) {
     const workflow = createWorkflowPlanRevision(request.workflow);
     const fences = activationFences(request.fences);
     assertWorkflowReservationCovered(fences, workflow);
-    await preflightVisibleTaskBranchReservations({
-      stateRoot: git.stateRoot,
-      runId,
-      branchFences: fences.branch_fences,
-    });
     const bundleSource = await loadRuntimeBundleSource({ packageRoot });
     const runtime = buildRuntimeContext({
       bundle: bundleSource.bundle,
@@ -590,6 +611,12 @@ async function commandRunV07(args) {
       },
       host: request.runtime.host,
       lineage: request.runtime.lineage,
+    });
+    const coordinatorIdentity = assertCurrentCoordinatorTask(runtime.lineage, "run activate");
+    await preflightVisibleTaskBranchReservations({
+      stateRoot: git.stateRoot,
+      runId,
+      branchFences: fences.branch_fences,
     });
     const lifecycle = await readRunLifecycle({ gitCommonDirectory: git.commonDir });
     const active = lifecycle.state.active_run_id === null
@@ -732,6 +759,7 @@ async function commandRunV07(args) {
         coordinator_binding: coordinatorBinding,
         coordinator_recipient: coordinatorRecipient,
       },
+      coordinator_identity: coordinatorIdentity,
       workflow_authority: {
         run_id: runId,
         plan_id: workflow.plan_id,

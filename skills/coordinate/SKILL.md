@@ -20,7 +20,7 @@ Questions and planning remain read-only. Before an actionable run writes
 operational state or creates a native task, disclose:
 
 - the package/runtime source and exact bundle hash;
-- the `.git/codex-flow/v0.8.0/` Git-common state root;
+- the `.git/codex-flow/v0.8.1-dev.0/` Git-common state root;
 - the repository, baseline, host, coordinator lineage and generation;
 - the proposed workflow revision and path/resource/branch reservation envelope;
 - each task's saved project, visible-task or subagent surface, requested model
@@ -31,6 +31,10 @@ operational state or creates a native task, disclose:
 An explicit orchestration request permits progressive run activation, not
 unmentioned external actions. Use
 `run activate|status|resume|rebind|audit|close|abandon`.
+Invoke `run activate` only from the host's current coordinator task, and invoke
+`run rebind` from the coordinator named by its resume fence. The runtime reads
+that host-exposed identity from `CODEX_THREAD_ID` and rejects a different task
+before it records activation or replacement authority.
 There is no requirement for tracked `.codex/orchestration/`. Activation must
 snapshot the exact runtime under the exact-version Git-common namespace and
 fail closed on runtime drift, a bounded foreign active-run collision, a second
@@ -110,7 +114,9 @@ observed-selector host timestamps must be inside the bounded window even if
 their private evidence is processed later. The source event may authenticate
 and atomically persist a provisional identity and accepted selectors that were
 not journaled before an exact window-expiry ambiguity, including the matching
-ready identity. The adapter reads evidence only; it never creates or retries.
+ready identity. Observed selectors belong only to a ready task identity;
+provisional and terminal no-ready phases may retain accepted selectors but not
+observations. The adapter reads evidence only; it never creates or retries.
 
 Accept the ready identity only when the exact bootstrap digest, launch nonce,
 ready ID, selector evidence, and placement agree. Direct ready IDs retain the

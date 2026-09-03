@@ -81,7 +81,7 @@ async function fixture({
     generation: 1,
   };
   coordinator.binding_digest = coordinatorBindingDigest(coordinator);
-  const stateRoot = resolve(commonDir, "codex-flow", "v0.8.0");
+  const stateRoot = resolve(commonDir, "codex-flow", "v0.8.1-dev.0");
   const runId = "run-visible-task";
   const snapshot = gitSnapshot(root);
   const bundleSource = await loadRuntimeBundleSource({ packageRoot });
@@ -359,6 +359,54 @@ test("one-shot visible creation binds provisional and ready identities through t
     assert.equal(provisional.status, "provisional");
     assert.equal(provisional.release_permitted, false);
     assert.equal(provisional.provisional.client_thread_id, provisionalClientThreadId);
+
+    await assert.rejects(
+      () => reconcileVisibleTaskCreation({
+        stateRoot: context.stateRoot,
+        operationId: prepared.operation_id,
+        outcome: "provisional",
+        provisionalClientThreadId,
+        selectorEvidence: {
+          accepted: acceptedSelectors(context.requested),
+          observed: {
+            project_id: null,
+            model: null,
+            reasoning_effort: null,
+            worktree: null,
+            observed_at: new Date(START + 1_500).toISOString(),
+          },
+        },
+        now: START + 1_500,
+      }),
+      /observed selectors before ready task identity/,
+    );
+    assert.equal((await visibleTaskCreationStatus({
+      stateRoot: context.stateRoot,
+      operationId: prepared.operation_id,
+      now: START + 1_500,
+    })).selector_evidence.observed, null);
+
+    await assert.rejects(
+      () => reconcileVisibleTaskCreation({
+        stateRoot: context.stateRoot,
+        operationId: prepared.operation_id,
+        outcome: "ambiguous",
+        provisionalClientThreadId,
+        reasonCode: "identity-evidence-missing",
+        selectorEvidence: {
+          accepted: acceptedSelectors(context.requested),
+          observed: {
+            project_id: null,
+            model: null,
+            reasoning_effort: null,
+            worktree: null,
+            observed_at: new Date(START + 1_600).toISOString(),
+          },
+        },
+        now: START + 1_600,
+      }),
+      /observed selectors before ready task identity/,
+    );
 
     await assert.rejects(
       () => reconcileVisibleTaskCreation({

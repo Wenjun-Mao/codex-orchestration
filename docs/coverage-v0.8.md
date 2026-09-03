@@ -15,6 +15,7 @@ and the `refresh` skill define the contract.
 | Dependency coverage is exact | Target work includes each discarded assignment and only dependencies not represented by the post-integration baseline. |
 | Compatibility stays bounded | Exact-tag v0.7.8 adapter cutover passes while a deliberately broken target validator proves that raw legacy records are read and validated only by the authenticated v0.7.8 bundle; successive v0.8+ sources parse their own records through an authenticated source exporter; malformed or unsupported predecessor state blocks and routes to `unplug`. |
 | Whole-namespace deletion is complete | Every non-selected source run is independently closed and cleanup-complete; abandoned runs, pending callbacks, live worktrees, or local branches block deletion. |
+| Coordinator and selector authority is phase-bound | Activation and rebind require the host's current task to match the coordinator identity before state acquisition or rebind; provisional and terminal task-creation records may retain accepted selectors but never observed selectors before a ready task identity exists. |
 | Safety gates remain closed | Stale receipt, late callback, remote/protected ref, prior integration, ambiguous task identity, archive disagreement, path drift, or snapshot tampering prevents apply or activation. |
 | Non-goals remain absent | No `AGENTS.md` access, recurring preflight, general predecessor migration, daemon, registry, or silent fallback is introduced. |
 

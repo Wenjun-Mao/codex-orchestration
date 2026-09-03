@@ -23,8 +23,8 @@ packages no general predecessor reader, mutator, migration path, retirement
 command, tracked adoption, or predecessor test fixture. Its only compatibility
 surface is the bounded refresh authority described below.
 
-The accepted public release and this checkout's package authority are v0.8.0.
-v0.8 carries forward the proven
+The accepted public release is v0.8.0. This checkout is the unreleased
+v0.8.1-dev.0 development authority. v0.8 carries forward the proven
 cross-task behavior under `codex-flow-v08-*` identities and exact-version
 Git-common namespaces. It retains a bounded foreign-active-run sentinel:
 ordinary activation never silently ignores or migrates a live predecessor run.
@@ -120,7 +120,7 @@ When the user authorizes actionable orchestration, the plugin may activate one
 run after disclosing:
 
 - the exact package/runtime source and bundle hash;
-- the exact-version `.git/codex-flow/v0.8.0/` operational state root;
+- the exact-version `.git/codex-flow/v0.8.1-dev.0/` operational state root;
 - repository/common-directory, baseline, host, and coordinator binding;
 - the immutable workflow revision and its path/resource/branch reservation
   envelope;
@@ -135,6 +135,11 @@ active per clone/Git common directory. A normal close requires a current,
 content-addressed terminal run audit over all reconciled state. Explicit
 abandonment releases the active slot but retains the complete admitted path,
 resource, and branch reservation envelope.
+
+`run activate` and `run rebind` also require the host-exposed current task
+identity (`CODEX_THREAD_ID`) to be the coordinator being activated or the
+coordinator named by the rebind resume fence. This prevents an executor or a
+different task from recording coordinator authority on its behalf.
 
 ### Content-addressed workflow
 

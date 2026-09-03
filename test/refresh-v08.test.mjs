@@ -172,10 +172,15 @@ async function applyRefreshForTest(options) {
   });
 }
 
-function invoke(cli, args, cwd) {
+function invoke(cli, args, cwd, env = {}) {
   return spawnSync(process.execPath, [cli, ...args], {
     cwd,
-    env: { ...process.env, GIT_OPTIONAL_LOCKS: "0", GIT_TERMINAL_PROMPT: "0" },
+    env: {
+      ...process.env,
+      GIT_OPTIONAL_LOCKS: "0",
+      GIT_TERMINAL_PROMPT: "0",
+      ...env,
+    },
     encoding: "utf8",
   });
 }
@@ -276,7 +281,7 @@ async function createSourceExecutor({
   const activationPath = await jsonFile(requests, "source-activation", activation);
   const activated = invoke(sourceCli, [
     "run", "activate", "--run-id", activation.run_id, "--file", activationPath, "--json",
-  ], root);
+  ], root, { CODEX_THREAD_ID: activation.runtime.lineage.thread_id });
   assertSuccess(activated, "source activation");
   const activatedRecord = JSON.parse(activated.stdout);
   const runtimeCli = resolve(activatedRecord.runtime_authority.bundle_root, "bin", "codex-flow.mjs");
@@ -676,7 +681,7 @@ async function createActiveSourceSubagent({ root, requests, sourceCli }) {
   const activationPath = await jsonFile(requests, "active-subagent-activation", activation);
   const activated = invoke(sourceCli, [
     "run", "activate", "--run-id", activation.run_id, "--file", activationPath, "--json",
-  ], root);
+  ], root, { CODEX_THREAD_ID: activation.runtime.lineage.thread_id });
   assertSuccess(activated, "active subagent source activation");
   const activatedRecord = JSON.parse(activated.stdout);
   const runtimeCli = resolve(activatedRecord.runtime_authority.bundle_root, "bin", "codex-flow.mjs");
@@ -1060,7 +1065,7 @@ test("long-lived coordinator refresh discards exact dirty work and consumes a v0
     "run", "activate", "--run-id", targetActivation.run_id,
     "--refresh-id", handoff.refresh_id,
     "--file", targetActivationPath, "--json",
-  ], root);
+  ], root, { CODEX_THREAD_ID: targetActivation.runtime.lineage.thread_id });
   assertSuccess(activated, "target refresh activation");
   const target = JSON.parse(activated.stdout);
   assert.equal(target.state_authority.namespace, "v0.8.0-rc.8");
@@ -1081,7 +1086,7 @@ test("long-lived coordinator refresh discards exact dirty work and consumes a v0
     "run", "activate", "--run-id", targetActivation.run_id,
     "--refresh-id", handoff.refresh_id,
     "--file", targetActivationPath, "--json",
-  ], root);
+  ], root, { CODEX_THREAD_ID: targetActivation.runtime.lineage.thread_id });
   assert.notEqual(tamperedReplay.status, 0);
   assert.match(tamperedReplay.stderr, /already bound|no exact existing target run/);
   await assert.rejects(stat(targetLifecyclePath), /ENOENT/);
@@ -1190,7 +1195,7 @@ test("detached coordinator refresh preserves its exact root and normalized branc
     "run", "activate", "--run-id", targetActivation.run_id,
     "--refresh-id", handoff.refresh_id,
     "--file", targetActivationPath, "--json",
-  ], impostorRoot);
+  ], impostorRoot, { CODEX_THREAD_ID: targetActivation.runtime.lineage.thread_id });
   assert.notEqual(wrongRoot.status, 0);
   assert.match(wrongRoot.stderr, /baseline drifted after refresh preparation/);
   assert.equal((await refreshStatus({
@@ -1482,7 +1487,7 @@ test("all-wait refresh consumes to a clean start without inventing a target run"
     "run", "activate", "--run-id", forbiddenActivation.run_id,
     "--refresh-id", handoff.refresh_id,
     "--file", forbiddenActivationPath, "--json",
-  ], root);
+  ], root, { CODEX_THREAD_ID: forbiddenActivation.runtime.lineage.thread_id });
   assert.notEqual(forbidden.status, 0);
   assert.match(forbidden.stderr, /consumed with refresh apply, not run activation/);
 
@@ -1602,7 +1607,7 @@ test("refresh accepts only the exact v0.7.8 adapter as a legacy source", async (
     "run", "activate", "--run-id", targetActivation.run_id,
     "--refresh-id", handoff.refresh_id,
     "--file", targetActivationPath, "--json",
-  ], root);
+  ], root, { CODEX_THREAD_ID: targetActivation.runtime.lineage.thread_id });
   assertSuccess(activated, "v0.7.8 adapter target activation");
   await assert.rejects(stat(resolve(root, ".git", "codex-flow", "v0.7.8")), /ENOENT/);
 });
@@ -1709,7 +1714,7 @@ test("refresh refuses to erase an unretired non-selected source run", async (t) 
   const activatedOld = invoke(sourcePackage.cli, [
     "run", "activate", "--run-id", oldActivation.run_id,
     "--file", oldActivationPath, "--json",
-  ], root);
+  ], root, { CODEX_THREAD_ID: oldActivation.runtime.lineage.thread_id });
   assertSuccess(activatedOld, "older source activation");
   const oldRecord = JSON.parse(activatedOld.stdout);
   const oldRuntimeCli = resolve(oldRecord.runtime_authority.bundle_root, "bin", "codex-flow.mjs");
@@ -1775,7 +1780,7 @@ test("refresh skill authentication rejects a stale loaded catalog path", async (
 test("refresh inspection blocks malformed current namespace authority", async (t) => {
   const root = await createGitFixture("codex-flow-refresh-malformed-current-");
   t.after(() => removeFixture(root));
-  const lifecycleRoot = resolve(root, ".git", "codex-flow", "v0.8.0", "runs");
+  const lifecycleRoot = resolve(root, ".git", "codex-flow", "v0.8.1-dev.0", "runs");
   await mkdir(lifecycleRoot, { recursive: true });
   await writeFile(resolve(lifecycleRoot, "lifecycle.json"), "{}\n", "utf8");
   const result = runCli([

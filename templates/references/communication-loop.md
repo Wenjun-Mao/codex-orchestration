@@ -29,5 +29,7 @@ eligible. Duplicate host delivery is suppressed. Ordinary completion is never
 upgraded to urgent merely to get attention.
 
 After coordinator handoff or replacement, rebind the run to the new lineage
-generation before processing results. Stale recipient identity cannot dispose
+generation before processing results. The rebind must be invoked by the
+host-exposed current task named by its resume fence; a different coordinator or
+executor cannot record the replacement. Stale recipient identity cannot dispose
 or integrate work.
