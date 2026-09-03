@@ -106,7 +106,7 @@ async function fixture(suffix, {
     },
     now: CLOCK - 3_000,
   });
-  const stateRoot = resolve(commonDir, "codex-flow", "v0.8.0-dev.0");
+  const stateRoot = resolve(commonDir, "codex-flow", "v0.8.0-rc.1");
   await createWorkflowJournal({
     stateRoot,
     runId,

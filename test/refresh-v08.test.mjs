@@ -485,7 +485,7 @@ async function integrateExecutorResult({ root, executor }) {
     cwd: executor.observedWorktreePath,
     encoding: "utf8",
   }).trim();
-  const stateRoot = resolve(executor.contract.common_dir, "codex-flow", "v0.8.0-dev.0");
+  const stateRoot = resolve(executor.contract.common_dir, "codex-flow", "v0.8.0-rc.1");
   const receipt = terminalReceipt(executor, {
     kind: "clean-commit",
     baseline_revision: executor.baseline,
@@ -640,8 +640,8 @@ test("long-lived coordinator refresh discards exact dirty work and consumes a v0
   const requests = await mkdtemp(resolve(tmpdir(), "codex-flow-refresh-v08-requests-"));
   const worktreeParent = await mkdtemp(resolve(tmpdir(), "codex-flow-refresh-v08-worktree-"));
   const worktree = resolve(worktreeParent, "executor");
-  const sourcePackage = await copyTargetPackage("0.8.0-dev.0");
-  const targetPackage = await copyTargetPackage("0.8.0-rc.1");
+  const sourcePackage = await copyTargetPackage("0.8.0-rc.1");
+  const targetPackage = await copyTargetPackage("0.8.0-rc.8");
   t.after(async () => {
     spawnSync("git", ["worktree", "remove", "--force", worktree], { cwd: root, stdio: "ignore" });
   });
@@ -659,7 +659,7 @@ test("long-lived coordinator refresh discards exact dirty work and consumes a v0
 
   await loadRefreshSourceAuthority({
     commonDir: source.contract.common_dir,
-    namespace: "v0.8.0-dev.0",
+    namespace: "v0.8.0-rc.1",
     runId: source.activation.run_id,
   });
 
@@ -687,7 +687,7 @@ test("long-lived coordinator refresh discards exact dirty work and consumes a v0
     branch: targetBranch,
   });
   const prepareRequest = {
-    source_namespace: "v0.8.0-dev.0",
+    source_namespace: "v0.8.0-rc.1",
     source_run_id: source.activation.run_id,
     source_resume: source.activated.run.binding,
     decisions: [{
@@ -734,7 +734,7 @@ test("long-lived coordinator refresh discards exact dirty work and consumes a v0
   const lifecyclePath = resolve(
     source.contract.common_dir,
     "codex-flow",
-    "v0.8.0-dev.0",
+    "v0.8.0-rc.1",
     "runs",
     "lifecycle.json",
   );
@@ -849,7 +849,7 @@ test("long-lived coordinator refresh discards exact dirty work and consumes a v0
     const lifecycle = await readFile(resolve(
       source.contract.common_dir,
       "codex-flow",
-      "v0.8.0-dev.0",
+      "v0.8.0-rc.1",
       "runs",
       "lifecycle.json",
     ), "utf8");
@@ -874,7 +874,7 @@ test("long-lived coordinator refresh discards exact dirty work and consumes a v0
     root,
     ".git",
     "codex-flow",
-    "v0.8.0-rc.1",
+    "v0.8.0-rc.8",
     "runs",
     "refresh-origins",
     `${targetActivation.run_id}.json`,
@@ -915,7 +915,7 @@ test("long-lived coordinator refresh discards exact dirty work and consumes a v0
     refreshId: handoff.refresh_id,
     crashAfter: "afterSourceNamespaceRemoval",
   }), /simulated crash at afterSourceNamespaceRemoval/);
-  await assert.rejects(stat(resolve(root, ".git", "codex-flow", "v0.8.0-dev.0")), /ENOENT/);
+  await assert.rejects(stat(resolve(root, ".git", "codex-flow", "v0.8.0-rc.1")), /ENOENT/);
   assert.equal((await stat(resolve(root, ".git", "codex-flow", "refresh-v1"))).isDirectory(), true);
 
   const targetActivationPath = await jsonFile(requests, "target-activation", targetActivation);
@@ -926,16 +926,16 @@ test("long-lived coordinator refresh discards exact dirty work and consumes a v0
   ], root);
   assertSuccess(activated, "target refresh activation");
   const target = JSON.parse(activated.stdout);
-  assert.equal(target.state_authority.namespace, "v0.8.0-rc.1");
+  assert.equal(target.state_authority.namespace, "v0.8.0-rc.8");
   assert.equal(target.refresh_origin.refresh_id, handoff.refresh_id);
-  await assert.rejects(stat(resolve(root, ".git", "codex-flow", "v0.8.0-dev.0")), /ENOENT/);
+  await assert.rejects(stat(resolve(root, ".git", "codex-flow", "v0.8.0-rc.1")), /ENOENT/);
   await assert.rejects(stat(resolve(root, ".git", "codex-flow", "refresh-v1")), /ENOENT/);
-  assert.equal((await stat(resolve(root, ".git", "codex-flow", "v0.8.0-rc.1"))).isDirectory(), true);
+  assert.equal((await stat(resolve(root, ".git", "codex-flow", "v0.8.0-rc.8"))).isDirectory(), true);
   const targetLifecyclePath = resolve(
     root,
     ".git",
     "codex-flow",
-    "v0.8.0-rc.1",
+    "v0.8.0-rc.8",
     "runs",
     "lifecycle.json",
   );
@@ -957,7 +957,7 @@ test("detached coordinator refresh preserves its exact root and normalized branc
   const coordinatorRoot = resolve(worktreeParent, "coordinator");
   const executorRoot = resolve(worktreeParent, "executor");
   const impostorRoot = resolve(worktreeParent, "same-revision-other-root");
-  const sourcePackage = await copyTargetPackage("0.8.0-dev.0");
+  const sourcePackage = await copyTargetPackage("0.8.0-rc.1");
   const targetPackage = await copyTargetPackage("0.8.0-rc.7");
   const baseline = execFileSync("git", ["rev-parse", "HEAD"], {
     cwd: repositoryRoot,
@@ -1012,7 +1012,7 @@ test("detached coordinator refresh preserves its exact root and normalized branc
     branch: "codex/refresh-detached-target",
   });
   const preparePath = await jsonFile(requests, "detached-refresh-prepare", {
-    source_namespace: "v0.8.0-dev.0",
+    source_namespace: "v0.8.0-rc.1",
     source_run_id: source.activation.run_id,
     source_resume: source.activated.run.binding,
     decisions: [{
@@ -1075,7 +1075,7 @@ test("refresh preserves an integrated baseline and reissues only the discarded e
   const worktreeParent = await mkdtemp(resolve(tmpdir(), "codex-flow-refresh-mixed-worktree-"));
   const integratedWorktree = resolve(worktreeParent, "integrated");
   const discardedWorktree = resolve(worktreeParent, "discarded");
-  const sourcePackage = await copyTargetPackage("0.8.0-dev.0");
+  const sourcePackage = await copyTargetPackage("0.8.0-rc.1");
   const targetPackage = await copyTargetPackage("0.8.0-rc.2");
   t.after(async () => {
     for (const worktree of [integratedWorktree, discardedWorktree]) {
@@ -1137,7 +1137,7 @@ test("refresh preserves an integrated baseline and reissues only the discarded e
   });
   const targetSkill = resolve(targetPackage.root, "skills", "refresh", "SKILL.md");
   const integratedDiscardPath = await jsonFile(requests, "refresh-mixed-integrated-discard", {
-    source_namespace: "v0.8.0-dev.0",
+    source_namespace: "v0.8.0-rc.1",
     source_run_id: integrated.activation.run_id,
     source_resume: integrated.activated.run.binding,
     decisions: [
@@ -1167,7 +1167,7 @@ test("refresh preserves an integrated baseline and reissues only the discarded e
   assert.notEqual(integratedDiscard.status, 0);
   assert.match(integratedDiscard.stderr, /integration record can no longer be discarded/);
   const preparePath = await jsonFile(requests, "refresh-mixed-prepare", {
-    source_namespace: "v0.8.0-dev.0",
+    source_namespace: "v0.8.0-rc.1",
     source_run_id: integrated.activation.run_id,
     source_resume: integrated.activated.run.binding,
     decisions: [
@@ -1251,7 +1251,7 @@ test("all-wait refresh consumes to a clean start without inventing a target run"
   const requests = await mkdtemp(resolve(tmpdir(), "codex-flow-refresh-all-wait-requests-"));
   const worktreeParent = await mkdtemp(resolve(tmpdir(), "codex-flow-refresh-all-wait-worktree-"));
   const worktree = resolve(worktreeParent, "integrated");
-  const sourcePackage = await copyTargetPackage("0.8.0-dev.0");
+  const sourcePackage = await copyTargetPackage("0.8.0-rc.1");
   const targetPackage = await copyTargetPackage("0.8.0-rc.5");
   t.after(async () => {
     spawnSync("git", ["worktree", "remove", "--force", worktree], { cwd: root, stdio: "ignore" });
@@ -1274,7 +1274,7 @@ test("all-wait refresh consumes to a clean start without inventing a target run"
 
   const targetSkill = resolve(targetPackage.root, "skills", "refresh", "SKILL.md");
   const baseRequest = {
-    source_namespace: "v0.8.0-dev.0",
+    source_namespace: "v0.8.0-rc.1",
     source_run_id: source.activation.run_id,
     source_resume: source.activated.run.binding,
     decisions: [{
@@ -1375,7 +1375,7 @@ test("all-wait refresh consumes to a clean start without inventing a target run"
       },
     },
   }), /simulated crash after clean-start source removal/);
-  await assert.rejects(stat(resolve(root, ".git", "codex-flow", "v0.8.0-dev.0")), /ENOENT/);
+  await assert.rejects(stat(resolve(root, ".git", "codex-flow", "v0.8.0-rc.1")), /ENOENT/);
   const residue = await refreshStatus({
     commonDir: source.contract.common_dir,
     refreshId: handoff.refresh_id,
@@ -1562,7 +1562,7 @@ test("refresh refuses to erase an unretired non-selected source run", async (t) 
   const requests = await mkdtemp(resolve(tmpdir(), "codex-flow-refresh-other-run-requests-"));
   const worktreeParent = await mkdtemp(resolve(tmpdir(), "codex-flow-refresh-other-run-worktree-"));
   const worktree = resolve(worktreeParent, "current-executor");
-  const sourcePackage = await copyTargetPackage("0.8.0-dev.0");
+  const sourcePackage = await copyTargetPackage("0.8.0-rc.1");
   const targetPackage = await copyTargetPackage("0.8.0-rc.6");
   t.after(async () => {
     spawnSync("git", ["worktree", "remove", "--force", worktree], { cwd: root, stdio: "ignore" });
@@ -1622,7 +1622,7 @@ test("refresh refuses to erase an unretired non-selected source run", async (t) 
 test("refresh blocks an active native subagent instead of placing it on the executor discard path", async (t) => {
   const root = await createGitFixture("codex-flow-refresh-active-subagent-");
   const requests = await mkdtemp(resolve(tmpdir(), "codex-flow-refresh-active-subagent-requests-"));
-  const sourcePackage = await copyTargetPackage("0.8.0-dev.0");
+  const sourcePackage = await copyTargetPackage("0.8.0-rc.1");
   const targetPackage = await copyTargetPackage("0.8.0-rc.3");
   t.after(async () => Promise.all([
     removeFixture(root),
@@ -1659,7 +1659,7 @@ test("refresh skill authentication rejects a stale loaded catalog path", async (
 test("refresh inspection blocks malformed current namespace authority", async (t) => {
   const root = await createGitFixture("codex-flow-refresh-malformed-current-");
   t.after(() => removeFixture(root));
-  const lifecycleRoot = resolve(root, ".git", "codex-flow", "v0.8.0-dev.0", "runs");
+  const lifecycleRoot = resolve(root, ".git", "codex-flow", "v0.8.0-rc.1", "runs");
   await mkdir(lifecycleRoot, { recursive: true });
   await writeFile(resolve(lifecycleRoot, "lifecycle.json"), "{}\n", "utf8");
   const result = runCli([
