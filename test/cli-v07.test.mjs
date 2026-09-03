@@ -555,7 +555,7 @@ test("run activation needs no tracked setup and replays the same disclosed autho
   await assert.rejects(stat(resolve(context.root, ".codex", "orchestration")), /ENOENT/);
   assert.equal(context.result.status, "admitted");
   assert.equal(context.result.state_authority.namespace, "v0.8.0-rc.1");
-  assert.match(context.result.state_authority.state_root, /\.git\/codex-flow\/v0\.8\.0-dev\.0$/);
+  assert.match(context.result.state_authority.state_root, /\.git\/codex-flow\/v0\.8\.0-rc\.1$/);
   assert.equal(context.result.repository_authority.cleanliness, "clean");
   assert.equal(context.result.workflow_authority.run_id, context.runId);
   assert.equal(context.result.model_routing[0].model, "gpt-5.6-terra");
