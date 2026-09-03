@@ -88,7 +88,7 @@ async function acceptedAuthority({
     parent_revision_digest: null,
     tasks: [task()],
   });
-  const stateRoot = resolve(commonDir, "codex-flow", "v0.8.0-rc.2");
+  const stateRoot = resolve(commonDir, "codex-flow", "v0.8.0");
   const runId = "disposition-run-v07";
   const { run } = await activateV07FixtureRun({
     root,

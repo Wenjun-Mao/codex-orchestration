@@ -225,6 +225,7 @@ test("active v0.7 schemas match direct runtime timestamp, thread, and task-surfa
     callbackSchema,
     workflowJournalSchema,
     archiveSchema,
+    refreshSchema,
   ] =
     await Promise.all([
       schema("integration-record.schema.json"),
@@ -234,6 +235,7 @@ test("active v0.7 schemas match direct runtime timestamp, thread, and task-surfa
       schema("callback-record.schema.json"),
       schema("workflow-journal-v07.schema.json"),
       schema("archive-operation.schema.json"),
+      schema("refresh-handoff-v1.schema.json"),
     ]);
 
   assert.equal(integrationSchema.properties.executor_thread_id.$ref, "#/$defs/threadId");
@@ -287,6 +289,20 @@ test("active v0.7 schemas match direct runtime timestamp, thread, and task-surfa
   assert.equal(operationKindsFor("subagent").includes("visible-task-creation"), false);
   assert(archiveSchema.properties.state.enum.includes("archived-awaiting-worktree-reclamation"));
   assert(archiveSchema.properties.observation.oneOf[1].properties.worktree_state.enum.includes("present"));
+  assert.deepEqual(refreshSchema.$defs.archiveEvidence.required.toSorted(), [
+    "archive_intent_id", "handoff_digest", "host_id", "kind", "private_observation",
+    "proof_digest", "refresh_id", "schema_version", "source", "thread_id",
+  ].toSorted());
+  assert.equal(refreshSchema.$defs.archiveEvidence.properties.active_visible, undefined);
+  assert.equal(
+    refreshSchema.$defs.archiveEvidence.properties.private_observation.$ref,
+    "#/$defs/privateArchiveObservation",
+  );
+  assert.equal(refreshSchema.$defs.privateArchiveObservation.properties.active_session_absent.const, true);
+  assert.equal(
+    refreshSchema.$defs.privateArchiveObservation.properties.source.const,
+    "codex-app-private-archive-session-v1",
+  );
 
   const pendingArchive = pendingArchiveRecord();
   assert.deepEqual(validateArchiveOperation(pendingArchive), pendingArchive);

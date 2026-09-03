@@ -13,7 +13,7 @@ import {
 import { validateReleaseIdentity } from "./release-identity.mjs";
 
 const root = resolve(import.meta.dirname, "..");
-const EXPECTED_PACKAGE_VERSION = "0.8.0-rc.2";
+const EXPECTED_PACKAGE_VERSION = "0.8.0";
 
 // ACTIVE V0.7 SCHEMA REGISTRY INSERTION POINT:
 // add every new operating schema here in the same change that introduces it.
@@ -367,6 +367,7 @@ const skillContracts = new Map([
   ["refresh", [
     "Route once before actionable coordination",
     "refresh inspect",
+    "refresh observe-private",
     "Wait",
     "Discard",
     "run activate --refresh-id",
@@ -446,7 +447,7 @@ const templateContracts = new Map([
     "persist the signal before one identified interrupt attempt",
   ]],
   ["templates/references/task-lifecycle.md", [
-    ".git/codex-flow/v0.8.0-rc.2/runtimes/<bundle-sha256>/",
+    ".git/codex-flow/v0.8.0/runtimes/<bundle-sha256>/",
     "content-addressed intent precedes the detached",
     "terminal-receipt-v3 journal result without messaging",
     "content-addressed PASS verification and integration/no-change records",

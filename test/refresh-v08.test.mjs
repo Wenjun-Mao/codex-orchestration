@@ -21,7 +21,14 @@ import {
   prepareSerialIntegration,
   reconcileSerialIntegration,
 } from "../lib/integration-v07.mjs";
-import { applyRefresh, refreshStatus } from "../lib/refresh-v08.mjs";
+import {
+  applyRefresh,
+  refreshArchiveAuthorityDigest,
+  refreshArchiveEvidenceDigest,
+  observeRefreshPrivateArchives,
+  refreshStatus,
+} from "../lib/refresh-v08.mjs";
+import { privateArchiveObservationDigest } from "../lib/codex-app-private-archive-v07.mjs";
 import { loadRefreshSourceAuthority } from "../lib/refresh-source-v08.mjs";
 import { runCombinedVerification } from "../lib/verifications-v07.mjs";
 import { terminalReceipt } from "./v07-lifecycle-fixture.mjs";
@@ -97,6 +104,72 @@ async function jsonFile(directory, name, value) {
   const path = resolve(directory, `${name}.json`);
   await writeFile(path, `${JSON.stringify(value)}\n`, "utf8");
   return path;
+}
+
+async function writePrivateArchiveSession(codexHome, threadId) {
+  const archiveDirectory = resolve(codexHome, "archived_sessions");
+  await mkdir(archiveDirectory, { recursive: true });
+  await writeFile(
+    resolve(archiveDirectory, `refresh-fixture-${threadId}.jsonl`),
+    `${JSON.stringify({
+      timestamp: "2026-09-03T12:00:00.000Z",
+      type: "session_meta",
+      payload: {
+        id: threadId,
+        cwd: resolve(codexHome, "worktrees", "refresh-task"),
+        thread_source: "agent_created_thread",
+        cli_version: "0.152.0",
+      },
+    })}\n`,
+    "utf8",
+  );
+}
+
+function privateArchiveObservation(threadId, observedAt = new Date().toISOString()) {
+  const observation = {
+    schema_version: 1,
+    kind: "codex-flow-v07-private-archive-observation",
+    source: "codex-app-private-archive-session-v1",
+    thread_id: threadId,
+    binding_digest: "",
+    session_digest: "a".repeat(64),
+    active_session_absent: true,
+    app_version: null,
+    host_cli_version: "0.152.0",
+    observed_at: observedAt,
+  };
+  observation.binding_digest = privateArchiveObservationDigest(observation);
+  return observation;
+}
+
+function archiveEvidenceForHandoff(handoff) {
+  return handoff.cleanup.map((item) => {
+    const evidence = {
+      schema_version: 1,
+      kind: "codex-flow-refresh-v1-private-archive-observation",
+      refresh_id: handoff.refresh_id,
+      handoff_digest: refreshArchiveAuthorityDigest(handoff),
+      archive_intent_id: item.archive_intent_id,
+      thread_id: item.thread_id,
+      host_id: item.host_id,
+      source: "codex-app-private-archive-session-v1",
+      private_observation: privateArchiveObservation(item.thread_id),
+      proof_digest: "",
+    };
+    evidence.proof_digest = refreshArchiveEvidenceDigest(evidence);
+    return evidence;
+  });
+}
+
+async function applyRefreshForTest(options) {
+  const evidence = options.archiveEvidence;
+  return await applyRefresh({
+    ...options,
+    privateArchiveObserver: async ({ threadId }) => {
+      const entry = evidence.find((item) => item.thread_id === threadId);
+      return entry.private_observation;
+    },
+  });
 }
 
 function invoke(cli, args, cwd) {
@@ -639,6 +712,7 @@ test("long-lived coordinator refresh discards exact dirty work and consumes a v0
   const root = await createGitFixture("codex-flow-refresh-v08-");
   const requests = await mkdtemp(resolve(tmpdir(), "codex-flow-refresh-v08-requests-"));
   const worktreeParent = await mkdtemp(resolve(tmpdir(), "codex-flow-refresh-v08-worktree-"));
+  const codexHome = await mkdtemp(resolve(tmpdir(), "codex-flow-refresh-v08-home-"));
   const worktree = resolve(worktreeParent, "executor");
   const sourcePackage = await copyTargetPackage("0.8.0-rc.1");
   const targetPackage = await copyTargetPackage("0.8.0-rc.8");
@@ -649,6 +723,7 @@ test("long-lived coordinator refresh discards exact dirty work and consumes a v0
     removeFixture(root),
     rm(requests, { recursive: true, force: true }),
     rm(worktreeParent, { recursive: true, force: true }),
+    rm(codexHome, { recursive: true, force: true }),
     rm(sourcePackage.root, { recursive: true, force: true }),
     rm(targetPackage.root, { recursive: true, force: true }),
   ]));
@@ -715,21 +790,75 @@ test("long-lived coordinator refresh discards exact dirty work and consumes a v0
   assert.equal(Object.hasOwn(handoff.intent.replacements[0].brief, "model"), false);
   assert.equal(Object.hasOwn(handoff.intent.replacements[0].brief, "reasoning_effort"), false);
 
-  const archiveEvidence = [{
-    archive_intent_id: handoff.cleanup[0].archive_intent_id,
-    thread_id: handoff.cleanup[0].thread_id,
-    host_id: handoff.cleanup[0].host_id,
-    active_visible: false,
-    archived_visible: true,
-    observed_at: new Date().toISOString(),
-  }];
-  await assert.rejects(applyRefresh({
+  await writePrivateArchiveSession(codexHome, handoff.cleanup[0].thread_id);
+  const observedResult = spawnSync(process.execPath, [
+    targetPackage.cli,
+    "refresh", "observe-private",
+    "--invoking-skill", targetSkill,
+    "--refresh-id", handoff.refresh_id,
+    "--json",
+  ], {
+    cwd: root,
+    env: { ...process.env, CODEX_HOME: codexHome },
+    encoding: "utf8",
+  });
+  assertSuccess(observedResult, "refresh private archive observation");
+  const privateObserved = JSON.parse(observedResult.stdout);
+  const archiveEvidence = privateObserved.archive_evidence;
+  await assert.rejects(applyRefreshForTest({
     commonDir: source.contract.common_dir,
     refreshId: handoff.refresh_id,
     expectedHandoffDigest: handoff.handoff_digest,
     archiveEvidence: [{ ...archiveEvidence[0], thread_id: "wrong-executor-task" }],
     appliedAt: new Date().toISOString(),
+  }), /private archive observation does not match the exact task/);
+  const wrongHostEvidence = structuredClone(archiveEvidence);
+  wrongHostEvidence[0].host_id = "wrong-host";
+  wrongHostEvidence[0].proof_digest = refreshArchiveEvidenceDigest(wrongHostEvidence[0]);
+  await assert.rejects(applyRefreshForTest({
+    commonDir: source.contract.common_dir,
+    refreshId: handoff.refresh_id,
+    expectedHandoffDigest: handoff.handoff_digest,
+    archiveEvidence: wrongHostEvidence,
+    appliedAt: new Date().toISOString(),
   }), /task or host identity drifted/);
+  const foreignHandoffEvidence = structuredClone(archiveEvidence);
+  foreignHandoffEvidence[0].handoff_digest = "f".repeat(64);
+  foreignHandoffEvidence[0].proof_digest = refreshArchiveEvidenceDigest(foreignHandoffEvidence[0]);
+  await assert.rejects(applyRefreshForTest({
+    commonDir: source.contract.common_dir,
+    refreshId: handoff.refresh_id,
+    expectedHandoffDigest: handoff.handoff_digest,
+    archiveEvidence: foreignHandoffEvidence,
+    appliedAt: new Date().toISOString(),
+  }), /task or host identity drifted/);
+  const staleEvidence = structuredClone(archiveEvidence);
+  staleEvidence[0].private_observation.observed_at = "2020-01-01T00:00:00.000Z";
+  staleEvidence[0].private_observation.binding_digest = privateArchiveObservationDigest(
+    staleEvidence[0].private_observation,
+  );
+  staleEvidence[0].proof_digest = refreshArchiveEvidenceDigest(staleEvidence[0]);
+  await assert.rejects(applyRefreshForTest({
+    commonDir: source.contract.common_dir,
+    refreshId: handoff.refresh_id,
+    expectedHandoffDigest: handoff.handoff_digest,
+    archiveEvidence: staleEvidence,
+    appliedAt: new Date().toISOString(),
+  }), /predates the prepared handoff/);
+  const forgedEvidence = structuredClone(archiveEvidence);
+  forgedEvidence[0].private_observation.session_digest = "b".repeat(64);
+  forgedEvidence[0].private_observation.binding_digest = privateArchiveObservationDigest(
+    forgedEvidence[0].private_observation,
+  );
+  forgedEvidence[0].proof_digest = refreshArchiveEvidenceDigest(forgedEvidence[0]);
+  await assert.rejects(applyRefresh({
+    commonDir: source.contract.common_dir,
+    refreshId: handoff.refresh_id,
+    expectedHandoffDigest: handoff.handoff_digest,
+    archiveEvidence: forgedEvidence,
+    appliedAt: new Date().toISOString(),
+    codexHome,
+  }), /stale or no longer matches the host archive/);
   assert.equal((await stat(worktree)).isDirectory(), true);
   const lifecyclePath = resolve(
     source.contract.common_dir,
@@ -740,7 +869,7 @@ test("long-lived coordinator refresh discards exact dirty work and consumes a v0
   );
   const originalLifecycle = await readFile(lifecyclePath, "utf8");
   await writeFile(lifecyclePath, `${originalLifecycle}\n`, "utf8");
-  await assert.rejects(applyRefresh({
+  await assert.rejects(applyRefreshForTest({
     commonDir: source.contract.common_dir,
     refreshId: handoff.refresh_id,
     expectedHandoffDigest: handoff.handoff_digest,
@@ -755,6 +884,7 @@ test("long-lived coordinator refresh discards exact dirty work and consumes a v0
       expectedHandoffDigest: handoff.handoff_digest,
       archiveEvidence,
       appliedAt: new Date().toISOString(),
+      codexHome,
       hooks: {
         afterArchiveObserved() {
           throw new Error("simulated crash after archive observation");
@@ -769,12 +899,19 @@ test("long-lived coordinator refresh discards exact dirty work and consumes a v0
   });
   assert.equal(interrupted.status, "archive-observed");
   assert.equal((await stat(worktree)).isDirectory(), true);
+  const resumedPrivateObserved = await observeRefreshPrivateArchives({
+    commonDir: source.contract.common_dir,
+    refreshId: handoff.refresh_id,
+    codexHome,
+  });
+  assert.deepEqual(resumedPrivateObserved.archive_evidence, archiveEvidence);
+  const resumedArchiveEvidence = resumedPrivateObserved.archive_evidence;
   await assert.rejects(
-    applyRefresh({
+    applyRefreshForTest({
       commonDir: source.contract.common_dir,
       refreshId: handoff.refresh_id,
       expectedHandoffDigest: interrupted.handoff_digest,
-      archiveEvidence,
+      archiveEvidence: resumedArchiveEvidence,
       appliedAt: new Date().toISOString(),
       hooks: {
         afterWorktreeRemoval() {
@@ -794,11 +931,11 @@ test("long-lived coordinator refresh discards exact dirty work and consumes a v0
   });
   assert.equal(interrupted.status, "archive-observed");
   await assert.rejects(
-    applyRefresh({
+    applyRefreshForTest({
       commonDir: source.contract.common_dir,
       refreshId: handoff.refresh_id,
       expectedHandoffDigest: interrupted.handoff_digest,
-      archiveEvidence,
+      archiveEvidence: resumedArchiveEvidence,
       appliedAt: new Date().toISOString(),
       hooks: {
         afterBranchDeletion() {
@@ -817,7 +954,7 @@ test("long-lived coordinator refresh discards exact dirty work and consumes a v0
   });
   assert.equal(interrupted.status, "archive-observed");
   await assert.rejects(
-    applyRefresh({
+    applyRefreshForTest({
       commonDir: source.contract.common_dir,
       refreshId: handoff.refresh_id,
       expectedHandoffDigest: interrupted.handoff_digest,
@@ -838,7 +975,7 @@ test("long-lived coordinator refresh discards exact dirty work and consumes a v0
   assert.equal(interrupted.status, "archive-observed");
   let applied;
   try {
-    applied = await applyRefresh({
+    applied = await applyRefreshForTest({
       commonDir: source.contract.common_dir,
       refreshId: handoff.refresh_id,
       expectedHandoffDigest: interrupted.handoff_digest,
@@ -1036,18 +1173,11 @@ test("detached coordinator refresh preserves its exact root and normalized branc
   const handoff = JSON.parse(prepared.stdout).handoff;
   assert.equal(handoff.intent.target.baseline.root, canonicalCoordinatorRoot);
   assert.equal(handoff.intent.target.baseline.branch, "detached");
-  const applied = await applyRefresh({
+  const applied = await applyRefreshForTest({
     commonDir: source.contract.common_dir,
     refreshId: handoff.refresh_id,
     expectedHandoffDigest: handoff.handoff_digest,
-    archiveEvidence: [{
-      archive_intent_id: handoff.cleanup[0].archive_intent_id,
-      thread_id: handoff.cleanup[0].thread_id,
-      host_id: handoff.cleanup[0].host_id,
-      active_visible: false,
-      archived_visible: true,
-      observed_at: new Date().toISOString(),
-    }],
+    archiveEvidence: archiveEvidenceForHandoff(handoff),
     appliedAt: new Date().toISOString(),
   });
   assert.equal(applied.status, "source-retired");
@@ -1209,15 +1339,8 @@ test("refresh preserves an integrated baseline and reissues only the discarded e
     "",
   );
 
-  const archiveEvidence = [{
-    archive_intent_id: handoff.cleanup[0].archive_intent_id,
-    thread_id: handoff.cleanup[0].thread_id,
-    host_id: handoff.cleanup[0].host_id,
-    active_visible: false,
-    archived_visible: true,
-    observed_at: new Date().toISOString(),
-  }];
-  await assert.rejects(applyRefresh({
+  const archiveEvidence = archiveEvidenceForHandoff(handoff);
+  await assert.rejects(applyRefreshForTest({
     commonDir: discarded.contract.common_dir,
     refreshId: handoff.refresh_id,
     expectedHandoffDigest: handoff.handoff_digest,
@@ -1230,7 +1353,7 @@ test("refresh preserves an integrated baseline and reissues only the discarded e
   });
   assert.equal(cleanupBlocked.status, "archive-observed");
   execFileSync("git", ["branch", "-d", integrated.sourceBranch], { cwd: root });
-  const applied = await applyRefresh({
+  const applied = await applyRefreshForTest({
     commonDir: discarded.contract.common_dir,
     refreshId: handoff.refresh_id,
     expectedHandoffDigest: cleanupBlocked.handoff_digest,
@@ -1464,18 +1587,11 @@ test("refresh accepts only the exact v0.7.8 adapter as a legacy source", async (
   assertSuccess(prepared, "v0.7.8 adapter preparation");
   const handoff = JSON.parse(prepared.stdout).handoff;
   assert.equal(handoff.intent.source.adapter, "exact-v0.7.8-adapter");
-  const applied = await applyRefresh({
+  const applied = await applyRefreshForTest({
     commonDir: source.contract.common_dir,
     refreshId: handoff.refresh_id,
     expectedHandoffDigest: handoff.handoff_digest,
-    archiveEvidence: [{
-      archive_intent_id: handoff.cleanup[0].archive_intent_id,
-      thread_id: handoff.cleanup[0].thread_id,
-      host_id: handoff.cleanup[0].host_id,
-      active_visible: false,
-      archived_visible: true,
-      observed_at: new Date().toISOString(),
-    }],
+    archiveEvidence: archiveEvidenceForHandoff(handoff),
     appliedAt: new Date().toISOString(),
   });
   assert.equal(applied.status, "source-retired");
@@ -1659,7 +1775,7 @@ test("refresh skill authentication rejects a stale loaded catalog path", async (
 test("refresh inspection blocks malformed current namespace authority", async (t) => {
   const root = await createGitFixture("codex-flow-refresh-malformed-current-");
   t.after(() => removeFixture(root));
-  const lifecycleRoot = resolve(root, ".git", "codex-flow", "v0.8.0-rc.2", "runs");
+  const lifecycleRoot = resolve(root, ".git", "codex-flow", "v0.8.0", "runs");
   await mkdir(lifecycleRoot, { recursive: true });
   await writeFile(resolve(lifecycleRoot, "lifecycle.json"), "{}\n", "utf8");
   const result = runCli([

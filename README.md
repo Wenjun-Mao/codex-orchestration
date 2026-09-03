@@ -23,8 +23,8 @@ packages no general predecessor reader, mutator, migration path, retirement
 command, tracked adoption, or predecessor test fixture. Its only compatibility
 surface is the bounded refresh authority described below.
 
-The accepted public release is v0.7.8. The editable checkout is the unreleased
-v0.8.0-rc.2 release-candidate authority. v0.8 carries forward the proven
+The accepted public release and this checkout's package authority are v0.8.0.
+v0.8 carries forward the proven
 cross-task behavior under `codex-flow-v08-*` identities and exact-version
 Git-common namespaces. It retains a bounded foreign-active-run sentinel:
 ordinary activation never silently ignores or migrates a live predecessor run.
@@ -120,7 +120,7 @@ When the user authorizes actionable orchestration, the plugin may activate one
 run after disclosing:
 
 - the exact package/runtime source and bundle hash;
-- the exact-version `.git/codex-flow/v0.8.0-rc.2/` operational state root;
+- the exact-version `.git/codex-flow/v0.8.0/` operational state root;
 - repository/common-directory, baseline, host, and coordinator binding;
 - the immutable workflow revision and its path/resource/branch reservation
   envelope;
@@ -309,7 +309,7 @@ lifecycle is organized around these command families:
 
 ```text
 run activate|status|resume|rebind|audit|close|abandon
-refresh inspect|prepare|apply|status
+refresh inspect|prepare|observe-private|apply|status
 workflow create|revise|status|contract
 task create prepare|attempt|reconcile|bind|status
 task create resolve-private

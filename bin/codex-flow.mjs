@@ -90,6 +90,7 @@ import {
   authenticateRefreshSkill,
   consumeRefreshActivation,
   inspectRefresh,
+  observeRefreshPrivateArchives,
   prepareRefresh,
   refreshStatus,
 } from "../lib/refresh-v08.mjs";
@@ -174,6 +175,7 @@ Usage:
   codex-flow unplug observe-private --file request.json [--json]
   codex-flow unplug apply --file request.json [--json]
   codex-flow refresh inspect --invoking-skill PATH [--json]
+  codex-flow refresh observe-private --invoking-skill PATH --refresh-id ID [--json]
   codex-flow refresh prepare|apply --invoking-skill PATH --file request.json [--json]
   codex-flow refresh status --invoking-skill PATH [--refresh-id ID] [--json]
 
@@ -1662,8 +1664,8 @@ async function commandUnplugV07(args) {
 
 async function commandRefreshV08(args) {
   const [subcommand, ...rest] = args;
-  if (!["inspect", "prepare", "apply", "status"].includes(subcommand)) {
-    throw new CliError("refresh requires inspect, prepare, apply, or status");
+  if (!["inspect", "prepare", "observe-private", "apply", "status"].includes(subcommand)) {
+    throw new CliError("refresh requires inspect, prepare, observe-private, apply, or status");
   }
   const values = parseV07Options(rest, {
     "invoking-skill": { type: "string" },
@@ -1697,6 +1699,16 @@ async function commandRefreshV08(args) {
     v07Output(await refreshStatus({
       commonDir: git.commonDir,
       refreshId: values["refresh-id"] ?? null,
+    }));
+    return;
+  }
+  if (subcommand === "observe-private") {
+    if (values.file !== undefined || values["refresh-id"] === undefined) {
+      throw new CliError("refresh observe-private requires --refresh-id and accepts no --file", 64);
+    }
+    v07Output(await observeRefreshPrivateArchives({
+      commonDir: git.commonDir,
+      refreshId: requireText(values["refresh-id"], "--refresh-id", { max: 128, safeId: true }),
     }));
     return;
   }

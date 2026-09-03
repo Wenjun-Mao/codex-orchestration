@@ -85,17 +85,23 @@ old run/operation/Git authority and old selectors.
 
 ## Archive, apply, and activate
 
-Archive every discarded visible task exactly once through the App. Reconcile
-structured evidence that each exact ready task is archived and absent from the
-active surface. Then call `refresh apply` with the current `refresh_id`, current
-handoff digest, and exactly covering archive evidence.
+Archive every discarded visible task exactly once through the App. Then run
+`refresh observe-private --refresh-id <exact> --invoking-skill
+<this-SKILL.md> --json`. This read-only command authenticates the exact archived
+App session, proves the task is absent from active sessions, and binds the proof
+to the refresh, stable handoff authority, archive intent, task, and host. Pass
+its exactly covering `archive_evidence` to `refresh apply` with the current
+`refresh_id` and current handoff digest. Caller-authored archive booleans are not
+authority.
 
 Apply is crash-resumable. It revalidates evidence under the repository-wide
 lock, removes each exact worktree before its local branch, invokes the source
 run's authenticated snapshot to retire that source, and reaches
 `source-retired`. It never touches remote or external side effects. Use
 `refresh status` after interruption; do not replay an App archive call merely
-because local cleanup was interrupted.
+because local cleanup was interrupted. If status is already
+`archive-observed`, `refresh observe-private` rechecks the live archived session
+and returns the exact persisted proof required to resume apply.
 
 For a `replacement-run` handoff, finally call
 `run activate --refresh-id <exact>` with the prepared target workflow, fences,

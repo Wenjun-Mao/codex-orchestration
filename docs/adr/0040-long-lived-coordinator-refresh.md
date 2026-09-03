@@ -33,7 +33,10 @@ task:
 
 - **Wait**, then disposition and integrate its result under the source runtime.
 - **Discard**, recording a rationale and archiving the exact unintegrated task
-  before removing only its authenticated local worktree and local branch.
+  before removing only its authenticated local worktree and local branch. The
+  caller cannot assert archival with booleans: refresh binds the existing
+  private App archived-session observation to the exact handoff, archive intent,
+  task, and host, then re-observes that session before deletion.
 
 Before deletion, `refresh prepare` stores exactly one content-addressed
 `.git/codex-flow/refresh-v1/` handoff. It contains source and target runtime

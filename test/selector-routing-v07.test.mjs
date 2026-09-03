@@ -87,7 +87,7 @@ async function fixture(t, suffix) {
     branchFences: ["codex/selector-routing"],
     now: START - 3_000,
   });
-  const stateRoot = resolve(commonDir, "codex-flow", "v0.8.0-rc.2");
+  const stateRoot = resolve(commonDir, "codex-flow", "v0.8.0");
   await createWorkflowJournal({
     stateRoot,
     runId,

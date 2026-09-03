@@ -18,8 +18,23 @@ and the `refresh` skill define the contract.
 | Safety gates remain closed | Stale receipt, late callback, remote/protected ref, prior integration, ambiguous task identity, archive disagreement, path drift, or snapshot tampering prevents apply or activation. |
 | Non-goals remain absent | No `AGENTS.md` access, recurring preflight, general predecessor migration, daemon, registry, or silent fallback is introduced. |
 
-Before stable release, one live same-coordinator canary must use two visible
-executor tasks: accept one finished result, archive and discard the other,
-reload the App to a next RC without replacing the coordinator task, reissue
-only the discarded assignment with explicit fresh selectors, and prove the old
-task/worktree/branch/handoff are absent after the replacement completes.
+## Live acceptance
+
+The required same-coordinator canary passed on 2026-09-03. One RC1 executor
+finished and was integrated at `ff02ae322e8198594706dfeaf5c948947bdbaf00`;
+the other was archived and its unintegrated worktree and branch were discarded.
+After an App reload, the same coordinator consumed refresh handoff
+`refresh-v1-ce5dae4624f8cd25c1ef210a273df6de1ccfdecb939c6768349a8ae70acc90ec`
+into an RC2 run and reissued only the discarded assignment to a freshly
+selected Luna-medium executor. The replacement completed at
+`304fe9c17fbd4fdebc89ab11c28bea82b10389cc`; the target run closed with a
+terminal-ready audit and no canary task, worktree, branch, or handoff remained.
+
+Independent post-canary review found that the initial apply request still
+trusted caller-authored archive booleans. Stable v0.8.0 instead requires an
+exact, digest-bound private App archived-session proof and re-observes its
+session digest before deleting executor-local Git state. The corrected path is
+covered by the full refresh crash-boundary test, public CLI invocation, schema
+parity and forged/stale/foreign-proof negatives. A final read-only live check
+authenticated all three archived canary sessions under Codex host CLI
+`0.153.0-alpha.5`; the already completed destructive canary was not replayed.
