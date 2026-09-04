@@ -64,7 +64,7 @@ async function fixture(t, { tasks = [subagentTask()] } = {}) {
     cwd: root,
     encoding: "utf8",
   }).trim();
-  const stateRoot = resolve(commonDir, "codex-flow", "v0.8.3-dev.0");
+  const stateRoot = resolve(commonDir, "codex-flow", "v0.8.3");
   const coordinator = {
     lineage_id: "subagent-operation-lineage",
     thread_id: "subagent-operation-coordinator",

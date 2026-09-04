@@ -209,7 +209,7 @@ test("v0.7 activation requires a clean start when an incompatible namespace rema
   assert.match(result.stderr, /Clean start required before activation/);
   assert.match(result.stderr, /codex-flow unplug plan/);
   await assert.rejects(
-    stat(resolve(root, ".git", "codex-flow", "v0.8.3-dev.0", "runs", "lifecycle.json")),
+    stat(resolve(root, ".git", "codex-flow", "v0.8.3", "runs", "lifecycle.json")),
     { code: "ENOENT" },
   );
 });
@@ -229,7 +229,7 @@ test("v0.7 activation cannot race an in-progress unplug", async (t) => {
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /unplug is already in progress/i);
   await assert.rejects(
-    stat(resolve(root, ".git", "codex-flow", "v0.8.3-dev.0", "runs", "lifecycle.json")),
+    stat(resolve(root, ".git", "codex-flow", "v0.8.3", "runs", "lifecycle.json")),
     { code: "ENOENT" },
   );
 });
@@ -606,8 +606,8 @@ test("run activation needs no tracked setup and replays the same disclosed autho
   const context = await activatedFixture(t, "activation");
   await assert.rejects(stat(resolve(context.root, ".codex", "orchestration")), /ENOENT/);
   assert.equal(context.result.status, "admitted");
-  assert.equal(context.result.state_authority.namespace, "v0.8.3-dev.0");
-  assert.match(context.result.state_authority.state_root, /\.git\/codex-flow\/v0\.8\.3-dev\.0$/);
+  assert.equal(context.result.state_authority.namespace, "v0.8.3");
+  assert.match(context.result.state_authority.state_root, /\.git\/codex-flow\/v0\.8\.3$/);
   assert.equal(context.result.repository_authority.cleanliness, "clean");
   assert.equal(context.result.workflow_authority.run_id, context.runId);
   assert.equal(context.result.model_routing[0].model, "gpt-5.6-terra");
@@ -668,7 +668,7 @@ test("run activation rejects a workflow outside its reservation envelope before 
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /outside the admitted run fence envelope/);
   await assert.rejects(
-    stat(resolve(root, ".git", "codex-flow", "v0.8.3-dev.0")),
+    stat(resolve(root, ".git", "codex-flow", "v0.8.3")),
     (error) => error?.code === "ENOENT",
   );
 });
@@ -687,7 +687,7 @@ test("run activation rejects a different host current task before it records aut
   assert.equal(result.status, 73);
   assert.match(result.stderr, /host's current coordinator task/);
   await assert.rejects(
-    stat(resolve(root, ".git", "codex-flow", "v0.8.3-dev.0")),
+    stat(resolve(root, ".git", "codex-flow", "v0.8.3")),
     (error) => error?.code === "ENOENT",
   );
 });
@@ -706,7 +706,7 @@ test("run activation rejects missing host current-task identity before it record
   assert.equal(result.status, 1);
   assert.match(result.stderr, /host-exposed current task identity/);
   await assert.rejects(
-    stat(resolve(root, ".git", "codex-flow", "v0.8.3-dev.0")),
+    stat(resolve(root, ".git", "codex-flow", "v0.8.3")),
     (error) => error?.code === "ENOENT",
   );
 });
@@ -725,7 +725,7 @@ test("run activation rejects malformed host current-task identity before it reco
   assert.equal(result.status, 1);
   assert.match(result.stderr, /host-exposed current task identity/);
   await assert.rejects(
-    stat(resolve(root, ".git", "codex-flow", "v0.8.3-dev.0")),
+    stat(resolve(root, ".git", "codex-flow", "v0.8.3")),
     (error) => error?.code === "ENOENT",
   );
 });
@@ -825,7 +825,7 @@ test("a second active run is refused before acquiring orphan runtime or workflow
   const contextsRoot = resolve(
     context.result.state_authority.git_common_dir,
     "codex-flow",
-    "v0.8.3-dev.0",
+    "v0.8.3",
     "contexts",
   );
   const beforeContexts = await readdir(contextsRoot);

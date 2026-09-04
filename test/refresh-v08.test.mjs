@@ -1812,7 +1812,7 @@ test("the current CLI recovers one exact v0.8.1 private operation without mutati
   const requests = await mkdtemp(resolve(tmpdir(), "codex-flow-v081-private-recovery-requests-"));
   const codexHome = await mkdtemp(resolve(tmpdir(), "codex-flow-v081-private-recovery-home-"));
   const sourcePackage = await copyTaggedPackage("v0.8.1");
-  const targetPackage = await copyTargetPackage("0.8.3-dev.0");
+  const targetPackage = await copyTargetPackage("0.8.3");
   t.after(async () => Promise.all([
     removeFixture(root),
     rm(requests, { recursive: true, force: true }),
@@ -2070,7 +2070,7 @@ test("refresh skill authentication rejects a stale loaded catalog path", async (
 test("refresh inspection blocks malformed current namespace authority", async (t) => {
   const root = await createGitFixture("codex-flow-refresh-malformed-current-");
   t.after(() => removeFixture(root));
-  const lifecycleRoot = resolve(root, ".git", "codex-flow", "v0.8.3-dev.0", "runs");
+  const lifecycleRoot = resolve(root, ".git", "codex-flow", "v0.8.3", "runs");
   await mkdir(lifecycleRoot, { recursive: true });
   await writeFile(resolve(lifecycleRoot, "lifecycle.json"), "{}\n", "utf8");
   const result = runCli([
