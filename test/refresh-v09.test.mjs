@@ -116,6 +116,50 @@ async function copyCurrentPackage() {
   return { root, cli: resolve(root, "bin", "codex-flow.mjs") };
 }
 
+async function createAbandonedV08Run({
+  root,
+  requests,
+  sourcePackage,
+  runId = "refresh-v08-prior-abandoned",
+  branchFences = [],
+}) {
+  const workflowTask = task(`${runId}-sentinel`, {
+    execution_kind: "subagent",
+    mode: "read",
+    model: "gpt-5.6-luna",
+    reasoning_effort: "medium",
+    selector_rationale: "Luna-medium is sufficient for this read-only lifecycle sentinel.",
+    fork_turns: "2",
+    write_paths: [],
+    shared_resources: [],
+  });
+  const request = activation({
+    runId,
+    workflowTask,
+    lineageId: `${runId}-lineage`,
+    threadId: `${runId}-coordinator`,
+    branch: branchFences[0] ?? "codex/unused-abandoned-sentinel",
+    branchFences,
+  });
+  const activationPath = await jsonFile(requests, `${runId}-activation`, request);
+  const activatedCall = invoke(sourcePackage.cli, [
+    "run", "activate", "--run-id", runId, "--file", activationPath, "--json",
+  ], root, { CODEX_THREAD_ID: request.runtime.lineage.thread_id });
+  assertSuccess(activatedCall, "v0.8.3 prior run activation");
+  const activated = JSON.parse(activatedCall.stdout);
+  const runtimeCli = resolve(activated.runtime_authority.bundle_root, "bin", "codex-flow.mjs");
+  const abandonPath = await jsonFile(requests, `${runId}-abandon`, {
+    run_id: runId,
+    resume: activated.run.binding,
+    reason: "The fixture intentionally preserves an honest terminal abandonment.",
+  });
+  const abandonedCall = invoke(runtimeCli, [
+    "run", "abandon", "--run-id", runId, "--file", abandonPath, "--json",
+  ], root);
+  assertSuccess(abandonedCall, "v0.8.3 prior run abandonment");
+  return { activated, request, runtimeCli };
+}
+
 async function createV08Source({
   root,
   requests,
@@ -499,6 +543,7 @@ test("v0.9 consumes one exact v0.8.3 semantic handoff and resumes every deletion
     ]);
   });
 
+  await createAbandonedV08Run({ root, requests, sourcePackage });
   const source = await createV08Source({ root, requests, worktree, sourcePackage });
   await writeFile(resolve(worktree, "unintegrated.txt"), "discarded local work\n", "utf8");
   const targetSkill = resolve(targetPackage.root, "skills/refresh/SKILL.md");
@@ -619,9 +664,49 @@ test("v0.9 consumes one exact v0.8.3 semantic handoff and resumes every deletion
   ], root, { CODEX_THREAD_ID: source.coordinatorThreadId });
   assertSuccess(activatedCall, "v0.9 target activation");
   const activated = JSON.parse(activatedCall.stdout);
-  assert.equal(activated.state_authority.namespace, "v0.9.0-rc.1");
+  assert.equal(activated.state_authority.namespace, "v0.9.0-rc.2");
   assert.equal(activated.refresh_origin.refresh_id, handoff.refresh_id);
   await assert.rejects(stat(resolve(root, ".git/codex-flow/refresh-v1")), /ENOENT/);
+});
+
+test("v0.9 refresh rejects an abandoned predecessor that retains a live Git fence", async (t) => {
+  const root = await createGitFixture("codex-flow-refresh-v09-abandoned-residue-");
+  const requests = await mkdtemp(resolve(tmpdir(), "codex-flow-refresh-v09-abandoned-residue-requests-"));
+  const worktreeParent = await mkdtemp(resolve(tmpdir(), "codex-flow-refresh-v09-abandoned-residue-worktree-"));
+  const worktree = resolve(worktreeParent, "executor");
+  const sourcePackage = await extractTaggedPackage("v0.8.3");
+  const targetPackage = await copyCurrentPackage();
+  const retainedBranch = "codex/refresh-v08-abandoned-residue";
+  t.after(async () => {
+    spawnSync("git", ["worktree", "remove", "--force", worktree], { cwd: root, stdio: "ignore" });
+    spawnSync("git", ["branch", "-D", retainedBranch], { cwd: root, stdio: "ignore" });
+    await Promise.all([
+      removeFixture(root),
+      rm(requests, { recursive: true, force: true }),
+      rm(worktreeParent, { recursive: true, force: true }),
+      rm(sourcePackage.root, { recursive: true, force: true }),
+      rm(targetPackage.root, { recursive: true, force: true }),
+    ]);
+  });
+
+  await createAbandonedV08Run({
+    root,
+    requests,
+    sourcePackage,
+    runId: "refresh-v08-abandoned-with-residue",
+    branchFences: [retainedBranch],
+  });
+  execFileSync("git", ["branch", retainedBranch], { cwd: root });
+  await createV08Source({ root, requests, worktree, sourcePackage });
+
+  const targetSkill = resolve(targetPackage.root, "skills/refresh/SKILL.md");
+  const inspectionCall = invoke(targetPackage.cli, [
+    "refresh", "inspect", "--invoking-skill", targetSkill, "--json",
+  ], root);
+  assertSuccess(inspectionCall, "v0.9 blocked refresh inspection");
+  const inspection = JSON.parse(inspectionCall.stdout);
+  assert.equal(inspection.route, "blocked");
+  assert.match(inspection.reason, /Earlier source run is not cleanup-complete/);
 });
 
 test("v0.9 mixed refresh preserves integrated work and reissues only the discarded assignment", async (t) => {

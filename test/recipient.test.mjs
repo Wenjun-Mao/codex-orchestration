@@ -14,7 +14,7 @@ import { createGitFixture, removeFixture } from "./helpers.mjs";
 test("recipient registry fences rebinding and resolves only recorded lineage generations", async () => {
   const root = await createGitFixture("codex-flow-recipient-");
   try {
-    const stateRoot = resolve(root, ".git", "codex-flow", "v0.9.0-rc.1");
+    const stateRoot = resolve(root, ".git", "codex-flow", "v0.9.0-rc.2");
     const initial = await bindRecipient({
       stateRoot,
       recipient: {

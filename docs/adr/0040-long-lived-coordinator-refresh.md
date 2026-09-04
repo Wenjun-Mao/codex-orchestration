@@ -99,8 +99,10 @@ ambiguous predecessor state remains blocked and uses the existing explicit
   lifecycle; they never enter worktree discard.
 - Waited executors must finish ordinary archive and local Git cleanup before
   cutover. Before whole-namespace removal, every non-selected run must be
-  independently closed and cleanup-complete; abandoned or retained run residue
-  blocks refresh.
+  independently terminal and cleanup-complete. A closed run qualifies; an
+  abandoned run qualifies only when its authenticated source-runtime cleanup
+  plan proves zero cleanup requirements and zero blockers. Any retained Git or
+  operation residue still blocks refresh.
 - Remote refs and external side effects are never removed or reversed.
 - Provisional identity, archive disagreement, path/attachment drift, protected
   or remote refs, prior integration, stale callbacks, and tampered snapshots

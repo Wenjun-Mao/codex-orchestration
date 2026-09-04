@@ -109,9 +109,9 @@ test("v0.9 CLI activates a clean run through current launch-era wiring", async (
   const result = JSON.parse(activated.stdout);
   assert.equal(result.run.run_id, runId);
   assert.equal(result.coordinator_identity.matched, true);
-  assert.match(result.runtime_authority.bundle_root, /v0\.9\.0-rc\.1\/runtimes\//);
+  assert.match(result.runtime_authority.bundle_root, /v0\.9\.0-rc\.2\/runtimes\//);
 
-  await stat(resolve(root, ".git", "codex-flow", "v0.9.0-rc.1", "runs", "lifecycle.json"));
+  await stat(resolve(root, ".git", "codex-flow", "v0.9.0-rc.2", "runs", "lifecycle.json"));
   const status = runCli(["run", "status", "--run-id", runId, "--json"], { cwd: root });
   assertSuccess(status, "run status");
   assert.equal(JSON.parse(status.stdout).run.run_id, runId);
