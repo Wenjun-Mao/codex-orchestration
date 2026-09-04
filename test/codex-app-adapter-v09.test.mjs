@@ -5,6 +5,7 @@ import {
   assertExactExecutorStartClaim,
   classifyCodexAppCreation,
   classifyCodexAppExecutorStart,
+  createCodexAppHostEvidence,
   validateCodexAppHostEvidence,
 } from "../lib/adapters/codex-app/host-evidence.mjs";
 import { classifyCodexAppProvisionalMapping, provisionalMappingCandidate } from "../lib/adapters/codex-app/provisional-mapping.mjs";
@@ -23,8 +24,7 @@ test("creation evidence classifies settled, provisional, opaque, and contradicto
     observedAt: OBSERVED_AT,
   });
   assert.equal(current.classification, "current");
-  assert.equal(current.claims.reported_thread_digest.length, 64);
-  assert.equal(JSON.stringify(current).includes("executor-current"), false);
+  assert.equal(current.claims.ready_thread_id, "executor-current");
 
   const provisional = classifyCodexAppCreation({
     requestDigest: REQUEST_DIGEST,
@@ -50,21 +50,20 @@ test("creation evidence classifies settled, provisional, opaque, and contradicto
 
 test("only an exact executor start claim can yield an executor identity", () => {
   const exact = classifyCodexAppExecutorStart({
-    operationId: "operation-1",
+    launchId: "task-launch-1",
     executorThreadId: "executor-current",
-    turnId: "turn-1",
     launchNonceDigest: NONCE_DIGEST,
     exactLaunchNonceMatch: true,
     observedAt: OBSERVED_AT,
   });
   assert.equal(exact.classification, "current");
   assert.equal(assertExactExecutorStartClaim(exact, {
-    operationId: "operation-1",
+    launchId: "task-launch-1",
     launchNonceDigest: NONCE_DIGEST,
   }), "executor-current");
 
   const incomplete = classifyCodexAppExecutorStart({
-    operationId: "operation-1",
+    launchId: "task-launch-1",
     executorThreadId: "executor-unverified",
     observedAt: OBSERVED_AT,
   });
@@ -73,7 +72,7 @@ test("only an exact executor start claim can yield an executor identity", () => 
   assert.throws(() => assertExactExecutorStartClaim(incomplete), /exact executor-start evidence/);
 
   const provisional = classifyCodexAppExecutorStart({
-    operationId: "operation-1",
+    launchId: "task-launch-1",
     provisionalClientThreadId: "client-new-thread:one",
     observedAt: OBSERVED_AT,
   });
@@ -113,6 +112,54 @@ test("provisional mapping keeps candidates non-authoritative and fails closed on
   assert.equal(contradictory.classification, "contradictory");
   assert.equal(contradictory.claims.candidate_count, 2);
   assert.equal(JSON.stringify(contradictory).includes("executor-a"), false);
+});
+
+test("worktree and selector evidence cross the adapter as closed typed facts", () => {
+  const worktree = createCodexAppHostEvidence({
+    evidenceType: "worktree",
+    classification: "current",
+    source: "codex-app-host",
+    observedAt: OBSERVED_AT,
+    claims: {
+      common_dir: "/tmp/repository/.git",
+      worktree_path: "/tmp/repository-executor",
+      baseline_revision: "d".repeat(40),
+      pristine: true,
+      non_coordinator: true,
+    },
+  });
+  assert.equal(worktree.evidence_type, "worktree");
+  assert.equal(worktree.classification, "current");
+  assert.throws(
+    () => createCodexAppHostEvidence({
+      evidenceType: "worktree",
+      classification: "current",
+      source: "codex-app-host",
+      observedAt: OBSERVED_AT,
+      claims: { ...worktree.claims, pristine: false },
+    }),
+    /must be pristine and non-coordinator/,
+  );
+
+  const selector = createCodexAppHostEvidence({
+    evidenceType: "selector",
+    classification: "current",
+    source: "codex-app-host",
+    observedAt: OBSERVED_AT,
+    claims: { model: "gpt-5.6-terra", reasoning_effort: "xhigh" },
+  });
+  assert.equal(selector.evidence_type, "selector");
+  assert.equal(selector.claims.reasoning_effort, "xhigh");
+  assert.throws(
+    () => createCodexAppHostEvidence({
+      evidenceType: "selector",
+      classification: "current",
+      source: "codex-app-host",
+      observedAt: OBSERVED_AT,
+      claims: { model: "gpt-5.6-terra", reasoning_effort: "impossible" },
+    }),
+    /reasoning_effort/,
+  );
 });
 
 test("archive evidence distinguishes active, absent, opaque, and ambiguous inventories", () => {
@@ -157,7 +204,7 @@ test("host-evidence schema is valid JSON and declares the constrained evidence v
   ));
   assert.equal(schema.$schema, "https://json-schema.org/draft/2020-12/schema");
   assert.deepEqual(schema.properties.evidence_type.enum, [
-    "creation", "executor-start", "provisional-mapping", "archive",
+    "creation", "executor-start", "worktree", "selector", "provisional-mapping", "archive",
   ]);
   assert.equal(schema.$defs.mappingCurrent.properties.candidate_executor_thread_id !== undefined, true);
   assert.equal(schema.$defs.mappingCurrent.properties.ready_thread_id, undefined);

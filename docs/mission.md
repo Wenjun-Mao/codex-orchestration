@@ -1,7 +1,7 @@
 # Mission and product boundary
 
 - Status: accepted
-- Date: 2026-08-29
+- Last reviewed: 2026-09-04 for the v0.9 native-first boundary
 - Scope: durable product purpose and feature boundary
 
 This charter defines why Codex Orchestration exists and how proposed features
@@ -115,12 +115,14 @@ tasks may run concurrently and which must wait; dependency cycles are invalid.
 
 ### Durable identity and evidence
 
-The authorizing workflow revision, generated task contract, native creation attempt, ready task, release,
-bound recipient lineage, Git state, terminal result or urgent signal, and final
-disposition must form one traceable chain. A recipient authenticates the
-journaled identity against its current lineage before acting. Requested,
-host-accepted, and independently observed facts remain distinct. Ambiguous host
-outcomes fail closed instead of being converted into stronger claims.
+The authorizing workflow revision, generated task contract, one-shot launch,
+executor start claim, bound recipient lineage, Git state, terminal result or
+urgent signal, and final disposition must form one traceable chain. The full
+contract is the visible executor's first prompt; its deterministic start gate
+authenticates identity and attaches the reserved branch before source mutation.
+Requested, host-accepted, and independently observed facts remain distinct.
+Ambiguous host outcomes fail closed instead of being converted into stronger
+claims.
 
 ### Heterogeneous model orchestration
 
@@ -204,22 +206,22 @@ mission.
 
 ## Version relationship
 
-This charter guides v0.8 and later development. Ordinary activation is a clean
+This charter guides v0.9 and later development. Ordinary activation is a clean
 authority boundary: it packages no general predecessor protocol reader,
 migration, retirement, tracked adoption, or plugin-managed instruction path.
 Earlier releases remain immutable source-tag and Git-history evidence only.
 
 One narrow exception supports a long-lived coordinator after an App skill
 reload. The coordinator may use a bounded refresh handoff to finish or discard
-unintegrated executor tasks from one authenticated source runtime and activate
-one new run. The source snapshot remains the authority for source lifecycle
-work; the target receives only semantic replacement briefs and fresh task,
-selector, Git, and runtime identities. v0.8.0 includes an exact v0.7.8 source
-adapter whose raw legacy records remain governed by byte-authenticated v0.7.8
-reader/validator modules, while successive v0.8+ snapshots parse and export
-their own stable refresh semantics; neither is arbitrary predecessor
-compatibility.
-[ADR 0040](adr/0040-long-lived-coordinator-refresh.md) governs this exception.
+unintegrated executor tasks from one authenticated v0.8 source runtime and
+activate one new v0.9 run. The source snapshot remains authority for source
+lifecycle work; the target receives only semantic replacement briefs and fresh
+task, launch, selector, Git, and runtime identities. v0.9 invokes the
+authenticated source exporter and never parses or migrates source journals.
+There is no current v0.7.8 or v0.8.1 executable bridge.
+[ADR 0040](adr/0040-long-lived-coordinator-refresh.md) governs refresh, and
+[ADR 0043](adr/0043-native-first-modular-architecture.md) governs the v0.9
+compatibility boundary.
 
 When incompatible retained local Flow state prevents a clean start, the
 separate `unplug` lifecycle is deliberately narrower than predecessor support:

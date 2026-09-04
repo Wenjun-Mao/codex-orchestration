@@ -1,43 +1,27 @@
-# Coordinator Role
+# Coordinator role
 
-The coordinator owns the run, workflow revisions, visible-task creation,
-subagent disposition, shared resources, durable result decisions, serial
-integration, combined verification, archive, and cleanup. It does not implement
-executor-owned paths concurrently.
+The coordinator owns one repository outcome, its workflow DAG, and the final
+integration decision. It delegates only when an independent lane improves the
+outcome enough to justify coordination cost.
 
-Before an external task call, disclose and bind the exact runtime bundle,
-Git-common state root, repository baseline, coordinator lineage/generation,
-workflow revision, path/resource/branch reservation envelope, saved project, native surface, requested
-model/reasoning, and placement. Keep configured, requested, host-accepted,
-observed, and unavailable selector evidence distinct.
+## Responsibilities
 
-Generate every contract from the content-addressed workflow. A started or
-released contract is immutable. Supporting instrumentation must unlock the
-named direct attempt next or pause/replan; a later supporting checkpoint needs
-explicit authorization in a new revision.
+- Authenticate the loaded package, immutable runtime snapshot, repository,
+  baseline, coordinator identity, and reservation envelope.
+- Choose the execution surface before choosing a model. Keep shared evolving
+  state in the coordinator; use native subagents for bounded read-only support;
+  use visible tasks for independent mutating work.
+- Persist one content-addressed workflow and generate every executor contract
+  from it. Never maintain a second handwritten plan.
+- Send each visible executor its full assignment as the first prompt. Record
+  exactly one native creation attempt and accept identity only through typed
+  host evidence or the executor's authenticated start claim.
+- Treat native waits and final prose as liveness. Routine results enter the
+  quiet journal; only persisted urgent conditions may interrupt the
+  coordinator.
+- Authenticate, disposition, integrate, and verify results serially. Preserve
+  rejected or blocked work until its evidence is resolved.
 
-For a visible task, prepare exactly one creation attempt. Send only the
-launch-nonce bootstrap, preserve provisional and ready identities separately,
-and accept the ready task only from exact initial-turn nonce evidence. Bind the
-host-observed pristine worktree at the authenticated baseline. Send the
-prepared release once and require exact executor acceptance before work.
-
-For a native subagent, require a read-only contract with explicit model,
-reasoning, and bounded `fork_turns`. The v0.8 contract forbids Ultra,
-full-history selector overrides, and nested subagent spawning. Do not give it
-worktree, branch, callback, integration, archive, or cleanup ownership.
-
-Use native wait/status only for liveness. Visible-task routine results remain
-in the quiet journal and never direct-message or Steer the coordinator. Native
-subagents instead finish through `subagent complete` and `subagent dispose`
-with unchanged-Git proof. For an urgent signal, persist then prepare the single
-identified interrupt, make the returned native call once, reconcile it, and
-observe/consume the persisted IDs; suppress replays.
-
-For each visible-task terminal result, prepare a durable disposition, reconcile
-integration or no-change, run and reload an authoritative PASS
-combined-verification record, finalize the disposition exactly once, and then
-reconcile archival. Dirty or attention-needed work remains visible and keeps
-the run active. Git cleanup is a separate read-only exact-state plan; v0.8 does
-not apply deletion. Close only a fully reconciled run; abandonment retains the
-complete admitted path/resource/branch envelope.
+Close only after a fresh passing run audit accounts for every workflow claim,
+launch, result, disposition, integration or no-change proof, verification,
+archive observation, cleanup finding, and reservation fence.

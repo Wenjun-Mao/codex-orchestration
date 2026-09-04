@@ -3,11 +3,10 @@
 import { existsSync, readFileSync } from "node:fs";
 import { realpath } from "node:fs/promises";
 import { parseArgs } from "node:util";
-import { basename, dirname, isAbsolute, relative, resolve, sep } from "node:path";
+import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   CliError,
-  ensureExactJson,
   PACKAGE_VERSION,
   readJson,
   readJsonInput,
@@ -16,47 +15,47 @@ import {
   sha256,
   stableStringify,
 } from "../lib/core.mjs";
-import { cleanupPlanV07 } from "../lib/cleanup-v07.mjs";
+import { cleanupPlan } from "../lib/cleanup.mjs";
 import { discoverGit, gitSnapshot } from "../lib/git.mjs";
 import {
   assertNoForeignActiveRunCollision,
   assertNoIncompatibleFlowNamespace,
 } from "../lib/foreign-active-run-sentinel.mjs";
 import {
-  assertNoUnplugInProgressV07,
-  observePrivateUnplugV07,
-  unplugApplyV07,
-  unplugPlanV07,
-} from "../lib/unplug-v07.mjs";
+  assertNoUnplugInProgress,
+  observePrivateUnplug,
+  unplugApply,
+  unplugPlan,
+} from "../lib/compat/unplug.mjs";
 import {
   bindRecipient,
   rebindRecipient,
   recipientStatus,
 } from "../lib/recipients.mjs";
 import {
-  consumeUrgentSignalV07,
-  expireUrgentSignalV07,
-  observeUrgentSignalV07,
-  persistUrgentSignalV07,
-  prepareUrgentAttemptV07,
-  reconcileUrgentAttemptV07,
-  urgentSignalRecordV07,
-  urgentSignalStatusV07,
-} from "../lib/urgent-signals-v07.mjs";
+  consumeUrgentSignal,
+  expireUrgentSignal,
+  observeUrgentSignal,
+  persistUrgentSignal,
+  prepareUrgentAttempt,
+  reconcileUrgentAttempt,
+  urgentSignalRecord,
+  urgentSignalStatus,
+} from "../lib/urgent-signals.mjs";
 import {
-  observePrivateTaskArchive,
   prepareTaskArchive,
   reconcileTaskArchive,
   taskArchiveStatus,
 } from "../lib/archive-lifecycle.mjs";
+import { observeCodexAppArchiveEvidence } from "../lib/adapters/codex-app/private-archive-observer.mjs";
+import { codexAppArchiveToNativeObservation } from "../lib/adapters/codex-app/archive-observation.mjs";
 import {
-  callbackRecordV07,
-  callbackStatusV07,
-  deliverCallbackV07,
-  observeCallbackV07,
-} from "../lib/callbacks-v07.mjs";
+  callbackRecord,
+  callbackStatus,
+  deliverCallback,
+  observeCallback,
+} from "../lib/callbacks.mjs";
 import {
-  cancelTaskBeforeExecution,
   finalizeTaskDisposition,
   prepareTaskDisposition,
   taskDispositionStatus,
@@ -66,14 +65,7 @@ import {
   prepareSerialIntegration,
   reconcileSerialIntegration,
   serialIntegrationStatus,
-} from "../lib/integration-v07.mjs";
-import {
-  acceptTaskRelease,
-  authenticateTaskReleaseExecutorWorktree,
-  prepareTaskRelease,
-  reconcileTaskRelease,
-  taskReleaseStatus,
-} from "../lib/release-lifecycle.mjs";
+} from "../lib/integration.mjs";
 import {
   abandonRun,
   admitRun,
@@ -95,8 +87,7 @@ import {
   observeRefreshPrivateArchives,
   prepareRefresh,
   refreshStatus,
-} from "../lib/refresh-v08.mjs";
-import { loadRefreshSourceAuthority } from "../lib/refresh-source-v08.mjs";
+} from "../lib/compat/refresh.mjs";
 import {
   acquireRuntimeContext,
   buildRuntimeContext,
@@ -104,7 +95,7 @@ import {
   readRuntimeContext,
   runtimeBindingFromContext,
   runtimeContextHash,
-  V07_RUNTIME_DIRECTORY,
+  RUNTIME_DIRECTORY,
   validateRuntimeHost,
   validateRuntimeLineage,
 } from "../lib/runtime-context.mjs";
@@ -115,33 +106,30 @@ import {
   reconcileSubagentOperationAttempt,
   recordSubagentCoordinatorDisposition,
   subagentOperationStatus,
-} from "../lib/subagent-operations-v07.mjs";
+} from "../lib/subagent-operations.mjs";
 import {
-  bindVisibleTaskWorktree,
-  preflightVisibleTaskBranchReservations,
-  prepareVisibleTaskCreation,
-  reconcileVisibleTaskCreation,
-  recordVisibleTaskCreationAttempt,
-  resolvePrivateVisibleTaskCreation,
-  validateVisibleTaskCreationRecord,
-  visibleTaskCreationStatus,
-} from "../lib/task-creation-v07.mjs";
+  prepareTaskLaunch,
+  reconcileTaskLaunch,
+  recordTaskLaunchAttempt,
+  startTaskLaunch,
+  taskLaunchStatus,
+} from "../lib/core/task-launch.mjs";
 import {
-  recoverV081PrivateTaskResolution,
-  V081_PRIVATE_RESOLUTION_SOURCE_NAMESPACE,
-} from "../lib/private-resolution-recovery-v08.mjs";
+  classifyCodexAppCreation,
+  codexAppCreationToNativeEvidence,
+} from "../lib/adapters/codex-app/host-evidence.mjs";
 import {
   resolveNoChangeVerificationSubject,
   runCombinedVerification,
   verificationStatus,
-} from "../lib/verifications-v07.mjs";
+} from "../lib/verifications.mjs";
 import {
   createWorkflowJournal,
   persistWorkflowTaskContract,
   reviseWorkflowJournal,
   workflowJournalStatus,
   workflowTaskContractStatus,
-} from "../lib/workflow-journal-v07.mjs";
+} from "../lib/workflow-journal.mjs";
 import {
   coordinatorBindingDigest,
   createWorkflowPlanRevision,
@@ -158,18 +146,16 @@ Usage:
   codex-flow run audit --run-id ID [--json]
   codex-flow workflow create|revise|contract --run-id ID --file request.json [--json]
   codex-flow workflow status --run-id ID --plan-id ID [--json]
-  codex-flow task create prepare|attempt|reconcile|bind --run-id ID --file request.json [--json]
-  codex-flow task create resolve-private --run-id ID --operation-id ID [--json]
-  codex-flow task create status --run-id ID --operation-id ID [--json]
+  codex-flow task launch prepare|attempt|reconcile --run-id ID --file request.json [--json]
+  codex-flow task launch start --run-id ID --launch-id ID --nonce HEX [--json]
+  codex-flow task launch status --run-id ID --launch-id ID [--json]
   codex-flow subagent prepare|attempt|reconcile|complete|dispose --run-id ID --file request.json [--json]
   codex-flow subagent status --run-id ID --operation-id ID [--json]
-  codex-flow release prepare|reconcile|accept --run-id ID --file request.json [--json]
-  codex-flow release status --run-id ID --release-id ID [--json]
   codex-flow callback deliver|observe --run-id ID --file request.json [--json]
   codex-flow callback status --run-id ID [--json]
   codex-flow urgent persist|attempt|reconcile|observe|consume|expire --run-id ID --file request.json [--json]
   codex-flow urgent status --run-id ID [--json]
-  codex-flow disposition prepare|finalize|cancel --run-id ID --file request.json [--json]
+  codex-flow disposition prepare|finalize --run-id ID --file request.json [--json]
   codex-flow disposition status --run-id ID --disposition-id ID [--json]
   codex-flow verification run --run-id ID --file request.json [--json]
   codex-flow verification status --run-id ID [--verification-id ID] [--json]
@@ -178,7 +164,6 @@ Usage:
   codex-flow archive prepare|reconcile|observe-private --run-id ID --file request.json [--json]
   codex-flow archive status --run-id ID --archive-id ID [--json]
   codex-flow cleanup plan --run-id ID [--json]
-  codex-flow recovery v0.8.1 resolve-private --run-id ID --operation-id ID --out FILE [--json]
   codex-flow unplug plan [--file request.json] [--json]
   codex-flow unplug observe-private --file request.json [--json]
   codex-flow unplug apply --file request.json [--json]
@@ -190,50 +175,11 @@ Usage:
 Every run-scoped command requires an explicit --run-id. Complex mutations read
 one JSON request from --file and reject a mismatched request.run_id before any
 state change. Native App calls remain external: the CLI emits one exact host
-request when dispatch is permitted, then journals the separately reconciled
-outcome.
-`;
-
-const PRIVATE_RESOLUTION_HELP = `codex-flow ${PACKAGE_VERSION} task create resolve-private
-
-Usage:
-  codex-flow task create resolve-private --run-id ID --operation-id ID [--json]
-
-Read-only temporary Codex App compatibility adapter. It accepts a recorded
-provisional identity in an open creation or its exact persisted
-reconciliation-window-expired ambiguity, reads the exact private App binding
-and matching initial task session from CODEX_HOME (or ~/.codex), and emits one
-reconcile_request. In the expiry case, predeadline source events may
-authenticate previously unjournaled provisional, accepted-selector, and ready
-evidence. Authenticated host event timestamps must be within the bounded
-reconciliation window even when this command runs later. The expiry exception
-preserves the original resolution and one-shot attempt; every other terminal
-Flow state remains closed. It never creates or retries a task, and never
-changes App files. Missing, changing, or contradictory private evidence fails
-closed.
-`;
-
-const V081_PRIVATE_RECOVERY_HELP = `codex-flow ${PACKAGE_VERSION} recovery v0.8.1 resolve-private
-
-Usage:
-  codex-flow recovery v0.8.1 resolve-private --run-id ID --operation-id ID --out /absolute/temp/request.json [--json]
-
-Read-only compatibility adapter for one exact active v0.8.1 source run. It
-authenticates that run through its immutable runtime exporter, resolves the
-original provisional task from stable Codex App evidence, and writes only the
-unwrapped reconcile request outside the repository. The exact v0.8.1 snapshot
-remains the sole authority allowed to consume that request and mutate its run.
-This command never creates, retries, binds, releases, refreshes, or edits App
-state.
+request when dispatch is permitted, while the executor claims identity and
+activates its worktree from the full first-turn assignment.
 `;
 
 function helpFor(command, args) {
-  if (command === "task" && args[0] === "create" && args[1] === "resolve-private") {
-    return PRIVATE_RESOLUTION_HELP;
-  }
-  if (command === "recovery" && args[0] === "v0.8.1" && args[1] === "resolve-private") {
-    return V081_PRIVATE_RECOVERY_HELP;
-  }
   return HELP;
 }
 
@@ -274,7 +220,7 @@ function requireCanonicalSource() {
   }
 }
 
-function v07Output(value) {
+function v09Output(value) {
   console.log(stableStringify(value, 2));
 }
 
@@ -287,8 +233,8 @@ async function assertRunBoundRuntimeExecution({
   runId,
   requestFile,
   runtime,
-  command = ["release", "accept"],
-  label = "Release acceptance",
+  command,
+  label,
 }) {
   const runBoundDigest = runtime.bundle.bundle_sha256;
   const boundBundleRoot = resolve(
@@ -303,15 +249,15 @@ async function assertRunBoundRuntimeExecution({
   const executing = await loadRuntimeBundleSource({ packageRoot });
   if (executing.bundle.bundle_sha256 === runBoundDigest) return;
   const boundCli = resolve(boundBundleRoot, "bin", "codex-flow.mjs");
-  const requestPath = resolve(process.cwd(), requestFile);
   const recovery = [
     process.execPath,
     boundCli,
     ...command,
     "--run-id",
     runId,
-    "--file",
-    requestPath,
+    ...(requestFile === null || requestFile === undefined
+      ? []
+      : ["--file", resolve(process.cwd(), requestFile)]),
     "--json",
   ].map(shellArgument).join(" ");
   throw new CliError([
@@ -323,7 +269,7 @@ async function assertRunBoundRuntimeExecution({
   ].join("\n"), 73);
 }
 
-function parseV07Options(args, extra = {}) {
+function parseV09Options(args, extra = {}) {
   return parse({
     "run-id": { type: "string" },
     file: { type: "string" },
@@ -357,7 +303,7 @@ function commandNow(request, field = "recorded_at") {
   return milliseconds;
 }
 
-function v07Repository() {
+function v09Repository() {
   return discoverGit(process.cwd());
 }
 
@@ -366,18 +312,10 @@ function assertRunIdentity(value, runId, label) {
   return value;
 }
 
-async function visibleTaskAuthority(git, operationId, runId) {
-  const id = requireText(operationId, "operation_id", { max: 128, safeId: true });
-  const record = validateVisibleTaskCreationRecord(await readJson(
-    resolve(git.stateRoot, "visible-task-creations", "records", `${id}.json`),
-    { guardRoot: git.commonDir },
-  ));
-  return assertRunIdentity(record, runId, "visible-task creation");
-}
-
-async function releaseAuthority(git, releaseId, runId) {
-  const record = await taskReleaseStatus({ stateRoot: git.stateRoot, releaseId });
-  return assertRunIdentity(record, runId, "task release");
+async function taskLaunchAuthority(git, launchId, runId) {
+  const id = requireText(launchId, "launch_id", { max: 128, safeId: true });
+  const record = await taskLaunchStatus({ stateRoot: git.stateRoot, launchId: id });
+  return assertRunIdentity(record, runId, "task launch");
 }
 
 async function subagentAuthority(git, operationId, runId) {
@@ -386,13 +324,13 @@ async function subagentAuthority(git, operationId, runId) {
 }
 
 async function callbackAuthority(git, callbackId, runId) {
-  const record = await callbackRecordV07({ stateRoot: git.stateRoot, callbackId });
+  const record = await callbackRecord({ stateRoot: git.stateRoot, callbackId });
   assertRunIdentity(record.receipt, runId, "terminal callback");
   return record;
 }
 
 async function urgentAuthority(git, urgentId, runId) {
-  const record = await urgentSignalRecordV07({ stateRoot: git.stateRoot, urgentId });
+  const record = await urgentSignalRecord({ stateRoot: git.stateRoot, urgentId });
   assertRunIdentity(record.signal, runId, "urgent signal");
   return record;
 }
@@ -414,7 +352,7 @@ async function archiveAuthority(git, archiveId, runId) {
 
 async function activeRunAuthority(git, runId, planId = null, { allowLinkedWorktree = false } = {}) {
   const { run } = await readRun({ gitCommonDirectory: git.commonDir, runId });
-  if (run.status !== "active") throw new CliError(`v0.7 run is not active: ${runId}`, 73);
+  if (run.status !== "active") throw new CliError(`v0.9 run is not active: ${runId}`, 73);
   if (planId !== null && run.workflow_plan_id !== planId) {
     throw new CliError("workflow plan_id does not match the active run", 73);
   }
@@ -434,7 +372,7 @@ async function activeRunAuthority(git, runId, planId = null, { allowLinkedWorktr
   ) throw new CliError("active run/runtime/repository authority is inconsistent", 73);
   if (!allowLinkedWorktree && runtime.repository.root !== git.root) {
     throw new CliError(
-      "v0.7 mutation requires coordinator-only mutation authority from the exact coordinator checkout",
+      "v0.9 mutation requires coordinator-only mutation authority from the exact coordinator checkout",
       73,
     );
   }
@@ -514,7 +452,7 @@ async function rebindRunCoordinatorRecipient({ git, runId, resume, next, rebound
     gitCommonDirectory: git.commonDir,
     runId,
   });
-  if (current.status !== "active") throw new CliError(`v0.7 run is not active: ${runId}`, 73);
+  if (current.status !== "active") throw new CliError(`v0.9 run is not active: ${runId}`, 73);
   const latest = current.rebind_history.at(-1) ?? null;
   const resumeIsCurrent = stableStringify(current.binding) === stableStringify(resume);
   const exactReplay = !resumeIsCurrent
@@ -583,10 +521,10 @@ function activationFences(value) {
   });
 }
 
-async function commandRunV07(args) {
+async function commandRunV09(args) {
   const [subcommand, ...rest] = args;
   if (subcommand === "activate") {
-    const values = parseV07Options(rest, { "refresh-id": { type: "string" } });
+    const values = parseV09Options(rest, { "refresh-id": { type: "string" } });
     const { runId, request } = await runScopedRequest(values, "run activate", {
       required: ["activated_at", "runtime", "workflow", "fences"],
       optional: ["refresh_id"],
@@ -608,15 +546,15 @@ async function commandRunV07(args) {
     if (git.cleanliness !== "clean") {
       throw new CliError("run activate requires a clean authenticated Git worktree", 73);
     }
-    await assertNoUnplugInProgressV07({ gitCommonDirectory: git.commonDir });
+    await assertNoUnplugInProgress({ gitCommonDirectory: git.commonDir });
     if (refreshId === null) {
       await assertNoForeignActiveRunCollision({
         gitCommonDirectory: git.commonDir,
-        currentNamespace: V07_RUNTIME_DIRECTORY,
+        currentNamespace: RUNTIME_DIRECTORY,
       });
       await assertNoIncompatibleFlowNamespace({
         gitCommonDirectory: git.commonDir,
-        currentNamespace: V07_RUNTIME_DIRECTORY,
+        currentNamespace: RUNTIME_DIRECTORY,
       });
     }
     const workflow = createWorkflowPlanRevision(request.workflow);
@@ -638,18 +576,13 @@ async function commandRunV07(args) {
       lineage: request.runtime.lineage,
     });
     const coordinatorIdentity = assertCurrentCoordinatorTask(runtime.lineage, "run activate");
-    await preflightVisibleTaskBranchReservations({
-      stateRoot: git.stateRoot,
-      runId,
-      branchFences: fences.branch_fences,
-    });
     const lifecycle = await readRunLifecycle({ gitCommonDirectory: git.commonDir });
     const active = lifecycle.state.active_run_id === null
       ? null
       : lifecycle.state.runs[lifecycle.state.active_run_id];
     const existing = lifecycle.state.runs[runId] ?? null;
     if (active !== null && active.run_id !== runId) {
-      throw new CliError(`A different v0.7 run is already active: ${active.run_id}`, 75);
+      throw new CliError(`A different v0.9 run is already active: ${active.run_id}`, 75);
     }
     if (existing !== null && (
       existing.status !== "active"
@@ -658,7 +591,7 @@ async function commandRunV07(args) {
       || existing.workflow_revision_digest !== workflow.revision_digest
       || stableStringify(existing.plan) !== stableStringify(fences)
     )) {
-      throw new CliError(`v0.7 run activation does not match its immutable authority: ${runId}`, 73);
+      throw new CliError(`v0.9 run activation does not match its immutable authority: ${runId}`, 73);
     }
     if (runtime.lineage.generation !== 1) {
       throw new CliError("fresh run activation coordinator lineage must start at generation 1", 73);
@@ -753,7 +686,7 @@ async function commandRunV07(args) {
     });
     const binding = runtimeBindingFromContext(runtime);
     const coordinatorBinding = canonicalCoordinatorBinding(runtime.lineage);
-    v07Output({
+    v09Output({
       status: admitted.status,
       package_authority: {
         package: "@wjmao/codex-flow",
@@ -762,7 +695,7 @@ async function commandRunV07(args) {
         bundle_sha256: runtime.bundle.bundle_sha256,
       },
       state_authority: {
-        namespace: V07_RUNTIME_DIRECTORY,
+        namespace: RUNTIME_DIRECTORY,
         state_root: git.stateRoot,
         git_common_dir: git.commonDir,
       },
@@ -808,9 +741,9 @@ async function commandRunV07(args) {
   }
 
   if (subcommand === "status") {
-    const values = parseV07Options(rest);
+    const values = parseV09Options(rest);
     const runId = explicitRunId(values);
-    const git = v07Repository();
+    const git = v09Repository();
     const result = await readRun({ gitCommonDirectory: git.commonDir, runId });
     const runtime = await readRuntimeContext({
       gitCommonDirectory: git.commonDir,
@@ -821,21 +754,21 @@ async function commandRunV07(args) {
       runId,
       planId: result.run.workflow_plan_id,
     });
-    v07Output({ ...result, runtime: runtime.context, workflow });
+    v09Output({ ...result, runtime: runtime.context, workflow });
     return;
   }
 
   if (subcommand === "audit") {
-    const values = parseV07Options(rest);
+    const values = parseV09Options(rest);
     const runId = explicitRunId(values);
-    const git = v07Repository();
-    const { auditRunClosure } = await import("../lib/run-audit-v07.mjs");
-    v07Output(await auditRunClosure({ stateRoot: git.stateRoot, runId }));
+    const git = v09Repository();
+    const { auditRunClosure } = await import("../lib/run-audit.mjs");
+    v09Output(await auditRunClosure({ stateRoot: git.stateRoot, runId }));
     return;
   }
 
   if (["resume", "rebind", "close", "abandon"].includes(subcommand)) {
-    const values = parseV07Options(rest);
+    const values = parseV09Options(rest);
     const shapes = {
       resume: { required: ["resume"] },
       rebind: { required: ["resume", "next"], optional: ["rebound_at"] },
@@ -846,7 +779,7 @@ async function commandRunV07(args) {
       },
     };
     const { runId, request } = await runScopedRequest(values, `run ${subcommand}`, shapes[subcommand]);
-    const git = v07Repository();
+    const git = v09Repository();
     let result;
     if (subcommand === "resume") {
       result = await resumeRun({ gitCommonDirectory: git.commonDir, runId, resume: request.resume });
@@ -869,7 +802,7 @@ async function commandRunV07(args) {
         abandonedAt: request.abandoned_at ?? new Date().toISOString(),
       }));
     } else {
-      const { closeRunFromAudit } = await import("../lib/run-audit-v07.mjs");
+      const { closeRunFromAudit } = await import("../lib/run-audit.mjs");
       result = await closeRunFromAudit({
         gitCommonDirectory: git.commonDir,
         stateRoot: git.stateRoot,
@@ -879,16 +812,16 @@ async function commandRunV07(args) {
         closedAt: request.closed_at ?? new Date().toISOString(),
       });
     }
-    v07Output(result);
+    v09Output(result);
     return;
   }
   throw new CliError("run requires activate, status, resume, rebind, audit, close, or abandon");
 }
 
-async function commandWorkflowV07(args) {
+async function commandWorkflowV09(args) {
   const [subcommand, ...rest] = args;
-  const values = parseV07Options(rest, { "plan-id": { type: "string" } });
-  const git = v07Repository();
+  const values = parseV09Options(rest, { "plan-id": { type: "string" } });
+  const git = v09Repository();
   if (subcommand === "status") {
     const runId = explicitRunId(values);
     const planId = requireText(values["plan-id"], "--plan-id", { max: 128, safeId: true });
@@ -896,7 +829,7 @@ async function commandWorkflowV07(args) {
     if (run.workflow_plan_id !== planId) {
       throw new CliError("workflow plan_id does not match --run-id", 73);
     }
-    v07Output(await workflowJournalStatus({ stateRoot: git.stateRoot, runId, planId }));
+    v09Output(await workflowJournalStatus({ stateRoot: git.stateRoot, runId, planId }));
     return;
   }
   const shapes = {
@@ -942,13 +875,13 @@ async function commandWorkflowV07(args) {
       now: commandNow(request, "created_at"),
     });
   }
-  v07Output(result);
+  v09Output(result);
 }
 
-function taskAttemptView(result) {
+function taskLaunchAttemptView(result) {
   const base = {
     run_id: result.run_id,
-    operation_id: result.operation_id,
+    launch_id: result.launch_id,
     attempt_id: result.attempt?.attempt_id ?? null,
     reconcile_by: result.attempt?.reconcile_by ?? null,
     dispatch_permitted: result.dispatch_permitted === true,
@@ -958,128 +891,165 @@ function taskAttemptView(result) {
     : base;
 }
 
-async function commandTaskCreateV07(args, mutationAuthority = null) {
+async function commandTaskLaunchV09(args, mutationAuthority = null) {
   const [subcommand, ...rest] = args;
-  const values = parseV07Options(rest, { "operation-id": { type: "string" } });
-  const git = v07Repository();
+  const values = parseV09Options(rest, {
+    "launch-id": { type: "string" },
+    nonce: { type: "string" },
+  });
+  const git = v09Repository();
   if (subcommand === "status") {
     const runId = explicitRunId(values);
-    const operationId = requireText(values["operation-id"], "--operation-id", {
-      max: 128,
-      safeId: true,
-    });
-    await visibleTaskAuthority(git, operationId, runId);
-    const result = await visibleTaskCreationStatus({ stateRoot: git.stateRoot, operationId });
-    v07Output(assertRunIdentity(result, runId, "visible-task creation"));
+    const launchId = requireText(values["launch-id"], "--launch-id", { max: 128, safeId: true });
+    const result = await taskLaunchAuthority(git, launchId, runId);
+    v09Output(result);
     return;
   }
-  if (subcommand === "resolve-private") {
+  if (subcommand === "start") {
     const runId = explicitRunId(values);
-    const operationId = requireText(values["operation-id"], "--operation-id", {
-      max: 128,
+    if (values.file !== undefined) throw new CliError("task launch start does not accept --file", 64);
+    const launchId = requireText(values["launch-id"], "--launch-id", { max: 128, safeId: true });
+    const nonce = requireText(values.nonce, "--nonce", { max: 64 });
+    const executorThreadId = requireText(process.env.CODEX_THREAD_ID, "CODEX_THREAD_ID", {
+      max: 256,
       safeId: true,
     });
-    await visibleTaskAuthority(git, operationId, runId);
-    const result = await resolvePrivateVisibleTaskCreation({
-      stateRoot: git.stateRoot,
-      operationId,
+    if (mutationAuthority === null || mutationAuthority.caller_repository_mode !== "linked-worktree") {
+      throw new CliError("task launch start requires run-bound linked-worktree authority", 73);
+    }
+    await assertRunBoundRuntimeExecution({
+      git,
+      runId,
+      requestFile: null,
+      runtime: mutationAuthority.runtime,
+      command: ["task", "launch", "start"],
+      label: "Task launch start",
     });
-    v07Output(assertRunIdentity(result, runId, "private visible-task resolution"));
+    await taskLaunchAuthority(git, launchId, runId);
+    const result = await startTaskLaunch({
+      stateRoot: git.stateRoot,
+      launchId,
+      launchNonce: nonce,
+      executorThreadId,
+      repositoryPath: git.root,
+      now: Date.now(),
+    });
+    v09Output(assertRunIdentity(result, runId, "task launch"));
     return;
   }
   const shapes = {
     prepare: { required: ["task_contract", "requested_selectors"] },
     attempt: {
-      required: ["operation_id", "host_session_id"],
+      required: ["launch_id", "host_session_id"],
       optional: ["timeout_seconds"],
     },
     reconcile: {
-      required: ["operation_id", "outcome"],
+      required: ["launch_id", "outcome"],
       optional: [
-        "provisional_client_thread_id", "ready_thread_id", "initial_turn",
-        "private_resolution", "selector_evidence", "reason_code",
+        "host_id", "provisional_client_thread_id", "ready_thread_id", "opaque_result",
+        "observed_selectors", "reason_code",
       ],
     },
-    bind: { required: ["operation_id"] },
   };
   if (!shapes[subcommand]) {
-    throw new CliError("task create requires prepare, attempt, resolve-private, reconcile, bind, or status");
+    throw new CliError("task launch requires prepare, attempt, reconcile, start, or status");
   }
-  const { runId, request } = await runScopedRequest(values, `task create ${subcommand}`, shapes[subcommand]);
+  const { runId, request } = await runScopedRequest(values, `task launch ${subcommand}`, shapes[subcommand]);
   let result;
   if (subcommand === "prepare") {
     if (request.task_contract.run_id !== runId) {
       throw new CliError("task contract run_id does not match --run-id", 73);
     }
-    result = await prepareVisibleTaskCreation({
+    result = await prepareTaskLaunch({
       stateRoot: git.stateRoot,
       taskContract: request.task_contract,
       requestedSelectors: request.requested_selectors,
       now: Date.now(),
     });
   } else if (subcommand === "attempt") {
-    await visibleTaskAuthority(git, request.operation_id, runId);
-    result = await recordVisibleTaskCreationAttempt({
+    await taskLaunchAuthority(git, request.launch_id, runId);
+    result = await recordTaskLaunchAttempt({
       stateRoot: git.stateRoot,
-      operationId: request.operation_id,
+      launchId: request.launch_id,
       hostSessionId: request.host_session_id,
-      timeoutSeconds: request.timeout_seconds ?? 300,
-      now: Date.now(),
-    });
-  } else if (subcommand === "reconcile") {
-    await visibleTaskAuthority(git, request.operation_id, runId);
-    result = await reconcileVisibleTaskCreation({
-      stateRoot: git.stateRoot,
-      operationId: request.operation_id,
-      outcome: request.outcome,
-      provisionalClientThreadId: request.provisional_client_thread_id ?? null,
-      readyThreadId: request.ready_thread_id ?? null,
-      initialTurn: request.initial_turn ?? null,
-      privateResolution: request.private_resolution ?? null,
-      selectorEvidence: request.selector_evidence ?? null,
-      reasonCode: request.reason_code ?? null,
+      timeoutSeconds: request.timeout_seconds ?? 1800,
       now: Date.now(),
     });
   } else {
-    if (mutationAuthority === null) {
-      throw new CliError("Worktree binding requires coordinator-owned active mutation authority", 73);
+    const current = await taskLaunchAuthority(git, request.launch_id, runId);
+    let nativeEvidence = null;
+    if (["ready", "provisional", "opaque"].includes(request.outcome)) {
+      const adapterEvidence = classifyCodexAppCreation({
+        requestDigest: sha256(stableStringify({ launch_id: request.launch_id })),
+        hostId: request.host_id ?? "local",
+        reportedThreadId: request.outcome === "ready" ? request.ready_thread_id ?? null : null,
+        provisionalClientThreadId: request.outcome === "provisional"
+          ? request.provisional_client_thread_id ?? null
+          : null,
+        opaqueResult: request.outcome === "opaque" ? request.opaque_result ?? null : null,
+        observedAt: new Date().toISOString(),
+      });
+      nativeEvidence = codexAppCreationToNativeEvidence(adapterEvidence);
+      if (nativeEvidence.classification !== request.outcome) {
+        throw new CliError("Codex App result shape does not match the requested launch outcome", 73);
+      }
     }
-    await assertRunBoundRuntimeExecution({
-      git,
-      runId,
-      requestFile: values.file,
-      runtime: mutationAuthority.runtime,
-      command: ["task", "create", "bind"],
-      label: "Worktree binding",
-    });
-    await visibleTaskAuthority(git, request.operation_id, runId);
-    result = await bindVisibleTaskWorktree({
+    const acceptedAt = nativeEvidence?.observed_at ?? new Date().toISOString();
+    const observed = request.observed_selectors === undefined
+      ? null
+      : {
+          project_id: request.observed_selectors.project_id ?? null,
+          model: request.observed_selectors.model ?? null,
+          reasoning_effort: request.observed_selectors.reasoning_effort ?? null,
+          observed_at: acceptedAt,
+        };
+    result = await reconcileTaskLaunch({
       stateRoot: git.stateRoot,
-      operationId: request.operation_id,
+      launchId: request.launch_id,
+      outcome: request.outcome,
+      hostId: nativeEvidence?.host_id ?? request.host_id ?? "local",
+      readyThreadId: nativeEvidence?.ready_thread_id ?? null,
+      provisionalId: nativeEvidence?.provisional_id ?? null,
+      opaqueEvidence: nativeEvidence?.opaque_digest === undefined || nativeEvidence?.opaque_digest === null
+        ? null
+        : { digest: nativeEvidence.opaque_digest, length: nativeEvidence.opaque_length },
+      selectorEvidence: nativeEvidence === null
+        ? null
+        : {
+            accepted: {
+              project_id: current.selector_evidence.requested.project_id,
+              model: current.selector_evidence.requested.model,
+              reasoning_effort: current.selector_evidence.requested.reasoning_effort,
+              observed_at: acceptedAt,
+            },
+            observed,
+          },
+      reasonCode: request.reason_code ?? null,
+      observedAt: nativeEvidence?.observed_at ?? null,
       now: Date.now(),
     });
   }
-  assertRunIdentity(result, runId, "visible-task creation");
-  v07Output(subcommand === "attempt" ? taskAttemptView(result) : result);
+  assertRunIdentity(result, runId, "task launch");
+  v09Output(subcommand === "attempt" ? taskLaunchAttemptView(result) : result);
 }
 
-async function commandTaskV07(args, mutationAuthority = null) {
+async function commandTaskV09(args, mutationAuthority = null) {
   const [subcommand, ...rest] = args;
-  if (subcommand !== "create") {
-    throw new CliError("Legacy task packet/operation commands are not v0.7 authority; use workflow and task create");
+  if (subcommand !== "launch") {
+    throw new CliError("task requires the v0.9 launch lifecycle");
   }
-  return commandTaskCreateV07(rest, mutationAuthority);
+  return commandTaskLaunchV09(rest, mutationAuthority);
 }
 
-async function commandSubagentV07(args) {
+async function commandSubagentV09(args) {
   const [subcommand, ...rest] = args;
-  const values = parseV07Options(rest, { "operation-id": { type: "string" } });
-  const git = v07Repository();
+  const values = parseV09Options(rest, { "operation-id": { type: "string" } });
+  const git = v09Repository();
   if (subcommand === "status") {
     const runId = explicitRunId(values);
     const operationId = requireText(values["operation-id"], "--operation-id", { max: 128, safeId: true });
     const result = await subagentAuthority(git, operationId, runId);
-    v07Output(assertRunIdentity(result, runId, "subagent operation"));
+    v09Output(assertRunIdentity(result, runId, "subagent operation"));
     return;
   }
   const shapes = {
@@ -1162,118 +1132,19 @@ async function commandSubagentV07(args) {
   const output = assertRunIdentity(result, runId, "subagent operation");
   if (subcommand === "attempt" && output.dispatch_permitted !== true) {
     const { host_request: ignored, ...withoutHostRequest } = output;
-    v07Output(withoutHostRequest);
+    v09Output(withoutHostRequest);
   } else {
-    v07Output(output);
+    v09Output(output);
   }
 }
 
-function releasePrepareView(result) {
-  const base = {
-    run_id: result.run_id,
-    release_id: result.release_id,
-    operation_id: result.operation_id,
-    ready_thread_id: result.ready_thread_id,
-    status: result.status,
-    dispatch_permitted: result.dispatch_permitted === true,
-    prompt_digest: result.prompt_digest,
-  };
-  return result.dispatch_permitted === true
-    ? {
-      ...base,
-      host_request: {
-        kind: "send-message-to-task",
-        thread_id: result.ready_thread_id,
-        prompt: result.prompt,
-      },
-    }
-    : base;
-}
-
-async function commandReleaseV07(args, mutationAuthority = null) {
+async function commandCallbackV09(args) {
   const [subcommand, ...rest] = args;
-  const values = parseV07Options(rest, { "release-id": { type: "string" } });
-  const git = v07Repository();
+  const values = parseV09Options(rest);
+  const git = v09Repository();
   if (subcommand === "status") {
     const runId = explicitRunId(values);
-    const releaseId = requireText(values["release-id"], "--release-id", { max: 128, safeId: true });
-    const result = await releaseAuthority(git, releaseId, runId);
-    v07Output(assertRunIdentity(result, runId, "task release"));
-    return;
-  }
-  const shapes = {
-    prepare: { required: ["task_contract", "operation_id"], optional: ["prepared_at"] },
-    reconcile: { required: ["release_id", "outcome"], optional: ["reconciled_at"] },
-    accept: {
-      required: [
-        "release_id", "ready_thread_id", "contract_id",
-        "runtime_context_digest", "common_dir",
-      ],
-      optional: ["accepted_at"],
-    },
-  };
-  if (!shapes[subcommand]) throw new CliError("release requires prepare, reconcile, accept, or status");
-  const { runId, request } = await runScopedRequest(values, `release ${subcommand}`, shapes[subcommand]);
-  let result;
-  if (subcommand === "prepare") {
-    if (request.task_contract.run_id !== runId) throw new CliError("task contract run_id does not match --run-id", 73);
-    result = await prepareTaskRelease({
-      stateRoot: git.stateRoot,
-      taskContract: request.task_contract,
-      operationId: request.operation_id,
-      now: commandNow(request, "prepared_at"),
-    });
-  } else if (subcommand === "reconcile") {
-    await releaseAuthority(git, request.release_id, runId);
-    result = await reconcileTaskRelease({
-      stateRoot: git.stateRoot,
-      releaseId: request.release_id,
-      outcome: request.outcome,
-      now: commandNow(request, "reconciled_at"),
-    });
-  } else {
-    await releaseAuthority(git, request.release_id, runId);
-    if (mutationAuthority === null) {
-      throw new CliError("Release acceptance requires active mutation authority", 73);
-    }
-    await assertRunBoundRuntimeExecution({
-      git,
-      runId,
-      requestFile: values.file,
-      runtime: mutationAuthority.runtime,
-    });
-    const executor = await authenticateTaskReleaseExecutorWorktree({
-      stateRoot: git.stateRoot,
-      releaseId: request.release_id,
-      repositoryPath: git.root,
-    });
-    if (
-      executor.worktree.mode === "host-worktree"
-      && !mutationAuthority.run.plan.branch_fences.includes(executor.worktree.executor_branch)
-    ) {
-      throw new CliError("Release acceptance executor branch is outside the active run reservation", 73);
-    }
-    result = await acceptTaskRelease({
-      stateRoot: git.stateRoot,
-      releaseId: request.release_id,
-      readyThreadId: request.ready_thread_id,
-      contractId: request.contract_id,
-      runtimeContextDigest: request.runtime_context_digest,
-      commonDir: request.common_dir,
-      now: commandNow(request, "accepted_at"),
-    });
-  }
-  assertRunIdentity(result, runId, "task release");
-  v07Output(subcommand === "prepare" ? releasePrepareView(result) : result);
-}
-
-async function commandCallbackV07(args) {
-  const [subcommand, ...rest] = args;
-  const values = parseV07Options(rest);
-  const git = v07Repository();
-  if (subcommand === "status") {
-    const runId = explicitRunId(values);
-    v07Output(await callbackStatusV07({ stateRoot: git.stateRoot, runId }));
+    v09Output(await callbackStatus({ stateRoot: git.stateRoot, runId }));
     return;
   }
   if (subcommand === "consume") {
@@ -1288,7 +1159,7 @@ async function commandCallbackV07(args) {
   let result;
   if (subcommand === "deliver") {
     if (request.receipt.run_id !== runId) throw new CliError("receipt.run_id does not match --run-id", 73);
-    result = await deliverCallbackV07({
+    result = await deliverCallback({
       stateRoot: git.stateRoot,
       receipt: request.receipt,
       expectedRunId: runId,
@@ -1296,7 +1167,7 @@ async function commandCallbackV07(args) {
     });
   } else {
     await callbackAuthority(git, request.callback_id, runId);
-    result = await observeCallbackV07({
+    result = await observeCallback({
       stateRoot: git.stateRoot,
       callbackId: request.callback_id,
       recipient: request.recipient,
@@ -1304,7 +1175,7 @@ async function commandCallbackV07(args) {
     });
     if (result.receipt) assertRunIdentity(result.receipt, runId, "terminal callback");
   }
-  v07Output(result);
+  v09Output(result);
 }
 
 function urgentAttemptView(result) {
@@ -1319,19 +1190,19 @@ function urgentAttemptView(result) {
     : base;
 }
 
-async function commandUrgentV07(args) {
+async function commandUrgentV09(args) {
   const [subcommand, ...rest] = args;
-  const values = parseV07Options(rest);
-  const git = v07Repository();
+  const values = parseV09Options(rest);
+  const git = v09Repository();
   if (subcommand === "status") {
     const runId = explicitRunId(values);
     await readRun({ gitCommonDirectory: git.commonDir, runId });
-    v07Output(await urgentSignalStatusV07(git.stateRoot, { runId }));
+    v09Output(await urgentSignalStatus(git.stateRoot, { runId }));
     return;
   }
   const shapes = {
     persist: {
-      required: ["release_id", "signal"],
+      required: ["launch_id", "signal"],
       optional: ["persisted_at"],
     },
     attempt: {
@@ -1365,19 +1236,19 @@ async function commandUrgentV07(args) {
   );
   let result;
   if (subcommand === "persist") {
-    const release = await releaseAuthority(git, request.release_id, runId);
+    const launch = await taskLaunchAuthority(git, request.launch_id, runId);
     if (
-      release.status !== "accepted"
+      launch.status !== "active"
       || request.signal.run_id !== runId
-      || request.signal.executor_id !== release.ready_thread_id
-      || request.signal.recipient?.lineage_id !== release.coordinator_binding.lineage_id
+      || request.signal.executor_id !== launch.start_claim?.executor_thread_id
+      || request.signal.recipient?.lineage_id !== launch.coordinator_binding.lineage_id
     ) {
       throw new CliError(
-        "Urgent signal requires the exact accepted release executor and coordinator lineage",
+        "Urgent signal requires the exact active launch executor and coordinator lineage",
         73,
       );
     }
-    result = await persistUrgentSignalV07({
+    result = await persistUrgentSignal({
       stateRoot: git.stateRoot,
       signal: request.signal,
       now: commandNow(request, "persisted_at"),
@@ -1385,14 +1256,14 @@ async function commandUrgentV07(args) {
   } else {
     await urgentAuthority(git, request.urgent_id, runId);
     if (subcommand === "attempt") {
-      result = urgentAttemptView(await prepareUrgentAttemptV07({
+      result = urgentAttemptView(await prepareUrgentAttempt({
         stateRoot: git.stateRoot,
         urgentId: request.urgent_id,
         attemptSequence: 1,
         now: commandNow(request, "prepared_at"),
       }));
     } else if (subcommand === "reconcile") {
-      result = await reconcileUrgentAttemptV07({
+      result = await reconcileUrgentAttempt({
         stateRoot: git.stateRoot,
         urgentId: request.urgent_id,
         deliveryAttemptId: request.delivery_attempt_id,
@@ -1400,7 +1271,7 @@ async function commandUrgentV07(args) {
         now: commandNow(request, "reconciled_at"),
       });
     } else if (subcommand === "observe") {
-      result = await observeUrgentSignalV07({
+      result = await observeUrgentSignal({
         stateRoot: git.stateRoot,
         urgentId: request.urgent_id,
         deliveryAttemptId: request.delivery_attempt_id,
@@ -1408,7 +1279,7 @@ async function commandUrgentV07(args) {
         now: commandNow(request, "observed_at"),
       });
     } else if (subcommand === "consume") {
-      result = await consumeUrgentSignalV07({
+      result = await consumeUrgentSignal({
         stateRoot: git.stateRoot,
         urgentId: request.urgent_id,
         recipient: request.recipient,
@@ -1416,25 +1287,25 @@ async function commandUrgentV07(args) {
         now: commandNow(request, "consumed_at"),
       });
     } else {
-      result = await expireUrgentSignalV07({
+      result = await expireUrgentSignal({
         stateRoot: git.stateRoot,
         urgentId: request.urgent_id,
         now: commandNow(request, "expired_at"),
       });
     }
   }
-  v07Output(result);
+  v09Output(result);
 }
 
-async function commandDispositionV07(args) {
+async function commandDispositionV09(args) {
   const [subcommand, ...rest] = args;
-  const values = parseV07Options(rest, { "disposition-id": { type: "string" } });
-  const git = v07Repository();
+  const values = parseV09Options(rest, { "disposition-id": { type: "string" } });
+  const git = v09Repository();
   if (subcommand === "status") {
     const runId = explicitRunId(values);
     const dispositionId = requireText(values["disposition-id"], "--disposition-id", { max: 128, safeId: true });
     const result = await dispositionAuthority(git, dispositionId, runId);
-    v07Output(assertRunIdentity(result, runId, "task disposition"));
+    v09Output(assertRunIdentity(result, runId, "task disposition"));
     return;
   }
   const shapes = {
@@ -1443,23 +1314,11 @@ async function commandDispositionV07(args) {
       required: ["disposition_id", "recipient", "executor_thread_id"],
       optional: ["integration_id", "verification_id", "finalized_at"],
     },
-    cancel: {
-      required: ["release_id", "reason"],
-      optional: ["cancelled_at"],
-    },
   };
-  if (!shapes[subcommand]) throw new CliError("disposition requires prepare, finalize, cancel, or status");
+  if (!shapes[subcommand]) throw new CliError("disposition requires prepare, finalize, or status");
   const { runId, request } = await runScopedRequest(values, `disposition ${subcommand}`, shapes[subcommand]);
   let result;
-  if (subcommand === "cancel") {
-    await releaseAuthority(git, request.release_id, runId);
-    result = await cancelTaskBeforeExecution({
-      stateRoot: git.stateRoot,
-      releaseId: request.release_id,
-      reason: request.reason,
-      now: commandNow(request, "cancelled_at"),
-    });
-  } else if (subcommand === "prepare") {
+  if (subcommand === "prepare") {
     await callbackAuthority(git, request.callback_id, runId);
     result = await prepareTaskDisposition({
       stateRoot: git.stateRoot,
@@ -1480,16 +1339,16 @@ async function commandDispositionV07(args) {
       now: commandNow(request, "finalized_at"),
     });
   }
-  v07Output(assertRunIdentity(result, runId, "task disposition"));
+  v09Output(assertRunIdentity(result, runId, "task disposition"));
 }
 
-async function commandVerificationV07(args) {
+async function commandVerificationV09(args) {
   const [subcommand, ...rest] = args;
-  const values = parseV07Options(rest, { "verification-id": { type: "string" } });
-  const git = v07Repository();
+  const values = parseV09Options(rest, { "verification-id": { type: "string" } });
+  const git = v09Repository();
   if (subcommand === "status") {
     const runId = explicitRunId(values);
-    v07Output(await verificationStatus({
+    v09Output(await verificationStatus({
       stateRoot: git.stateRoot,
       verificationId: values["verification-id"] ?? null,
       runId,
@@ -1518,18 +1377,18 @@ async function commandVerificationV07(args) {
     now: commandNow(request, "verified_at"),
   });
   assertRunIdentity(result.identity, runId, "combined verification");
-  v07Output(result);
+  v09Output(result);
 }
 
-async function commandIntegrationV07(args) {
+async function commandIntegrationV09(args) {
   const [subcommand, ...rest] = args;
-  const values = parseV07Options(rest, { "integration-id": { type: "string" } });
-  const git = v07Repository();
+  const values = parseV09Options(rest, { "integration-id": { type: "string" } });
+  const git = v09Repository();
   if (subcommand === "status") {
     const runId = explicitRunId(values);
     const integrationId = requireText(values["integration-id"], "--integration-id", { max: 128, safeId: true });
     const result = await integrationAuthority(git, integrationId, runId);
-    v07Output(assertRunIdentity(result, runId, "serial integration"));
+    v09Output(assertRunIdentity(result, runId, "serial integration"));
     return;
   }
   const shapes = {
@@ -1577,7 +1436,7 @@ async function commandIntegrationV07(args) {
     });
     assertRunIdentity(result, runId, "serial integration");
   }
-  v07Output(result);
+  v09Output(result);
 }
 
 function archivePrepareView(result) {
@@ -1593,15 +1452,15 @@ function archivePrepareView(result) {
     : base;
 }
 
-async function commandArchiveV07(args) {
+async function commandArchiveV09(args) {
   const [subcommand, ...rest] = args;
-  const values = parseV07Options(rest, { "archive-id": { type: "string" } });
-  const git = v07Repository();
+  const values = parseV09Options(rest, { "archive-id": { type: "string" } });
+  const git = v09Repository();
   if (subcommand === "status") {
     const runId = explicitRunId(values);
     const archiveId = requireText(values["archive-id"], "--archive-id", { max: 128, safeId: true });
     const result = await archiveAuthority(git, archiveId, runId);
-    v07Output(assertRunIdentity(result, runId, "task archive"));
+    v09Output(assertRunIdentity(result, runId, "task archive"));
     return;
   }
   if (subcommand === "observe-private") {
@@ -1609,12 +1468,19 @@ async function commandArchiveV07(args) {
     const runId = explicitRunId(values);
     const request = await readJsonInput(values.file);
     requireExactFields(request, { required: ["archive_id"] }, "archive observe-private request");
-    await archiveAuthority(git, request.archive_id, runId);
-    const result = await observePrivateTaskArchive({
-      stateRoot: git.stateRoot,
-      archiveId: request.archive_id,
+    const archive = await archiveAuthority(git, request.archive_id, runId);
+    const evidence = await observeCodexAppArchiveEvidence({
+      threadId: archive.executor_thread_id,
     });
-    v07Output(assertRunIdentity(result, runId, "private task archive observation"));
+    v09Output({
+      schema_version: 1,
+      kind: "codex-flow-v09-task-archive-host-observation",
+      run_id: runId,
+      archive_id: archive.archive_id,
+      attempt_id: archive.host_intent.attempt_id,
+      evidence,
+      observation: codexAppArchiveToNativeObservation(evidence),
+    });
     return;
   }
   const shapes = {
@@ -1652,32 +1518,32 @@ async function commandArchiveV07(args) {
       });
     })();
   assertRunIdentity(result, runId, "task archive");
-  v07Output(subcommand === "prepare" ? archivePrepareView(result) : result);
+  v09Output(subcommand === "prepare" ? archivePrepareView(result) : result);
 }
 
-async function commandCleanupV07(args) {
+async function commandCleanupV09(args) {
   const [subcommand, ...rest] = args;
   if (subcommand !== "plan") {
-    throw new CliError("v0.7 cleanup exposes read-only plan only; cleanup apply is unavailable");
+    throw new CliError("v0.9 cleanup exposes read-only plan only; cleanup apply is unavailable");
   }
-  const values = parseV07Options(rest);
+  const values = parseV09Options(rest);
   const runId = explicitRunId(values);
-  const git = v07Repository();
+  const git = v09Repository();
   await readRun({ gitCommonDirectory: git.commonDir, runId });
-  const first = await cleanupPlanV07({ stateRoot: git.stateRoot, runId });
-  const confirmed = await cleanupPlanV07({ stateRoot: git.stateRoot, runId });
+  const first = await cleanupPlan({ stateRoot: git.stateRoot, runId });
+  const confirmed = await cleanupPlan({ stateRoot: git.stateRoot, runId });
   if (stableStringify(first) !== stableStringify(confirmed)) {
     throw new CliError("Cleanup state changed while deriving the read-only plan; inspect and retry", 75);
   }
-  v07Output(confirmed);
+  v09Output(confirmed);
 }
 
-async function commandUnplugV07(args) {
+async function commandUnplugV09(args) {
   const [subcommand, ...rest] = args;
   if (!["plan", "observe-private", "apply"].includes(subcommand)) {
     throw new CliError("unplug requires plan, observe-private, or apply");
   }
-  const values = parseV07Options(rest);
+  const values = parseV09Options(rest);
   if (values["run-id"] !== undefined) {
     throw new CliError("unplug is repository-scoped and does not accept --run-id", 64);
   }
@@ -1685,7 +1551,7 @@ async function commandUnplugV07(args) {
   if (subcommand === "plan") {
     const request = values.file === undefined ? { resources: [] } : await readJsonInput(values.file);
     requireExactFields(request, { required: ["resources"] }, "unplug plan request");
-    v07Output(await unplugPlanV07({
+    v09Output(await unplugPlan({
       repositoryPath: process.cwd(),
       resources: request.resources,
     }));
@@ -1695,7 +1561,7 @@ async function commandUnplugV07(args) {
     if (!values.file) throw new CliError("unplug observe-private requires --file <request.json>");
     const request = await readJsonInput(values.file);
     requireExactFields(request, { required: ["plan"] }, "unplug observe-private request");
-    v07Output(await observePrivateUnplugV07({ plan: request.plan }));
+    v09Output(await observePrivateUnplug({ plan: request.plan }));
     return;
   }
   if (!values.file) throw new CliError("unplug apply requires --file <request.json>");
@@ -1707,7 +1573,7 @@ async function commandUnplugV07(args) {
   if (request.approved !== true) {
     throw new CliError("unplug apply requires explicit approved=true for the exact plan", 73);
   }
-  v07Output(await unplugApplyV07({
+  v09Output(await unplugApply({
     repositoryPath: process.cwd(),
     plan: request.plan,
     archiveEvidence: request.archive_evidence,
@@ -1715,12 +1581,12 @@ async function commandUnplugV07(args) {
   }));
 }
 
-async function commandRefreshV08(args) {
+async function commandRefreshV09(args) {
   const [subcommand, ...rest] = args;
   if (!["inspect", "prepare", "observe-private", "apply", "status"].includes(subcommand)) {
     throw new CliError("refresh requires inspect, prepare, observe-private, apply, or status");
   }
-  const values = parseV07Options(rest, {
+  const values = parseV09Options(rest, {
     "invoking-skill": { type: "string" },
     "refresh-id": { type: "string" },
   });
@@ -1733,14 +1599,14 @@ async function commandRefreshV08(args) {
     { max: 2048 },
   );
   requireCanonicalSource();
-  const git = v07Repository();
+  const git = v09Repository();
   if (subcommand === "inspect") {
     if (values.file !== undefined || values["refresh-id"] !== undefined) {
       throw new CliError("refresh inspect accepts only --invoking-skill and --json", 64);
     }
-    v07Output(await inspectRefresh({
+    v09Output(await inspectRefresh({
       commonDir: git.commonDir,
-      currentNamespace: V07_RUNTIME_DIRECTORY,
+      currentNamespace: RUNTIME_DIRECTORY,
       packageRoot,
       invokingSkillPath,
     }));
@@ -1749,7 +1615,7 @@ async function commandRefreshV08(args) {
   const targetAuthority = await authenticateRefreshSkill({ packageRoot, invokingSkillPath });
   if (subcommand === "status") {
     if (values.file !== undefined) throw new CliError("refresh status does not accept --file", 64);
-    v07Output(await refreshStatus({
+    v09Output(await refreshStatus({
       commonDir: git.commonDir,
       refreshId: values["refresh-id"] ?? null,
     }));
@@ -1759,7 +1625,7 @@ async function commandRefreshV08(args) {
     if (values.file !== undefined || values["refresh-id"] === undefined) {
       throw new CliError("refresh observe-private requires --refresh-id and accepts no --file", 64);
     }
-    v07Output(await observeRefreshPrivateArchives({
+    v09Output(await observeRefreshPrivateArchives({
       commonDir: git.commonDir,
       refreshId: requireText(values["refresh-id"], "--refresh-id", { max: 128, safeId: true }),
     }));
@@ -1777,7 +1643,7 @@ async function commandRefreshV08(args) {
     }, "refresh prepare request");
     const preparedAt = new Date().toISOString();
     const fences = activationFences(request.target_fences);
-    v07Output(await prepareRefresh({
+    v09Output(await prepareRefresh({
       commonDir: git.commonDir,
       sourceNamespace: request.source_namespace,
       sourceRunId: request.source_run_id,
@@ -1800,7 +1666,7 @@ async function commandRefreshV08(args) {
   if (values["refresh-id"] !== undefined && values["refresh-id"] !== request.refresh_id) {
     throw new CliError("refresh apply --refresh-id does not match request.refresh_id", 73);
   }
-  v07Output(await applyRefresh({
+  v09Output(await applyRefresh({
     commonDir: git.commonDir,
     refreshId: request.refresh_id,
     expectedHandoffDigest: request.expected_handoff_digest,
@@ -1809,106 +1675,15 @@ async function commandRefreshV08(args) {
   }));
 }
 
-function pathIsWithin(root, candidate) {
-  const relation = relative(resolve(root), resolve(candidate));
-  return relation === ""
-    || (relation !== ".." && !relation.startsWith(`..${sep}`) && !isAbsolute(relation));
-}
-
-async function commandRecoveryV08(args) {
-  const [sourceNamespace, action, ...rest] = args;
-  if (
-    sourceNamespace !== V081_PRIVATE_RESOLUTION_SOURCE_NAMESPACE
-    || action !== "resolve-private"
-  ) {
-    throw new CliError("recovery supports only: v0.8.1 resolve-private", 64);
-  }
-  const values = parse({
-    "run-id": { type: "string" },
-    "operation-id": { type: "string" },
-    out: { type: "string" },
-    json: { type: "boolean", default: false },
-  }, rest, false).values;
-  const runId = explicitRunId(values);
-  const operationId = requireText(values["operation-id"], "--operation-id", {
-    max: 128,
-    safeId: true,
-  });
-  const outputPath = requireText(values.out, "--out", { max: 2048 });
-  if (!isAbsolute(outputPath)) throw new CliError("recovery --out must be an absolute path");
-  requireCanonicalSource();
-  const git = v07Repository();
-  const requestedParent = dirname(resolve(outputPath));
-  const canonicalParent = await realpath(requestedParent).catch(() => null);
-  if (canonicalParent === null) {
-    throw new CliError("Private recovery output parent must be an existing directory", 73);
-  }
-  const canonicalOutput = resolve(canonicalParent, basename(outputPath));
-  if (pathIsWithin(git.root, canonicalOutput) || pathIsWithin(git.commonDir, canonicalOutput)) {
-    throw new CliError("Private recovery output must remain outside the repository and Git common directory", 73);
-  }
-  let containingRepository = null;
-  try {
-    containingRepository = discoverGit(canonicalParent);
-  } catch {
-    // A normal temporary directory is not a Git worktree.
-  }
-  if (containingRepository !== null) {
-    throw new CliError("Private recovery output must remain outside every Git worktree", 73);
-  }
-  const source = await loadRefreshSourceAuthority({
-    commonDir: git.commonDir,
-    namespace: sourceNamespace,
-    runId,
-  });
-  const coordinatorIdentity = assertCurrentCoordinatorTask(
-    source.run.binding.lineage,
-    "v0.8.1 private-resolution recovery",
-  );
-  const recovered = await recoverV081PrivateTaskResolution({
-    source,
-    runId,
-    operationId,
-    coordinatorThreadId: coordinatorIdentity.invoking_thread_id,
-  });
-  const writeStatus = await ensureExactJson(canonicalOutput, recovered.reconcile_request, {
-    guardRoot: dirname(canonicalOutput),
-    mode: 0o600,
-  });
-  v07Output({
-    schema_version: recovered.schema_version,
-    kind: recovered.kind,
-    source_authority: recovered.source_authority,
-    target_package_version: recovered.target_package_version,
-    coordinator_identity: coordinatorIdentity,
-    reconcile_request_path: canonicalOutput,
-    reconcile_request_sha256: sha256(stableStringify(recovered.reconcile_request)),
-    source_reconcile: {
-      executable: process.execPath,
-      argv: [
-        recovered.source_authority.source_cli_path,
-        "task", "create", "reconcile",
-        "--run-id", runId,
-        "--file", canonicalOutput,
-        "--json",
-      ],
-    },
-    output_status: writeStatus,
-    app_state_mutation_performed: false,
-    flow_state_mutation_performed: false,
-  });
-}
-
-function isV07RunBoundMutation(command, args) {
+function isV09RunBoundMutation(command, args) {
   const subcommand = args[0];
   if (command === "workflow") return ["create", "revise", "contract"].includes(subcommand);
   if (command === "task") {
-    return subcommand === "create" && ["prepare", "attempt", "reconcile", "bind"].includes(args[1]);
+    return subcommand === "launch" && ["prepare", "attempt", "reconcile", "start"].includes(args[1]);
   }
   if (command === "subagent") {
     return ["prepare", "attempt", "reconcile", "complete", "dispose"].includes(subcommand);
   }
-  if (command === "release") return ["prepare", "reconcile", "accept"].includes(subcommand);
   if (command === "callback") return ["deliver", "observe"].includes(subcommand);
   if (command === "urgent") return [
     "persist", "attempt", "reconcile", "observe", "consume", "expire",
@@ -1920,8 +1695,8 @@ function isV07RunBoundMutation(command, args) {
   return false;
 }
 
-async function dispatchV07Command(command, args, handler) {
-  if (!isV07RunBoundMutation(command, args)) return handler(args);
+async function dispatchV09Command(command, args, handler) {
+  if (!isV09RunBoundMutation(command, args)) return handler(args);
   const runIds = [];
   for (let index = 0; index < args.length; index += 1) {
     if (args[index] === "--run-id") {
@@ -1932,11 +1707,11 @@ async function dispatchV07Command(command, args, handler) {
     }
   }
   if (runIds.length === 0) return handler(args);
-  if (runIds.length !== 1) throw new CliError("v0.7 mutations require exactly one --run-id", 64);
+  if (runIds.length !== 1) throw new CliError("v0.9 mutations require exactly one --run-id", 64);
   const runId = requireText(runIds[0], "--run-id", { max: 128, safeId: true });
-  const git = v07Repository();
+  const git = v09Repository();
   const allowLinkedWorktree = (
-    (command === "release" && args[0] === "accept")
+    (command === "task" && args[0] === "launch" && args[1] === "start")
     || (command === "callback" && args[0] === "deliver")
   );
   return guardedActiveRunMutation(
@@ -1961,21 +1736,19 @@ async function main() {
     console.log(PACKAGE_VERSION);
     return;
   }
-  if (command === "run") return commandRunV07(args);
-  if (command === "workflow") return dispatchV07Command(command, args, commandWorkflowV07);
-  if (command === "task") return dispatchV07Command(command, args, commandTaskV07);
-  if (command === "subagent") return dispatchV07Command(command, args, commandSubagentV07);
-  if (command === "release") return dispatchV07Command(command, args, commandReleaseV07);
-  if (command === "callback") return dispatchV07Command(command, args, commandCallbackV07);
-  if (command === "urgent") return dispatchV07Command(command, args, commandUrgentV07);
-  if (command === "disposition") return dispatchV07Command(command, args, commandDispositionV07);
-  if (command === "verification") return dispatchV07Command(command, args, commandVerificationV07);
-  if (command === "integration") return dispatchV07Command(command, args, commandIntegrationV07);
-  if (command === "archive") return dispatchV07Command(command, args, commandArchiveV07);
-  if (command === "cleanup") return commandCleanupV07(args);
-  if (command === "recovery") return commandRecoveryV08(args);
-  if (command === "unplug") return commandUnplugV07(args);
-  if (command === "refresh") return commandRefreshV08(args);
+  if (command === "run") return commandRunV09(args);
+  if (command === "workflow") return dispatchV09Command(command, args, commandWorkflowV09);
+  if (command === "task") return dispatchV09Command(command, args, commandTaskV09);
+  if (command === "subagent") return dispatchV09Command(command, args, commandSubagentV09);
+  if (command === "callback") return dispatchV09Command(command, args, commandCallbackV09);
+  if (command === "urgent") return dispatchV09Command(command, args, commandUrgentV09);
+  if (command === "disposition") return dispatchV09Command(command, args, commandDispositionV09);
+  if (command === "verification") return dispatchV09Command(command, args, commandVerificationV09);
+  if (command === "integration") return dispatchV09Command(command, args, commandIntegrationV09);
+  if (command === "archive") return dispatchV09Command(command, args, commandArchiveV09);
+  if (command === "cleanup") return commandCleanupV09(args);
+  if (command === "unplug") return commandUnplugV09(args);
+  if (command === "refresh") return commandRefreshV09(args);
   throw new CliError(`Unknown command: ${command}\n\n${HELP}`);
 }
 

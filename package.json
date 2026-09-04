@@ -9,8 +9,6 @@
   },
   "scripts": {
     "test": "npm run test:v09",
-    "test:v07": "node --test --test-concurrency=1 test/*-v07.test.mjs test/recipient.test.mjs test/release-identity.test.mjs",
-    "test:v08": "node --test --test-concurrency=1 test/*-v07.test.mjs test/*-v08.test.mjs test/recipient.test.mjs test/release-identity.test.mjs",
     "test:v09": "node --test --test-concurrency=1 test/*-v09.test.mjs test/recipient.test.mjs test/release-identity.test.mjs",
     "validate": "node scripts/validate.mjs",
     "prepack": "node scripts/release-identity.mjs",
@@ -28,8 +26,6 @@
     "skills/",
     "templates/",
     "docs/adr/",
-    "docs/coverage-v0.7.md",
-    "docs/coverage-v0.8.md",
     "docs/coverage-v0.9.md",
     "docs/architecture-v0.9.md",
     "docs/compatibility-capsules-v0.9.md",

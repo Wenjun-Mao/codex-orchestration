@@ -1,4 +1,4 @@
-import { consumeRefreshActivation } from "./lib/refresh-v08.mjs";
+import { consumeRefreshActivation } from "./lib/compat/refresh.mjs";
 import {
   acquireRuntimeContext,
   buildRuntimeContext,
@@ -14,7 +14,7 @@ import {
 import {
   createWorkflowJournal,
   workflowJournalStatus,
-} from "./lib/workflow-journal-v07.mjs";
+} from "./lib/workflow-journal.mjs";
 import { gitSnapshot } from "./lib/git.mjs";
 
 let input = "";

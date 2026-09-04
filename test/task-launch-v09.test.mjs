@@ -1,245 +1,435 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { readFile, rm, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import test from "node:test";
+import { bindRecipient } from "../lib/recipients.mjs";
 import {
-  admitTaskLaunchGitActivation,
-  admitTaskLaunchIdentity,
-  createTaskLaunch,
+  prepareTaskLaunch,
   reconcileTaskLaunch,
-  taskLaunchGitActivationDigest,
-  taskLaunchIdentityDigest,
+  recordTaskLaunchAttempt,
+  startTaskLaunch,
+  taskLaunchIdForContract,
   taskLaunchStatus,
-  validateTaskLaunch,
+  validateTaskLaunchRecord,
 } from "../lib/core/task-launch.mjs";
-import { sha256, stableStringify } from "../lib/core.mjs";
+import {
+  createWorkflowJournal,
+  persistWorkflowTaskContract,
+} from "../lib/workflow-journal.mjs";
+import {
+  coordinatorBindingDigest,
+  createWorkflowPlanRevision,
+} from "../lib/workflow-plan.mjs";
+import { activateFixtureRun, createGitFixture } from "./helpers.mjs";
 
-const BASELINE = "a".repeat(40);
-const NOW = "2026-09-04T00:00:00.000Z";
-const NONCE = "b".repeat(64);
+const BASE_TIME = Date.parse("2026-09-04T00:00:00.000Z");
 
-function coordinatorBinding() {
-  const identity = {
-    lineage_id: "v09-launch-lineage",
-    thread_id: "v09-coordinator-thread",
+function git(root, args) {
+  return execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
+}
+
+function workflowTask(suffix, overrides = {}) {
+  return {
+    task_id: `launch-task-${suffix}`,
+    title: `Execute first-turn task ${suffix}`,
+    execution_kind: "task-thread",
+    mode: "write",
+    model: "gpt-5.6-terra",
+    reasoning_effort: "high",
+    selector_rationale: "Terra-high is sufficient for this bounded implementation task.",
+    fork_turns: null,
+    dependencies: [],
+    read_paths: ["lib"],
+    write_paths: [`audit-sentinel/${suffix}.txt`],
+    shared_resources: [],
+    primary_outcome: `Complete first-turn task ${suffix}.`,
+    causal_question: null,
+    cheapest_safe_direct_attempt: `Run the bounded assignment ${suffix} once.`,
+    instrument_role: "none",
+    supporting_follow_up: null,
+    supporting_authorization: null,
+    ...overrides,
+  };
+}
+
+async function launchContext(root, suffix, { task = {} } = {}) {
+  const baseline = git(root, ["rev-parse", "HEAD"]);
+  const commonDir = git(root, ["rev-parse", "--path-format=absolute", "--git-common-dir"]);
+  const coordinator = {
+    lineage_id: `launch-lineage-${suffix}`,
+    thread_id: `launch-coordinator-${suffix}`,
     generation: 1,
   };
-  return { ...identity, binding_digest: sha256(stableStringify(identity)) };
-}
-
-function bootstrap() {
-  return [
-    "# Codex Flow v0.9 task bootstrap",
-    "",
-    `CODEX_FLOW_LAUNCH_NONCE=${NONCE}`,
-    "",
-    "Wait for the authenticated release before activating the executor.",
-  ].join("\n");
-}
-
-function authority(commonDir, overrides = {}) {
-  return {
-    run_id: "v09-launch-run",
-    operation_id: "task-launch-operation-v1",
-    release_id: "task-launch-release-v1",
-    ready_thread_id: "v09-ready-thread",
-    contract_id: "c".repeat(64),
-    runtime_context_digest: "d".repeat(64),
-    configuration_digest: "e".repeat(64),
-    repository_id: "v09-launch-repository",
-    common_dir: commonDir,
-    coordinator_binding: coordinatorBinding(),
-    plan_id: "v09-launch-plan",
-    revision_digest: "f".repeat(64),
-    task_id: "v09-launch-core",
-    task_digest: "1".repeat(64),
-    baseline_revision: BASELINE,
-    ...overrides,
-  };
-}
-
-function launchDraft({ commonDir = "/tmp/v09-launch/.git", worktreePath = "/tmp/v09-launch/executor" } = {}) {
-  return {
-    authority: authority(commonDir),
-    expected_initial_turn: {
-      launch_nonce: NONCE,
-      bootstrap_digest: sha256(bootstrap()),
-    },
-    expected_git_activation: {
-      worktree_path: worktreePath,
-      common_dir: commonDir,
-      executor_branch: "codex/v09-launch-executor",
-      baseline_revision: BASELINE,
-    },
-    prepared_at: NOW,
-  };
-}
-
-function identityEvidence(overrides = {}) {
-  return {
-    thread_id: "v09-ready-thread",
-    turn_id: "v09-first-turn",
-    turn_index: 1,
-    role: "user",
-    content: bootstrap(),
-    observed_at: "2026-09-04T00:00:01.000Z",
-    ...overrides,
-  };
-}
-
-function gitActivationEvidence({ commonDir, worktreePath, revision = BASELINE, branch = "codex/v09-launch-executor" }) {
-  return {
-    worktree_path: worktreePath,
-    common_dir: commonDir,
-    branch,
-    revision,
-    cleanliness: "clean",
-    observed_at: "2026-09-04T00:00:02.000Z",
-  };
-}
-
-function git(cwd, args) {
-  return execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
-}
-
-async function createGitFixture() {
-  const root = await mkdtemp(resolve(tmpdir(), "codex-flow-v09-launch-"));
-  git(root, ["init", "--quiet", "--initial-branch=main"]);
-  git(root, ["config", "user.email", "fixture@example.test"]);
-  git(root, ["config", "user.name", "Fixture"]);
-  await writeFile(resolve(root, ".gitkeep"), "fixture\n", "utf8");
-  git(root, ["add", ".gitkeep"]);
-  git(root, ["commit", "--quiet", "-m", "fixture"]);
-  return root;
-}
-
-function currentActivation(root, worktreePath, branch) {
-  return gitActivationEvidence({
-    worktreePath,
-    commonDir: git(worktreePath, ["rev-parse", "--path-format=absolute", "--git-common-dir"]),
-    revision: git(worktreePath, ["rev-parse", "HEAD"]),
-    branch: git(worktreePath, ["branch", "--show-current"]) || branch,
+  const plan = createWorkflowPlanRevision({
+    schema_version: 1,
+    plan_id: `launch-plan-${suffix}`,
+    revision: 1,
+    parent_revision_digest: null,
+    tasks: [workflowTask(suffix, task)],
   });
+  const runId = `launch-run-${suffix}`;
+  const activated = await activateFixtureRun({
+    root,
+    runId,
+    plan,
+    branchFences: [`codex/launch-${suffix}`],
+    lineage: coordinator,
+    now: BASE_TIME,
+  });
+  const coordinatorBinding = {
+    ...coordinator,
+    binding_digest: coordinatorBindingDigest(coordinator),
+  };
+  const stateRoot = resolve(commonDir, "codex-flow", "v0.9.0-dev.0");
+  await bindRecipient({
+    stateRoot,
+    recipient: coordinator,
+    fenceToken: activated.run.binding.fence_token,
+  });
+  await createWorkflowJournal({
+    stateRoot,
+    runId,
+    planId: plan.plan_id,
+    planRevision: plan,
+    now: BASE_TIME + 1_000,
+  });
+  const contract = await persistWorkflowTaskContract({
+    stateRoot,
+    runId,
+    planId: plan.plan_id,
+    taskId: plan.tasks[0].task_id,
+    currentBaseline: { revision: baseline },
+    dependencyAuthorities: [],
+    now: BASE_TIME + 2_000,
+  });
+  const requestedSelectors = {
+    project_id: `project-${suffix}`,
+    model: contract.task.model,
+    reasoning_effort: contract.task.reasoning_effort,
+    worktree: {
+      mode: "host-worktree",
+      starting_revision: baseline,
+      starting_branch: "main",
+      executor_branch: `codex/launch-${suffix}`,
+      path: null,
+    },
+  };
+  return {
+    root,
+    commonDir,
+    stateRoot,
+    baseline,
+    coordinator: coordinatorBinding,
+    plan,
+    runId,
+    contract,
+    requestedSelectors,
+  };
 }
 
-test("launch identity, Git activation, and lifecycle state are content-addressed", () => {
-  const first = createTaskLaunch(launchDraft());
-  const later = createTaskLaunch({ ...launchDraft(), prepared_at: "2026-09-04T01:00:00.000Z" });
-
-  assert.match(first.launch_id, /^task-launch-v09-[0-9a-f]{64}$/);
-  assert.equal(first.launch_id, later.launch_id, "creation time is not launch authority");
-  assert.notEqual(first.state_digest, later.state_digest, "the lifecycle record retains its preparation time");
-  assert.equal(first.status, "prepared");
-  assert.deepEqual(validateTaskLaunch(first), first);
-
-  const identityAdmitted = admitTaskLaunchIdentity({ launch: first, identity: identityEvidence() });
-  assert.equal(identityAdmitted.status, "identity-admitted");
-  assert.equal(taskLaunchStatus(identityAdmitted).executor_activation_permitted, false);
-  assert.match(taskLaunchIdentityDigest(identityAdmitted), /^[0-9a-f]{64}$/);
-
-  const active = admitTaskLaunchGitActivation({
-    launch: identityAdmitted,
-    git_activation: gitActivationEvidence({
-      commonDir: "/tmp/v09-launch/.git",
-      worktreePath: "/tmp/v09-launch/executor",
-    }),
+async function preparedAttempt(context) {
+  const prepared = await prepareTaskLaunch({
+    stateRoot: context.stateRoot,
+    taskContract: context.contract,
+    requestedSelectors: context.requestedSelectors,
+    now: BASE_TIME + 3_000,
   });
+  const attempted = await recordTaskLaunchAttempt({
+    stateRoot: context.stateRoot,
+    launchId: prepared.launch_id,
+    hostSessionId: `session-${context.runId}`,
+    timeoutSeconds: 300,
+    now: BASE_TIME + 4_000,
+  });
+  return { prepared, attempted };
+}
+
+async function linkedWorktree(context, suffix = "executor") {
+  const path = resolve(context.root, `../${context.runId}-${suffix}`);
+  git(context.root, ["worktree", "add", "--quiet", "--detach", path, context.baseline]);
+  return path;
+}
+
+async function removeWorktree(context, path) {
+  try {
+    git(context.root, ["worktree", "remove", "--force", path]);
+  } catch {
+    // A negative-path test may have removed or never attached the fixture.
+  }
+  await rm(path, { recursive: true, force: true });
+}
+
+function readyEvidence(context, launch, observedAt = BASE_TIME + 6_000) {
+  return {
+    stateRoot: context.stateRoot,
+    launchId: launch.launch_id,
+    outcome: "ready",
+    hostId: "local",
+    readyThreadId: `executor-${context.runId}`,
+    selectorEvidence: {
+      accepted: {
+        project_id: context.requestedSelectors.project_id,
+        model: context.requestedSelectors.model,
+        reasoning_effort: context.requestedSelectors.reasoning_effort,
+        observed_at: new Date(observedAt).toISOString(),
+      },
+      observed: null,
+    },
+    observedAt: new Date(observedAt).toISOString(),
+    now: observedAt,
+  };
+}
+
+test("launch attempt emits one full first-turn assignment and no release prompt", async (t) => {
+  const root = await createGitFixture("codex-flow-v09-launch-prompt-");
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const context = await launchContext(root, "prompt");
+  const { prepared, attempted } = await preparedAttempt(context);
+
+  assert.match(prepared.launch_id, /^task-launch-v1-[0-9a-f]{64}$/);
+  assert.equal(prepared.launch_id, taskLaunchIdForContract({
+    taskContract: context.contract,
+    requestedSelectors: context.requestedSelectors,
+  }));
+  assert.equal(attempted.dispatch_permitted, true);
+  assert.equal(attempted.host_request.prompt.includes(context.contract.task.primary_outcome), true);
+  assert.equal(attempted.host_request.prompt.includes(context.contract.contract_id), true);
+  assert.equal(attempted.host_request.prompt.includes("task launch start"), true);
+  assert.equal(attempted.host_request.prompt.includes("begin the assignment"), true);
+  assert.equal(attempted.host_request.prompt.includes("bootstrap-only"), false);
+  assert.equal(attempted.host_request.prompt.includes("awaiting release"), false);
+  assert.equal(attempted.host_request.prompt.includes("send_message_to_thread"), false);
+  const persistentFields = Object.fromEntries(Object.entries(prepared).filter(([key]) => ![
+    "dispatch_permitted", "activation_performed", "execution_permitted", "host_request",
+  ].includes(key)));
+  assert.deepEqual(validateTaskLaunchRecord(persistentFields), persistentFields);
+
+  const replay = await recordTaskLaunchAttempt({
+    stateRoot: context.stateRoot,
+    launchId: prepared.launch_id,
+    hostSessionId: `session-${context.runId}`,
+    timeoutSeconds: 300,
+    now: BASE_TIME + 4_000,
+  });
+  assert.equal(replay.dispatch_permitted, false);
+  assert.equal(replay.host_request, null);
+});
+
+test("executor start can establish exact identity before or after the host result", async (t) => {
+  for (const order of ["start-first", "result-first"]) {
+    const root = await createGitFixture(`codex-flow-v09-${order}-`);
+    const context = await launchContext(root, order);
+    const { attempted } = await preparedAttempt(context);
+    const worktree = await linkedWorktree(context);
+    t.after(async () => {
+      await removeWorktree(context, worktree);
+      await rm(root, { recursive: true, force: true });
+    });
+    const executorThreadId = `executor-${context.runId}`;
+    let result;
+    if (order === "result-first") {
+      result = await reconcileTaskLaunch(readyEvidence(context, attempted));
+      assert.equal(result.status, "awaiting-start");
+    }
+    result = await startTaskLaunch({
+      stateRoot: context.stateRoot,
+      launchId: attempted.launch_id,
+      launchNonce: attempted.launch_nonce,
+      executorThreadId,
+      repositoryPath: worktree,
+      now: BASE_TIME + 5_000,
+    });
+    assert.equal(result.status, "active");
+    assert.equal(result.execution_permitted, true);
+    assert.equal(result.start_claim.executor_thread_id, executorThreadId);
+    assert.equal(git(worktree, ["branch", "--show-current"]), context.requestedSelectors.worktree.executor_branch);
+    if (order === "start-first") {
+      result = await reconcileTaskLaunch(readyEvidence(context, attempted));
+      assert.equal(result.status, "active");
+    }
+    const status = await taskLaunchStatus({ stateRoot: context.stateRoot, launchId: attempted.launch_id });
+    assert.equal(status.start_claim.executor_thread_id, executorThreadId);
+    assert.equal(status.creation_evidence.ready_thread_id, executorThreadId);
+  }
+});
+
+test("provisional and opaque App results remain non-authoritative until exact task start", async (t) => {
+  for (const outcome of ["provisional", "opaque"]) {
+    const root = await createGitFixture(`codex-flow-v09-${outcome}-`);
+    const context = await launchContext(root, outcome);
+    const { attempted } = await preparedAttempt(context);
+    const worktree = await linkedWorktree(context);
+    t.after(async () => {
+      await removeWorktree(context, worktree);
+      await rm(root, { recursive: true, force: true });
+    });
+    const result = await reconcileTaskLaunch({
+      stateRoot: context.stateRoot,
+      launchId: attempted.launch_id,
+      outcome,
+      hostId: "local",
+      provisionalId: outcome === "provisional" ? "client-new-thread:fixture" : null,
+      opaqueEvidence: outcome === "opaque" ? { digest: "a".repeat(64), length: 42 } : null,
+      selectorEvidence: {
+        accepted: {
+          project_id: context.requestedSelectors.project_id,
+          model: context.requestedSelectors.model,
+          reasoning_effort: context.requestedSelectors.reasoning_effort,
+          observed_at: new Date(BASE_TIME + 5_000).toISOString(),
+        },
+        observed: null,
+      },
+      observedAt: new Date(BASE_TIME + 5_000).toISOString(),
+      now: BASE_TIME + 5_000,
+    });
+    assert.equal(result.status, "awaiting-start");
+    assert.equal(result.execution_permitted, false);
+    const active = await startTaskLaunch({
+      stateRoot: context.stateRoot,
+      launchId: attempted.launch_id,
+      launchNonce: attempted.launch_nonce,
+      executorThreadId: `executor-${context.runId}`,
+      repositoryPath: worktree,
+      now: BASE_TIME + 6_000,
+    });
+    assert.equal(active.status, "active");
+  }
+});
+
+test("task start is crash-resumable on both sides of branch attachment", async (t) => {
+  for (const boundary of ["after-intent", "after-switch"]) {
+    const root = await createGitFixture(`codex-flow-v09-crash-${boundary}-`);
+    const context = await launchContext(root, `crash-${boundary}`);
+    const { attempted } = await preparedAttempt(context);
+    const worktree = await linkedWorktree(context);
+    t.after(async () => {
+      await removeWorktree(context, worktree);
+      await rm(root, { recursive: true, force: true });
+    });
+    const hooks = boundary === "after-intent"
+      ? { afterPreparedIntent: () => { throw new Error("fixture crash after intent"); } }
+      : { afterBranchSwitch: () => { throw new Error("fixture crash after switch"); } };
+    await assert.rejects(startTaskLaunch({
+      stateRoot: context.stateRoot,
+      launchId: attempted.launch_id,
+      launchNonce: attempted.launch_nonce,
+      executorThreadId: `executor-${context.runId}`,
+      repositoryPath: worktree,
+      now: BASE_TIME + 5_000,
+      hooks,
+    }), /fixture crash/);
+    const recovered = await startTaskLaunch({
+      stateRoot: context.stateRoot,
+      launchId: attempted.launch_id,
+      launchNonce: attempted.launch_nonce,
+      executorThreadId: `executor-${context.runId}`,
+      repositoryPath: worktree,
+      now: BASE_TIME + 6_000,
+    });
+    assert.equal(recovered.status, "active");
+    assert.equal(git(worktree, ["branch", "--show-current"]), context.requestedSelectors.worktree.executor_branch);
+  }
+});
+
+test("task start rejects coordinator, dirty, wrong identity, nonce, and returned-ID contradictions", async (t) => {
+  const root = await createGitFixture("codex-flow-v09-negative-");
+  const context = await launchContext(root, "negative");
+  const { attempted } = await preparedAttempt(context);
+  const worktree = await linkedWorktree(context);
+  t.after(async () => {
+    await removeWorktree(context, worktree);
+    await rm(root, { recursive: true, force: true });
+  });
+  const base = {
+    stateRoot: context.stateRoot,
+    launchId: attempted.launch_id,
+    launchNonce: attempted.launch_nonce,
+    executorThreadId: `executor-${context.runId}`,
+    repositoryPath: worktree,
+    now: BASE_TIME + 5_000,
+  };
+  await assert.rejects(startTaskLaunch({ ...base, launchNonce: "0".repeat(64) }), /nonce does not match/);
+  await assert.rejects(startTaskLaunch({ ...base, repositoryPath: root }), /coordinator checkout|source checkout/);
+  await writeFile(resolve(worktree, "untracked.txt"), "dirty\n", "utf8");
+  await assert.rejects(startTaskLaunch(base), /must be pristine/);
+  await rm(resolve(worktree, "untracked.txt"));
+  const active = await startTaskLaunch(base);
   assert.equal(active.status, "active");
-  assert.equal(taskLaunchStatus(active).executor_activation_permitted, true);
-  assert.match(taskLaunchGitActivationDigest(active), /^[0-9a-f]{64}$/);
+  await assert.rejects(startTaskLaunch({ ...base, executorThreadId: "different-executor" }), /different executor/);
+  await assert.rejects(reconcileTaskLaunch({
+    ...readyEvidence(context, attempted),
+    readyThreadId: "different-executor",
+  }), /contradicts the executor start claim/);
+});
 
-  assert.deepEqual(
-    admitTaskLaunchIdentity({ launch: active, identity: identityEvidence() }),
-    active,
-    "an exact first-turn replay converges",
+test("task start rejects another repository and a drifted baseline", async (t) => {
+  const root = await createGitFixture("codex-flow-v09-negative-git-");
+  const foreign = await createGitFixture("codex-flow-v09-negative-foreign-");
+  const context = await launchContext(root, "negative-git");
+  const { attempted } = await preparedAttempt(context);
+  const driftedWorktree = resolve(root, `../${context.runId}-drifted`);
+  t.after(async () => {
+    await removeWorktree(context, driftedWorktree);
+    await rm(root, { recursive: true, force: true });
+    await rm(foreign, { recursive: true, force: true });
+  });
+  const base = {
+    stateRoot: context.stateRoot,
+    launchId: attempted.launch_id,
+    launchNonce: attempted.launch_nonce,
+    executorThreadId: `executor-${context.runId}`,
+    now: BASE_TIME + 5_000,
+  };
+  await assert.rejects(
+    startTaskLaunch({ ...base, repositoryPath: foreign }),
+    /wrong repository|common directory/,
   );
-  assert.throws(
-    () => admitTaskLaunchIdentity({
-      launch: active,
-      identity: identityEvidence({ turn_id: "different-first-turn" }),
-    }),
-    /conflicts with the one-shot admitted identity/,
-  );
-  assert.throws(
-    () => admitTaskLaunchGitActivation({
-      launch: active,
-      git_activation: gitActivationEvidence({
-        commonDir: "/tmp/v09-launch/.git",
-        worktreePath: "/tmp/v09-launch/executor",
-        branch: "codex/different-branch",
-      }),
-    }),
-    /does not match the expected executor branch/,
-  );
-  assert.throws(
-    () => admitTaskLaunchIdentity({
-      launch: first,
-      identity: identityEvidence({ content: bootstrap().replace(NONCE, "0".repeat(64)) }),
-    }),
-    /exact launch nonce marker/,
-  );
-  assert.throws(
-    () => admitTaskLaunchIdentity({
-      launch: first,
-      identity: identityEvidence({ observed_at: "2026-09-03T23:59:59.000Z" }),
-    }),
-    /observation predates launch preparation/,
+
+  await writeFile(resolve(root, "later.txt"), "later baseline\n", "utf8");
+  git(root, ["add", "later.txt"]);
+  git(root, ["commit", "--quiet", "-m", "later baseline"]);
+  git(root, ["worktree", "add", "--quiet", "--detach", driftedWorktree, "HEAD"]);
+  await assert.rejects(
+    startTaskLaunch({ ...base, repositoryPath: driftedWorktree }),
+    /starting revision|baseline/,
   );
 });
 
-test("real Git activation and first-turn identity reconcile in either host-result order", async (t) => {
-  const root = await createGitFixture();
-  const baseline = git(root, ["rev-parse", "HEAD"]);
-  const commonDir = git(root, ["rev-parse", "--path-format=absolute", "--git-common-dir"]);
-  const worktreePaths = [];
+test("task start rejects an existing reserved branch before attachment", async (t) => {
+  const root = await createGitFixture("codex-flow-v09-negative-branch-");
+  const context = await launchContext(root, "negative-branch");
+  const { attempted } = await preparedAttempt(context);
+  const worktree = await linkedWorktree(context);
   t.after(async () => {
-    for (const worktreePath of worktreePaths) {
-      try {
-        git(root, ["worktree", "remove", "--force", worktreePath]);
-      } catch {
-        // The fixture may fail before Git records the linked worktree.
-      }
+    await removeWorktree(context, worktree);
+    try {
+      git(root, ["branch", "-D", context.requestedSelectors.worktree.executor_branch]);
+    } catch {
+      // The start must not remove a pre-existing branch.
     }
     await rm(root, { recursive: true, force: true });
   });
+  git(root, ["branch", context.requestedSelectors.worktree.executor_branch, context.baseline]);
+  await assert.rejects(startTaskLaunch({
+    stateRoot: context.stateRoot,
+    launchId: attempted.launch_id,
+    launchNonce: attempted.launch_nonce,
+    executorThreadId: `executor-${context.runId}`,
+    repositoryPath: worktree,
+    now: BASE_TIME + 5_000,
+  }), /pristine detached launch worktree|branch already exists/);
+});
 
-  for (const order of ["identity-first", "git-first"]) {
-    const worktreePath = resolve(root, `executor-${order}`);
-    worktreePaths.push(worktreePath);
-    const branch = `codex/v09-${order}`;
-    git(root, ["worktree", "add", "--quiet", "--detach", worktreePath, baseline]);
-    const draft = launchDraft({ commonDir, worktreePath });
-    draft.authority = authority(commonDir, { baseline_revision: baseline });
-    draft.expected_git_activation = {
-      ...draft.expected_git_activation,
-      executor_branch: branch,
-      baseline_revision: baseline,
-    };
-    let launch = createTaskLaunch(draft);
-    const identity = identityEvidence({ turn_id: `first-turn-${order}` });
-
-    if (order === "identity-first") {
-      launch = reconcileTaskLaunch({ launch, identity });
-      assert.equal(launch.status, "identity-admitted");
-    }
-
-    git(worktreePath, ["switch", "--quiet", "--no-track", "-c", branch, baseline]);
-    const activation = currentActivation(root, worktreePath, branch);
-    assert.equal(activation.revision, baseline);
-    assert.equal(activation.branch, branch);
-
-    if (order === "git-first") {
-      launch = reconcileTaskLaunch({ launch, git_activation: activation });
-      assert.equal(launch.status, "git-activated");
-      launch = reconcileTaskLaunch({ launch, identity });
-    } else {
-      launch = reconcileTaskLaunch({ launch, git_activation: activation });
-    }
-
-    assert.equal(launch.status, "active");
-    assert.equal(taskLaunchStatus(launch).executor_activation_permitted, true);
-    assert.equal(launch.git_activation.branch, branch);
-  }
+test("task-launch schema describes the persistent first-turn lifecycle", async () => {
+  const schema = JSON.parse(await readFile(
+    new URL("../schemas/task-launch.schema.json", import.meta.url),
+    "utf8",
+  ));
+  assert.equal(schema.$schema, "https://json-schema.org/draft/2020-12/schema");
+  assert.equal(schema.properties.launch_id.pattern, "^task-launch-v1-[0-9a-f]{64}$");
+  assert.equal(schema.required.includes("task_contract"), true);
+  assert.equal(schema.required.includes("initial_prompt_digest"), true);
+  assert.equal(JSON.stringify(schema).includes("release_id"), false);
+  assert.equal(JSON.stringify(schema).includes("bootstrap_digest"), false);
 });

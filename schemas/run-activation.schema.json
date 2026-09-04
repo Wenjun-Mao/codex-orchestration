@@ -21,7 +21,7 @@
   ],
   "properties": {
     "schema_version": { "const": 1 },
-    "kind": { "const": "codex-flow-v07-run-activation" },
+    "kind": { "const": "codex-flow-v09-run-activation" },
     "run_id": { "$ref": "#/$defs/safeId" },
     "runtime_id": { "$ref": "#/$defs/digest" },
     "runtime_context_hash": { "$ref": "#/$defs/digest" },

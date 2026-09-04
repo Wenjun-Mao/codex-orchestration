@@ -1,68 +1,67 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://private.local/codex-flow/task-launch.schema.json",
+  "title": "Codex Flow v0.9 task launch",
   "type": "object",
   "additionalProperties": false,
   "required": [
-    "schema_version", "kind", "launch_id", "authority", "expected_initial_turn",
-    "expected_git_activation", "prepared_at", "identity", "git_activation", "status",
-    "state_digest"
+    "schema_version", "kind", "launch_id", "run_id", "runtime_context_digest",
+    "configuration_digest", "repository_id", "common_dir", "coordinator_binding",
+    "plan_id", "revision_digest", "task_id", "task_digest", "contract_id",
+    "task_title", "selector_rationale", "task_contract", "launch_nonce",
+    "task_start_command", "initial_prompt_digest", "selector_evidence", "status",
+    "attempt", "creation_evidence", "start_claim", "git_activation", "resolution",
+    "prepared_at", "updated_at"
   ],
   "properties": {
     "schema_version": { "const": 1 },
     "kind": { "const": "codex-flow-v09-task-launch" },
-    "launch_id": { "type": "string", "pattern": "^task-launch-v09-[0-9a-f]{64}$" },
-    "authority": { "$ref": "#/$defs/authority" },
-    "expected_initial_turn": { "$ref": "#/$defs/expectedInitialTurn" },
-    "expected_git_activation": { "$ref": "#/$defs/expectedGitActivation" },
+    "launch_id": { "type": "string", "pattern": "^task-launch-v1-[0-9a-f]{64}$" },
+    "run_id": { "$ref": "#/$defs/safeId" },
+    "runtime_context_digest": { "$ref": "#/$defs/digest" },
+    "configuration_digest": { "$ref": "#/$defs/digest" },
+    "repository_id": { "$ref": "#/$defs/safeId" },
+    "common_dir": { "$ref": "#/$defs/absolutePath" },
+    "coordinator_binding": { "$ref": "#/$defs/coordinatorBinding" },
+    "plan_id": { "$ref": "#/$defs/safeId" },
+    "revision_digest": { "$ref": "#/$defs/digest" },
+    "task_id": { "$ref": "#/$defs/safeId" },
+    "task_digest": { "$ref": "#/$defs/digest" },
+    "contract_id": { "$ref": "#/$defs/digest" },
+    "task_title": { "type": "string", "minLength": 1, "maxLength": 160 },
+    "selector_rationale": { "type": "string", "minLength": 1, "maxLength": 512 },
+    "task_contract": { "$ref": "https://private.local/codex-flow/generated-task-contract.schema.json" },
+    "launch_nonce": { "$ref": "#/$defs/digest" },
+    "task_start_command": { "type": "string", "minLength": 1, "maxLength": 8192 },
+    "initial_prompt_digest": { "$ref": "#/$defs/digest" },
+    "selector_evidence": { "$ref": "#/$defs/selectorEvidence" },
+    "status": {
+      "enum": [
+        "prepared", "attempting", "awaiting-start", "active",
+        "terminal-no-object", "ambiguous", "session-blocked"
+      ]
+    },
+    "attempt": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/attempt" }] },
+    "creation_evidence": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/creationEvidence" }] },
+    "start_claim": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/startClaim" }] },
+    "git_activation": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/gitActivation" }] },
+    "resolution": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/resolution" }] },
     "prepared_at": { "$ref": "#/$defs/timestamp" },
-    "identity": {
-      "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/identity" }]
-    },
-    "git_activation": {
-      "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/gitActivation" }]
-    },
-    "status": { "enum": ["prepared", "identity-admitted", "git-activated", "active"] },
-    "state_digest": { "$ref": "#/$defs/digest" }
+    "updated_at": { "$ref": "#/$defs/timestamp" }
   },
-  "allOf": [
-    {
-      "if": { "properties": { "status": { "const": "prepared" } } },
-      "then": {
-        "properties": { "identity": { "type": "null" }, "git_activation": { "type": "null" } }
-      }
-    },
-    {
-      "if": { "properties": { "status": { "const": "identity-admitted" } } },
-      "then": {
-        "properties": { "identity": { "$ref": "#/$defs/identity" }, "git_activation": { "type": "null" } }
-      }
-    },
-    {
-      "if": { "properties": { "status": { "const": "git-activated" } } },
-      "then": {
-        "properties": { "identity": { "type": "null" }, "git_activation": { "$ref": "#/$defs/gitActivation" } }
-      }
-    },
-    {
-      "if": { "properties": { "status": { "const": "active" } } },
-      "then": {
-        "properties": { "identity": { "$ref": "#/$defs/identity" }, "git_activation": { "$ref": "#/$defs/gitActivation" } }
-      }
-    }
-  ],
   "$defs": {
     "safeId": {
       "type": "string",
       "minLength": 1,
       "maxLength": 256,
-      "pattern": "^[A-Za-z0-9_.-]+$"
+      "pattern": "^[A-Za-z0-9._-]+$"
     },
     "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
     "revision": { "type": "string", "pattern": "^[0-9a-f]{40,64}$" },
     "timestamp": { "type": "string", "format": "date-time", "maxLength": 64 },
-    "absolutePath": { "type": "string", "pattern": "^/", "maxLength": 2048 },
+    "absolutePath": { "type": "string", "pattern": "^/", "maxLength": 4096 },
     "branch": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "reasoning": { "enum": ["none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"] },
     "coordinatorBinding": {
       "type": "object",
       "additionalProperties": false,
@@ -74,86 +73,120 @@
         "binding_digest": { "$ref": "#/$defs/digest" }
       }
     },
-    "authority": {
+    "requestedWorktree": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "run_id", "operation_id", "release_id", "ready_thread_id", "contract_id",
-        "runtime_context_digest", "configuration_digest", "repository_id", "common_dir",
-        "coordinator_binding", "plan_id", "revision_digest", "task_id", "task_digest",
-        "baseline_revision"
-      ],
+      "required": ["mode", "starting_revision", "starting_branch", "executor_branch", "path"],
       "properties": {
-        "run_id": { "$ref": "#/$defs/safeId" },
-        "operation_id": { "$ref": "#/$defs/safeId" },
-        "release_id": { "$ref": "#/$defs/safeId" },
-        "ready_thread_id": { "$ref": "#/$defs/safeId" },
-        "contract_id": { "$ref": "#/$defs/digest" },
-        "runtime_context_digest": { "$ref": "#/$defs/digest" },
-        "configuration_digest": { "$ref": "#/$defs/digest" },
-        "repository_id": { "$ref": "#/$defs/safeId" },
-        "common_dir": { "$ref": "#/$defs/absolutePath" },
-        "coordinator_binding": { "$ref": "#/$defs/coordinatorBinding" },
-        "plan_id": { "$ref": "#/$defs/safeId" },
-        "revision_digest": { "$ref": "#/$defs/digest" },
-        "task_id": { "$ref": "#/$defs/safeId" },
-        "task_digest": { "$ref": "#/$defs/digest" },
-        "baseline_revision": { "$ref": "#/$defs/revision" }
-      }
-    },
-    "expectedInitialTurn": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["launch_nonce", "bootstrap_digest"],
-      "properties": {
-        "launch_nonce": { "$ref": "#/$defs/digest" },
-        "bootstrap_digest": { "$ref": "#/$defs/digest" }
-      }
-    },
-    "expectedGitActivation": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["worktree_path", "common_dir", "executor_branch", "baseline_revision"],
-      "properties": {
-        "worktree_path": { "$ref": "#/$defs/absolutePath" },
-        "common_dir": { "$ref": "#/$defs/absolutePath" },
+        "mode": { "const": "host-worktree" },
+        "starting_revision": { "$ref": "#/$defs/revision" },
+        "starting_branch": { "$ref": "#/$defs/branch" },
         "executor_branch": { "$ref": "#/$defs/branch" },
-        "baseline_revision": { "$ref": "#/$defs/revision" }
+        "path": { "type": "null" }
       }
     },
-    "identity": {
+    "requestedSelector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["project_id", "model", "reasoning_effort", "worktree"],
+      "properties": {
+        "project_id": { "$ref": "#/$defs/safeId" },
+        "model": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "reasoning_effort": { "$ref": "#/$defs/reasoning" },
+        "worktree": { "$ref": "#/$defs/requestedWorktree" }
+      }
+    },
+    "selector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["project_id", "model", "reasoning_effort", "observed_at"],
+      "properties": {
+        "project_id": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/safeId" }] },
+        "model": { "type": ["string", "null"], "minLength": 1, "maxLength": 128 },
+        "reasoning_effort": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/reasoning" }] },
+        "observed_at": { "$ref": "#/$defs/timestamp" }
+      }
+    },
+    "selectorEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requested", "accepted", "observed"],
+      "properties": {
+        "requested": { "$ref": "#/$defs/requestedSelector" },
+        "accepted": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/selector" }] },
+        "observed": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/selector" }] }
+      }
+    },
+    "attempt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["attempt_id", "host_session_id", "started_at", "reconcile_by"],
+      "properties": {
+        "attempt_id": { "type": "string", "pattern": "^task-launch-attempt-v1-[0-9a-f]{64}$" },
+        "host_session_id": { "$ref": "#/$defs/safeId" },
+        "started_at": { "$ref": "#/$defs/timestamp" },
+        "reconcile_by": { "$ref": "#/$defs/timestamp" }
+      }
+    },
+    "creationEvidence": {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "thread_id", "turn_id", "turn_index", "role", "launch_nonce", "content_digest",
-        "observed_at", "identity_digest"
+        "schema_version", "kind", "classification", "host_id", "ready_thread_id",
+        "provisional_id", "opaque_digest", "opaque_length", "observed_at"
       ],
       "properties": {
-        "thread_id": { "$ref": "#/$defs/safeId" },
-        "turn_id": { "$ref": "#/$defs/safeId" },
-        "turn_index": { "const": 1 },
-        "role": { "const": "user" },
-        "launch_nonce": { "$ref": "#/$defs/digest" },
-        "content_digest": { "$ref": "#/$defs/digest" },
-        "observed_at": { "$ref": "#/$defs/timestamp" },
-        "identity_digest": { "$ref": "#/$defs/digest" }
+        "schema_version": { "const": 1 },
+        "kind": { "const": "codex-flow-native-creation-evidence-v1" },
+        "classification": { "enum": ["ready", "provisional", "opaque"] },
+        "host_id": { "$ref": "#/$defs/safeId" },
+        "ready_thread_id": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/safeId" }] },
+        "provisional_id": { "type": ["string", "null"], "minLength": 1, "maxLength": 256 },
+        "opaque_digest": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/digest" }] },
+        "opaque_length": { "type": ["integer", "null"], "minimum": 0, "maximum": 16384 },
+        "observed_at": { "$ref": "#/$defs/timestamp" }
+      }
+    },
+    "startClaim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["executor_thread_id", "identity_source", "launch_nonce_digest", "claimed_at"],
+      "properties": {
+        "executor_thread_id": { "$ref": "#/$defs/safeId" },
+        "identity_source": { "const": "host-environment" },
+        "launch_nonce_digest": { "$ref": "#/$defs/digest" },
+        "claimed_at": { "$ref": "#/$defs/timestamp" }
       }
     },
     "gitActivation": {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "worktree_path", "common_dir", "branch", "revision", "cleanliness", "observed_at",
-        "activation_digest"
+        "schema_version", "kind", "activation_id", "launch_id", "worktree_path",
+        "common_dir", "executor_branch", "baseline_revision", "state", "prepared_at", "completed_at"
       ],
       "properties": {
+        "schema_version": { "const": 1 },
+        "kind": { "const": "codex-flow-task-launch-git-activation-v1" },
+        "activation_id": { "type": "string", "pattern": "^task-launch-activation-v1-[0-9a-f]{64}$" },
+        "launch_id": { "type": "string", "pattern": "^task-launch-v1-[0-9a-f]{64}$" },
         "worktree_path": { "$ref": "#/$defs/absolutePath" },
         "common_dir": { "$ref": "#/$defs/absolutePath" },
-        "branch": { "$ref": "#/$defs/branch" },
-        "revision": { "$ref": "#/$defs/revision" },
-        "cleanliness": { "const": "clean" },
-        "observed_at": { "$ref": "#/$defs/timestamp" },
-        "activation_digest": { "$ref": "#/$defs/digest" }
+        "executor_branch": { "$ref": "#/$defs/branch" },
+        "baseline_revision": { "$ref": "#/$defs/revision" },
+        "state": { "enum": ["prepared", "completed"] },
+        "prepared_at": { "$ref": "#/$defs/timestamp" },
+        "completed_at": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/timestamp" }] }
+      }
+    },
+    "resolution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["outcome", "reason_code", "recorded_at"],
+      "properties": {
+        "outcome": { "enum": ["terminal-no-object", "ambiguous", "session-blocked"] },
+        "reason_code": { "$ref": "#/$defs/safeId" },
+        "recorded_at": { "$ref": "#/$defs/timestamp" }
       }
     }
   }

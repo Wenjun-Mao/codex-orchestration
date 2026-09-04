@@ -19,7 +19,7 @@ import {
 export const packageRoot = resolve(import.meta.dirname, "..");
 export const cli = resolve(packageRoot, "bin", "codex-flow.mjs");
 
-export async function activateV07FixtureRun({
+export async function activateFixtureRun({
   root,
   runId,
   plan,

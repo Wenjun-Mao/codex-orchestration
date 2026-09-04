@@ -6,7 +6,7 @@ import {
   requireText,
   stableStringify,
 } from "../lib/core.mjs";
-import { exportRefreshSourceAuthority } from "../lib/refresh-source-v08.mjs";
+import { exportRefreshSourceAuthority } from "../lib/compat/refresh-source.mjs";
 
 try {
   let input = "";

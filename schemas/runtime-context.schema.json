@@ -17,7 +17,7 @@
   ],
   "properties": {
     "schema_version": { "const": 1 },
-    "kind": { "const": "codex-flow-v07-runtime-context" },
+    "kind": { "const": "codex-flow-v09-runtime-context" },
     "runtime_id": { "$ref": "#/$defs/digest" },
     "created_at": { "$ref": "#/$defs/timestamp" },
     "bundle": { "$ref": "https://private.local/codex-flow/runtime-bundle.schema.json" },

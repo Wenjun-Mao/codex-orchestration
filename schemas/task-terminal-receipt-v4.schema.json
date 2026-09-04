@@ -7,7 +7,7 @@
     "schema_version", "kind", "recipient", "executor_thread_id", "run_id",
     "runtime_context_digest", "configuration_digest", "repository_id", "common_dir",
     "plan_id", "revision_digest", "task_id", "task_digest", "contract_id",
-    "operation_id", "release_id", "task_launch", "classification", "git_outcome",
+    "launch_id", "classification", "git_outcome",
     "model_evidence", "result_or_blocker", "next_decision", "accounting", "completed_at"
   ],
   "properties": {
@@ -25,9 +25,7 @@
     "task_id": { "$ref": "#/$defs/safeId" },
     "task_digest": { "$ref": "#/$defs/digest" },
     "contract_id": { "$ref": "#/$defs/digest" },
-    "operation_id": { "$ref": "#/$defs/safeId" },
-    "release_id": { "$ref": "#/$defs/safeId" },
-    "task_launch": { "$ref": "#/$defs/taskLaunch" },
+    "launch_id": { "type": "string", "pattern": "^task-launch-v1-[0-9a-f]{64}$" },
     "classification": { "enum": ["PASS", "BLOCKED", "FAIL"] },
     "git_outcome": { "$ref": "#/$defs/gitOutcome" },
     "model_evidence": { "$ref": "#/$defs/modelEvidence" },
@@ -77,17 +75,6 @@
         "thread_id": { "$ref": "#/$defs/safeId" },
         "generation": { "type": "integer", "minimum": 1, "maximum": 2147483647 },
         "binding_digest": { "$ref": "#/$defs/digest" }
-      }
-    },
-    "taskLaunch": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["launch_id", "state_digest", "identity_digest", "git_activation_digest"],
-      "properties": {
-        "launch_id": { "type": "string", "pattern": "^task-launch-v09-[0-9a-f]{64}$" },
-        "state_digest": { "$ref": "#/$defs/digest" },
-        "identity_digest": { "$ref": "#/$defs/digest" },
-        "git_activation_digest": { "$ref": "#/$defs/digest" }
       }
     },
     "gitOutcome": {

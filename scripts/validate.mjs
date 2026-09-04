@@ -2,10 +2,10 @@
 
 import { spawnSync } from "node:child_process";
 import { access, readdir, readFile } from "node:fs/promises";
-import { basename, relative, resolve } from "node:path";
+import { basename, dirname, relative, resolve, sep } from "node:path";
 import { PACKAGE_VERSION } from "../lib/core.mjs";
 import { CODEX_FLOW_STATE_NAMESPACE } from "../lib/git.mjs";
-import { V07_RUNTIME_DIRECTORY } from "../lib/runtime-context.mjs";
+import { RUNTIME_DIRECTORY } from "../lib/runtime-context.mjs";
 import {
   createWorkflowPlanRevision,
   validateWorkflowPlanRevision,
@@ -15,72 +15,74 @@ import { validateReleaseIdentity } from "./release-identity.mjs";
 const root = resolve(import.meta.dirname, "..");
 const EXPECTED_PACKAGE_VERSION = "0.9.0-dev.0";
 
-// ACTIVE V0.7 SCHEMA REGISTRY INSERTION POINT:
-// add every new operating schema here in the same change that introduces it.
-const ACTIVE_V07_SCHEMA_NAMES = Object.freeze([
+const ACTIVE_SCHEMA_NAMES = Object.freeze([
+  "archive-operation",
+  "callback-record",
+  "cleanup-plan",
+  "codex-app-host-evidence",
+  "generated-task-contract",
+  "integration-record",
+  "refresh-handoff-v1",
+  "refresh-inspection",
+  "refresh-origin",
+  "run-activation",
+  "run-audit",
+  "run-fence",
   "runtime-bundle",
   "runtime-context",
-  "run-fence",
-  "run-activation",
-  "run-audit-v07",
-  "urgent-signal",
-  "urgent-record-v07",
-  "workflow-plan",
-  "workflow-journal-v07",
-  "generated-task-contract",
   "subagent-operation",
-  "visible-task-creation",
-  "release-record",
-  "terminal-receipt-v3",
-  "callback-record",
   "task-disposition",
+  "task-launch",
+  "task-terminal-receipt-v4",
+  "unplug-plan",
+  "unplug-plan-v2",
+  "urgent-record",
+  "urgent-signal",
   "verification-record",
-  "integration-record",
-  "archive-operation",
-  "cleanup-plan-v07",
-  "unplug-plan-v07",
-  "unplug-plan-v07-v2",
-  "refresh-inspection",
-  "refresh-handoff-v1",
-  "refresh-origin",
+  "workflow-journal",
+  "workflow-plan",
 ]);
 
-const ACTIVE_V07_EXAMPLES = new Set(["v0.7-workflow-draft.json"]);
+const RETIRED_AUTHORITY_PATHS = Object.freeze([
+  "lib/task-creation-v07.mjs",
+  "lib/release-lifecycle.mjs",
+  "lib/codex-app-private-resolution-v07.mjs",
+  "lib/private-resolution-recovery-v08.mjs",
+  "lib/refresh-v078-bridge.mjs",
+  "lib/model-routing-v07.mjs",
+  "schemas/visible-task-creation.schema.json",
+  "schemas/release-record.schema.json",
+  "schemas/terminal-receipt-v3.schema.json",
+  "templates/agents-block.md",
+  "lib/config.mjs",
+  "lib/doctor.mjs",
+  "lib/installation.mjs",
+  "lib/managed.mjs",
+  "lib/adoption-v06.mjs",
+  "lib/legacy-retirement-v06.mjs",
+  "lib/legacy-v05-readonly.mjs",
+  "scripts/test-accepted-v05.mjs",
+  "skills/setup",
+]);
 
-async function walk(path) {
+const FORBIDDEN_CURRENT_TEST_PATTERNS = [/-v07\.test\.mjs$/, /-v08\.test\.mjs$/];
+const CORE_HOST_PRIVATE_TOKENS = Object.freeze([
+  ".jsonl",
+  "rollout-",
+  "mcp_tool_call_end",
+  ".codex/plugins/cache",
+  "clientThreadId",
+  "provisional_client_thread_id",
+]);
+
+async function walk(directory) {
   const result = [];
-  for (const entry of await readdir(path, { withFileTypes: true })) {
-    const child = resolve(path, entry.name);
+  for (const entry of await readdir(directory, { withFileTypes: true })) {
+    const child = resolve(directory, entry.name);
     if (entry.isDirectory()) result.push(...await walk(child));
     else if (entry.isFile()) result.push(child);
   }
   return result;
-}
-
-function assertExactInventory(actual, expected, label) {
-  const actualSorted = [...actual].sort();
-  const expectedSorted = [...expected].sort();
-  if (JSON.stringify(actualSorted) !== JSON.stringify(expectedSorted)) {
-    const missing = expectedSorted.filter((entry) => !actualSorted.includes(entry));
-    const unregistered = actualSorted.filter((entry) => !expectedSorted.includes(entry));
-    throw new Error(
-      `${label} inventory mismatch; missing: ${missing.join(", ") || "none"}; `
-      + `unregistered: ${unregistered.join(", ") || "none"}`,
-    );
-  }
-}
-
-function normalizeMarker(value) {
-  return value.replace(/\s+/g, " ").trim();
-}
-
-function assertMarkers(source, markers, label) {
-  const normalizedSource = normalizeMarker(source);
-  for (const marker of markers) {
-    if (!normalizedSource.includes(normalizeMarker(marker))) {
-      throw new Error(`${label} is missing current v0.7 contract: ${marker}`);
-    }
-  }
 }
 
 async function readRequired(path, label = path) {
@@ -92,17 +94,41 @@ async function readRequired(path, label = path) {
   }
 }
 
+function assertExactInventory(actual, expected, label) {
+  const observed = [...actual].sort();
+  const required = [...expected].sort();
+  if (JSON.stringify(observed) === JSON.stringify(required)) return;
+  const missing = required.filter((entry) => !observed.includes(entry));
+  const unregistered = observed.filter((entry) => !required.includes(entry));
+  throw new Error(
+    `${label} inventory mismatch; missing: ${missing.join(", ") || "none"}; `
+    + `unregistered: ${unregistered.join(", ") || "none"}`,
+  );
+}
+
+function normalizeMarker(value) {
+  return value.replace(/\s+/g, " ").trim();
+}
+
+function assertMarkers(source, markers, label) {
+  const normalized = normalizeMarker(source);
+  for (const marker of markers) {
+    if (!normalized.includes(normalizeMarker(marker))) {
+      throw new Error(`${label} is missing current v0.9 contract: ${marker}`);
+    }
+  }
+}
+
 function schemaNameFromFile(path) {
-  const suffix = ".schema.json";
   const name = basename(path);
-  if (!name.endsWith(suffix)) throw new Error(`Unexpected schema filename: ${name}`);
-  return name.slice(0, -suffix.length);
+  if (!name.endsWith(".schema.json")) throw new Error(`Unexpected schema filename: ${name}`);
+  return name.slice(0, -".schema.json".length);
 }
 
 function decodeJsonPointer(fragment, label) {
   if (fragment === "" || fragment === "#") return [];
   const pointer = fragment.startsWith("#") ? fragment.slice(1) : fragment;
-  if (!pointer.startsWith("/")) throw new Error(`${label} has an unsupported JSON Pointer: ${fragment}`);
+  if (!pointer.startsWith("/")) throw new Error(`${label} has an unsupported JSON Pointer`);
   return pointer.slice(1).split("/").map((part) => (
     decodeURIComponent(part).replaceAll("~1", "/").replaceAll("~0", "~")
   ));
@@ -116,10 +142,9 @@ function resolveJsonPointer(schema, parts, label) {
     }
     cursor = cursor[part];
   }
-  return cursor;
 }
 
-function compileActiveSchemas(schemas) {
+function compileSchemas(schemas) {
   const byId = new Map();
   const byFile = new Map();
   for (const [name, schema] of schemas) {
@@ -129,35 +154,12 @@ function compileActiveSchemas(schemas) {
     }
     const expectedId = `https://private.local/codex-flow/${name}.schema.json`;
     if (schema.$id !== expectedId) throw new Error(`${label} must use canonical $id ${expectedId}`);
-    if (byId.has(schema.$id)) throw new Error(`${label} duplicates schema $id ${schema.$id}`);
-    byId.set(schema.$id, { name, schema });
-    byFile.set(`${name}.schema.json`, { name, schema });
     if (schema.type !== "object" || schema.additionalProperties !== false || !schema.properties) {
       throw new Error(`${label} must declare a closed top-level object contract`);
     }
-  }
-
-  function targetForRef(current, reference) {
-    if (typeof reference !== "string" || reference === "") {
-      throw new Error(`Schema ${current.name} contains an invalid $ref`);
-    }
-    const hashIndex = reference.indexOf("#");
-    const document = hashIndex < 0 ? reference : reference.slice(0, hashIndex);
-    const fragment = hashIndex < 0 ? "" : reference.slice(hashIndex);
-    let target = current;
-    if (document !== "") {
-      target = byId.get(document) ?? byFile.get(document);
-      if (!target) {
-        throw new Error(
-          `Schema ${current.name} references an unregistered or historical schema: ${document}`,
-        );
-      }
-    }
-    resolveJsonPointer(
-      target.schema,
-      decodeJsonPointer(fragment, `Schema ${current.name} reference ${reference}`),
-      `Schema ${current.name} reference ${reference}`,
-    );
+    if (byId.has(schema.$id)) throw new Error(`${label} duplicates ${schema.$id}`);
+    byId.set(schema.$id, { name, schema });
+    byFile.set(`${name}.schema.json`, { name, schema });
   }
 
   function compileNode(current, node, path = "#") {
@@ -166,40 +168,64 @@ function compileActiveSchemas(schemas) {
       return;
     }
     if (node === null || typeof node !== "object") return;
-    if (Object.hasOwn(node, "$ref")) targetForRef(current, node.$ref);
-    if (Object.hasOwn(node, "pattern")) {
-      if (typeof node.pattern !== "string") throw new Error(`Schema ${current.name} ${path}.pattern must be text`);
-      try {
-        new RegExp(node.pattern);
-      } catch (error) {
-        throw new Error(`Schema ${current.name} ${path}.pattern does not compile: ${error.message}`);
+    if (Object.hasOwn(node, "$ref")) {
+      const reference = node.$ref;
+      if (typeof reference !== "string" || reference === "") {
+        throw new Error(`Schema ${current.name} ${path} contains an invalid $ref`);
       }
+      const hashIndex = reference.indexOf("#");
+      const document = hashIndex < 0 ? reference : reference.slice(0, hashIndex);
+      const fragment = hashIndex < 0 ? "" : reference.slice(hashIndex);
+      const target = document === "" ? current : byId.get(document) ?? byFile.get(document);
+      if (!target) throw new Error(`Schema ${current.name} references unregistered ${document}`);
+      resolveJsonPointer(
+        target.schema,
+        decodeJsonPointer(fragment, `Schema ${current.name} ${path}`),
+        `Schema ${current.name} reference ${reference}`,
+      );
     }
+    if (Object.hasOwn(node, "pattern")) new RegExp(node.pattern);
     if (Object.hasOwn(node, "required")) {
-      if (!Array.isArray(node.required) || node.required.some((field) => typeof field !== "string")) {
-        throw new Error(`Schema ${current.name} ${path}.required must be a string array`);
-      }
-      if (new Set(node.required).size !== node.required.length) {
-        throw new Error(`Schema ${current.name} ${path}.required contains duplicates`);
+      if (!Array.isArray(node.required) || new Set(node.required).size !== node.required.length) {
+        throw new Error(`Schema ${current.name} ${path}.required is invalid`);
       }
       if (node.properties) {
         for (const field of node.required) {
           if (!Object.hasOwn(node.properties, field)) {
-            throw new Error(`Schema ${current.name} ${path} requires undeclared property ${field}`);
+            throw new Error(`Schema ${current.name} ${path} requires undeclared ${field}`);
           }
         }
       }
     }
-    if (path.startsWith("#/$defs/") && node.type === "object" && node.required && node.properties
-      && node.additionalProperties !== false) {
-      throw new Error(`Schema ${current.name} ${path} must declare a closed object contract`);
-    }
+    if (
+      path.startsWith("#/$defs/")
+      && node.type === "object"
+      && node.required
+      && node.properties
+      && node.additionalProperties !== false
+    ) throw new Error(`Schema ${current.name} ${path} must be a closed object contract`);
     for (const [key, value] of Object.entries(node)) {
       compileNode(current, value, `${path}/${key.replaceAll("~", "~0").replaceAll("/", "~1")}`);
     }
   }
 
   for (const [name, schema] of schemas) compileNode({ name, schema }, schema);
+}
+
+function moduleSpecifiers(source) {
+  return [
+    ...[...source.matchAll(/\bfrom\s+["']([^"']+)["']/g)].map((match) => match[1]),
+    ...[...source.matchAll(/^\s*import\s+["']([^"']+)["']/gm)].map((match) => match[1]),
+    ...[...source.matchAll(/\bimport\s*\(\s*["']([^"']+)["']\s*\)/g)].map((match) => match[1]),
+  ];
+}
+
+function resolveLibImport(moduleName, specifier) {
+  if (!specifier.startsWith(".")) return null;
+  const absolute = resolve(root, "lib", dirname(moduleName), specifier);
+  const libRoot = resolve(root, "lib");
+  if (absolute !== libRoot && !absolute.startsWith(`${libRoot}${sep}`)) return null;
+  return relative(libRoot, absolute);
 }
 
 const packageJson = JSON.parse(await readRequired("package.json"));
@@ -210,288 +236,204 @@ if (PACKAGE_VERSION !== EXPECTED_PACKAGE_VERSION) {
 if (packageJson.version !== PACKAGE_VERSION || plugin.version !== PACKAGE_VERSION) {
   throw new Error("Package, plugin, and runtime versions must match");
 }
-const expectedStateNamespace = `v${PACKAGE_VERSION}`;
-if (CODEX_FLOW_STATE_NAMESPACE !== expectedStateNamespace || V07_RUNTIME_DIRECTORY !== expectedStateNamespace) {
-  throw new Error(
-    `Runtime state must use exact package namespace ${expectedStateNamespace}`,
-  );
+const expectedNamespace = `v${PACKAGE_VERSION}`;
+if (CODEX_FLOW_STATE_NAMESPACE !== expectedNamespace || RUNTIME_DIRECTORY !== expectedNamespace) {
+  throw new Error(`Runtime state must use exact package namespace ${expectedNamespace}`);
 }
 validateReleaseIdentity(root, packageJson);
 if (packageJson.private !== true) throw new Error("Package must remain private");
 if (packageJson.license !== "UNLICENSED" || plugin.license !== packageJson.license) {
-  throw new Error("Source and plugin must preserve the UNLICENSED authority boundary");
+  throw new Error("Source and plugin must preserve the UNLICENSED boundary");
 }
-const requiredPackageFiles = [
+for (const path of [
   ".codex-plugin/", "bin/", "lib/", "schemas/", "examples/", "skills/",
-  "templates/", "docs/adr/", "docs/coverage-v0.7.md", "docs/coverage-v0.8.md", "docs/mission.md", "README.md",
-];
-for (const path of requiredPackageFiles) {
-  if (!packageJson.files.includes(path)) throw new Error(`Published package is missing required path: ${path}`);
-}
-if (packageJson.files.includes("prompts/")) {
-  throw new Error("Published package must exclude retired copy-paste prompts");
+  "templates/", "docs/adr/", "docs/coverage-v0.9.md", "docs/architecture-v0.9.md",
+  "docs/compatibility-capsules-v0.9.md", "docs/lessons-learned-v0.8.md",
+  "docs/mission.md", "README.md",
+]) {
+  if (!packageJson.files.includes(path)) throw new Error(`Published package omits ${path}`);
 }
 for (const field of [
-  "dependencies",
-  "devDependencies",
-  "peerDependencies",
-  "optionalDependencies",
-  "bundledDependencies",
-  "bundleDependencies",
+  "dependencies", "devDependencies", "peerDependencies", "optionalDependencies",
+  "bundledDependencies", "bundleDependencies",
 ]) {
   if (packageJson[field]) throw new Error(`Zero-third-party-dependency contract violated by ${field}`);
 }
+if (packageJson.scripts["test:v07"] || packageJson.scripts["test:v08"]) {
+  throw new Error("Current package scripts must not expose predecessor test authority");
+}
 
-for (const path of [
-  "templates/agents-block.md",
-  "templates/project.json",
-  "lib/config.mjs",
-  "lib/doctor.mjs",
-  "lib/installation.mjs",
-  "lib/managed.mjs",
-  "lib/task-operations.mjs",
-  "lib/task-packet.mjs",
-  "lib/urgent-signals.mjs",
-  "schemas/project.schema.json",
-  "schemas/install-plan.schema.json",
-  "schemas/task-operation.schema.json",
-  "schemas/task-packet.schema.json",
-  "test/urgent-signal.test.mjs",
-  "lib/adoption-v06.mjs",
-  "lib/legacy-retirement-v06.mjs",
-  "lib/legacy-v05-readonly.mjs",
-  "schemas/adoption-manifest.schema.json",
-  "schemas/adoption-plan.schema.json",
-  "schemas/adoption-retirement-plan.schema.json",
-  "schemas/legacy-retirement-plan.schema.json",
-  "scripts/test-accepted-v05.mjs",
-  "skills/setup",
-]) {
+for (const path of RETIRED_AUTHORITY_PATHS) {
   try {
     await access(resolve(root, path));
-    throw new Error(`Retired predecessor authority must not be packaged: ${path}`);
+    throw new Error(`Retired executable authority remains present: ${path}`);
   } catch (error) {
     if (error?.code !== "ENOENT") throw error;
   }
 }
 
-const modules = (await walk(root)).filter((path) => (
-  path.endsWith(".mjs") && !path.includes("node_modules") && !path.startsWith(resolve(root, ".git"))
-));
-for (const modulePath of modules) {
+const sourceModules = [];
+for (const directory of ["bin", "lib", "scripts", "test"]) {
+  sourceModules.push(...(await walk(resolve(root, directory))).filter((path) => path.endsWith(".mjs")));
+}
+for (const modulePath of sourceModules) {
   const syntax = spawnSync(process.execPath, ["--check", modulePath], { encoding: "utf8" });
   if (syntax.status !== 0) throw new Error(`Syntax check failed for ${modulePath}: ${syntax.stderr}`);
   const source = await readFile(modulePath, "utf8");
-  const staticImports = [
-    ...source.matchAll(/\bfrom\s+["']([^"']+)["']/g),
-    ...source.matchAll(/^\s*import\s+["']([^"']+)["']/gm),
-  ];
-  for (const match of staticImports) {
-    const specifier = match[1];
-    if (!specifier.startsWith("node:") && !specifier.startsWith(".") && !specifier.startsWith("/")) {
-      throw new Error(`External module import is not allowed: ${specifier} in ${modulePath}`);
-    }
+  const dynamicCount = [...source.matchAll(/\bimport\s*\(/g)].length;
+  const literalDynamicCount = [...source.matchAll(/\bimport\s*\(\s*["'][^"']+["']\s*\)/g)].length;
+  if (dynamicCount !== literalDynamicCount) {
+    throw new Error(`Nonliteral dynamic import is not allowed in ${relative(root, modulePath)}`);
   }
-  const dynamicImports = [...source.matchAll(/\bimport\s*\(/g)];
-  const literalDynamicImports = [...source.matchAll(/\bimport\s*\(\s*["']([^"']+)["']\s*\)/g)];
-  const moduleRelativePath = relative(root, modulePath);
-  const exactBridgeLoader = ["im", "port(pathToFileURL(resolve(bundleRoot, path)).href)"].join("");
-  const exactLegacyBridge = moduleRelativePath === "lib/refresh-v078-bridge.mjs"
-    && dynamicImports.length === 1
-    && literalDynamicImports.length === 0
-    && source.includes(exactBridgeLoader);
-  if (dynamicImports.length !== literalDynamicImports.length && !exactLegacyBridge) {
-    throw new Error(`Nonliteral dynamic import is not allowed in ${modulePath}`);
-  }
-  for (const match of literalDynamicImports) {
-    const specifier = match[1];
+  for (const specifier of moduleSpecifiers(source)) {
     if (!specifier.startsWith("node:") && !specifier.startsWith(".") && !specifier.startsWith("/")) {
-      throw new Error(`External dynamic import is not allowed: ${specifier} in ${modulePath}`);
+      throw new Error(`External module import ${specifier} in ${relative(root, modulePath)}`);
     }
   }
 }
 
-const schemaDirectory = resolve(root, "schemas");
-const schemaFiles = (await readdir(schemaDirectory, { withFileTypes: true }))
+const layerRegistry = JSON.parse(await readRequired("lib/module-layers.json"));
+if (layerRegistry.schema_version !== 1 || layerRegistry.kind !== "codex-flow-module-layer-registry-v1") {
+  throw new Error("Module layer registry has unsupported authority");
+}
+const libModules = (await walk(resolve(root, "lib")))
+  .filter((path) => path.endsWith(".mjs"))
+  .map((path) => relative(resolve(root, "lib"), path));
+assertExactInventory(libModules, Object.keys(layerRegistry.modules), "Module layer registry");
+function physicalModuleLayer(moduleName) {
+  if (moduleName.startsWith("policy/")) return "routing-policy";
+  if (moduleName.startsWith("adapters/codex-app/")) return "codex-app-adapter";
+  if (moduleName.startsWith("compat/")) return "compatibility-capsule";
+  return "governance-core";
+}
+for (const [moduleName, layer] of Object.entries(layerRegistry.modules)) {
+  if (layer !== physicalModuleLayer(moduleName)) {
+    throw new Error(`${moduleName} is not physically located in its declared ${layer} layer`);
+  }
+  const allowed = layerRegistry.allowed_imports[layer];
+  if (!Array.isArray(allowed)) throw new Error(`Unknown module layer ${layer} for ${moduleName}`);
+  const source = await readRequired(`lib/${moduleName}`);
+  if (layer === "governance-core") {
+    for (const token of CORE_HOST_PRIVATE_TOKENS) {
+      if (source.includes(token)) throw new Error(`Governance core ${moduleName} leaks host-private token ${token}`);
+    }
+    if (/gpt-[0-9]/i.test(source)) {
+      throw new Error(`Governance core ${moduleName} embeds a current model name`);
+    }
+  }
+  for (const specifier of moduleSpecifiers(source)) {
+    const target = resolveLibImport(moduleName, specifier);
+    if (target === null) continue;
+    const targetLayer = layerRegistry.modules[target];
+    if (targetLayer === undefined) throw new Error(`${moduleName} imports unregistered module ${target}`);
+    if (!allowed.includes(targetLayer)) {
+      throw new Error(`${layer} ${moduleName} cannot import ${targetLayer} ${target}`);
+    }
+  }
+}
+
+const schemaFiles = (await readdir(resolve(root, "schemas"), { withFileTypes: true }))
   .filter((entry) => entry.isFile() && entry.name.endsWith(".schema.json"))
   .map((entry) => entry.name);
-const registeredSchemaNames = new Set(ACTIVE_V07_SCHEMA_NAMES);
-assertExactInventory(schemaFiles.map(schemaNameFromFile), registeredSchemaNames, "Schema authority");
-
-const parsedSchemas = new Map();
+assertExactInventory(schemaFiles.map(schemaNameFromFile), ACTIVE_SCHEMA_NAMES, "Schema authority");
+const schemas = new Map();
 for (const file of schemaFiles) {
-  const name = schemaNameFromFile(file);
-  parsedSchemas.set(name, JSON.parse(await readRequired(`schemas/${file}`)));
+  schemas.set(schemaNameFromFile(file), JSON.parse(await readRequired(`schemas/${file}`)));
 }
-const activeSchemas = new Map(ACTIVE_V07_SCHEMA_NAMES.map((name) => [name, parsedSchemas.get(name)]));
-compileActiveSchemas(activeSchemas);
+compileSchemas(schemas);
 
-const exampleDirectory = resolve(root, "examples");
-const exampleJsonFiles = (await readdir(exampleDirectory, { withFileTypes: true }))
+const exampleFiles = (await readdir(resolve(root, "examples"), { withFileTypes: true }))
   .filter((entry) => entry.isFile() && entry.name.endsWith(".json"))
   .map((entry) => entry.name);
-assertExactInventory(
-  exampleJsonFiles,
-  ACTIVE_V07_EXAMPLES,
-  "Example authority",
-);
-const workflowDraft = JSON.parse(await readRequired("examples/v0.7-workflow-draft.json"));
-if (Object.hasOwn(workflowDraft, "revision_digest")) {
-  throw new Error("The v0.7 workflow example must remain a user-authored draft, not a runtime record");
-}
+assertExactInventory(exampleFiles, ["v0.9-workflow-draft.json"], "Example authority");
+const workflowDraft = JSON.parse(await readRequired("examples/v0.9-workflow-draft.json"));
 const workflowRevision = createWorkflowPlanRevision(workflowDraft);
 validateWorkflowPlanRevision(workflowRevision);
 if (!workflowRevision.tasks.some((task) => task.execution_kind === "task-thread")
   || !workflowRevision.tasks.some((task) => task.execution_kind === "subagent")) {
-  throw new Error("The v0.7 workflow example must cover both native task surfaces");
+  throw new Error("The v0.9 example must cover both native task surfaces");
 }
-const examplesReadme = await readRequired("examples/README.md");
-assertMarkers(examplesReadme, [
-  "v0.7-workflow-draft.json` is the only user-authored v0.7 example",
-  "Predecessor examples remain available only from their immutable source tags",
-], "examples/README.md");
-assertMarkers(await readRequired("docs/coverage-v0.7.md"), [
-  "No predecessor reader, mutator, migration, retirement, or tracked-adoption command is packaged",
-  "bounded foreign-active-run sentinel",
-  "content-addressed binding intent",
-  "task create resolve-private",
-  "npm run test:v07",
-], "docs/coverage-v0.7.md");
-assertMarkers(await readRequired("docs/coverage-v0.8.md"), [
-  "Long-lived private task resolution stays exact",
-  "Multi-GiB source sessions stream within a finite envelope",
-  "authenticated exact-v0.8.1 bridge emits only a reconcile request",
-], "docs/coverage-v0.8.md");
-assertMarkers(await readRequired("docs/adr/0042-long-lived-private-task-resolution.md"), [
-  "32 MiB-per-line envelope",
-  "mcp_tool_call_end",
-  "read-only recovery adapter for exact v0.8.1 source authority",
-  "Only the immutable v0.8.1 CLI may consume that request",
-], "docs/adr/0042-long-lived-private-task-resolution.md");
+
+const currentTests = (await readdir(resolve(root, "test"), { withFileTypes: true }))
+  .filter((entry) => entry.isFile())
+  .map((entry) => entry.name);
+for (const name of currentTests) {
+  if (FORBIDDEN_CURRENT_TEST_PATTERNS.some((pattern) => pattern.test(name))) {
+    throw new Error(`Obsolete predecessor test remains in current source authority: ${name}`);
+  }
+}
+if (currentTests.includes("v07-lifecycle-fixture.mjs")) {
+  throw new Error("Obsolete v0.7 lifecycle fixture remains in current source authority");
+}
 
 const skillContracts = new Map([
-  ["index", [
-    "A repository does not need `.codex/orchestration/` to discuss or plan Codex Flow",
-    "codex-orchestration:refresh` once",
-    "Native subagents are a distinct, read-only supporting lane",
-  ]],
-  ["refresh", [
-    "Route once before actionable coordination",
-    "refresh inspect",
-    "refresh observe-private",
-    "Wait",
-    "Discard",
-    "run activate --refresh-id",
-    "exact v0.7.8 adapter",
-    "recovery v0.8.1 resolve-private",
-    "writes only the unwrapped reconcile request",
-    "Node is the executable",
-    "Do not add recurring preflights, daemons, registries",
-  ]],
-  ["coordinate", [
-    "include the explicit `run_id` in every stateful operation",
-    "There is no requirement for tracked `.codex/orchestration/`",
-    "Use `workflow create|revise|status|contract`",
-    "coordinator-owned `task create bind`",
-    "`task create resolve-private`",
-    "Visible-task routine completion must stay quiet and journal-only",
-  ]],
-  ["execute", [
-    "use `release accept`",
-    "Persist exactly one terminal-receipt-v3 result with `callback deliver`",
-    "Ordinary completion must not call direct messaging or Steer",
-  ]],
-  ["integrate", [
-    "do not expose a public bare callback-consume shortcut",
-    "content-addressed PASS verification record",
-    "Finalization performs any internal result consumption exactly once",
-  ]],
-  ["cleanup", [
-    "Name the exact `run_id`",
-    "cleanup plan --run-id",
-    "v0.8 exposes no cleanup apply command",
-    "complete admitted path/resource/branch envelope durable",
-  ]],
-  ["unplug", [
-    "Run `unplug plan` first",
-    "An opaque file is authenticated by exact root-child path, size, and byte digest",
-    "Archive every task named by the plan through the App",
-    "Apply only an approved exact plan",
-    "Delete every exact planned `.git/codex-flow` path last",
-  ]],
+  ["index", ["codex-orchestration:refresh", "first-turn assignment", "Native subagents"]],
+  ["coordinate", ["task launch prepare", "task launch attempt", "task launch reconcile", "full contract", "one native creation call"]],
+  ["execute", ["task launch start", "same first turn", "terminal-receipt-v4", "Routine terminal completion"]],
+  ["integrate", ["launch_id", "content-addressed PASS verification", "Finalization"]],
+  ["cleanup", ["cleanup plan --run-id", "launch", "read-only"]],
+  ["refresh", ["authenticated v0.8", "Wait", "Discard", "run activate --refresh-id", "no migration"]],
+  ["unplug", ["unplug plan", "Apply only an approved exact plan", "state paths last"]],
 ]);
-for (const [skillName, markers] of skillContracts) {
-  const skill = await readRequired(`skills/${skillName}/SKILL.md`);
-  if (!skill.startsWith("---\n") || !skill.includes(`\nname: ${skillName}\n`)) {
-    throw new Error(`Invalid skill entrypoint: ${skillName}`);
+for (const [name, markers] of skillContracts) {
+  const source = await readRequired(`skills/${name}/SKILL.md`);
+  if (!source.startsWith("---\n") || !source.includes(`\nname: ${name}\n`)) {
+    throw new Error(`Invalid skill entrypoint: ${name}`);
   }
-  assertMarkers(skill, markers, `skills/${skillName}/SKILL.md`);
+  assertMarkers(source, markers, `skills/${name}/SKILL.md`);
 }
+
+for (const [path, markers] of new Map([
+  ["templates/references/communication-loop.md", ["Routine completion", "quiet", "Urgent interruption"]],
+  ["templates/references/host-operations.md", ["full contract", "task launch start", "one native creation call", "opaque"]],
+  ["templates/references/parallel-execution.md", ["acyclic dependency graph", "Visible tasks", "Native subagents"]],
+  ["templates/references/task-lifecycle.md", ["v0.9.0-dev.0", "first prompt", "terminal-receipt-v4", "launch"]],
+  ["templates/roles/coordinator.md", ["full assignment", "quiet journal", "Close only"]],
+  ["templates/roles/executor.md", ["task launch start", "same first turn", "terminal-receipt-v4"]],
+])) {
+  assertMarkers(await readRequired(path), markers, path);
+}
+
+assertMarkers(await readRequired("README.md"), [
+  "Native-first visible-task launch",
+  "Stable governance core",
+  "Replaceable routing policy",
+  "Codex App adapter",
+  "task launch prepare",
+  "terminal receipt v4",
+], "README.md");
+assertMarkers(await readRequired("docs/architecture-v0.9.md"), [
+  "Replaceable routing policy",
+  "Stable Flow governance core",
+  "Codex App adapter",
+  "Compatibility capsule",
+], "docs/architecture-v0.9.md");
+assertMarkers(await readRequired("docs/compatibility-capsules-v0.9.md"), [
+  "Authenticated v0.8 semantic refresh export",
+  "Provisional-to-ready mapping",
+  "Private archive observation",
+], "docs/compatibility-capsules-v0.9.md");
+assertMarkers(await readRequired("docs/lessons-learned-v0.8.md"), [
+  "Root cause",
+  "Missed release gate",
+  "Durable guardrail",
+  "Compatibility exit condition",
+], "docs/lessons-learned-v0.8.md");
+assertMarkers(await readRequired("docs/adr/0043-native-first-modular-architecture.md"), [
+  "v0.8.3 is maintenance-only",
+  "first prompt",
+  "module-layer registry",
+  "terminal receipt v4",
+], "ADR 0043");
 
 if (!Array.isArray(plugin.interface?.defaultPrompt)
   || !plugin.interface.defaultPrompt.some((item) => item.includes("separate executor tasks"))
   || !plugin.interface.defaultPrompt.some((item) => item.includes("explicitly selected executor models"))
-  || !plugin.interface.defaultPrompt.some((item) => item.includes("Refresh this long-lived coordinator"))
-  || !plugin.interface.defaultPrompt.some((item) => item.includes("journaled task results"))) {
-  throw new Error("Plugin interface must expose task orchestration, model routing, and result starter prompts");
-}
-
-const templateContracts = new Map([
-  ["templates/references/communication-loop.md", [
-    "Routine completion",
-    "quiet Git-common journal write",
-    "There is no public bare callback-consume operation",
-    "Urgent interruption",
-  ]],
-  ["templates/references/host-operations.md", [
-    "cryptographic launch nonce but no objective",
-    "`clientThreadId`, record it only as provisional",
-    "coordinator-owned `task create bind`",
-    "send its exact prompt at most once",
-    "Archive is also a prepared/reconciled host operation",
-    "mcp_tool_call_end",
-    "multi-GiB",
-  ]],
-  ["templates/references/parallel-execution.md", [
-    "acyclic dependency graph",
-    "Visible tasks are the primary independent/mutating lanes",
-    "Native subagents are read-only supporting lanes",
-  ]],
-  ["templates/references/stop-policy.md", [
-    "primary outcome, causal question, and cheapest safe direct attempt",
-    "After one supporting-instrument checkpoint",
-    "persist the signal before one identified interrupt attempt",
-  ]],
-  ["templates/references/task-lifecycle.md", [
-    ".git/codex-flow/v0.8.3/runtimes/<bundle-sha256>/",
-    "content-addressed intent precedes the detached",
-    "terminal-receipt-v3 journal result without messaging",
-    "content-addressed PASS verification and integration/no-change records",
-    "Every stateful command names the run explicitly",
-  ]],
-  ["templates/roles/coordinator.md", [
-    "preserve provisional and ready identities separately",
-    "Visible-task routine results remain in the quiet journal",
-    "Close only a fully reconciled run",
-  ]],
-  ["templates/roles/executor.md", [
-    "launch-nonce bootstrap carries no objective",
-    "Routine terminal completion never calls messaging or Steer",
-    "terminal-receipt-v3 result in the journal",
-  ]],
-]);
-for (const [path, markers] of templateContracts) {
-  assertMarkers(await readRequired(path), markers, path);
-}
-
-try {
-  await access(resolve(root, "prompts"));
-  throw new Error("Retired copy-paste prompts directory must not exist");
-} catch (error) {
-  if (error?.code !== "ENOENT") throw error;
+  || !plugin.interface.defaultPrompt.some((item) => item.includes("Refresh this long-lived coordinator"))) {
+  throw new Error("Plugin interface omits orchestration, routing, or refresh entrypoints");
 }
 
 console.log(
   `codex-orchestration ${PACKAGE_VERSION} source contracts validated `
-  + `(${ACTIVE_V07_SCHEMA_NAMES.length} active v0.8 schemas; state ${CODEX_FLOW_STATE_NAMESPACE})`,
+  + `(${ACTIVE_SCHEMA_NAMES.length} schemas, ${libModules.length} classified modules; state ${expectedNamespace})`,
 );

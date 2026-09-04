@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://codex-flow.local/schemas/codex-app-host-evidence.schema.json",
+  "$id": "https://private.local/codex-flow/codex-app-host-evidence.schema.json",
   "title": "Codex App host evidence",
   "type": "object",
   "additionalProperties": false,
@@ -19,7 +19,10 @@
     "schema_version": { "const": 1 },
     "kind": { "const": "codex-flow-v09-codex-app-host-evidence" },
     "evidence_type": {
-      "enum": ["creation", "executor-start", "provisional-mapping", "archive"]
+      "enum": [
+        "creation", "executor-start", "worktree", "selector",
+        "provisional-mapping", "archive"
+      ]
     },
     "classification": {
       "enum": ["current", "provisional", "opaque", "contradictory"]
@@ -41,6 +44,14 @@
     { "if": { "$ref": "#/$defs/executorProvisionalMatch" }, "then": { "properties": { "claims": { "$ref": "#/$defs/executorProvisional" } } } },
     { "if": { "$ref": "#/$defs/executorOpaqueMatch" }, "then": { "properties": { "claims": { "$ref": "#/$defs/executorOpaque" } } } },
     { "if": { "$ref": "#/$defs/executorContradictoryMatch" }, "then": { "properties": { "claims": { "$ref": "#/$defs/executorContradictory" } } } },
+    { "if": { "$ref": "#/$defs/worktreeCurrentMatch" }, "then": { "properties": { "claims": { "$ref": "#/$defs/worktreeCurrent" } } } },
+    { "if": { "$ref": "#/$defs/worktreeProvisionalMatch" }, "then": { "properties": { "claims": { "$ref": "#/$defs/worktreeProvisional" } } } },
+    { "if": { "$ref": "#/$defs/worktreeOpaqueMatch" }, "then": { "properties": { "claims": { "$ref": "#/$defs/worktreeOpaque" } } } },
+    { "if": { "$ref": "#/$defs/worktreeContradictoryMatch" }, "then": { "properties": { "claims": { "$ref": "#/$defs/worktreeContradictory" } } } },
+    { "if": { "$ref": "#/$defs/selectorCurrentMatch" }, "then": { "properties": { "claims": { "$ref": "#/$defs/selectorCurrent" } } } },
+    { "if": { "$ref": "#/$defs/selectorProvisionalMatch" }, "then": { "properties": { "claims": { "$ref": "#/$defs/selectorProvisional" } } } },
+    { "if": { "$ref": "#/$defs/selectorOpaqueMatch" }, "then": { "properties": { "claims": { "$ref": "#/$defs/selectorOpaque" } } } },
+    { "if": { "$ref": "#/$defs/selectorContradictoryMatch" }, "then": { "properties": { "claims": { "$ref": "#/$defs/selectorContradictory" } } } },
     { "if": { "$ref": "#/$defs/mappingCurrentMatch" }, "then": { "properties": { "claims": { "$ref": "#/$defs/mappingCurrent" } } } },
     { "if": { "$ref": "#/$defs/mappingProvisionalMatch" }, "then": { "properties": { "claims": { "$ref": "#/$defs/mappingProvisional" } } } },
     { "if": { "$ref": "#/$defs/mappingOpaqueMatch" }, "then": { "properties": { "claims": { "$ref": "#/$defs/mappingOpaque" } } } },
@@ -53,15 +64,13 @@
   "$defs": {
     "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
     "safeId": { "type": "string", "minLength": 1, "maxLength": 256, "pattern": "^[A-Za-z0-9._-]+$" },
+    "absolutePath": { "type": "string", "minLength": 1, "maxLength": 2048, "pattern": "^/" },
+    "revision": { "type": "string", "pattern": "^[0-9a-f]{40,64}$" },
+    "reasoningEffort": { "enum": ["none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"] },
     "provisionalId": { "type": "string", "minLength": 1, "maxLength": 256 },
     "reasonCode": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9._-]+$" },
     "match": {
-      "type": "object",
-      "required": ["evidence_type", "classification"],
-      "properties": {
-        "evidence_type": { "type": "string" },
-        "classification": { "type": "string" }
-      }
+      "required": ["evidence_type", "classification"]
     },
     "creationCurrentMatch": { "allOf": [{ "$ref": "#/$defs/match" }, { "properties": { "evidence_type": { "const": "creation" }, "classification": { "const": "current" } } }] },
     "creationProvisionalMatch": { "allOf": [{ "$ref": "#/$defs/match" }, { "properties": { "evidence_type": { "const": "creation" }, "classification": { "const": "provisional" } } }] },
@@ -71,6 +80,14 @@
     "executorProvisionalMatch": { "allOf": [{ "$ref": "#/$defs/match" }, { "properties": { "evidence_type": { "const": "executor-start" }, "classification": { "const": "provisional" } } }] },
     "executorOpaqueMatch": { "allOf": [{ "$ref": "#/$defs/match" }, { "properties": { "evidence_type": { "const": "executor-start" }, "classification": { "const": "opaque" } } }] },
     "executorContradictoryMatch": { "allOf": [{ "$ref": "#/$defs/match" }, { "properties": { "evidence_type": { "const": "executor-start" }, "classification": { "const": "contradictory" } } }] },
+    "worktreeCurrentMatch": { "allOf": [{ "$ref": "#/$defs/match" }, { "properties": { "evidence_type": { "const": "worktree" }, "classification": { "const": "current" } } }] },
+    "worktreeProvisionalMatch": { "allOf": [{ "$ref": "#/$defs/match" }, { "properties": { "evidence_type": { "const": "worktree" }, "classification": { "const": "provisional" } } }] },
+    "worktreeOpaqueMatch": { "allOf": [{ "$ref": "#/$defs/match" }, { "properties": { "evidence_type": { "const": "worktree" }, "classification": { "const": "opaque" } } }] },
+    "worktreeContradictoryMatch": { "allOf": [{ "$ref": "#/$defs/match" }, { "properties": { "evidence_type": { "const": "worktree" }, "classification": { "const": "contradictory" } } }] },
+    "selectorCurrentMatch": { "allOf": [{ "$ref": "#/$defs/match" }, { "properties": { "evidence_type": { "const": "selector" }, "classification": { "const": "current" } } }] },
+    "selectorProvisionalMatch": { "allOf": [{ "$ref": "#/$defs/match" }, { "properties": { "evidence_type": { "const": "selector" }, "classification": { "const": "provisional" } } }] },
+    "selectorOpaqueMatch": { "allOf": [{ "$ref": "#/$defs/match" }, { "properties": { "evidence_type": { "const": "selector" }, "classification": { "const": "opaque" } } }] },
+    "selectorContradictoryMatch": { "allOf": [{ "$ref": "#/$defs/match" }, { "properties": { "evidence_type": { "const": "selector" }, "classification": { "const": "contradictory" } } }] },
     "mappingCurrentMatch": { "allOf": [{ "$ref": "#/$defs/match" }, { "properties": { "evidence_type": { "const": "provisional-mapping" }, "classification": { "const": "current" } } }] },
     "mappingProvisionalMatch": { "allOf": [{ "$ref": "#/$defs/match" }, { "properties": { "evidence_type": { "const": "provisional-mapping" }, "classification": { "const": "provisional" } } }] },
     "mappingOpaqueMatch": { "allOf": [{ "$ref": "#/$defs/match" }, { "properties": { "evidence_type": { "const": "provisional-mapping" }, "classification": { "const": "opaque" } } }] },
@@ -79,14 +96,22 @@
     "archiveProvisionalMatch": { "allOf": [{ "$ref": "#/$defs/match" }, { "properties": { "evidence_type": { "const": "archive" }, "classification": { "const": "provisional" } } }] },
     "archiveOpaqueMatch": { "allOf": [{ "$ref": "#/$defs/match" }, { "properties": { "evidence_type": { "const": "archive" }, "classification": { "const": "opaque" } } }] },
     "archiveContradictoryMatch": { "allOf": [{ "$ref": "#/$defs/match" }, { "properties": { "evidence_type": { "const": "archive" }, "classification": { "const": "contradictory" } } }] },
-    "creationCurrent": { "type": "object", "additionalProperties": false, "required": ["host_id", "request_digest", "reported_thread_digest"], "properties": { "host_id": { "$ref": "#/$defs/safeId" }, "request_digest": { "$ref": "#/$defs/digest" }, "reported_thread_digest": { "$ref": "#/$defs/digest" } } },
+    "creationCurrent": { "type": "object", "additionalProperties": false, "required": ["host_id", "request_digest", "ready_thread_id"], "properties": { "host_id": { "$ref": "#/$defs/safeId" }, "request_digest": { "$ref": "#/$defs/digest" }, "ready_thread_id": { "$ref": "#/$defs/safeId" } } },
     "creationProvisional": { "type": "object", "additionalProperties": false, "required": ["host_id", "request_digest", "provisional_client_thread_id"], "properties": { "host_id": { "$ref": "#/$defs/safeId" }, "request_digest": { "$ref": "#/$defs/digest" }, "provisional_client_thread_id": { "$ref": "#/$defs/provisionalId" } } },
-    "creationOpaque": { "type": "object", "additionalProperties": false, "required": ["request_digest", "reason_code"], "properties": { "request_digest": { "$ref": "#/$defs/digest" }, "reason_code": { "$ref": "#/$defs/reasonCode" } } },
+    "creationOpaque": { "type": "object", "additionalProperties": false, "required": ["request_digest", "reason_code", "opaque_digest", "opaque_length"], "properties": { "request_digest": { "$ref": "#/$defs/digest" }, "reason_code": { "$ref": "#/$defs/reasonCode" }, "opaque_digest": { "$ref": "#/$defs/digest" }, "opaque_length": { "type": "integer", "minimum": 0, "maximum": 16384 } } },
     "creationContradictory": { "type": "object", "additionalProperties": false, "required": ["request_digest", "provisional_client_thread_id", "conflict_digest"], "properties": { "request_digest": { "$ref": "#/$defs/digest" }, "provisional_client_thread_id": { "$ref": "#/$defs/provisionalId" }, "conflict_digest": { "$ref": "#/$defs/digest" } } },
-    "executorCurrent": { "type": "object", "additionalProperties": false, "required": ["operation_id", "executor_thread_id", "turn_id", "launch_nonce_digest"], "properties": { "operation_id": { "$ref": "#/$defs/safeId" }, "executor_thread_id": { "$ref": "#/$defs/safeId" }, "turn_id": { "$ref": "#/$defs/safeId" }, "launch_nonce_digest": { "$ref": "#/$defs/digest" } } },
-    "executorProvisional": { "type": "object", "additionalProperties": false, "required": ["operation_id", "provisional_client_thread_id"], "properties": { "operation_id": { "$ref": "#/$defs/safeId" }, "provisional_client_thread_id": { "$ref": "#/$defs/provisionalId" } } },
-    "executorOpaque": { "type": "object", "additionalProperties": false, "required": ["operation_id", "reason_code"], "properties": { "operation_id": { "$ref": "#/$defs/safeId" }, "reason_code": { "$ref": "#/$defs/reasonCode" } } },
-    "executorContradictory": { "type": "object", "additionalProperties": false, "required": ["operation_id", "conflict_digest"], "properties": { "operation_id": { "$ref": "#/$defs/safeId" }, "conflict_digest": { "$ref": "#/$defs/digest" } } },
+    "executorCurrent": { "type": "object", "additionalProperties": false, "required": ["launch_id", "executor_thread_id", "launch_nonce_digest"], "properties": { "launch_id": { "$ref": "#/$defs/safeId" }, "executor_thread_id": { "$ref": "#/$defs/safeId" }, "launch_nonce_digest": { "$ref": "#/$defs/digest" } } },
+    "executorProvisional": { "type": "object", "additionalProperties": false, "required": ["launch_id", "provisional_client_thread_id"], "properties": { "launch_id": { "$ref": "#/$defs/safeId" }, "provisional_client_thread_id": { "$ref": "#/$defs/provisionalId" } } },
+    "executorOpaque": { "type": "object", "additionalProperties": false, "required": ["launch_id", "reason_code"], "properties": { "launch_id": { "$ref": "#/$defs/safeId" }, "reason_code": { "$ref": "#/$defs/reasonCode" } } },
+    "executorContradictory": { "type": "object", "additionalProperties": false, "required": ["launch_id", "conflict_digest"], "properties": { "launch_id": { "$ref": "#/$defs/safeId" }, "conflict_digest": { "$ref": "#/$defs/digest" } } },
+    "worktreeCurrent": { "type": "object", "additionalProperties": false, "required": ["common_dir", "worktree_path", "baseline_revision", "pristine", "non_coordinator"], "properties": { "common_dir": { "$ref": "#/$defs/absolutePath" }, "worktree_path": { "$ref": "#/$defs/absolutePath" }, "baseline_revision": { "$ref": "#/$defs/revision" }, "pristine": { "const": true }, "non_coordinator": { "const": true } } },
+    "worktreeProvisional": { "type": "object", "additionalProperties": false, "required": ["worktree_path", "reason_code"], "properties": { "worktree_path": { "$ref": "#/$defs/absolutePath" }, "reason_code": { "$ref": "#/$defs/reasonCode" } } },
+    "worktreeOpaque": { "type": "object", "additionalProperties": false, "required": ["evidence_digest", "reason_code"], "properties": { "evidence_digest": { "$ref": "#/$defs/digest" }, "reason_code": { "$ref": "#/$defs/reasonCode" } } },
+    "worktreeContradictory": { "type": "object", "additionalProperties": false, "required": ["conflict_digest", "reason_code"], "properties": { "conflict_digest": { "$ref": "#/$defs/digest" }, "reason_code": { "$ref": "#/$defs/reasonCode" } } },
+    "selectorCurrent": { "type": "object", "additionalProperties": false, "required": ["model", "reasoning_effort"], "properties": { "model": { "type": "string", "minLength": 1, "maxLength": 128 }, "reasoning_effort": { "$ref": "#/$defs/reasoningEffort" } } },
+    "selectorProvisional": { "type": "object", "additionalProperties": false, "required": ["model", "reasoning_effort", "reason_code"], "properties": { "model": { "type": "string", "minLength": 1, "maxLength": 128 }, "reasoning_effort": { "$ref": "#/$defs/reasoningEffort" }, "reason_code": { "$ref": "#/$defs/reasonCode" } } },
+    "selectorOpaque": { "type": "object", "additionalProperties": false, "required": ["evidence_digest", "reason_code"], "properties": { "evidence_digest": { "$ref": "#/$defs/digest" }, "reason_code": { "$ref": "#/$defs/reasonCode" } } },
+    "selectorContradictory": { "type": "object", "additionalProperties": false, "required": ["conflict_digest", "reason_code"], "properties": { "conflict_digest": { "$ref": "#/$defs/digest" }, "reason_code": { "$ref": "#/$defs/reasonCode" } } },
     "mappingCurrent": { "type": "object", "additionalProperties": false, "required": ["provisional_client_thread_id", "candidate_executor_thread_id", "mapping_digest"], "properties": { "provisional_client_thread_id": { "$ref": "#/$defs/provisionalId" }, "candidate_executor_thread_id": { "$ref": "#/$defs/safeId" }, "mapping_digest": { "$ref": "#/$defs/digest" } } },
     "mappingProvisional": { "type": "object", "additionalProperties": false, "required": ["provisional_client_thread_id", "mapping_digest"], "properties": { "provisional_client_thread_id": { "$ref": "#/$defs/provisionalId" }, "mapping_digest": { "$ref": "#/$defs/digest" } } },
     "mappingOpaque": { "type": "object", "additionalProperties": false, "required": ["mapping_digest", "reason_code"], "properties": { "mapping_digest": { "$ref": "#/$defs/digest" }, "reason_code": { "$ref": "#/$defs/reasonCode" } } },

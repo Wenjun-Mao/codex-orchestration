@@ -1,80 +1,26 @@
 ---
 name: unplug
-description: Plan and, with explicit approval, apply a repository-scoped clean start that archives known Codex Flow tasks and removes exact local Flow state. Use when incompatible retained Flow state blocks activation or the user asks to unplug a repository; do not use for ordinary run cleanup.
+description: Plan and, with explicit approval, apply a repository-scoped clean start that archives known Codex Flow tasks and removes exact local Flow state.
 ---
 
-# Clean-start and unplug
+# Unplug a Repository Cleanly
 
-Use the installed plugin's `unplug` commands only for the one repository the
-user placed in scope. This is a local reset of Flow operational state, not a
-predecessor migration, ordinary generic Git cleanup, or way to bypass an active run.
-It never reads `AGENTS.md` or creates an instruction authority.
+Run `unplug plan` first. It is version-agnostic discovery, not migration: it
+classifies bounded namespace directories and opaque root files by exact path,
+type, size, and digest; authenticates local Git resources; and identifies every
+task that must be archived. Host-managed turn-diff refs are observations, not
+source identity, while source/local/remote/tag refs relevant to planned
+resources remain binding.
 
-## Plan before changing anything
+Archive every named task through the App. If public archive indexing lags, use
+`unplug observe-private` for a digest-bound observation of the exact archived
+session and absent active counterpart.
 
-Run `unplug plan` first and present the repository root, Git common directory,
-exact local state entries, state digest, and every known task that must be
-archived. Plan v2 distinguishes `namespace-directory` entries from
-`opaque-file` entries. An opaque file is authenticated by exact root-child
-path, size, and byte digest; never parse, classify, migrate, or treat its
-contents as current runtime authority. The plan is read-only. Do not substitute
-a branch-name heuristic or delete a parent directory because it appears to
-contain only Flow data.
+Apply only an approved exact plan with `unplug apply`. Revalidate all task,
+Git, path, byte, and attachment evidence immediately before mutation. Remove
+eligible worktrees before local branches. Never remove remote refs, protected
+branches, unmerged work, another repository, or the coordinator checkout.
+Delete exact planned state paths last and require zero residue.
 
-Build the plan request from authenticated retained records and current App/Git
-observation. Each resource carries `provenance: "state-derived"` or
-`"user-bound"`, the exact Git common directory, and all kind-specific fields:
-
-- a worktree has its absolute path and expected tip. Its branch is either
-  `null` for a detached Codex App task worktree, or its attached local
-  `codex/*` branch; `thread_id` is null. A detached tip must already be an
-  ancestor of the authenticated base;
-- a branch has null path, its local `codex/*` name and expected tip, and
-  `thread_id: null`;
-- a task has null Git fields and its exact visible `thread_id`.
-
-Never invent a resource or task identity. An empty `resources` array is valid
-when only opaque Flow state remains. Keep request JSON outside the repository
-when zero repository residue is the user's outcome.
-
-Archive every task named by the plan through the App and reconcile its observed
-archived state before local cleanup. If the public archived-task index is
-stale, use the explicit read-only `unplug observe-private` command against the
-unchanged exact plan; it emits compact digest-bound evidence for one archived
-session and no active counterpart. If a task cannot be archived, its state is
-ambiguous, or the plan changes, stop and report the blocker; do not remove
-state that may still authorize work.
-
-For apply, bind each planned task resource to exact structured App evidence:
-`{thread_id, archived: true, observed_at, source: "codex-app"}` or the
-unchanged `unplug observe-private` result. The evidence map must cover every
-planned task ID and no other entry. A successful setter call without reconciled
-archive observation is not enough.
-
-## Apply only an approved exact plan
-
-Ask for explicit approval of the unchanged repository-specific plan before
-`unplug apply`. Re-read the plan immediately before applying it. Apply may
-remove exact local Flow paths plus only these authenticated registered local
-resources:
-
-- a same-common-directory linked worktree at the planned path and tip, when it
-  is tracked-clean. It may be detached only when its tip is already an ancestor
-  of the authenticated base, or attached to the planned local `codex/*` branch;
-  Git-ignored artifacts may remain;
-- an unprotected local `codex/*` branch at its planned tip, only after it is
-  an ancestor of the authenticated base and no worktree still attaches it.
-
-Dirty or ordinarily untracked worktrees, unmerged or attached branches,
-protected resources, remote state, and any path or tip drift block apply. Do
-not delete remote refs, tags, source files, or another repository's state.
-Delete every exact planned `.git/codex-flow` path last: regular opaque files
-non-recursively and namespace directories recursively. Any content, path, or
-entry-kind drift blocks apply. Require zero-residue confirmation. It does not
-delete Codex tasks; task archival is a separate host action completed first.
-
-## Optional App removal
-
-After successful zero-residue confirmation, offer App-plugin uninstallation
-only when it would help the user's stated outcome. Uninstallation requires its
-own explicit request and must not be bundled into the repository cleanup.
+Unplug does not reinterpret predecessor records or silently clean a running
+workflow. Optional plugin uninstallation is a separate explicit request.

@@ -7,14 +7,14 @@
     "schema_version", "kind", "disposition_id", "run_id",
     "runtime_context_digest", "configuration_digest", "repository_id", "common_dir",
     "coordinator_binding", "plan_id", "revision_digest", "task_id", "task_digest",
-    "contract_id", "operation_id", "release_id", "executor_thread_id",
+    "contract_id", "launch_id", "executor_thread_id",
     "callback_id", "receipt_digest", "decision", "reason", "integration_id",
     "verification_id", "verification_digest", "state", "prepared_at", "finalized_at",
     "callback_consumed_at"
   ],
   "properties": {
     "schema_version": { "const": 1 },
-    "kind": { "const": "codex-flow-v07-task-disposition" },
+    "kind": { "const": "codex-flow-v09-task-disposition" },
     "disposition_id": { "$ref": "#/$defs/safeId" },
     "run_id": { "$ref": "#/$defs/safeId" },
     "runtime_context_digest": { "$ref": "#/$defs/digest" },
@@ -27,13 +27,12 @@
     "task_id": { "$ref": "#/$defs/safeId" },
     "task_digest": { "$ref": "#/$defs/digest" },
     "contract_id": { "$ref": "#/$defs/digest" },
-    "operation_id": { "$ref": "#/$defs/safeId" },
-    "release_id": { "$ref": "#/$defs/safeId" },
+    "launch_id": { "$ref": "#/$defs/safeId" },
     "executor_thread_id": { "$ref": "#/$defs/threadId" },
     "callback_id": { "$ref": "#/$defs/nullableId" },
     "receipt_digest": { "$ref": "#/$defs/nullableDigest" },
     "decision": {
-      "enum": ["accepted-no-change", "accepted-for-integration", "rejected", "retained-blocked", "cancelled"]
+      "enum": ["accepted-no-change", "accepted-for-integration", "rejected", "retained-blocked"]
     },
     "reason": { "type": "string", "minLength": 1, "maxLength": 512 },
     "integration_id": { "$ref": "#/$defs/nullableId" },

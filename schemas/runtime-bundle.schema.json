@@ -6,7 +6,7 @@
   "required": ["schema_version", "kind", "package_version", "files", "bundle_sha256"],
   "properties": {
     "schema_version": { "const": 1 },
-    "kind": { "const": "codex-flow-v07-runtime-bundle" },
+    "kind": { "const": "codex-flow-v09-runtime-bundle" },
     "package_version": { "type": "string", "minLength": 1, "maxLength": 128 },
     "files": {
       "type": "object",

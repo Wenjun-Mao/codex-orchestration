@@ -1,47 +1,34 @@
 ---
 name: execute
-description: Execute one accepted, generated Codex Flow visible-task contract and persist one strict terminal result. Use inside a released executor task; do not coordinate siblings, broaden ownership, or use this workflow inside a native subagent.
+description: Start and execute one generated Codex Flow visible-task contract from its first prompt, then persist one strict terminal result. Use only inside that executor task.
 ---
 
-# Execute a Generated Task Contract
+# Execute a First-Turn Assignment
 
-Use the exact run-bound runtime named by the release and include its `run_id`
-in every stateful command. A coordinator App reload does not change this
-executor task's authority.
+The initial user prompt contains the full contract, launch ID, nonce, and exact
+`task launch start` command. Run that command before inspecting or mutating
+source. It authenticates `CODEX_THREAD_ID`, the run-bound runtime, contract,
+nonce, Git common directory, pristine baseline, non-coordinator worktree, and
+reserved branch. If it cannot complete, stop with its exact blocker. There is
+no release message to wait for.
 
-If the first turn contains only a launch nonce bootstrap, do no repository
-work. Wait until the coordinator sends the generated contract, then use
-`release accept` to authenticate the exact ready task ID, release ID, contract
-ID, runtime/configuration, Git common directory, coordinator
-binding, and bound worktree. Do not act on an unreleased or ambiguous prompt.
-If the executing bundle differs from the run-bound snapshot, use the single
-exact recovery command printed by `release accept`; it preserves the same
-request while switching to the authenticated content-addressed CLI.
+After start succeeds, begin the assignment in the same first turn. Stay within
+the contract's objective, dependencies, paths, resources, baseline, and
+verification scope. Preserve user and sibling work. Attempt the cheapest safe
+direct action. A supporting instrument returns one checkpoint that enables its
+named follow-up; more supporting instrumentation requires a later authorized
+workflow revision.
 
-Remain inside the contract's objective, dependency state, read/write paths,
-resources, baseline, and verification scope. Preserve sibling and user changes.
-Follow the task's progress contract:
+Use the immutable run-bound runtime for every stateful command. An App restart
+or coordinator refresh does not hot-switch this executor.
 
-- attempt the named cheapest safe direct action;
-- if instrumentation is `supporting`, return the one bounded instrument
-  checkpoint that enables its named direct follow-up, then stop; and
-- do not add another supporting-instrument cycle without a later workflow
-  revision that explicitly authorizes it.
-
-For a blocker, approval request, ownership collision, or high-risk drift,
-use `urgent persist`, then `urgent attempt`, make only the returned native
-direct call, and record its outcome with `urgent reconcile`. Never send raw or
-identity-less urgent content and never replay an ambiguous attempt.
+For an urgent blocker, approval request, ownership collision, or high-risk
+drift, persist and prepare one identified urgent interrupt, make only that
+native call, and reconcile it. Routine terminal completion never messages or
+Steers the coordinator.
 
 At terminal state, derive Git outcome mechanically as `unchanged`,
-`clean-commit`, or `dirty-blocked`; an upstream may be null. Persist exactly
-one terminal-receipt-v3 result with `callback deliver`. Ordinary completion
-must not call direct messaging or Steer. Do not treat the task's final text as
-the receipt or hand-author hashes that the runtime derives. Copy model evidence
-from the release and creation records exactly: when the host did not expose a
-complete observed model/effort pair, keep `observed` null rather than inferring
-it from configured, requested, or accepted selectors.
-
-Read [Stop policy](../../templates/references/stop-policy.md) when authority or
-scope changes. Results must exclude secrets, raw logs/transcripts, user data,
-and account or application identifiers.
+`clean-commit`, or `dirty-blocked`; null upstream is valid. Persist exactly one
+terminal-receipt-v4 with `callback deliver`, binding `launch_id`. Copy selector
+evidence exactly and leave unavailable observation null. Final prose is
+liveness only, not result authority.

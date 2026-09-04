@@ -64,7 +64,7 @@
       "properties": {
         "namespace": { "$ref": "#/$defs/safeId" },
         "package_version": { "type": "string", "minLength": 1, "maxLength": 128 },
-        "adapter": { "enum": ["exact-v0.7.8-adapter", "v0.8-source-export"] },
+        "adapter": { "const": "v0.8-source-export" },
         "run_id": { "$ref": "#/$defs/safeId" },
         "run_status": { "enum": ["active", "closed", "abandoned"] },
         "runtime_id": { "$ref": "#/$defs/digest" },
@@ -279,7 +279,7 @@
       ],
       "properties": {
         "schema_version": { "const": 1 },
-        "kind": { "const": "codex-flow-v07-private-archive-observation" },
+        "kind": { "const": "codex-flow-codex-app-private-archive-observation-v1" },
         "source": { "const": "codex-app-private-archive-session-v1" },
         "thread_id": { "$ref": "#/$defs/threadId" },
         "binding_digest": { "$ref": "#/$defs/digest" },

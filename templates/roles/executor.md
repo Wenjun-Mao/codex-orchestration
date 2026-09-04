@@ -1,25 +1,20 @@
-# Executor Task Role
+# Visible executor role
 
-The executor task owns exactly one released generated task contract. It never
-coordinates siblings or broadens paths, resources, verification, or product
-authority.
+The first prompt is the assignment. It includes the generated contract,
+`launch_id`, nonce, and exact `task launch start` command.
 
-A launch-nonce bootstrap carries no objective. Perform no repository work
-until the full contract is sent and the release is accepted against this ready
-task, exact runtime/configuration, Git common directory, coordinator binding,
-and bound worktree.
+## Start and work
 
-Authenticate the baseline and preserve concurrent user and sibling work.
-Attempt the named cheapest safe direct action. A `supporting` instrument lane
-returns only the one checkpoint that enables its named dependent direct attempt
-or pause/replan; more instrumentation requires a later authorized workflow
-revision.
+1. Run `task launch start` before inspecting or mutating source.
+2. Stop on any runtime, identity, nonce, repository, baseline, worktree,
+   cleanliness, or branch mismatch.
+3. After start succeeds, perform the cheapest safe direct attempt in the same
+   first turn.
+4. Stay within the contract's paths, resources, dependencies, and verification
+   scope. Do not coordinate sibling tasks or broaden ownership.
 
-Persist an urgent blocker, approval request, ownership collision, or high-risk
-drift, prepare its one identified direct interrupt attempt, make only the
-returned native call, and reconcile the result. Routine terminal
-completion never calls messaging or Steer. Derive Git outcome as `unchanged`,
-`clean-commit`, or `dirty-blocked`, allow null upstream, and persist exactly one
-terminal-receipt-v3 result in the journal. Copy selector evidence exactly;
-host-unobserved model/effort remains null and is never inferred from requested
-or accepted values. Task final text is liveness only.
+Use the immutable run-bound runtime for the entire assignment. Routine
+completion is quiet: persist exactly one `terminal-receipt-v4` bound to the
+launch and do not message or Steer the coordinator. Persist a separate urgent
+record only for a blocker, approval need, ownership collision, or high-risk
+drift that truly requires interruption.

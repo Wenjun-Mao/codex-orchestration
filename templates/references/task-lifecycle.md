@@ -1,63 +1,36 @@
-# Task Lifecycle
+# v0.9 task lifecycle
 
-1. **Activate:** snapshot the exact runtime under
-   `.git/codex-flow/v0.8.3/runtimes/<bundle-sha256>/`; bind repository/common
-   directory, host, coordinator lineage/generation, configuration/policy, and
-   the path/resource/branch reservation envelope to an explicit run ID.
-2. **Plan:** persist a content-addressed workflow revision with dependency DAG,
-   ownership, exclusive resources, models, primary outcomes, direct attempts,
-   and instrument roles.
-   Generate every task contract from that revision.
-3. **Create:** for visible work, prepare one native call, bootstrap with the
-   launch nonce, record the host's provisional ID verbatim as bounded opaque
-   evidence, and preserve provisional and ready identities separately. For
-   subagents, use the separate read-only `prepare -> attempt -> reconcile ->
-   complete -> dispose` lifecycle; an accepted subagent operation closes that lane
-   with unchanged-Git proof and skips steps 4 through 10 below.
-   Reconcile the source create completion, initial delegation, and observed
-   selectors by exact host event time, not by delayed private-evidence
-   processing time; events at or after the bounded deadline remain ineligible.
-   The runtime owns lifecycle transition timestamps; callers provide no
-   task-create clock fields, only authenticated host-event evidence.
-   Only exact source-session evidence may add a provisional identity after a
-   durable window-expiry ambiguity.
-4. **Bind and release:** reconcile selector evidence, run coordinator-owned
-   `task create bind` so content-addressed intent precedes the detached
-   worktree branch switch, reject the active coordinator root as the executor,
-   preserve intent time while recording actual recovery completion, and
-   live-reauthenticate completed binding during
-   `release prepare`, send the prepared objective once, and require acceptance
-   from that persisted worktree and reserved branch through the exact
-   run-bound runtime.
-5. **Execute:** stay inside the generated contract and attempt the named direct
-   outcome. Supporting instrumentation returns one bounded checkpoint only.
-6. **Signal visible-task results:** routine completion persists one
-   terminal-receipt-v3 journal result without messaging. Admission first
-   matches its release, ready task, baseline, and exact selector evidence;
-   unavailable host observation remains null. Urgent blocker/approval/high-risk
-   drift persists before one identified interrupt attempt.
-7. **Select and dispose:** native waits and finals provide liveness only. The
-   coordinator authenticates and observes the exact journaled result, then
-   prepares its durable disposition. If release was durably rejected before
-   send, the callback-less path uses `disposition cancel`.
-8. **Reconcile repository state:** integrate each accepted `clean-commit`
-   serially or record authoritative no-change. `dirty-blocked` remains fenced.
-9. **Verify and finalize:** run combined checks at the exact reconciled state,
-   reload the content-addressed PASS verification and integration/no-change
-   records, finalize the disposition, and consume the result internally exactly
-   once.
-10. **Archive and clean:** reconcile native archive only after the full proof
-    chain. Archived task visibility may precede asynchronous host-managed
-    worktree reclamation; persist that interval without replaying archive, and
-    complete only after the exact path is absent. If the public archived-task
-    index lags, use explicit digest-bound private archive observation rather
-    than inferring status. Derive the separate
-   exact-state cleanup plan and independently resolve branch/worktree state;
-   v0.8 does not apply ordinary Git deletion.
-11. **Audit and close:** persist a content-addressed `run audit` over every
-    current lifecycle record, then close only while that exact terminal proof
-    remains current. Abandonment preserves the complete admitted reservation
-    envelope.
+Package authority during development is `v0.9.0-dev.0`. Every run snapshots
+that exact runtime and uses it until completion.
 
-Every stateful command names the run explicitly. No phase infers the newest
-run, trusts a raw digest, or treats a task final as durable authority.
+```text
+workflow contract
+      |
+task launch prepare
+      |
+task launch attempt
+      |
+one Codex App creation call with the full first prompt
+      |
+creation-result reconciliation <--> executor start claim
+      |
+task launch start: identity + pristine worktree + branch activation
+      |
+useful work in the same first turn
+      |
+terminal-receipt-v4 bound to launch
+      |
+disposition -> integration/no-change -> combined verification
+      |
+archive observation -> cleanup plan -> run audit -> close
+```
+
+The launch is the durable join between workflow authority, native task
+identity, selector evidence, worktree evidence, and the terminal receipt. There
+is no bootstrap-only turn, coordinator branch-binding wait, separate release
+message, or ordinary private-history scan.
+
+Crash recovery repeats only idempotent local reconciliation. It never repeats
+the native creation call, fabricates identity, or weakens a mismatch. Routine
+completion stays journal-only; urgent interruption is a separate one-shot
+lifecycle.

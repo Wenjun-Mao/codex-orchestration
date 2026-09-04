@@ -18,7 +18,7 @@
   ],
   "properties": {
     "schema_version": { "const": 1 },
-    "kind": { "const": "codex-flow-v07-combined-verification" },
+    "kind": { "const": "codex-flow-v09-combined-verification" },
     "verification_id": {
       "type": "string",
       "pattern": "^verification-v1-[0-9a-f]{64}$"
@@ -42,8 +42,7 @@
         "task_id",
         "task_digest",
         "contract_id",
-        "operation_id",
-        "release_id"
+        "launch_id"
       ],
       "properties": {
         "callback_id": { "$ref": "#/$defs/safeId" },
@@ -60,8 +59,7 @@
         "task_id": { "$ref": "#/$defs/safeId" },
         "task_digest": { "$ref": "#/$defs/digest" },
         "contract_id": { "$ref": "#/$defs/digest" },
-        "operation_id": { "$ref": "#/$defs/safeId" },
-        "release_id": { "$ref": "#/$defs/safeId" }
+        "launch_id": { "$ref": "#/$defs/safeId" }
       }
     },
     "integration_scope": {
@@ -87,8 +85,7 @@
             "task_id",
             "task_digest",
             "contract_id",
-            "operation_id",
-            "release_id",
+            "launch_id",
             "main_branch",
             "reconciled_main_tip",
             "outcome"
@@ -110,8 +107,7 @@
             "task_id": { "$ref": "#/$defs/safeId" },
             "task_digest": { "$ref": "#/$defs/digest" },
             "contract_id": { "$ref": "#/$defs/digest" },
-            "operation_id": { "$ref": "#/$defs/safeId" },
-            "release_id": { "$ref": "#/$defs/safeId" },
+            "launch_id": { "$ref": "#/$defs/safeId" },
             "main_branch": {
               "type": "string",
               "minLength": 1,

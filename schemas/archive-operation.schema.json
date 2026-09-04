@@ -7,13 +7,13 @@
     "schema_version", "kind", "archive_id", "run_id", "runtime_context_digest",
     "configuration_digest", "repository_id", "common_dir", "coordinator_binding",
     "plan_id", "revision_digest", "task_id", "task_digest", "contract_id",
-    "operation_id", "release_id", "executor_thread_id", "callback_id", "disposition_id",
+    "launch_id", "executor_thread_id", "callback_id", "disposition_id",
     "decision", "task", "host_intent", "git_resolution", "worktree", "setter",
     "observation", "state", "prepared_at", "updated_at"
   ],
   "properties": {
     "schema_version": { "const": 1 },
-    "kind": { "const": "codex-flow-v07-task-archive-operation" },
+    "kind": { "const": "codex-flow-v09-task-archive-operation" },
     "archive_id": { "$ref": "#/$defs/safeId" },
     "run_id": { "$ref": "#/$defs/safeId" },
     "runtime_context_digest": { "$ref": "#/$defs/digest" },
@@ -26,8 +26,7 @@
     "task_id": { "$ref": "#/$defs/safeId" },
     "task_digest": { "$ref": "#/$defs/digest" },
     "contract_id": { "$ref": "#/$defs/digest" },
-    "operation_id": { "$ref": "#/$defs/safeId" },
-    "release_id": { "$ref": "#/$defs/safeId" },
+    "launch_id": { "$ref": "#/$defs/safeId" },
     "executor_thread_id": { "$ref": "#/$defs/threadId" },
     "callback_id": { "$ref": "#/$defs/safeId" },
     "disposition_id": { "$ref": "#/$defs/safeId" },
@@ -167,40 +166,19 @@
           "additionalProperties": false,
           "required": [
             "execution_kind", "thread_id", "source", "active_visible", "archived_visible",
-            "private_observation"
+            "host_evidence_digest", "observed_at"
           ],
           "properties": {
             "execution_kind": { "const": "task-thread" },
             "thread_id": { "$ref": "#/$defs/threadId" },
-            "source": { "const": "codex-app-private-archive-session-v1" },
+            "source": { "const": "typed-host-evidence-v1" },
             "active_visible": { "const": false },
             "archived_visible": { "const": true },
-            "private_observation": { "$ref": "#/$defs/privateArchiveObservation" }
+            "host_evidence_digest": { "$ref": "#/$defs/digest" },
+            "observed_at": { "$ref": "#/$defs/timestamp" }
           }
         }
       ]
-    },
-    "privateArchiveObservation": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "schema_version", "kind", "source", "thread_id", "binding_digest", "session_digest",
-        "active_session_absent", "app_version", "host_cli_version", "observed_at"
-      ],
-      "properties": {
-        "schema_version": { "const": 1 },
-        "kind": { "const": "codex-flow-v07-private-archive-observation" },
-        "source": { "const": "codex-app-private-archive-session-v1" },
-        "thread_id": { "$ref": "#/$defs/threadId" },
-        "binding_digest": { "$ref": "#/$defs/digest" },
-        "session_digest": { "$ref": "#/$defs/digest" },
-        "active_session_absent": { "const": true },
-        "app_version": { "type": "null" },
-        "host_cli_version": {
-          "oneOf": [{ "type": "null" }, { "type": "string", "minLength": 1, "maxLength": 64 }]
-        },
-        "observed_at": { "$ref": "#/$defs/timestamp" }
       }
-    }
   }
 }
