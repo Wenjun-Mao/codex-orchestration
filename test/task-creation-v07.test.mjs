@@ -83,7 +83,7 @@ async function fixture({
     generation: 1,
   };
   coordinator.binding_digest = coordinatorBindingDigest(coordinator);
-  const stateRoot = resolve(commonDir, "codex-flow", "v0.8.2");
+  const stateRoot = resolve(commonDir, "codex-flow", "v0.8.3-dev.0");
   const runId = "run-visible-task";
   const snapshot = gitSnapshot(root);
   const bundleSource = await loadRuntimeBundleSource({ packageRoot });
@@ -612,7 +612,7 @@ test("explicit private resolution binds the exact provisional ID to delegated bo
   }
 });
 
-test("v0.8.2 recovers an exact v0.8.1 private request without mutating source Flow state", async () => {
+test("the current adapter recovers an exact v0.8.1 private request without mutating source Flow state", async () => {
   const context = await fixture();
   const codexHome = await mkdtemp(resolve(tmpdir(), "codex-flow-v081-private-recovery-"));
   const provisionalClientThreadId = "client-new-thread:v081-private-recovery";

@@ -44,6 +44,13 @@ repository. Only the immutable v0.8.1 CLI may consume that request and mutate
 the source run. The bridge supports no other predecessor and performs no task
 creation, retry, binding, release, refresh, or state migration.
 
+The emitted source-reconciliation command names the current Node executable
+and passes the immutable snapshot CLI as its first argument. Runtime bundle
+materialization preserves authenticated bytes but does not promise executable
+file modes, so the snapshot `.mjs` path is never presented as a directly
+executable program. v0.8.3 adds this invocation correction and executes the
+emitted pair in the exact-v0.8.1 regression.
+
 ## Rejected alternatives
 
 - Increase the cap while continuing to retain matching raw rows. That leaves an

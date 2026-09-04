@@ -1807,12 +1807,12 @@ test("refresh accepts only the exact v0.7.8 adapter as a legacy source", async (
   await assert.rejects(stat(resolve(root, ".git", "codex-flow", "v0.7.8")), /ENOENT/);
 });
 
-test("v0.8.2 CLI recovers one exact v0.8.1 private operation without mutating source state", async (t) => {
+test("the current CLI recovers one exact v0.8.1 private operation without mutating source state", async (t) => {
   const root = await createGitFixture("codex-flow-v081-private-recovery-");
   const requests = await mkdtemp(resolve(tmpdir(), "codex-flow-v081-private-recovery-requests-"));
   const codexHome = await mkdtemp(resolve(tmpdir(), "codex-flow-v081-private-recovery-home-"));
   const sourcePackage = await copyTaggedPackage("v0.8.1");
-  const targetPackage = await copyTargetPackage("0.8.2-rc.1");
+  const targetPackage = await copyTargetPackage("0.8.3-dev.0");
   t.after(async () => Promise.all([
     removeFixture(root),
     rm(requests, { recursive: true, force: true }),
@@ -1846,7 +1846,8 @@ test("v0.8.2 CLI recovers one exact v0.8.1 private operation without mutating so
   assert.equal(output.source_authority.package_version, "0.8.1");
   assert.equal(output.source_authority.bundle_sha256, source.authority.package_authority.bundle_sha256);
   assert.equal(output.source_authority.source_cli_path, source.runtimeCli);
-  assert.equal(output.source_reconcile.executable, source.runtimeCli);
+  assert.equal(output.source_reconcile.executable, process.execPath);
+  assert.equal(output.source_reconcile.argv[0], source.runtimeCli);
   assert.equal(output.reconcile_request_sha256.length, 64);
   assert.equal(request.run_id, source.activation.run_id);
   assert.equal(request.operation_id, source.creation.operation_id);
@@ -1885,6 +1886,20 @@ test("v0.8.2 CLI recovers one exact v0.8.1 private operation without mutating so
     await refreshNamespaceTreeDigest({ commonDir, namespace: "v0.8.1" }),
     before,
   );
+  await writeFile(requestPath, `${JSON.stringify(request)}\n`, "utf8");
+  const reconciled = spawnSync(
+    output.source_reconcile.executable,
+    output.source_reconcile.argv,
+    {
+      cwd: root,
+      env: { ...process.env, CODEX_HOME: codexHome, CODEX_THREAD_ID: source.coordinatorThread },
+      encoding: "utf8",
+    },
+  );
+  assertSuccess(reconciled, "emitted v0.8.1 source reconcile command");
+  const reconciledRecord = JSON.parse(reconciled.stdout);
+  assert.equal(reconciledRecord.status, "ready-unreleased");
+  assert.equal(reconciledRecord.ready.thread_id, source.readyThreadId);
 });
 
 test("a later v0.8 source parses its own forward-compatible records", async (t) => {
@@ -2055,7 +2070,7 @@ test("refresh skill authentication rejects a stale loaded catalog path", async (
 test("refresh inspection blocks malformed current namespace authority", async (t) => {
   const root = await createGitFixture("codex-flow-refresh-malformed-current-");
   t.after(() => removeFixture(root));
-  const lifecycleRoot = resolve(root, ".git", "codex-flow", "v0.8.2", "runs");
+  const lifecycleRoot = resolve(root, ".git", "codex-flow", "v0.8.3-dev.0", "runs");
   await mkdir(lifecycleRoot, { recursive: true });
   await writeFile(resolve(lifecycleRoot, "lifecycle.json"), "{}\n", "utf8");
   const result = runCli([

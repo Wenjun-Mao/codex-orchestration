@@ -22,7 +22,7 @@ asks for actionable orchestration. Follow exactly one route:
   fresh run.
 - `resume-source`: continue the active run only through the immutable runtime
   snapshot named by the inspection. Never send a source-run mutation through
-  the newly loaded package. The sole exception is the v0.8.2 read-only evidence
+  the newly loaded package. The sole exception is the v0.8.2/v0.8.3 read-only evidence
   adapter below; its output is still consumed only by the v0.8.1 snapshot.
 - `refresh-ready`: choose wait or discard for each source executor task, then
   perform the bounded handoff below.
@@ -34,7 +34,7 @@ this loaded skill is invoked for actionable work in the same coordinator task.
 
 ## Recover one exact v0.8.1 private task identity
 
-v0.8.2 contains one narrow recovery adapter for an active v0.8.1 operation
+v0.8.2 and v0.8.3 contain one narrow recovery adapter for an active v0.8.1 operation
 whose private task-ID resolver rejected a valid long-lived coordinator session
 as too large. Use it only when inspection authenticates exact v0.8.1 source
 authority and that source retains the same provisional operation or its exact
@@ -46,7 +46,10 @@ task. The output path must be outside the repository. The command authenticates
 the v0.8.1 runtime exporter and App evidence, writes only the unwrapped
 reconcile request, and does not mutate App or Flow state. Submit that file
 unchanged to `task create reconcile` through the exact source snapshot CLI
-reported by source authority. Continue binding and release through that same
+reported by source authority. Execute the emitted `source_reconcile`
+executable/argv pair exactly: Node is the executable and the immutable snapshot
+CLI is its first argument because snapshot materialization does not preserve an
+executable file mode. Continue binding and release through that same
 snapshot. Never run target-package reconciliation, infer a task ID, retry
 creation, or treat this adapter as a general predecessor reader.
 
@@ -136,7 +139,7 @@ the source namespace and handoff. The next actionable invocation then routes
 `fresh` and may create a new run only if new work actually exists.
 
 The exact v0.7.8 adapter remains the only general predecessor cutover
-adapter in v0.8. The v0.8.2 private-resolution adapter above is a read-only,
+adapter in v0.8. The v0.8.2/v0.8.3 private-resolution adapter above is a read-only,
 exact-v0.8.1 evidence bridge for one stranded operation shape; it neither
 migrates journals nor mutates source state. Raw legacy refresh records remain
 validated only through modules from the authenticated source runtime bundle;

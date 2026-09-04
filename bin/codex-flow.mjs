@@ -1884,8 +1884,9 @@ async function commandRecoveryV08(args) {
     reconcile_request_path: canonicalOutput,
     reconcile_request_sha256: sha256(stableStringify(recovered.reconcile_request)),
     source_reconcile: {
-      executable: recovered.source_authority.source_cli_path,
+      executable: process.execPath,
       argv: [
+        recovered.source_authority.source_cli_path,
         "task", "create", "reconcile",
         "--run-id", runId,
         "--file", canonicalOutput,
