@@ -58,7 +58,7 @@ export async function createActiveTaskLaunch(root, suffix, {
   executorPath = resolve(root, `../${basename(root)}-${suffix}-executor`),
 } = {}) {
   const commonDir = await realpath(resolve(root, ".git"));
-  const stateRoot = resolve(commonDir, "codex-flow", "v0.9.0-rc.2");
+  const stateRoot = resolve(commonDir, "codex-flow", "v0.9.0-rc.3");
   const baseline = git(root, ["rev-parse", "HEAD"]);
   const coordinator = {
     lineage_id: `lifecycle-lineage-${suffix}`,

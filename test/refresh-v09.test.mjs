@@ -18,6 +18,11 @@ import {
   observeRefreshPrivateArchives,
   refreshStatus,
 } from "../lib/compat/refresh.mjs";
+import {
+  captureRefreshGitAuthority,
+  deleteRefreshExecutorBranch,
+  removeRefreshExecutorWorktree,
+} from "../lib/compat/refresh-discard-git.mjs";
 import { createGitFixture, packageRoot, removeFixture } from "./helpers.mjs";
 
 function invoke(cli, args, cwd, env = {}) {
@@ -523,6 +528,53 @@ async function consumeWithHooks({ targetPackage, root, activationRequest, refres
   return JSON.parse(result.stdout);
 }
 
+test("refresh discards a tagged local branch while a matching remote ref still blocks", async (t) => {
+  const root = await createGitFixture("codex-flow-refresh-v09-tagged-branch-");
+  const worktreeParent = await mkdtemp(resolve(tmpdir(), "codex-flow-refresh-v09-tagged-worktree-"));
+  const worktree = resolve(worktreeParent, "executor");
+  const branch = "codex/refresh-tagged-discard";
+  const tag = "v-refresh-tagged-baseline";
+  t.after(async () => {
+    spawnSync("git", ["update-ref", "-d", `refs/remotes/origin/${branch}`], { cwd: root, stdio: "ignore" });
+    spawnSync("git", ["worktree", "remove", "--force", worktree], { cwd: root, stdio: "ignore" });
+    spawnSync("git", ["branch", "-D", branch], { cwd: root, stdio: "ignore" });
+    await Promise.all([
+      removeFixture(root),
+      rm(worktreeParent, { recursive: true, force: true }),
+    ]);
+  });
+
+  execFileSync("git", ["worktree", "add", "--quiet", "-b", branch, worktree, "HEAD"], { cwd: root });
+  execFileSync("git", ["tag", "-a", tag, "-m", "Retain the executor baseline independently"], { cwd: root });
+  await writeFile(resolve(worktree, "discarded.txt"), "dirty executor-local work\n", "utf8");
+  const commonDir = await realpath(resolve(root, ".git"));
+  const authority = await captureRefreshGitAuthority({
+    commonDir,
+    worktreePath: worktree,
+    branch,
+    expectedHead: null,
+    forbiddenRoots: [root],
+    protectedBranches: ["main"],
+  });
+  assert.deepEqual(authority.tags_at_tip, [tag]);
+
+  execFileSync("git", ["update-ref", `refs/remotes/origin/${branch}`, authority.head], { cwd: root });
+  await assert.rejects(captureRefreshGitAuthority({
+    commonDir,
+    worktreePath: worktree,
+    branch,
+    expectedHead: authority.head,
+    forbiddenRoots: [root],
+    protectedBranches: ["main"],
+  }), /matching remote ref/);
+  execFileSync("git", ["update-ref", "-d", `refs/remotes/origin/${branch}`], { cwd: root });
+
+  await removeRefreshExecutorWorktree(authority);
+  await deleteRefreshExecutorBranch(authority);
+  assert.equal(spawnSync("git", ["show-ref", "--verify", "--quiet", `refs/heads/${branch}`], { cwd: root }).status, 1);
+  assert.equal(execFileSync("git", ["rev-parse", `${tag}^{commit}`], { cwd: root, encoding: "utf8" }).trim(), authority.head);
+});
+
 test("v0.9 consumes one exact v0.8.3 semantic handoff and resumes every deletion boundary", async (t) => {
   const root = await createGitFixture("codex-flow-refresh-v09-");
   const requests = await mkdtemp(resolve(tmpdir(), "codex-flow-refresh-v09-requests-"));
@@ -664,7 +716,7 @@ test("v0.9 consumes one exact v0.8.3 semantic handoff and resumes every deletion
   ], root, { CODEX_THREAD_ID: source.coordinatorThreadId });
   assertSuccess(activatedCall, "v0.9 target activation");
   const activated = JSON.parse(activatedCall.stdout);
-  assert.equal(activated.state_authority.namespace, "v0.9.0-rc.2");
+  assert.equal(activated.state_authority.namespace, "v0.9.0-rc.3");
   assert.equal(activated.refresh_origin.refresh_id, handoff.refresh_id);
   await assert.rejects(stat(resolve(root, ".git/codex-flow/refresh-v1")), /ENOENT/);
 });

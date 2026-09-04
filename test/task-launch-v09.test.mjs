@@ -81,7 +81,7 @@ async function launchContext(root, suffix, { task = {} } = {}) {
     ...coordinator,
     binding_digest: coordinatorBindingDigest(coordinator),
   };
-  const stateRoot = resolve(commonDir, "codex-flow", "v0.9.0-rc.2");
+  const stateRoot = resolve(commonDir, "codex-flow", "v0.9.0-rc.3");
   await bindRecipient({
     stateRoot,
     recipient: coordinator,

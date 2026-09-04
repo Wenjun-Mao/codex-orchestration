@@ -104,6 +104,9 @@ ambiguous predecessor state remains blocked and uses the existing explicit
   plan proves zero cleanup requirements and zero blockers. Any retained Git or
   operation residue still blocks refresh.
 - Remote refs and external side effects are never removed or reversed.
+- A local tag pointing at the executor tip is disclosed but is not branch
+  deletion authority: deleting the exact local executor branch cannot alter the
+  tag or its retained commit. Upstreams and matching remote refs still block.
 - Provisional identity, archive disagreement, path/attachment drift, protected
   or remote refs, prior integration, stale callbacks, and tampered snapshots
   fail closed.
