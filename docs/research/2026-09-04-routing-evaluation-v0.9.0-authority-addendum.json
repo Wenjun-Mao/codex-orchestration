@@ -1,0 +1,143 @@
+{
+  "addendum_version": 1,
+  "kind": "codex-flow-routing-evidence-authority-addendum",
+  "status": "authority-pinned-routing-comparison-ready",
+  "created_on": "2026-09-04",
+  "supersedes_for_execution_only": "docs/research/2026-09-02-routing-evaluation-v0.7.8-authority-addendum.json",
+  "base_preregistration": {
+    "path": "docs/research/2026-08-30-routing-evaluation-preregistration.json",
+    "sha256": "ae610fa6d72fd1980d5c705922b6245d2cacf9635eaa41bbd3db9a05493fce93",
+    "git_blob": "00fee783f588fc02bf2af1843386a3e42868eea0",
+    "last_authority_pin_commit": "3d1ffec5ae012cdcb1a4199240e91e1927610f93",
+    "remains_byte_unchanged": true
+  },
+  "amendment_reason": "The accepted v0.9.0 release replaces bootstrap and release delivery with native-first first-turn launch, isolates the Codex App adapter from the governance core, and retains explicit routing, immutable run authority, quiet callbacks, exact integration, archive observation, cleanup, and bounded v0.8 refresh. The frozen comparison therefore runs on current accepted v0.9.0 authority without changing its experimental design or using its results to alter v0.9.0.",
+  "json_pointer_overrides": [
+    {
+      "pointer": "/claims_boundary/cheapest_safe_direct_attempt",
+      "previous": "After a fresh v0.7.6 authority check, run only the two scheduled blind cases and their three frozen arms with no new telemetry or routing behavior.",
+      "replacement": "After a fresh v0.9.0 authority check, run only the two scheduled blind cases and their three frozen arms with no new telemetry or routing behavior."
+    },
+    {
+      "pointer": "/runtime_preconditions/accepted_plugin_version",
+      "previous": "0.7.6",
+      "replacement": "0.9.0"
+    },
+    {
+      "pointer": "/runtime_preconditions/accepted_source_commit",
+      "previous": "1e4a825df878ec05d7a971cddb3984ce3f4b2b52",
+      "replacement": "010bdf74290ae2656a3f3f812a8143f7445be9c8"
+    },
+    {
+      "pointer": "/runtime_preconditions/accepted_source_tag",
+      "previous": "v0.7.6",
+      "replacement": "v0.9.0"
+    },
+    {
+      "pointer": "/runtime_preconditions/accepted_cache_path",
+      "previous": "/Users/wjmao/.codex/plugins/cache/personal/codex-orchestration/0.7.6",
+      "replacement": "/Users/wjmao/.codex/plugins/cache/personal/codex-orchestration/0.9.0"
+    },
+    {
+      "pointer": "/runtime_preconditions/accepted_bundle_sha256",
+      "previous": "5d9f88167432c8939cf2ffa254796d671deb72dbef62f7813c434c59754d4ce7",
+      "replacement": "315756c7a7bfffd746cab0196d054ee2c024e3e26986aa53f9693c07e3666d62"
+    },
+    {
+      "pointer": "/runtime_preconditions/advertised_skill_version_must_equal",
+      "previous": "0.7.6",
+      "replacement": "0.9.0"
+    },
+    {
+      "pointer": "/arms/sol_coord_two_terra_visible/shape",
+      "previous": "One fresh Sol-high coordinator uses exactly two Terra-high user-visible tasks according to the case-specific DAG and ownership, then integrates and verifies serially through v0.7.6.",
+      "replacement": "One fresh Sol-high coordinator uses exactly two Terra-high user-visible tasks according to the case-specific DAG and ownership, then integrates and verifies serially through v0.9.0."
+    },
+    {
+      "pointer": "/stopping_rules/0",
+      "previous": "Stop before launch if the fresh v0.7.6 authority check fails, any required selector is unsupported, a source archive digest differs, the imported baseline is dirty, or visible-task authorization is absent.",
+      "replacement": "Stop before launch if the fresh v0.9.0 authority check fails, any required selector is unsupported, a source archive digest differs, the imported baseline is dirty, or visible-task authorization is absent."
+    }
+  ],
+  "accepted_v0_9_0_authority": {
+    "source_commit": "010bdf74290ae2656a3f3f812a8143f7445be9c8",
+    "source_tree": "7c159794b9989131782644c882208b80c294e360",
+    "annotated_tag": "v0.9.0",
+    "annotated_tag_object": "8619d40ca1189a7b990360bbab63d9d7a0f4562c",
+    "package_version": "0.9.0",
+    "plugin_version": "0.9.0",
+    "artifact_sha256": "ac7ba4b90a5940eda79b5700c298aa8c3d530507423c57c9ede53d3878c23890",
+    "installed_cache_path": "/Users/wjmao/.codex/plugins/cache/personal/codex-orchestration/0.9.0",
+    "installed_cli_sha256": "71e2db8155edbc3046bb486b4d2b114ac89fc69b115e7bed9d4241754da08900",
+    "runtime_bundle_sha256": "315756c7a7bfffd746cab0196d054ee2c024e3e26986aa53f9693c07e3666d62",
+    "runtime_bundle_file_count": 74,
+    "installed_cache_equals_artifact": true,
+    "source_main_and_tag_match": true
+  },
+  "fresh_host_authority": {
+    "codex_app_version": "26.901.31953",
+    "codex_app_bundle": "7868",
+    "bundled_cli_version": "0.153.1",
+    "advertised_skill_version": "0.9.0",
+    "refresh_route": "fresh",
+    "fresh_skill_load_verified": true,
+    "active_codex_flow_runs": 0
+  },
+  "compatibility_gate": {
+    "field_test_path": "docs/field-tests/2026-09-04-v0.9.0-rc4-live-app-canary.md",
+    "field_test_sha256": "45d12249002d0959974caaed4a7194d9b9ae2634b351d2f9909453c605f7e2ec",
+    "candidate_commit": "3060c93fcdb41cb87117ecc92ffb4e19e3cc2528",
+    "stable_promotion_commit": "010bdf74290ae2656a3f3f812a8143f7445be9c8",
+    "first_turn_full_assignment_verified": true,
+    "executor_identity_claim_verified": true,
+    "separate_release_message_absent": true,
+    "stable_promotion_changed_lifecycle_implementation": false,
+    "result": "pass",
+    "routing_result": null
+  },
+  "compatibility_interpretations": [
+    {
+      "frozen_text": "Binds branch and ownership before objective release.",
+      "v0_9_successor": "The full objective is the first prompt, but task launch start must authenticate identity, ownership, baseline, and attach the reserved branch before any source mutation. No second release step exists.",
+      "scoring_change": false
+    },
+    {
+      "frozen_text": "Uses nonce-bound one-shot task creation and exact identity reconciliation.",
+      "v0_9_successor": "The one-shot launch nonce and exact executor start claim bind native creation evidence to the ready task independently of provisional App return shape.",
+      "scoring_change": false
+    }
+  ],
+  "reverified_case_archives": [
+    {
+      "case_id": "v051-acceptance-plan",
+      "baseline_commit": "b3d933a4b895dfee26fd142eb994f338456f5591",
+      "archive_sha256": "7a8e6aaf4bcbf2d3479a4d2ec2187928f7542cf96281339d24cb4100be3e40ca"
+    },
+    {
+      "case_id": "ignored-archive-artifacts",
+      "baseline_commit": "aa7e09761c274252a02676bf840e5d6f58827614",
+      "archive_sha256": "8e80890aa9fa19a804f2caa8711582ee1424dbbedfe13b186c3ad389961383d5"
+    }
+  ],
+  "preserved_protocol": {
+    "all_unlisted_base_values_remain_authoritative": true,
+    "frozen_without_change": [
+      "primary outcome and causal question",
+      "scheduled cases and source archives",
+      "prompts and acceptance criteria",
+      "selectors and selector rationales",
+      "arms and execution surfaces",
+      "run order and time limits",
+      "measurements and scoring",
+      "zero selector replans, fallbacks, and retries",
+      "no new telemetry or instrumentation",
+      "deferred controls",
+      "closure and policy-promotion boundary"
+    ],
+    "fresh_candidate_tasks_required": true,
+    "active_codex_flow_runs_required": 0,
+    "explicit_visible_task_creation_authorization_required": true,
+    "may_promote_package_policy": false
+  },
+  "interpretation": "This addendum pins the frozen retrospective comparison to accepted v0.9.0 and current Codex App authority. A package or host compatibility failure remains a stopping condition and is not evidence for or against a routing arm. No evaluation result was examined while creating this addendum, and the comparison cannot silently change v0.9.0."
+}
