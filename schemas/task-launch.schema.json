@@ -1,0 +1,160 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://private.local/codex-flow/task-launch.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "kind", "launch_id", "authority", "expected_initial_turn",
+    "expected_git_activation", "prepared_at", "identity", "git_activation", "status",
+    "state_digest"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "kind": { "const": "codex-flow-v09-task-launch" },
+    "launch_id": { "type": "string", "pattern": "^task-launch-v09-[0-9a-f]{64}$" },
+    "authority": { "$ref": "#/$defs/authority" },
+    "expected_initial_turn": { "$ref": "#/$defs/expectedInitialTurn" },
+    "expected_git_activation": { "$ref": "#/$defs/expectedGitActivation" },
+    "prepared_at": { "$ref": "#/$defs/timestamp" },
+    "identity": {
+      "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/identity" }]
+    },
+    "git_activation": {
+      "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/gitActivation" }]
+    },
+    "status": { "enum": ["prepared", "identity-admitted", "git-activated", "active"] },
+    "state_digest": { "$ref": "#/$defs/digest" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "status": { "const": "prepared" } } },
+      "then": {
+        "properties": { "identity": { "type": "null" }, "git_activation": { "type": "null" } }
+      }
+    },
+    {
+      "if": { "properties": { "status": { "const": "identity-admitted" } } },
+      "then": {
+        "properties": { "identity": { "$ref": "#/$defs/identity" }, "git_activation": { "type": "null" } }
+      }
+    },
+    {
+      "if": { "properties": { "status": { "const": "git-activated" } } },
+      "then": {
+        "properties": { "identity": { "type": "null" }, "git_activation": { "$ref": "#/$defs/gitActivation" } }
+      }
+    },
+    {
+      "if": { "properties": { "status": { "const": "active" } } },
+      "then": {
+        "properties": { "identity": { "$ref": "#/$defs/identity" }, "git_activation": { "$ref": "#/$defs/gitActivation" } }
+      }
+    }
+  ],
+  "$defs": {
+    "safeId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9_.-]+$"
+    },
+    "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "revision": { "type": "string", "pattern": "^[0-9a-f]{40,64}$" },
+    "timestamp": { "type": "string", "format": "date-time", "maxLength": 64 },
+    "absolutePath": { "type": "string", "pattern": "^/", "maxLength": 2048 },
+    "branch": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "coordinatorBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["lineage_id", "thread_id", "generation", "binding_digest"],
+      "properties": {
+        "lineage_id": { "$ref": "#/$defs/safeId" },
+        "thread_id": { "$ref": "#/$defs/safeId" },
+        "generation": { "type": "integer", "minimum": 1, "maximum": 2147483647 },
+        "binding_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "run_id", "operation_id", "release_id", "ready_thread_id", "contract_id",
+        "runtime_context_digest", "configuration_digest", "repository_id", "common_dir",
+        "coordinator_binding", "plan_id", "revision_digest", "task_id", "task_digest",
+        "baseline_revision"
+      ],
+      "properties": {
+        "run_id": { "$ref": "#/$defs/safeId" },
+        "operation_id": { "$ref": "#/$defs/safeId" },
+        "release_id": { "$ref": "#/$defs/safeId" },
+        "ready_thread_id": { "$ref": "#/$defs/safeId" },
+        "contract_id": { "$ref": "#/$defs/digest" },
+        "runtime_context_digest": { "$ref": "#/$defs/digest" },
+        "configuration_digest": { "$ref": "#/$defs/digest" },
+        "repository_id": { "$ref": "#/$defs/safeId" },
+        "common_dir": { "$ref": "#/$defs/absolutePath" },
+        "coordinator_binding": { "$ref": "#/$defs/coordinatorBinding" },
+        "plan_id": { "$ref": "#/$defs/safeId" },
+        "revision_digest": { "$ref": "#/$defs/digest" },
+        "task_id": { "$ref": "#/$defs/safeId" },
+        "task_digest": { "$ref": "#/$defs/digest" },
+        "baseline_revision": { "$ref": "#/$defs/revision" }
+      }
+    },
+    "expectedInitialTurn": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["launch_nonce", "bootstrap_digest"],
+      "properties": {
+        "launch_nonce": { "$ref": "#/$defs/digest" },
+        "bootstrap_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "expectedGitActivation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["worktree_path", "common_dir", "executor_branch", "baseline_revision"],
+      "properties": {
+        "worktree_path": { "$ref": "#/$defs/absolutePath" },
+        "common_dir": { "$ref": "#/$defs/absolutePath" },
+        "executor_branch": { "$ref": "#/$defs/branch" },
+        "baseline_revision": { "$ref": "#/$defs/revision" }
+      }
+    },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "thread_id", "turn_id", "turn_index", "role", "launch_nonce", "content_digest",
+        "observed_at", "identity_digest"
+      ],
+      "properties": {
+        "thread_id": { "$ref": "#/$defs/safeId" },
+        "turn_id": { "$ref": "#/$defs/safeId" },
+        "turn_index": { "const": 1 },
+        "role": { "const": "user" },
+        "launch_nonce": { "$ref": "#/$defs/digest" },
+        "content_digest": { "$ref": "#/$defs/digest" },
+        "observed_at": { "$ref": "#/$defs/timestamp" },
+        "identity_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "gitActivation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "worktree_path", "common_dir", "branch", "revision", "cleanliness", "observed_at",
+        "activation_digest"
+      ],
+      "properties": {
+        "worktree_path": { "$ref": "#/$defs/absolutePath" },
+        "common_dir": { "$ref": "#/$defs/absolutePath" },
+        "branch": { "$ref": "#/$defs/branch" },
+        "revision": { "$ref": "#/$defs/revision" },
+        "cleanliness": { "const": "clean" },
+        "observed_at": { "$ref": "#/$defs/timestamp" },
+        "activation_digest": { "$ref": "#/$defs/digest" }
+      }
+    }
+  }
+}
