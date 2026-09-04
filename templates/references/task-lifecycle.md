@@ -1,7 +1,7 @@
 # v0.9 task lifecycle
 
-Package authority during development is `v0.9.0-dev.0`. Every run snapshots
-that exact runtime and uses it until completion.
+Current RC package authority is `v0.9.0-rc.1`. Every run snapshots that exact
+runtime and uses it until completion.
 
 ```text
 workflow contract
