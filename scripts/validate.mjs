@@ -13,7 +13,7 @@ import {
 import { validateReleaseIdentity } from "./release-identity.mjs";
 
 const root = resolve(import.meta.dirname, "..");
-const EXPECTED_PACKAGE_VERSION = "0.8.3";
+const EXPECTED_PACKAGE_VERSION = "0.9.0-dev.0";
 
 // ACTIVE V0.7 SCHEMA REGISTRY INSERTION POINT:
 // add every new operating schema here in the same change that introduces it.
@@ -205,7 +205,7 @@ function compileActiveSchemas(schemas) {
 const packageJson = JSON.parse(await readRequired("package.json"));
 const plugin = JSON.parse(await readRequired(".codex-plugin/plugin.json"));
 if (PACKAGE_VERSION !== EXPECTED_PACKAGE_VERSION) {
-  throw new Error(`v0.8 source must identify as ${EXPECTED_PACKAGE_VERSION}`);
+  throw new Error(`v0.9 source must identify as ${EXPECTED_PACKAGE_VERSION}`);
 }
 if (packageJson.version !== PACKAGE_VERSION || plugin.version !== PACKAGE_VERSION) {
   throw new Error("Package, plugin, and runtime versions must match");

@@ -16,15 +16,15 @@ See [Mission and product boundary](docs/mission.md) for the durable charter.
 ## Current authority
 
 This public repository is the editing authority and remains `UNLICENSED`;
-public visibility does not grant an open-source license. v0.8 is the sole
-current package, runtime, schema, skill, and operational-state authority.
-Earlier releases remain source-history and immutable-tag evidence only; v0.8
+public visibility does not grant an open-source license. v0.9 is the sole
+editable package, runtime, schema, skill, and operational-state authority.
+Earlier releases remain source-history and immutable-tag evidence only; v0.9
 packages no general predecessor reader, mutator, migration path, retirement
 command, tracked adoption, or predecessor test fixture. Its only compatibility
 surface is the bounded refresh authority described below.
 
-The accepted public release and this checkout's package authority are v0.8.3.
-v0.8 carries forward the proven
+The accepted public release remains v0.8.3. This checkout is the unreleased
+v0.9.0-dev.0 development authority. v0.9 carries forward the proven
 cross-task behavior under `codex-flow-v08-*` identities and exact-version
 Git-common namespaces. It retains a bounded foreign-active-run sentinel:
 ordinary activation never silently ignores or migrates a live predecessor run.
