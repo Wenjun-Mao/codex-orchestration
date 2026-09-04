@@ -162,7 +162,41 @@ async function createAbandonedV08Run({
     "run", "abandon", "--run-id", runId, "--file", abandonPath, "--json",
   ], root);
   assertSuccess(abandonedCall, "v0.8.3 prior run abandonment");
-  return { activated, request, runtimeCli };
+  return { activated, request, runtimeCli, abandoned: JSON.parse(abandonedCall.stdout) };
+}
+
+async function prepareSelectedAbandonedV08Refresh({ root, requests, sourcePackage, targetPackage }) {
+  const source = await createAbandonedV08Run({
+    root,
+    requests,
+    sourcePackage,
+    runId: "refresh-v08-selected-already-abandoned",
+  });
+  const targetSkill = resolve(targetPackage.root, "skills/refresh/SKILL.md");
+  const inspectionCall = invoke(targetPackage.cli, [
+    "refresh", "inspect", "--invoking-skill", targetSkill, "--json",
+  ], root);
+  assertSuccess(inspectionCall, "already-terminal refresh inspection");
+  assert.equal(JSON.parse(inspectionCall.stdout).route, "refresh-ready");
+  const preparePath = await jsonFile(requests, "refresh-already-terminal-prepare", {
+    source_namespace: "v0.8.3",
+    source_run_id: source.request.run_id,
+    source_resume: source.activated.run.binding,
+    decisions: [],
+    replacements: [],
+    target_workflow: null,
+    target_fences: {
+      path_fences: [],
+      resource_fences: [],
+      branch_fences: [],
+    },
+    target_coordinator_thread_id: source.request.runtime.lineage.thread_id,
+  });
+  const preparedCall = invoke(targetPackage.cli, [
+    "refresh", "prepare", "--invoking-skill", targetSkill, "--file", preparePath, "--json",
+  ], root);
+  assertSuccess(preparedCall, "already-terminal refresh preparation");
+  return { source, handoff: JSON.parse(preparedCall.stdout).handoff };
 }
 
 async function createV08Source({
@@ -759,6 +793,73 @@ test("v0.9 refresh rejects an abandoned predecessor that retains a live Git fenc
   const inspection = JSON.parse(inspectionCall.stdout);
   assert.equal(inspection.route, "blocked");
   assert.match(inspection.reason, /Earlier source run is not cleanup-complete/);
+});
+
+test("v0.9 refresh recognizes a selected source already abandoned before preparation", async (t) => {
+  const root = await createGitFixture("codex-flow-refresh-v09-selected-terminal-");
+  const requests = await mkdtemp(resolve(tmpdir(), "codex-flow-refresh-v09-selected-terminal-requests-"));
+  const sourcePackage = await extractTaggedPackage("v0.8.3");
+  const targetPackage = await copyCurrentPackage();
+  t.after(async () => {
+    await Promise.all([
+      removeFixture(root),
+      rm(requests, { recursive: true, force: true }),
+      rm(sourcePackage.root, { recursive: true, force: true }),
+      rm(targetPackage.root, { recursive: true, force: true }),
+    ]);
+  });
+
+  const { source, handoff } = await prepareSelectedAbandonedV08Refresh({
+    root,
+    requests,
+    sourcePackage,
+    targetPackage,
+  });
+  const applied = await applyRefresh({
+    commonDir: source.activated.state_authority.git_common_dir,
+    refreshId: handoff.refresh_id,
+    expectedHandoffDigest: handoff.handoff_digest,
+    archiveEvidence: [],
+    appliedAt: new Date().toISOString(),
+  });
+
+  assert.equal(applied.status, "consumed-clean-start");
+  assert.equal(applied.handoff.source_retirement.method, "already-terminal");
+  assert.equal(applied.handoff.source_retirement.terminal_status, "abandoned");
+  assert.ok(Date.parse(applied.handoff.source_retirement.retired_at) >= Date.parse(handoff.intent.prepared_at));
+  assert.ok(Date.parse(source.abandoned.run.terminal.abandoned_at) <= Date.parse(handoff.intent.prepared_at));
+  await assert.rejects(stat(resolve(root, ".git/codex-flow/v0.8.3")), /ENOENT/);
+});
+
+test("v0.9 refresh rejects drift in a selected already-terminal source", async (t) => {
+  const root = await createGitFixture("codex-flow-refresh-v09-terminal-drift-");
+  const requests = await mkdtemp(resolve(tmpdir(), "codex-flow-refresh-v09-terminal-drift-requests-"));
+  const sourcePackage = await extractTaggedPackage("v0.8.3");
+  const targetPackage = await copyCurrentPackage();
+  t.after(async () => {
+    await Promise.all([
+      removeFixture(root),
+      rm(requests, { recursive: true, force: true }),
+      rm(sourcePackage.root, { recursive: true, force: true }),
+      rm(targetPackage.root, { recursive: true, force: true }),
+    ]);
+  });
+
+  const { source, handoff } = await prepareSelectedAbandonedV08Refresh({
+    root,
+    requests,
+    sourcePackage,
+    targetPackage,
+  });
+  await writeFile(resolve(root, ".git/codex-flow/v0.8.3/runs/lifecycle.json"), "{}\n", "utf8");
+
+  await assert.rejects(applyRefresh({
+    commonDir: source.activated.state_authority.git_common_dir,
+    refreshId: handoff.refresh_id,
+    expectedHandoffDigest: handoff.handoff_digest,
+    archiveEvidence: [],
+    appliedAt: new Date().toISOString(),
+  }), /Refresh source state changed after handoff preparation/);
 });
 
 test("v0.9 mixed refresh preserves integrated work and reissues only the discarded assignment", async (t) => {
