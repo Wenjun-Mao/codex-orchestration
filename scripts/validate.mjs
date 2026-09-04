@@ -13,7 +13,7 @@ import {
 import { validateReleaseIdentity } from "./release-identity.mjs";
 
 const root = resolve(import.meta.dirname, "..");
-const EXPECTED_PACKAGE_VERSION = "0.9.0-rc.3";
+const EXPECTED_PACKAGE_VERSION = "0.9.0-rc.4";
 
 const ACTIVE_SCHEMA_NAMES = Object.freeze([
   "archive-operation",
@@ -387,7 +387,7 @@ for (const [path, markers] of new Map([
   ["templates/references/communication-loop.md", ["Routine completion", "quiet", "Urgent interruption"]],
   ["templates/references/host-operations.md", ["full contract", "task launch start", "one native creation call", "opaque"]],
   ["templates/references/parallel-execution.md", ["acyclic dependency graph", "Visible tasks", "Native subagents"]],
-  ["templates/references/task-lifecycle.md", ["v0.9.0-rc.3", "first prompt", "terminal-receipt-v4", "launch"]],
+  ["templates/references/task-lifecycle.md", ["v0.9.0-rc.4", "first prompt", "terminal-receipt-v4", "launch"]],
   ["templates/roles/coordinator.md", ["full assignment", "quiet journal", "Close only"]],
   ["templates/roles/executor.md", ["task launch start", "same first turn", "terminal-receipt-v4"]],
 ])) {

@@ -12,7 +12,7 @@ canary pass.
 | Replaceable selector policy and deliberate overrides | `selector-policy-v09.test.mjs` |
 | Typed Codex App evidence, ready/provisional/opaque shapes, duplicate discovery, and contradictions | `codex-app-adapter-v09.test.mjs` |
 | First-turn launch, exact executor claim, linked-worktree activation, one-shot creation, crash recovery, and negative identity/Git cases | `task-launch-v09.test.mjs` |
-| Full launch through callback, disposition, integration/no-change, verification, archive, cleanup, and audit joins | `lifecycle-v09.test.mjs`, `run-lifecycle-v09.test.mjs` |
+| Full launch through callback, disposition, integration/no-change, verification, archive, cleanup, and audit joins, including callback-before-App-result selector enrichment | `lifecycle-v09.test.mjs`, `run-lifecycle-v09.test.mjs` |
 | Quiet completion and separate one-shot urgent interruption | `lifecycle-v09.test.mjs`, `urgent-v09.test.mjs` |
 | Explicit read-only native-subagent lifecycle and selector rejection | `subagent-v09.test.mjs` |
 | Public/private archive evidence | `codex-app-private-archive-v09.test.mjs` |

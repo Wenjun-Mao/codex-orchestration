@@ -56,9 +56,10 @@ export async function createActiveTaskLaunch(root, suffix, {
   task = {},
   executorBranch = `codex/lifecycle-v09-${suffix}`,
   executorPath = resolve(root, `../${basename(root)}-${suffix}-executor`),
+  reconcileCreation = true,
 } = {}) {
   const commonDir = await realpath(resolve(root, ".git"));
-  const stateRoot = resolve(commonDir, "codex-flow", "v0.9.0-rc.3");
+  const stateRoot = resolve(commonDir, "codex-flow", "v0.9.0-rc.4");
   const baseline = git(root, ["rev-parse", "HEAD"]);
   const coordinator = {
     lineage_id: `lifecycle-lineage-${suffix}`,
@@ -129,7 +130,7 @@ export async function createActiveTaskLaunch(root, suffix, {
   });
   git(root, ["worktree", "add", "--quiet", "--detach", executorPath, baseline]);
   const executorThreadId = `lifecycle-executor-${suffix}`;
-  await startTaskLaunch({
+  const started = await startTaskLaunch({
     stateRoot,
     launchId: prepared.launch_id,
     launchNonce: prepared.launch_nonce,
@@ -137,24 +138,26 @@ export async function createActiveTaskLaunch(root, suffix, {
     repositoryPath: executorPath,
     now: BASE_TIME + 2_000,
   });
-  const launch = await reconcileTaskLaunch({
-    stateRoot,
-    launchId: prepared.launch_id,
-    outcome: "ready",
-    hostId: "local",
-    readyThreadId: executorThreadId,
-    selectorEvidence: {
-      accepted: {
-        project_id: requestedSelectors.project_id,
-        model: requestedSelectors.model,
-        reasoning_effort: requestedSelectors.reasoning_effort,
-        observed_at: new Date(BASE_TIME + 2_500).toISOString(),
+  const launch = reconcileCreation
+    ? await reconcileTaskLaunch({
+      stateRoot,
+      launchId: prepared.launch_id,
+      outcome: "ready",
+      hostId: "local",
+      readyThreadId: executorThreadId,
+      selectorEvidence: {
+        accepted: {
+          project_id: requestedSelectors.project_id,
+          model: requestedSelectors.model,
+          reasoning_effort: requestedSelectors.reasoning_effort,
+          observed_at: new Date(BASE_TIME + 2_500).toISOString(),
+        },
+        observed: null,
       },
-      observed: null,
-    },
-    observedAt: new Date(BASE_TIME + 2_500).toISOString(),
-    now: BASE_TIME + 2_500,
-  });
+      observedAt: new Date(BASE_TIME + 2_500).toISOString(),
+      now: BASE_TIME + 2_500,
+    })
+    : started;
   return {
     root,
     stateRoot,

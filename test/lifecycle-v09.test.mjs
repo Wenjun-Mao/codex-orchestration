@@ -7,6 +7,9 @@ import {
   observeCallback,
 } from "../lib/callbacks.mjs";
 import {
+  reconcileTaskLaunch,
+} from "../lib/core/task-launch.mjs";
+import {
   finalizeTaskDisposition,
   prepareTaskDisposition,
 } from "../lib/dispositions.mjs";
@@ -296,6 +299,101 @@ test("v0.9 admits only launch-bound evidence and completes clean-commit integrat
     assert.equal(audit.audit.terminal_ready, true);
     assert.equal(audit.audit.counts.integrations, 1);
     context = null;
+  } finally {
+    if (context !== null) {
+      try {
+        git(root, ["worktree", "remove", "--force", context.executorPath]);
+      } catch {}
+    }
+    await removeFixture(root);
+  }
+});
+
+test("selector evidence may enrich after callback admission without deadlocking disposition", async () => {
+  const root = await createGitFixture("codex-flow-v09-selector-race-");
+  let context = null;
+  try {
+    context = await createActiveTaskLaunch(root, "selector-race", {
+      reconcileCreation: false,
+    });
+    await mkdir(`${context.executorPath}/audit-sentinel`, { recursive: true });
+    await writeFile(
+      `${context.executorPath}/audit-sentinel/selector-race.txt`,
+      "callback precedes host-result reconciliation\n",
+      "utf8",
+    );
+    git(context.executorPath, ["add", "audit-sentinel/selector-race.txt"]);
+    git(context.executorPath, ["commit", "--quiet", "-m", "test: cover selector evidence race"]);
+    const authoritativeSelector = {
+      model: context.requestedSelectors.model,
+      reasoning_effort: context.requestedSelectors.reasoning_effort,
+    };
+    const receipt = {
+      ...terminalReceiptV4(context, {
+        kind: "clean-commit",
+        baseline_revision: context.baseline,
+        commit: git(context.executorPath, ["rev-parse", "HEAD"]),
+        branch: context.executorBranch,
+        upstream: null,
+        cleanliness: "clean",
+      }),
+      model_evidence: {
+        configured: authoritativeSelector,
+        requested: authoritativeSelector,
+        accepted: null,
+        observed: null,
+      },
+    };
+    await assert.rejects(
+      deliverCallback({
+        stateRoot: context.stateRoot,
+        receipt: {
+          ...receipt,
+          model_evidence: {
+            ...receipt.model_evidence,
+            accepted: authoritativeSelector,
+          },
+        },
+        expectedRunId: context.contract.run_id,
+      }),
+      /accepted model evidence|selector evidence/i,
+    );
+    const delivered = await deliverCallback({
+      stateRoot: context.stateRoot,
+      receipt,
+      expectedRunId: context.contract.run_id,
+    });
+
+    await reconcileTaskLaunch({
+      stateRoot: context.stateRoot,
+      launchId: context.launch.launch_id,
+      outcome: "provisional",
+      hostId: "local",
+      provisionalId: "client-new-thread:selector-race",
+      selectorEvidence: {
+        accepted: {
+          project_id: context.requestedSelectors.project_id,
+          model: context.requestedSelectors.model,
+          reasoning_effort: context.requestedSelectors.reasoning_effort,
+          observed_at: "2026-09-04T12:00:03.000Z",
+        },
+        observed: null,
+      },
+      observedAt: "2026-09-04T12:00:03.000Z",
+      now: Date.parse("2026-09-04T12:00:03.000Z"),
+    });
+    await observeCallback({
+      stateRoot: context.stateRoot,
+      callbackId: delivered.callback_id,
+      recipient: recipient(context),
+    });
+    const disposition = await prepareTaskDisposition({
+      stateRoot: context.stateRoot,
+      callbackId: delivered.callback_id,
+      decision: "accepted-for-integration",
+      reason: "Later host evidence may enrich, but not contradict, the admitted receipt.",
+    });
+    assert.equal(disposition.state, "prepared");
   } finally {
     if (context !== null) {
       try {
