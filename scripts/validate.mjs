@@ -13,7 +13,7 @@ import {
 import { validateReleaseIdentity } from "./release-identity.mjs";
 
 const root = resolve(import.meta.dirname, "..");
-const EXPECTED_PACKAGE_VERSION = "0.8.1";
+const EXPECTED_PACKAGE_VERSION = "0.8.2-dev.0";
 
 // ACTIVE V0.7 SCHEMA REGISTRY INSERTION POINT:
 // add every new operating schema here in the same change that introduces it.
@@ -357,6 +357,17 @@ assertMarkers(await readRequired("docs/coverage-v0.7.md"), [
   "task create resolve-private",
   "npm run test:v07",
 ], "docs/coverage-v0.7.md");
+assertMarkers(await readRequired("docs/coverage-v0.8.md"), [
+  "Long-lived private task resolution stays exact",
+  "Multi-GiB source sessions stream within a finite envelope",
+  "authenticated exact-v0.8.1 bridge emits only a reconcile request",
+], "docs/coverage-v0.8.md");
+assertMarkers(await readRequired("docs/adr/0042-long-lived-private-task-resolution.md"), [
+  "32 MiB-per-line envelope",
+  "mcp_tool_call_end",
+  "read-only recovery adapter for exact v0.8.1 source authority",
+  "Only the immutable v0.8.1 CLI may consume that request",
+], "docs/adr/0042-long-lived-private-task-resolution.md");
 
 const skillContracts = new Map([
   ["index", [
@@ -372,6 +383,8 @@ const skillContracts = new Map([
     "Discard",
     "run activate --refresh-id",
     "exact v0.7.8 adapter",
+    "recovery v0.8.1 resolve-private",
+    "writes only the unwrapped reconcile request",
     "Do not add recurring preflights, daemons, registries",
   ]],
   ["coordinate", [
@@ -435,6 +448,8 @@ const templateContracts = new Map([
     "coordinator-owned `task create bind`",
     "send its exact prompt at most once",
     "Archive is also a prepared/reconciled host operation",
+    "mcp_tool_call_end",
+    "multi-GiB",
   ]],
   ["templates/references/parallel-execution.md", [
     "acyclic dependency graph",
@@ -447,7 +462,7 @@ const templateContracts = new Map([
     "persist the signal before one identified interrupt attempt",
   ]],
   ["templates/references/task-lifecycle.md", [
-    ".git/codex-flow/v0.8.1/runtimes/<bundle-sha256>/",
+    ".git/codex-flow/v0.8.2-dev.0/runtimes/<bundle-sha256>/",
     "content-addressed intent precedes the detached",
     "terminal-receipt-v3 journal result without messaging",
     "content-addressed PASS verification and integration/no-change records",

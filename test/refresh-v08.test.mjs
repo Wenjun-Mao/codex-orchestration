@@ -29,7 +29,10 @@ import {
   refreshStatus,
 } from "../lib/refresh-v08.mjs";
 import { privateArchiveObservationDigest } from "../lib/codex-app-private-archive-v07.mjs";
-import { loadRefreshSourceAuthority } from "../lib/refresh-source-v08.mjs";
+import {
+  loadRefreshSourceAuthority,
+  refreshNamespaceTreeDigest,
+} from "../lib/refresh-source-v08.mjs";
 import { runCombinedVerification } from "../lib/verifications-v07.mjs";
 import { terminalReceipt } from "./v07-lifecycle-fixture.mjs";
 import {
@@ -413,6 +416,198 @@ async function createSourceExecutor({
     sourceBranch,
     coordinatorThread,
     coordinator: activation.runtime.lineage,
+    readyThreadId,
+  };
+}
+
+async function createProvisionalSourceExecutor({ root, requests, codexHome, sourceCli }) {
+  const task = sourceTask({
+    task_id: "private-recovery-source",
+    title: "Recover the exact private executor identity",
+    model: "gpt-5.6-luna",
+    reasoning_effort: "medium",
+    selector_rationale: "Luna-medium is sufficient for the bounded recovery fixture.",
+  });
+  const sourceBranch = "codex/private-recovery-source";
+  const coordinatorThread = "private-recovery-coordinator";
+  const activation = activationRequest({
+    runId: "private-recovery-source-run",
+    task,
+    lineageId: "private-recovery-source-lineage",
+    threadId: coordinatorThread,
+    branch: sourceBranch,
+  });
+  const activationPath = await jsonFile(requests, "private-source-activation", activation);
+  const activated = invoke(sourceCli, [
+    "run", "activate", "--run-id", activation.run_id, "--file", activationPath, "--json",
+  ], root, { CODEX_THREAD_ID: coordinatorThread });
+  assertSuccess(activated, "v0.8.1 private source activation");
+  const authority = JSON.parse(activated.stdout);
+  const runtimeCli = resolve(authority.runtime_authority.bundle_root, "bin", "codex-flow.mjs");
+  const contractPath = await jsonFile(requests, "private-source-contract", {
+    run_id: activation.run_id,
+    plan_id: activation.workflow.plan_id,
+    task_id: task.task_id,
+    dependency_authorities: [],
+  });
+  const contracted = invoke(runtimeCli, [
+    "workflow", "contract", "--run-id", activation.run_id, "--file", contractPath, "--json",
+  ], root);
+  assertSuccess(contracted, "v0.8.1 private source contract");
+  const contract = JSON.parse(contracted.stdout);
+  const baseline = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+  const selectors = {
+    project_id: "refresh-project",
+    model: task.model,
+    reasoning_effort: task.reasoning_effort,
+    worktree: {
+      mode: "host-worktree",
+      starting_revision: baseline,
+      starting_branch: "main",
+      executor_branch: sourceBranch,
+      path: null,
+    },
+  };
+  const preparePath = await jsonFile(requests, "private-source-prepare", {
+    run_id: activation.run_id,
+    task_contract: contract,
+    requested_selectors: selectors,
+  });
+  const prepared = invoke(runtimeCli, [
+    "task", "create", "prepare", "--run-id", activation.run_id,
+    "--file", preparePath, "--json",
+  ], root);
+  assertSuccess(prepared, "v0.8.1 private source preparation");
+  const creation = JSON.parse(prepared.stdout);
+  const attemptPath = await jsonFile(requests, "private-source-attempt", {
+    run_id: activation.run_id,
+    operation_id: creation.operation_id,
+    host_session_id: "private-recovery-host-session",
+    timeout_seconds: 300,
+  });
+  const attempted = invoke(runtimeCli, [
+    "task", "create", "attempt", "--run-id", activation.run_id,
+    "--file", attemptPath, "--json",
+  ], root);
+  assertSuccess(attempted, "v0.8.1 private source attempt");
+  const attempt = JSON.parse(attempted.stdout);
+  const provisionalClientThreadId = "client-new-thread:private-recovery-source";
+  const readyThreadId = "private-recovery-ready-task";
+  const observedAt = new Date().toISOString();
+  const provisionalPath = await jsonFile(requests, "private-source-provisional", {
+    run_id: activation.run_id,
+    operation_id: creation.operation_id,
+    outcome: "provisional",
+    provisional_client_thread_id: provisionalClientThreadId,
+    selector_evidence: {
+      accepted: { ...selectors, accepted_at: observedAt },
+      observed: null,
+    },
+  });
+  assertSuccess(invoke(runtimeCli, [
+    "task", "create", "reconcile", "--run-id", activation.run_id,
+    "--file", provisionalPath, "--json",
+  ], root), "v0.8.1 private source provisional reconciliation");
+
+  await writeFile(resolve(codexHome, ".codex-global-state.json"), JSON.stringify({
+    "electron-persisted-atom-state": {
+      "client-thread-bindings-v1": { [provisionalClientThreadId]: readyThreadId },
+      [`thread-client-id-v1:${encodeURIComponent(`local:${readyThreadId}`)}`]: provisionalClientThreadId,
+      "electron:last-seen-changelog-release-family": "26.831",
+    },
+  }));
+  const sessionDirectory = resolve(codexHome, "sessions", "2026", "09", "03");
+  await mkdir(sessionDirectory, { recursive: true });
+  const hostArguments = {
+    prompt: attempt.host_request.prompt,
+    title: task.title,
+    model: task.model,
+    thinking: task.reasoning_effort,
+    target: {
+      type: "project",
+      projectId: selectors.project_id,
+      environment: {
+        type: "worktree",
+        startingState: { type: "branch", branchName: selectors.worktree.starting_branch },
+      },
+    },
+  };
+  await writeFile(
+    resolve(sessionDirectory, `rollout-private-${coordinatorThread}.jsonl`),
+    [
+      {
+        timestamp: observedAt,
+        type: "session_meta",
+        payload: { id: coordinatorThread },
+      },
+      {
+        timestamp: observedAt,
+        type: "event_msg",
+        payload: {
+          type: "mcp_tool_call_end",
+          call_id: "private-recovery-create-call",
+          invocation: { server: "codex_app", tool: "create_thread", arguments: hostArguments },
+          duration: { secs: 1, nanos: 0 },
+          result: {
+            Ok: {
+              content: [{
+                type: "text",
+                text: JSON.stringify({ clientThreadId: provisionalClientThreadId, hostId: "local" }),
+              }],
+              isError: false,
+            },
+          },
+        },
+      },
+    ].map((row) => JSON.stringify(row)).join("\n") + "\n",
+  );
+  const turnId = "private-recovery-ready-turn";
+  const childObservedAt = new Date(Date.parse(observedAt) + 100).toISOString();
+  const delegation = [
+    "<codex_delegation>",
+    `  <source_thread_id>${coordinatorThread}</source_thread_id>`,
+    `  <input>${attempt.host_request.prompt}</input>`,
+    "</codex_delegation>",
+  ].join("\n");
+  await writeFile(
+    resolve(sessionDirectory, `rollout-private-${readyThreadId}.jsonl`),
+    [
+      {
+        timestamp: childObservedAt,
+        type: "session_meta",
+        payload: {
+          id: readyThreadId,
+          thread_source: "agent_created_thread",
+          cwd: resolve(codexHome, "worktrees", "private-recovery"),
+          cli_version: "0.153.0",
+          git: { commit_hash: baseline },
+        },
+      },
+      { timestamp: childObservedAt, type: "event_msg", payload: { type: "task_started", turn_id: turnId } },
+      {
+        timestamp: childObservedAt,
+        type: "turn_context",
+        payload: { turn_id: turnId, model: task.model, effort: task.reasoning_effort },
+      },
+      {
+        timestamp: childObservedAt,
+        type: "response_item",
+        payload: {
+          type: "function_call_output",
+          namespace: "codex_app",
+          name: "create_thread",
+          output: delegation,
+        },
+      },
+      { timestamp: childObservedAt, type: "event_msg", payload: { type: "task_complete", turn_id: turnId } },
+    ].map((row) => JSON.stringify(row)).join("\n") + "\n",
+  );
+  return {
+    activation,
+    authority,
+    runtimeCli,
+    creation,
+    coordinatorThread,
     readyThreadId,
   };
 }
@@ -1612,6 +1807,86 @@ test("refresh accepts only the exact v0.7.8 adapter as a legacy source", async (
   await assert.rejects(stat(resolve(root, ".git", "codex-flow", "v0.7.8")), /ENOENT/);
 });
 
+test("v0.8.2 CLI recovers one exact v0.8.1 private operation without mutating source state", async (t) => {
+  const root = await createGitFixture("codex-flow-v081-private-recovery-");
+  const requests = await mkdtemp(resolve(tmpdir(), "codex-flow-v081-private-recovery-requests-"));
+  const codexHome = await mkdtemp(resolve(tmpdir(), "codex-flow-v081-private-recovery-home-"));
+  const sourcePackage = await copyTaggedPackage("v0.8.1");
+  const targetPackage = await copyTargetPackage("0.8.2-rc.1");
+  t.after(async () => Promise.all([
+    removeFixture(root),
+    rm(requests, { recursive: true, force: true }),
+    rm(codexHome, { recursive: true, force: true }),
+    rm(sourcePackage.root, { recursive: true, force: true }),
+    rm(targetPackage.root, { recursive: true, force: true }),
+  ]));
+  const source = await createProvisionalSourceExecutor({
+    root,
+    requests,
+    codexHome,
+    sourceCli: sourcePackage.cli,
+  });
+  const commonDir = await realpath(resolve(root, ".git"));
+  const before = await refreshNamespaceTreeDigest({ commonDir, namespace: "v0.8.1" });
+  const requestPath = resolve(requests, "recovered-v081-request.json");
+  const args = [
+    "recovery", "v0.8.1", "resolve-private",
+    "--run-id", source.activation.run_id,
+    "--operation-id", source.creation.operation_id,
+    "--out", requestPath,
+    "--json",
+  ];
+  const recovered = invoke(targetPackage.cli, args, root, {
+    CODEX_HOME: codexHome,
+    CODEX_THREAD_ID: source.coordinatorThread,
+  });
+  assertSuccess(recovered, "exact v0.8.1 private recovery bridge");
+  const output = JSON.parse(recovered.stdout);
+  const request = JSON.parse(await readFile(requestPath, "utf8"));
+  assert.equal(output.source_authority.package_version, "0.8.1");
+  assert.equal(output.source_authority.bundle_sha256, source.authority.package_authority.bundle_sha256);
+  assert.equal(output.source_authority.source_cli_path, source.runtimeCli);
+  assert.equal(output.source_reconcile.executable, source.runtimeCli);
+  assert.equal(output.reconcile_request_sha256.length, 64);
+  assert.equal(request.run_id, source.activation.run_id);
+  assert.equal(request.operation_id, source.creation.operation_id);
+  assert.equal(request.outcome, "ready");
+  assert.equal(request.ready_thread_id, source.readyThreadId);
+  assert.deepEqual(
+    await refreshNamespaceTreeDigest({ commonDir, namespace: "v0.8.1" }),
+    before,
+  );
+
+  const wrongThread = invoke(targetPackage.cli, [
+    ...args.slice(0, -3),
+    "--out", resolve(requests, "wrong-thread.json"), "--json",
+  ], root, { CODEX_HOME: codexHome, CODEX_THREAD_ID: "different-coordinator" });
+  assert.notEqual(wrongThread.status, 0);
+  assert.match(wrongThread.stderr, /current coordinator task/);
+
+  const missingOperation = invoke(targetPackage.cli, [
+    "recovery", "v0.8.1", "resolve-private",
+    "--run-id", source.activation.run_id,
+    "--operation-id", "missing-private-operation",
+    "--out", resolve(requests, "missing-operation.json"),
+    "--json",
+  ], root, { CODEX_HOME: codexHome, CODEX_THREAD_ID: source.coordinatorThread });
+  assert.notEqual(missingOperation.status, 0);
+  assert.match(missingOperation.stderr, /no unique visible-task creation/);
+
+  await writeFile(requestPath, "{}\n", "utf8");
+  const conflictingOutput = invoke(targetPackage.cli, args, root, {
+    CODEX_HOME: codexHome,
+    CODEX_THREAD_ID: source.coordinatorThread,
+  });
+  assert.notEqual(conflictingOutput.status, 0);
+  assert.match(conflictingOutput.stderr, /Existing state does not match/);
+  assert.deepEqual(
+    await refreshNamespaceTreeDigest({ commonDir, namespace: "v0.8.1" }),
+    before,
+  );
+});
+
 test("a later v0.8 source parses its own forward-compatible records", async (t) => {
   const root = await createGitFixture("codex-flow-refresh-forward-source-");
   const requests = await mkdtemp(resolve(tmpdir(), "codex-flow-refresh-forward-source-requests-"));
@@ -1780,7 +2055,7 @@ test("refresh skill authentication rejects a stale loaded catalog path", async (
 test("refresh inspection blocks malformed current namespace authority", async (t) => {
   const root = await createGitFixture("codex-flow-refresh-malformed-current-");
   t.after(() => removeFixture(root));
-  const lifecycleRoot = resolve(root, ".git", "codex-flow", "v0.8.1", "runs");
+  const lifecycleRoot = resolve(root, ".git", "codex-flow", "v0.8.2-dev.0", "runs");
   await mkdir(lifecycleRoot, { recursive: true });
   await writeFile(resolve(lifecycleRoot, "lifecycle.json"), "{}\n", "utf8");
   const result = runCli([

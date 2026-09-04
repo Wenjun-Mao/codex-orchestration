@@ -356,7 +356,7 @@ test("foreign active-run sentinel blocks admission and bounds foreign namespace 
   await assert.rejects(
     foreignActiveRunCollisions({
       gitCommonDirectory: commonDir,
-      currentNamespace: "v0.8.1",
+      currentNamespace: "v0.8.2-dev.0",
     }),
     /exceeds 32 namespaces/,
   );
@@ -373,7 +373,7 @@ test("clean-start guard rejects even terminal incompatible namespaces", async (t
   await assert.rejects(
     assertNoIncompatibleFlowNamespace({
       gitCommonDirectory: commonDir,
-      currentNamespace: "v0.8.1",
+      currentNamespace: "v0.8.2-dev.0",
     }),
     /Clean start required before activation.*v0\.7\.0/,
   );
@@ -434,7 +434,7 @@ test("run admission binds a persisted root workflow to its path and resource env
     }],
   });
   await createWorkflowJournal({
-    stateRoot: resolve(commonDir, "codex-flow", "v0.8.1"),
+    stateRoot: resolve(commonDir, "codex-flow", "v0.8.2-dev.0"),
     runId: "run-root-envelope",
     planId: workflow.plan_id,
     planRevision: workflow,

@@ -34,7 +34,10 @@ bounded and separate requested, accepted, and observed evidence.
    atomically. The adapter only reads evidence: it never creates or retries.
    Missing, malformed, duplicate, or contradictory private evidence remains
    unresolved ambiguity. Title, recency, and timing are never correlation
-   authority.
+   authority. v0.8.2 also recognizes the App's `mcp_tool_call_end` completion
+   shape and streams bounded multi-GiB coordinator histories without retaining
+   raw session rows. Its exact-v0.8.1 recovery bridge may emit evidence for an
+   older active run, but only that run's immutable snapshot may reconcile it.
 5. Reconcile requested, host-accepted, and independently observed project,
    model, reasoning, visibility, and worktree evidence. A non-null observed
    mismatch or missing nonce is ambiguous and blocks release.

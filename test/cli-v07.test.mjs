@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdir, mkdtemp, readFile, readdir, realpath, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, realpath, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import test from "node:test";
@@ -119,6 +119,7 @@ test("v0.7 help exposes no bare callback consume or predecessor commands", () =>
   assert.match(help.stdout, /archive prepare\|reconcile\|observe-private --run-id/);
   assert.match(help.stdout, /urgent persist\|attempt\|reconcile\|observe\|consume\|expire --run-id/);
   assert.match(help.stdout, /cleanup plan --run-id/);
+  assert.match(help.stdout, /recovery v0\.8\.1 resolve-private --run-id/);
   assert.match(help.stdout, /unplug plan/);
   assert.match(help.stdout, /unplug observe-private/);
   assert.match(help.stdout, /unplug apply/);
@@ -135,6 +136,13 @@ test("v0.7 help exposes no bare callback consume or predecessor commands", () =>
   assert.match(privateHelp.stdout, /preserves the original resolution and one-shot attempt/);
   assert.doesNotMatch(privateHelp.stderr, /ERR_PARSE_ARGS_UNKNOWN_OPTION|at parseArgs/);
 
+  const recoveryHelp = runCli(["recovery", "v0.8.1", "resolve-private", "--help"]);
+  assertSuccess(recoveryHelp, "v0.8.1 private recovery scoped help");
+  assert.match(recoveryHelp.stdout, /exact active v0\.8\.1 source run/);
+  assert.match(recoveryHelp.stdout, /--out \/absolute\/temp\/request\.json/);
+  assert.match(recoveryHelp.stdout, /v0\.8\.1 snapshot.*sole authority/s);
+  assert.doesNotMatch(recoveryHelp.stderr, /ERR_PARSE_ARGS_UNKNOWN_OPTION|at parseArgs/);
+
   const familyHelp = runCli(["release", "prepare", "--help"]);
   assertSuccess(familyHelp, "generic scoped help");
   assert.match(familyHelp.stdout, /codex-flow release prepare\|reconcile\|accept/);
@@ -147,6 +155,42 @@ test("v0.7 help exposes no bare callback consume or predecessor commands", () =>
   const predecessor = runCli(["legacy-v05", "status"]);
   assert.notEqual(predecessor.status, 0);
   assert.match(predecessor.stderr, /Unknown command: legacy-v05/);
+});
+
+test("private recovery output rejects symlink aliases and every Git worktree", async (t) => {
+  const root = await createGitFixture("codex-flow-cli-private-recovery-output-");
+  const external = await mkdtemp(resolve(tmpdir(), "codex-flow-cli-private-recovery-output-"));
+  const alias = resolve(external, "checkout-alias");
+  const linked = resolve(external, "linked-worktree");
+  let linkedCreated = false;
+  t.after(async () => {
+    if (linkedCreated) {
+      execFileSync("git", ["worktree", "remove", "--force", linked], { cwd: root });
+    }
+    await Promise.all([
+      removeFixture(root),
+      rm(external, { recursive: true, force: true }),
+    ]);
+  });
+  await symlink(root, alias, "dir");
+  const base = [
+    "recovery", "v0.8.1", "resolve-private",
+    "--run-id", "private-output-run",
+    "--operation-id", "private-output-operation",
+  ];
+  const aliased = runCli([...base, "--out", resolve(alias, "request.json"), "--json"], {
+    cwd: root,
+  });
+  assert.notEqual(aliased.status, 0);
+  assert.match(aliased.stderr, /outside the repository and Git common directory/);
+
+  execFileSync("git", ["worktree", "add", "--detach", linked, "HEAD"], { cwd: root });
+  linkedCreated = true;
+  const sibling = runCli([...base, "--out", resolve(linked, "request.json"), "--json"], {
+    cwd: root,
+  });
+  assert.notEqual(sibling.status, 0);
+  assert.match(sibling.stderr, /outside every Git worktree/);
 });
 
 test("v0.7 activation requires a clean start when an incompatible namespace remains", async (t) => {
@@ -165,7 +209,7 @@ test("v0.7 activation requires a clean start when an incompatible namespace rema
   assert.match(result.stderr, /Clean start required before activation/);
   assert.match(result.stderr, /codex-flow unplug plan/);
   await assert.rejects(
-    stat(resolve(root, ".git", "codex-flow", "v0.8.1", "runs", "lifecycle.json")),
+    stat(resolve(root, ".git", "codex-flow", "v0.8.2-dev.0", "runs", "lifecycle.json")),
     { code: "ENOENT" },
   );
 });
@@ -185,7 +229,7 @@ test("v0.7 activation cannot race an in-progress unplug", async (t) => {
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /unplug is already in progress/i);
   await assert.rejects(
-    stat(resolve(root, ".git", "codex-flow", "v0.8.1", "runs", "lifecycle.json")),
+    stat(resolve(root, ".git", "codex-flow", "v0.8.2-dev.0", "runs", "lifecycle.json")),
     { code: "ENOENT" },
   );
 });
@@ -562,8 +606,8 @@ test("run activation needs no tracked setup and replays the same disclosed autho
   const context = await activatedFixture(t, "activation");
   await assert.rejects(stat(resolve(context.root, ".codex", "orchestration")), /ENOENT/);
   assert.equal(context.result.status, "admitted");
-  assert.equal(context.result.state_authority.namespace, "v0.8.1");
-  assert.match(context.result.state_authority.state_root, /\.git\/codex-flow\/v0\.8\.1$/);
+  assert.equal(context.result.state_authority.namespace, "v0.8.2-dev.0");
+  assert.match(context.result.state_authority.state_root, /\.git\/codex-flow\/v0\.8\.2-dev\.0$/);
   assert.equal(context.result.repository_authority.cleanliness, "clean");
   assert.equal(context.result.workflow_authority.run_id, context.runId);
   assert.equal(context.result.model_routing[0].model, "gpt-5.6-terra");
@@ -624,7 +668,7 @@ test("run activation rejects a workflow outside its reservation envelope before 
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /outside the admitted run fence envelope/);
   await assert.rejects(
-    stat(resolve(root, ".git", "codex-flow", "v0.8.1")),
+    stat(resolve(root, ".git", "codex-flow", "v0.8.2-dev.0")),
     (error) => error?.code === "ENOENT",
   );
 });
@@ -643,7 +687,7 @@ test("run activation rejects a different host current task before it records aut
   assert.equal(result.status, 73);
   assert.match(result.stderr, /host's current coordinator task/);
   await assert.rejects(
-    stat(resolve(root, ".git", "codex-flow", "v0.8.1")),
+    stat(resolve(root, ".git", "codex-flow", "v0.8.2-dev.0")),
     (error) => error?.code === "ENOENT",
   );
 });
@@ -662,7 +706,7 @@ test("run activation rejects missing host current-task identity before it record
   assert.equal(result.status, 1);
   assert.match(result.stderr, /host-exposed current task identity/);
   await assert.rejects(
-    stat(resolve(root, ".git", "codex-flow", "v0.8.1")),
+    stat(resolve(root, ".git", "codex-flow", "v0.8.2-dev.0")),
     (error) => error?.code === "ENOENT",
   );
 });
@@ -681,7 +725,7 @@ test("run activation rejects malformed host current-task identity before it reco
   assert.equal(result.status, 1);
   assert.match(result.stderr, /host-exposed current task identity/);
   await assert.rejects(
-    stat(resolve(root, ".git", "codex-flow", "v0.8.1")),
+    stat(resolve(root, ".git", "codex-flow", "v0.8.2-dev.0")),
     (error) => error?.code === "ENOENT",
   );
 });
@@ -781,7 +825,7 @@ test("a second active run is refused before acquiring orphan runtime or workflow
   const contextsRoot = resolve(
     context.result.state_authority.git_common_dir,
     "codex-flow",
-    "v0.8.1",
+    "v0.8.2-dev.0",
     "contexts",
   );
   const beforeContexts = await readdir(contextsRoot);

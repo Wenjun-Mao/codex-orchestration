@@ -10,9 +10,11 @@ import {
   reconcileVisibleTaskCreation,
   recordVisibleTaskCreationAttempt,
   resolvePrivateVisibleTaskCreation,
+  resolvePrivateVisibleTaskCreationRecord,
   validateVisibleTaskCreationRecord,
   visibleTaskCreationStatus,
 } from "../lib/task-creation-v07.mjs";
+import { recoverV081PrivateTaskResolution } from "../lib/private-resolution-recovery-v08.mjs";
 import {
   coordinatorBindingDigest,
   createWorkflowPlanRevision,
@@ -81,7 +83,7 @@ async function fixture({
     generation: 1,
   };
   coordinator.binding_digest = coordinatorBindingDigest(coordinator);
-  const stateRoot = resolve(commonDir, "codex-flow", "v0.8.1");
+  const stateRoot = resolve(commonDir, "codex-flow", "v0.8.2-dev.0");
   const runId = "run-visible-task";
   const snapshot = gitSnapshot(root);
   const bundleSource = await loadRuntimeBundleSource({ packageRoot });
@@ -604,6 +606,131 @@ test("explicit private resolution binds the exact provisional ID to delegated bo
       now: START + 400_000,
     });
     assert.equal(replay.updated_at, ready.updated_at);
+  } finally {
+    await rm(codexHome, { recursive: true, force: true });
+    await removeFixture(context.root);
+  }
+});
+
+test("v0.8.2 recovers an exact v0.8.1 private request without mutating source Flow state", async () => {
+  const context = await fixture();
+  const codexHome = await mkdtemp(resolve(tmpdir(), "codex-flow-v081-private-recovery-"));
+  const provisionalClientThreadId = "client-new-thread:v081-private-recovery";
+  const readyThreadId = "ready-v081-private-recovery";
+  try {
+    const prepared = await prepareVisibleTaskCreation({
+      stateRoot: context.stateRoot,
+      taskContract: context.contract,
+      requestedSelectors: context.requested,
+      now: START,
+    });
+    const attempt = await recordVisibleTaskCreationAttempt({
+      stateRoot: context.stateRoot,
+      operationId: prepared.operation_id,
+      hostSessionId: "v081-private-recovery-session",
+      timeoutSeconds: 300,
+      now: START,
+    });
+    await reconcileVisibleTaskCreation({
+      stateRoot: context.stateRoot,
+      operationId: prepared.operation_id,
+      outcome: "provisional",
+      provisionalClientThreadId,
+      selectorEvidence: {
+        accepted: acceptedSelectors(context.requested, START + 1_200),
+        observed: null,
+      },
+      now: START + 1_200,
+    });
+    await seedPrivateTaskEvidence({
+      codexHome,
+      context,
+      attempt,
+      provisionalClientThreadId,
+      readyThreadId,
+    });
+    const recordPath = resolve(
+      context.stateRoot,
+      "visible-task-creations",
+      "records",
+      `${prepared.operation_id}.json`,
+    );
+    const before = await readFile(recordPath, "utf8");
+    const creation = validateVisibleTaskCreationRecord(JSON.parse(before));
+    const source = {
+      namespace: "v0.8.1",
+      runtime: {
+        adapter: "v0.8-source-export",
+        cli_path: "/immutable/v0.8.1/bin/codex-flow.mjs",
+        manifest: {
+          package_version: "0.8.1",
+          bundle_sha256: "a".repeat(64),
+        },
+      },
+      lifecycle: { active_run_id: context.runId },
+      run: {
+        run_id: context.runId,
+        status: "active",
+        runtime_id: "b".repeat(64),
+        runtime_context_hash: creation.runtime_context_digest,
+        binding: { lineage: { thread_id: "coordinator-thread" } },
+      },
+      task_states: [{
+        task: visibleTask(),
+        contract: context.contract,
+        creation,
+      }],
+    };
+    const recovered = await recoverV081PrivateTaskResolution({
+      source,
+      runId: context.runId,
+      operationId: prepared.operation_id,
+      coordinatorThreadId: "coordinator-thread",
+      codexHome,
+      now: START + 2_000,
+    });
+    assert.equal(recovered.source_authority.namespace, "v0.8.1");
+    assert.equal(
+      recovered.source_authority.source_cli_path,
+      "/immutable/v0.8.1/bin/codex-flow.mjs",
+    );
+    assert.equal(recovered.reconcile_request.ready_thread_id, readyThreadId);
+    assert.equal(await readFile(recordPath, "utf8"), before);
+    await assert.rejects(
+      recoverV081PrivateTaskResolution({
+        source,
+        runId: context.runId,
+        operationId: prepared.operation_id,
+        coordinatorThreadId: "different-coordinator",
+        codexHome,
+        now: START + 2_000,
+      }),
+      /does not match the active coordinator run/,
+    );
+    const direct = await resolvePrivateVisibleTaskCreationRecord({
+      record: creation,
+      codexHome,
+      now: START + 2_000,
+    });
+    assert.deepEqual(direct.reconcile_request, recovered.reconcile_request);
+    for (const malformed of [
+      null,
+      { ...source, runtime: null },
+      { ...source, run: null },
+      { ...source, task_states: null },
+    ]) {
+      await assert.rejects(
+        recoverV081PrivateTaskResolution({
+          source: malformed,
+          runId: context.runId,
+          operationId: prepared.operation_id,
+          coordinatorThreadId: "coordinator-thread",
+          codexHome,
+          now: START + 2_000,
+        }),
+        /source authority is malformed/,
+      );
+    }
   } finally {
     await rm(codexHome, { recursive: true, force: true });
     await removeFixture(context.root);

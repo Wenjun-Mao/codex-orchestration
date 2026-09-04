@@ -3,15 +3,17 @@
 import { existsSync, readFileSync } from "node:fs";
 import { realpath } from "node:fs/promises";
 import { parseArgs } from "node:util";
-import { dirname, resolve } from "node:path";
+import { basename, dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   CliError,
+  ensureExactJson,
   PACKAGE_VERSION,
   readJson,
   readJsonInput,
   requireExactFields,
   requireText,
+  sha256,
   stableStringify,
 } from "../lib/core.mjs";
 import { cleanupPlanV07 } from "../lib/cleanup-v07.mjs";
@@ -94,6 +96,7 @@ import {
   prepareRefresh,
   refreshStatus,
 } from "../lib/refresh-v08.mjs";
+import { loadRefreshSourceAuthority } from "../lib/refresh-source-v08.mjs";
 import {
   acquireRuntimeContext,
   buildRuntimeContext,
@@ -123,6 +126,10 @@ import {
   validateVisibleTaskCreationRecord,
   visibleTaskCreationStatus,
 } from "../lib/task-creation-v07.mjs";
+import {
+  recoverV081PrivateTaskResolution,
+  V081_PRIVATE_RESOLUTION_SOURCE_NAMESPACE,
+} from "../lib/private-resolution-recovery-v08.mjs";
 import {
   resolveNoChangeVerificationSubject,
   runCombinedVerification,
@@ -171,6 +178,7 @@ Usage:
   codex-flow archive prepare|reconcile|observe-private --run-id ID --file request.json [--json]
   codex-flow archive status --run-id ID --archive-id ID [--json]
   codex-flow cleanup plan --run-id ID [--json]
+  codex-flow recovery v0.8.1 resolve-private --run-id ID --operation-id ID --out FILE [--json]
   codex-flow unplug plan [--file request.json] [--json]
   codex-flow unplug observe-private --file request.json [--json]
   codex-flow unplug apply --file request.json [--json]
@@ -205,9 +213,26 @@ changes App files. Missing, changing, or contradictory private evidence fails
 closed.
 `;
 
+const V081_PRIVATE_RECOVERY_HELP = `codex-flow ${PACKAGE_VERSION} recovery v0.8.1 resolve-private
+
+Usage:
+  codex-flow recovery v0.8.1 resolve-private --run-id ID --operation-id ID --out /absolute/temp/request.json [--json]
+
+Read-only compatibility adapter for one exact active v0.8.1 source run. It
+authenticates that run through its immutable runtime exporter, resolves the
+original provisional task from stable Codex App evidence, and writes only the
+unwrapped reconcile request outside the repository. The exact v0.8.1 snapshot
+remains the sole authority allowed to consume that request and mutate its run.
+This command never creates, retries, binds, releases, refreshes, or edits App
+state.
+`;
+
 function helpFor(command, args) {
   if (command === "task" && args[0] === "create" && args[1] === "resolve-private") {
     return PRIVATE_RESOLUTION_HELP;
+  }
+  if (command === "recovery" && args[0] === "v0.8.1" && args[1] === "resolve-private") {
+    return V081_PRIVATE_RECOVERY_HELP;
   }
   return HELP;
 }
@@ -1784,6 +1809,95 @@ async function commandRefreshV08(args) {
   }));
 }
 
+function pathIsWithin(root, candidate) {
+  const relation = relative(resolve(root), resolve(candidate));
+  return relation === ""
+    || (relation !== ".." && !relation.startsWith(`..${sep}`) && !isAbsolute(relation));
+}
+
+async function commandRecoveryV08(args) {
+  const [sourceNamespace, action, ...rest] = args;
+  if (
+    sourceNamespace !== V081_PRIVATE_RESOLUTION_SOURCE_NAMESPACE
+    || action !== "resolve-private"
+  ) {
+    throw new CliError("recovery supports only: v0.8.1 resolve-private", 64);
+  }
+  const values = parse({
+    "run-id": { type: "string" },
+    "operation-id": { type: "string" },
+    out: { type: "string" },
+    json: { type: "boolean", default: false },
+  }, rest, false).values;
+  const runId = explicitRunId(values);
+  const operationId = requireText(values["operation-id"], "--operation-id", {
+    max: 128,
+    safeId: true,
+  });
+  const outputPath = requireText(values.out, "--out", { max: 2048 });
+  if (!isAbsolute(outputPath)) throw new CliError("recovery --out must be an absolute path");
+  requireCanonicalSource();
+  const git = v07Repository();
+  const requestedParent = dirname(resolve(outputPath));
+  const canonicalParent = await realpath(requestedParent).catch(() => null);
+  if (canonicalParent === null) {
+    throw new CliError("Private recovery output parent must be an existing directory", 73);
+  }
+  const canonicalOutput = resolve(canonicalParent, basename(outputPath));
+  if (pathIsWithin(git.root, canonicalOutput) || pathIsWithin(git.commonDir, canonicalOutput)) {
+    throw new CliError("Private recovery output must remain outside the repository and Git common directory", 73);
+  }
+  let containingRepository = null;
+  try {
+    containingRepository = discoverGit(canonicalParent);
+  } catch {
+    // A normal temporary directory is not a Git worktree.
+  }
+  if (containingRepository !== null) {
+    throw new CliError("Private recovery output must remain outside every Git worktree", 73);
+  }
+  const source = await loadRefreshSourceAuthority({
+    commonDir: git.commonDir,
+    namespace: sourceNamespace,
+    runId,
+  });
+  const coordinatorIdentity = assertCurrentCoordinatorTask(
+    source.run.binding.lineage,
+    "v0.8.1 private-resolution recovery",
+  );
+  const recovered = await recoverV081PrivateTaskResolution({
+    source,
+    runId,
+    operationId,
+    coordinatorThreadId: coordinatorIdentity.invoking_thread_id,
+  });
+  const writeStatus = await ensureExactJson(canonicalOutput, recovered.reconcile_request, {
+    guardRoot: dirname(canonicalOutput),
+    mode: 0o600,
+  });
+  v07Output({
+    schema_version: recovered.schema_version,
+    kind: recovered.kind,
+    source_authority: recovered.source_authority,
+    target_package_version: recovered.target_package_version,
+    coordinator_identity: coordinatorIdentity,
+    reconcile_request_path: canonicalOutput,
+    reconcile_request_sha256: sha256(stableStringify(recovered.reconcile_request)),
+    source_reconcile: {
+      executable: recovered.source_authority.source_cli_path,
+      argv: [
+        "task", "create", "reconcile",
+        "--run-id", runId,
+        "--file", canonicalOutput,
+        "--json",
+      ],
+    },
+    output_status: writeStatus,
+    app_state_mutation_performed: false,
+    flow_state_mutation_performed: false,
+  });
+}
+
 function isV07RunBoundMutation(command, args) {
   const subcommand = args[0];
   if (command === "workflow") return ["create", "revise", "contract"].includes(subcommand);
@@ -1858,6 +1972,7 @@ async function main() {
   if (command === "integration") return dispatchV07Command(command, args, commandIntegrationV07);
   if (command === "archive") return dispatchV07Command(command, args, commandArchiveV07);
   if (command === "cleanup") return commandCleanupV07(args);
+  if (command === "recovery") return commandRecoveryV08(args);
   if (command === "unplug") return commandUnplugV07(args);
   if (command === "refresh") return commandRefreshV08(args);
   throw new CliError(`Unknown command: ${command}\n\n${HELP}`);

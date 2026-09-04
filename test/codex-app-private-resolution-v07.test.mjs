@@ -1,9 +1,13 @@
 import assert from "node:assert/strict";
+import { appendFileSync } from "node:fs";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import test from "node:test";
 import {
+  MAX_SOURCE_SESSION_BYTES,
+  MAX_SOURCE_SESSION_LINE_BYTES,
+  MAX_SOURCE_SESSION_LINES,
   PRIVATE_DELEGATION_SOURCE,
   PRIVATE_TASK_RESOLUTION_SOURCE,
   privateAcceptedSelectorDigest,
@@ -48,7 +52,7 @@ async function fixture({
   delegation = delegationOutput(),
   observedModel = "gpt-5.6-luna",
   sourceTransform = (rows) => rows,
-  sourcePrefix = "",
+  sourceSuffix = "",
 } = {}) {
   const codexHome = await mkdtemp(resolve(tmpdir(), "codex-private-resolution-"));
   const state = stateTransform({
@@ -106,7 +110,7 @@ async function fixture({
   );
   await writeFile(
     sourceSessionPath,
-    `${sourcePrefix}${sourceRows.map((row) => JSON.stringify(row)).join("\n")}\n`,
+    `${sourceRows.map((row) => JSON.stringify(row)).join("\n")}\n${sourceSuffix}`,
   );
   const turnId = "01a0600e-20ee-7777-aaaa-111111111111";
   const rows = [
@@ -208,6 +212,42 @@ test("private resolver requires agreeing exact bindings and authenticates the de
   }
 });
 
+test("private resolver accepts the current App mcp_tool_call_end completion shape", async () => {
+  const context = await fixture({
+    sourceTransform: (rows) => {
+      const legacy = rows[1];
+      return [rows[0], {
+        timestamp: legacy.timestamp,
+        type: "event_msg",
+        payload: {
+          type: "mcp_tool_call_end",
+          call_id: "call-current-app-shape",
+          invocation: {
+            server: legacy.payload.item.server,
+            tool: legacy.payload.item.tool,
+            arguments: legacy.payload.item.arguments,
+          },
+          duration: { secs: 1, nanos: 25 },
+          result: { Ok: legacy.payload.item.result },
+        },
+      }];
+    },
+  });
+  try {
+    const result = await resolveFixture(context);
+    assert.equal(result.resolution.provisional_client_thread_id, PROVISIONAL);
+    assert.equal(result.resolution.ready_thread_id, READY);
+  } finally {
+    await rm(context.codexHome, { recursive: true, force: true });
+  }
+});
+
+test("private resolver source bounds cover observed long-lived coordinator sessions", () => {
+  assert.equal(MAX_SOURCE_SESSION_BYTES, 16 * 1024 * 1024 * 1024);
+  assert.equal(MAX_SOURCE_SESSION_LINES, 1_000_000);
+  assert.equal(MAX_SOURCE_SESSION_LINE_BYTES, 32 * 1024 * 1024);
+});
+
 test("private resolver fails closed on absent, disagreeing, or malformed bindings", async (suite) => {
   await suite.test("missing reverse binding", async () => {
     const context = await fixture({
@@ -251,8 +291,63 @@ test("private resolver fails closed on absent, disagreeing, or malformed binding
   await suite.test("oversized source line", async () => {
     const context = await fixture();
     try {
-      await writeFile(context.sourceSessionPath, `${"x".repeat((4 * 1024 * 1024) + 1)}\n`);
+      await writeFile(context.sourceSessionPath, `${"x".repeat(MAX_SOURCE_SESSION_LINE_BYTES + 1)}\n`);
       await assert.rejects(() => resolveFixture(context), /oversized JSON line/);
+    } finally {
+      await rm(context.codexHome, { recursive: true, force: true });
+    }
+  });
+
+  await suite.test("source session accepts a valid row above the old four MiB limit", async () => {
+    const sourceSuffix = `${JSON.stringify({
+      type: "ignored",
+      payload: "x".repeat(13 * 1024 * 1024),
+    })}\n`;
+    const context = await fixture({ sourceSuffix });
+    try {
+      const result = await resolveFixture(context);
+      assert.equal(result.resolution.provisional_client_thread_id, PROVISIONAL);
+    } finally {
+      await rm(context.codexHome, { recursive: true, force: true });
+    }
+  });
+
+  await suite.test("malformed duplicate source metadata fails closed", async () => {
+    const context = await fixture({
+      sourceTransform: (rows) => [rows[0], { type: "session_meta", payload: null }, rows[1]],
+    });
+    try {
+      await assert.rejects(() => resolveFixture(context), /malformed session metadata/);
+    } finally {
+      await rm(context.codexHome, { recursive: true, force: true });
+    }
+  });
+
+  await suite.test("forked source history may retain authenticated ancestor metadata", async () => {
+    const context = await fixture({
+      sourceTransform: (rows) => [rows[0], {
+        timestamp: rows[0].timestamp,
+        type: "session_meta",
+        payload: { id: "019f2ad5-9761-7371-94ba-ab52aa619182" },
+      }, rows[1]],
+    });
+    try {
+      const result = await resolveFixture(context);
+      assert.equal(result.resolution.ready_thread_id, READY);
+    } finally {
+      await rm(context.codexHome, { recursive: true, force: true });
+    }
+  });
+
+  await suite.test("source history must begin with the current coordinator identity", async () => {
+    const context = await fixture({
+      sourceTransform: (rows) => {
+        rows[0].payload.id = "different-source-task";
+        return rows;
+      },
+    });
+    try {
+      await assert.rejects(() => resolveFixture(context), /metadata does not match the coordinator task/);
     } finally {
       await rm(context.codexHome, { recursive: true, force: true });
     }
@@ -260,13 +355,32 @@ test("private resolver fails closed on absent, disagreeing, or malformed binding
 
   await suite.test("source session larger than the child-session cap streams successfully", async () => {
     const paddingLine = `${JSON.stringify({ type: "ignored", payload: "x".repeat(4096) })}\n`;
-    const sourcePrefix = paddingLine.repeat(Math.ceil((33 * 1024 * 1024) / Buffer.byteLength(paddingLine)));
-    const context = await fixture({ sourcePrefix });
+    const sourceSuffix = paddingLine.repeat(Math.ceil((33 * 1024 * 1024) / Buffer.byteLength(paddingLine)));
+    const context = await fixture({ sourceSuffix });
     try {
       const result = await resolveFixture(context);
       assert.equal(result.resolution.provisional_client_thread_id, PROVISIONAL);
       assert.match(result.resolution.source_session_digest, /^[0-9a-f]{64}$/);
     } finally {
+      await rm(context.codexHome, { recursive: true, force: true });
+    }
+  });
+
+  await suite.test("append-only coordinator growth does not invalidate the authenticated prefix", async () => {
+    const paddingLine = `${JSON.stringify({ type: "ignored", payload: "x".repeat(4096) })}\n`;
+    const sourceSuffix = paddingLine.repeat(Math.ceil((33 * 1024 * 1024) / Buffer.byteLength(paddingLine)));
+    const context = await fixture({ sourceSuffix });
+    let appendCount = 0;
+    const timer = setInterval(() => {
+      appendCount += 1;
+      appendFileSync(context.sourceSessionPath, "\n");
+    }, 2);
+    try {
+      const result = await resolveFixture(context);
+      assert.equal(result.resolution.ready_thread_id, READY);
+      assert.ok(appendCount > 0);
+    } finally {
+      clearInterval(timer);
       await rm(context.codexHome, { recursive: true, force: true });
     }
   });
