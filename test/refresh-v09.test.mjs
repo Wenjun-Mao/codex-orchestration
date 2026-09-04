@@ -716,7 +716,7 @@ test("v0.9 consumes one exact v0.8.3 semantic handoff and resumes every deletion
   ], root, { CODEX_THREAD_ID: source.coordinatorThreadId });
   assertSuccess(activatedCall, "v0.9 target activation");
   const activated = JSON.parse(activatedCall.stdout);
-  assert.equal(activated.state_authority.namespace, "v0.9.0-rc.4");
+  assert.equal(activated.state_authority.namespace, "v0.9.0");
   assert.equal(activated.refresh_origin.refresh_id, handoff.refresh_id);
   await assert.rejects(stat(resolve(root, ".git/codex-flow/refresh-v1")), /ENOENT/);
 });

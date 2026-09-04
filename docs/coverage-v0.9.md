@@ -1,8 +1,7 @@
 # v0.9 coverage map
 
-v0.9 is a native-first architecture reset under active development. Accepted
-public authority remains v0.8.3 until every automated gate and the live RC
-canary pass.
+v0.9 is the accepted native-first architecture reset. Immutable `v0.9.0`
+authority passed every automated gate and the live RC canary recorded below.
 
 ## Automated authority
 
@@ -33,7 +32,7 @@ canary pass.
 
 ## Live RC canary
 
-Stable promotion is blocked until one same-coordinator App canary proves:
+The same-coordinator App canary proved:
 
 1. an exact v0.8.3 source run with two bounded visible executors;
 2. one accepted result embodied in the baseline and one exact disposable lane;
@@ -48,9 +47,10 @@ Stable promotion is blocked until one same-coordinator App canary proves:
    old task/worktree/branch/handoff/canary state; and
 8. separately recorded App provisioning and Flow activation latency.
 
-An App-facing failure blocks stable release. Its root cause must be classified
-as adapter or core, receive a regression, and have the failed canary segment
-repeated.
+The complete result is recorded in
+[`2026-09-04-v0.9.0-rc4-live-app-canary.md`](field-tests/2026-09-04-v0.9.0-rc4-live-app-canary.md).
+The RC3 selector-evidence ordering failure was classified as core, fixed with a
+regression, and the exact failed segment passed under RC4 before promotion.
 
 ## Release gate
 

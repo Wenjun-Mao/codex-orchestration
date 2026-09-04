@@ -1,6 +1,6 @@
 # v0.9 task lifecycle
 
-Current RC package authority is `v0.9.0-rc.4`. Every run snapshots that exact
+Current stable package authority is `v0.9.0`. Every run snapshots that exact
 runtime and uses it until completion.
 
 ```text
