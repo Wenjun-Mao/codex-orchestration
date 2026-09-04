@@ -2055,7 +2055,7 @@ test("refresh skill authentication rejects a stale loaded catalog path", async (
 test("refresh inspection blocks malformed current namespace authority", async (t) => {
   const root = await createGitFixture("codex-flow-refresh-malformed-current-");
   t.after(() => removeFixture(root));
-  const lifecycleRoot = resolve(root, ".git", "codex-flow", "v0.8.2-dev.0", "runs");
+  const lifecycleRoot = resolve(root, ".git", "codex-flow", "v0.8.2", "runs");
   await mkdir(lifecycleRoot, { recursive: true });
   await writeFile(resolve(lifecycleRoot, "lifecycle.json"), "{}\n", "utf8");
   const result = runCli([

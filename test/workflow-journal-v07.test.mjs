@@ -115,7 +115,7 @@ async function fixture(t, suffix) {
   return {
     root,
     commonDir,
-    stateRoot: resolve(commonDir, "codex-flow", "v0.8.2-dev.0"),
+    stateRoot: resolve(commonDir, "codex-flow", "v0.8.2"),
     revision,
     runId,
     coordinator,
