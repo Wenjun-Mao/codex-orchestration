@@ -1,9 +1,8 @@
 # v0.9 coverage map
 
-v0.9 is the accepted native-first architecture reset. Immutable `v0.9.0`
-remains accepted public authority. Candidate `v0.9.1-rc.2` includes the
-lifecycle-authority corrections and the version-bound maintenance-refresh fix;
-promotion remains gated on exact-source replay and the release checks below.
+v0.9 is the accepted native-first architecture reset. Immutable `v0.9.1`
+authority includes the lifecycle-authority corrections and the version-bound
+maintenance-refresh fix, with the automated and live gates recorded below.
 
 ## Automated authority
 
@@ -62,6 +61,13 @@ distinct reserved branches, returned unchanged clean receipts, passed combined
 verification, archived with typed private evidence, and left zero residue after
 exact cleanup and unplug. The complete result is recorded in
 [`2026-09-05-v0.9.1-rc1-live-app-canary.md`](field-tests/2026-09-05-v0.9.1-rc1-live-app-canary.md).
+
+RC2 then repaired the source cleanup transfer boundary exposed by a real
+closed-v0.9.0 refresh. After App reload, the installed RC2 skill and package
+authenticated exactly, and an exact-tag v0.9.0 source replay completed the
+no-replacement refresh through namespace removal. This checkpoint does not add
+launch-based v0.9 discard support. The result is recorded in
+[`2026-09-05-v0.9.1-rc2-v090-refresh-replay.md`](field-tests/2026-09-05-v0.9.1-rc2-v090-refresh-replay.md).
 
 ## Release gate
 

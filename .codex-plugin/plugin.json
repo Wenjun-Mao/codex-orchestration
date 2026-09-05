@@ -1,6 +1,6 @@
 {
   "name": "codex-orchestration",
-  "version": "0.9.1-rc.2",
+  "version": "0.9.1",
   "description": "Orchestrate visible Codex tasks with explicit model routing, bounded ownership, and quiet durable results.",
   "author": {
     "name": "Wenjun Mao"
