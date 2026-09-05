@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { resolve } from "node:path";
 import test from "node:test";
 import {
   deliverCallback,
@@ -25,6 +26,10 @@ import {
 } from "../lib/archive-lifecycle.mjs";
 import { cleanupPlan } from "../lib/cleanup.mjs";
 import { auditRunClosure } from "../lib/run-audit.mjs";
+import {
+  persistWorkflowTaskContract,
+  reviseWorkflowJournal,
+} from "../lib/workflow-journal.mjs";
 import {
   createActiveTaskLaunch,
   terminalReceiptV4,
@@ -143,6 +148,131 @@ test("v0.9 completes launch through quiet callback, no-change proof, archive, cl
     assert.equal(audit.audit.counts.task_launches, 1);
     assert.equal(audit.audit.counts.callbacks, 1);
     context = null;
+  } finally {
+    if (context !== null) {
+      try {
+        git(root, ["worktree", "remove", "--force", context.executorPath]);
+      } catch {}
+    }
+    await removeFixture(root);
+  }
+});
+
+test("cross-revision dependencies bind task dispositions through their exact launch identity", async () => {
+  const root = await createGitFixture("codex-flow-v09-cross-revision-dependency-");
+  let context = null;
+  try {
+    context = await createActiveTaskLaunch(root, "cross-revision-dependency", {
+      task: { write_paths: ["audit-sentinel/cross-revision-dependency"] },
+    });
+    const receipt = terminalReceiptV4(context, {
+      kind: "unchanged",
+      baseline_revision: context.baseline,
+      final_revision: context.baseline,
+      branch: context.executorBranch,
+      upstream: null,
+      cleanliness: "clean",
+    });
+    const delivered = await deliverCallback({
+      stateRoot: context.stateRoot,
+      receipt,
+      expectedRunId: context.contract.run_id,
+    });
+    await observeCallback({
+      stateRoot: context.stateRoot,
+      callbackId: delivered.callback_id,
+      recipient: recipient(context),
+    });
+    const preparedDisposition = await prepareTaskDisposition({
+      stateRoot: context.stateRoot,
+      callbackId: delivered.callback_id,
+      decision: "accepted-no-change",
+      reason: "The historical task completed without source changes.",
+    });
+    const verification = await runCombinedVerification({
+      stateRoot: context.stateRoot,
+      repositoryPath: context.executorPath,
+      receipt,
+      checks: [{
+        check_id: "historical-task-pass",
+        argv: [process.execPath, "-e", "process.exit(0)"],
+      }],
+    });
+    const disposition = await finalizeTaskDisposition({
+      stateRoot: context.stateRoot,
+      dispositionId: preparedDisposition.disposition_id,
+      recipient: recipient(context),
+      executorThreadId: context.executorThreadId,
+      verificationId: verification.verification_id,
+    });
+
+    const dependentTask = (suffix) => ({
+      ...context.plan.tasks[0],
+      task_id: `dependent-${suffix}`,
+      title: `Execute dependent ${suffix}`,
+      dependencies: [context.contract.task_id],
+      read_paths: [],
+      write_paths: [`audit-sentinel/cross-revision-dependency/${suffix}.txt`],
+      primary_outcome: `Prove the ${suffix} cross-revision dependency path.`,
+      cheapest_safe_direct_attempt: `Generate the ${suffix} dependent contract once.`,
+    });
+    const acceptedTask = dependentTask("accepted");
+    const rejectedTask = dependentTask("rejected");
+    const revised = await reviseWorkflowJournal({
+      stateRoot: context.stateRoot,
+      runId: context.contract.run_id,
+      planId: context.plan.plan_id,
+      draft: {
+        schema_version: 1,
+        plan_id: context.plan.plan_id,
+        revision: 2,
+        parent_revision_digest: context.plan.revision_digest,
+        tasks: [context.plan.tasks[0], acceptedTask, rejectedTask],
+      },
+    });
+    assert.equal(revised.current_revision.revision, 2);
+    const dependencyAuthorities = [{
+      authority_kind: "task-disposition",
+      authority_id: disposition.disposition_id,
+    }];
+    const accepted = await persistWorkflowTaskContract({
+      stateRoot: context.stateRoot,
+      runId: context.contract.run_id,
+      planId: context.plan.plan_id,
+      taskId: acceptedTask.task_id,
+      currentBaseline: { revision: context.baseline },
+      dependencyAuthorities,
+    });
+    assert.deepEqual(accepted.accepted_dependencies.map((entry) => ({
+      task_id: entry.task_id,
+      authority_id: entry.authority_id,
+    })), [{
+      task_id: context.contract.task_id,
+      authority_id: disposition.disposition_id,
+    }]);
+
+    const dispositionPath = resolve(
+      context.stateRoot,
+      "dispositions",
+      "records",
+      `${disposition.disposition_id}.json`,
+    );
+    const persistedDisposition = JSON.parse(await readFile(dispositionPath, "utf8"));
+    await writeFile(dispositionPath, `${JSON.stringify({
+      ...persistedDisposition,
+      launch_id: `task-launch-v1-${"0".repeat(64)}`,
+    })}\n`, "utf8");
+    await assert.rejects(
+      persistWorkflowTaskContract({
+        stateRoot: context.stateRoot,
+        runId: context.contract.run_id,
+        planId: context.plan.plan_id,
+        taskId: rejectedTask.task_id,
+        currentBaseline: { revision: context.baseline },
+        dependencyAuthorities,
+      }),
+      /does not match its persisted workflow authority/,
+    );
   } finally {
     if (context !== null) {
       try {

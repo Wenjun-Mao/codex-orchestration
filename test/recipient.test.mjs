@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { resolve } from "node:path";
 import test from "node:test";
+import { RUNTIME_DIRECTORY } from "../lib/runtime-context.mjs";
 import {
   bindRecipient,
   currentRecipient,
@@ -14,7 +15,7 @@ import { createGitFixture, removeFixture } from "./helpers.mjs";
 test("recipient registry fences rebinding and resolves only recorded lineage generations", async () => {
   const root = await createGitFixture("codex-flow-recipient-");
   try {
-    const stateRoot = resolve(root, ".git", "codex-flow", "v0.9.0");
+    const stateRoot = resolve(root, ".git", "codex-flow", RUNTIME_DIRECTORY);
     const initial = await bindRecipient({
       stateRoot,
       recipient: {

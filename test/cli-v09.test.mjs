@@ -3,6 +3,7 @@ import { mkdtemp, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import test from "node:test";
+import { RUNTIME_DIRECTORY } from "../lib/runtime-context.mjs";
 import {
   assertSuccess,
   createGitFixture,
@@ -109,9 +110,12 @@ test("v0.9 CLI activates a clean run through current launch-era wiring", async (
   const result = JSON.parse(activated.stdout);
   assert.equal(result.run.run_id, runId);
   assert.equal(result.coordinator_identity.matched, true);
-  assert.match(result.runtime_authority.bundle_root, /v0\.9\.0\/runtimes\//);
+  assert.match(
+    result.runtime_authority.bundle_root,
+    new RegExp(`${RUNTIME_DIRECTORY.replaceAll(".", "\\.")}/runtimes/`),
+  );
 
-  await stat(resolve(root, ".git", "codex-flow", "v0.9.0", "runs", "lifecycle.json"));
+  await stat(resolve(root, ".git", "codex-flow", RUNTIME_DIRECTORY, "runs", "lifecycle.json"));
   const status = runCli(["run", "status", "--run-id", runId, "--json"], { cwd: root });
   assertSuccess(status, "run status");
   assert.equal(JSON.parse(status.stdout).run.run_id, runId);

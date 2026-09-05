@@ -13,7 +13,7 @@ import {
 import { validateReleaseIdentity } from "./release-identity.mjs";
 
 const root = resolve(import.meta.dirname, "..");
-const EXPECTED_PACKAGE_VERSION = "0.9.0";
+const EXPECTED_PACKAGE_VERSION = "0.9.1-dev.1";
 
 const ACTIVE_SCHEMA_NAMES = Object.freeze([
   "archive-operation",

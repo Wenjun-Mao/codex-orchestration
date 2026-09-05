@@ -6,6 +6,7 @@ still creates and runs tasks; this package binds their intent, dependencies,
 ownership, identity, Git effects, quiet results, integration, and cleanup.
 
 The current accepted public authority is immutable `v0.9.0`. The package is
+currently staged as the unreleased `v0.9.1-dev.1` development namespace. It is
 private and `UNLICENSED`.
 
 ## v0.9 architecture

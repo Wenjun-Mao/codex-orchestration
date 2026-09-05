@@ -4,6 +4,7 @@ import { readFile, readdir, realpath, unlink, writeFile } from "node:fs/promises
 import { resolve } from "node:path";
 import test from "node:test";
 import { sha256 } from "../lib/core.mjs";
+import { RUNTIME_DIRECTORY } from "../lib/runtime-context.mjs";
 import {
   acceptedSubagentDependency,
   beginSubagentOperationAttempt,
@@ -64,7 +65,7 @@ async function fixture(t, { tasks = [subagentTask()] } = {}) {
     cwd: root,
     encoding: "utf8",
   }).trim();
-  const stateRoot = resolve(commonDir, "codex-flow", "v0.9.0");
+  const stateRoot = resolve(commonDir, "codex-flow", RUNTIME_DIRECTORY);
   const coordinator = {
     lineage_id: "subagent-operation-lineage",
     thread_id: "subagent-operation-coordinator",

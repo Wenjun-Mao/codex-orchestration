@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { realpath } from "node:fs/promises";
 import { basename, resolve } from "node:path";
 import { bindRecipient } from "../lib/recipients.mjs";
+import { RUNTIME_DIRECTORY } from "../lib/runtime-context.mjs";
 import {
   prepareTaskLaunch,
   reconcileTaskLaunch,
@@ -59,7 +60,7 @@ export async function createActiveTaskLaunch(root, suffix, {
   reconcileCreation = true,
 } = {}) {
   const commonDir = await realpath(resolve(root, ".git"));
-  const stateRoot = resolve(commonDir, "codex-flow", "v0.9.0");
+  const stateRoot = resolve(commonDir, "codex-flow", RUNTIME_DIRECTORY);
   const baseline = git(root, ["rev-parse", "HEAD"]);
   const coordinator = {
     lineage_id: `lifecycle-lineage-${suffix}`,

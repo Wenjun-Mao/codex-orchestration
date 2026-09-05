@@ -233,6 +233,37 @@ test("v0.9 runtime snapshots are immutable while one active run resumes and rebi
   assert.equal(restarted.state.runs["run-one"].terminal.kind, "closed");
 });
 
+test("run admission rejects the coordinator branch as an executor cleanup fence", async (t) => {
+  const root = await createGitFixture("codex-flow-v09-coordinator-fence-");
+  t.after(() => removeFixture(root));
+  const commonDir = resolve(root, ".git");
+  const { bundleSource } = await runtimeBundleFor(root, "coordinator-fence");
+  const runtime = runtimeFor(root, bundleSource);
+  await acquireRuntimeContext({
+    gitCommonDirectory: commonDir,
+    context: runtime,
+    bundleSource,
+  });
+
+  await assert.rejects(
+    admitRun({
+      gitCommonDirectory: commonDir,
+      runId: "run-coordinator-fence",
+      runtimeId: runtime.runtime_id,
+      ...workflowBinding("coordinator-fence"),
+      plan: buildFencePlan({
+        pathFences: ["lib/coordinator-fence"],
+        resourceFences: ["resource-coordinator-fence"],
+        branchFences: [runtime.repository.branch],
+      }),
+      admittedAt: "2026-08-29T12:05:00.000Z",
+    }),
+    /branch fences must not include the coordinator repository branch/,
+  );
+  const lifecycle = await readRunLifecycle({ gitCommonDirectory: commonDir });
+  assert.equal(lifecycle.state.active_run_id, null);
+});
+
 test("abandoned runs retain all fence types and permit only a disjoint next plan", async (t) => {
   const root = await createGitFixture("codex-flow-v09-fence-");
   t.after(() => removeFixture(root));
@@ -356,7 +387,7 @@ test("foreign active-run sentinel blocks admission and bounds foreign namespace 
   await assert.rejects(
     foreignActiveRunCollisions({
       gitCommonDirectory: commonDir,
-      currentNamespace: "v0.9.0",
+      currentNamespace: RUNTIME_DIRECTORY,
     }),
     /exceeds 32 namespaces/,
   );
@@ -373,7 +404,7 @@ test("clean-start guard rejects even terminal incompatible namespaces", async (t
   await assert.rejects(
     assertNoIncompatibleFlowNamespace({
       gitCommonDirectory: commonDir,
-      currentNamespace: "v0.9.0",
+      currentNamespace: RUNTIME_DIRECTORY,
     }),
     /Clean start required before activation.*v0\.7\.0/,
   );
@@ -434,7 +465,7 @@ test("run admission binds a persisted root workflow to its path and resource env
     }],
   });
   await createWorkflowJournal({
-    stateRoot: resolve(commonDir, "codex-flow", "v0.9.0"),
+    stateRoot: resolve(commonDir, "codex-flow", RUNTIME_DIRECTORY),
     runId: "run-root-envelope",
     planId: workflow.plan_id,
     planRevision: workflow,

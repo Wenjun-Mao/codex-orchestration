@@ -11,11 +11,12 @@ authority passed every automated gate and the live RC canary recorded below.
 | Replaceable selector policy and deliberate overrides | `selector-policy-v09.test.mjs` |
 | Typed Codex App evidence, ready/provisional/opaque shapes, duplicate discovery, and contradictions | `codex-app-adapter-v09.test.mjs` |
 | First-turn launch, exact executor claim, linked-worktree activation, one-shot creation, crash recovery, and negative identity/Git cases | `task-launch-v09.test.mjs` |
-| Full launch through callback, disposition, integration/no-change, verification, archive, cleanup, and audit joins, including callback-before-App-result selector enrichment | `lifecycle-v09.test.mjs`, `run-lifecycle-v09.test.mjs` |
+| Full launch through callback, disposition, integration/no-change, verification, archive, cleanup, and audit joins, including callback-before-App-result selector enrichment and cross-revision task-disposition dependencies | `lifecycle-v09.test.mjs`, `run-lifecycle-v09.test.mjs` |
 | Quiet completion and separate one-shot urgent interruption | `lifecycle-v09.test.mjs`, `urgent-v09.test.mjs` |
 | Explicit read-only native-subagent lifecycle and selector rejection | `subagent-v09.test.mjs` |
 | Public/private archive evidence | `codex-app-private-archive-v09.test.mjs` |
-| Exact v0.8.3 semantic refresh, dirty discard, branch/worktree deletion, target consumption, and crash boundaries | `refresh-v09.test.mjs` |
+| Exact v0.8.3 semantic refresh, selected already-terminal evidence, dirty discard, branch/worktree deletion, target consumption, and joined crash-replay boundaries | `refresh-v09.test.mjs` |
+| Coordinator branch authority remains disjoint from executor cleanup branch fences at admission | `run-lifecycle-v09.test.mjs` |
 | Version-agnostic clean-start unplug | `unplug-v09.test.mjs` |
 | Schema/runtime parity and immutable release identity | `schema-runtime-parity-v09.test.mjs`, `release-identity.test.mjs` |
 | CLI inventory, scoped help, and real activation wiring | `cli-v09.test.mjs` |

@@ -23,6 +23,7 @@ import {
   deleteRefreshExecutorBranch,
   removeRefreshExecutorWorktree,
 } from "../lib/compat/refresh-discard-git.mjs";
+import { RUNTIME_DIRECTORY } from "../lib/runtime-context.mjs";
 import { createGitFixture, packageRoot, removeFixture } from "./helpers.mjs";
 
 function invoke(cli, args, cwd, env = {}) {
@@ -750,7 +751,7 @@ test("v0.9 consumes one exact v0.8.3 semantic handoff and resumes every deletion
   ], root, { CODEX_THREAD_ID: source.coordinatorThreadId });
   assertSuccess(activatedCall, "v0.9 target activation");
   const activated = JSON.parse(activatedCall.stdout);
-  assert.equal(activated.state_authority.namespace, "v0.9.0");
+  assert.equal(activated.state_authority.namespace, RUNTIME_DIRECTORY);
   assert.equal(activated.refresh_origin.refresh_id, handoff.refresh_id);
   await assert.rejects(stat(resolve(root, ".git/codex-flow/refresh-v1")), /ENOENT/);
 });
@@ -829,6 +830,178 @@ test("v0.9 refresh recognizes a selected source already abandoned before prepara
   assert.ok(Date.parse(applied.handoff.source_retirement.retired_at) >= Date.parse(handoff.intent.prepared_at));
   assert.ok(Date.parse(source.abandoned.run.terminal.abandoned_at) <= Date.parse(handoff.intent.prepared_at));
   await assert.rejects(stat(resolve(root, ".git/codex-flow/v0.8.3")), /ENOENT/);
+});
+
+test("v0.9 resumes discarded cleanup and consumption for a selected already-abandoned source", async (t) => {
+  const root = await createGitFixture("codex-flow-refresh-v09-selected-terminal-replay-");
+  const requests = await mkdtemp(resolve(tmpdir(), "codex-flow-refresh-v09-selected-terminal-replay-requests-"));
+  const worktreeParent = await mkdtemp(resolve(tmpdir(), "codex-flow-refresh-v09-selected-terminal-replay-worktree-"));
+  const codexHome = await mkdtemp(resolve(tmpdir(), "codex-flow-refresh-v09-selected-terminal-replay-home-"));
+  const worktree = resolve(worktreeParent, "executor");
+  const sourcePackage = await extractTaggedPackage("v0.8.3");
+  const targetPackage = await copyCurrentPackage();
+  const sourceBranch = "codex/refresh-v08-selected-terminal-discard";
+  const targetBranch = "codex/refresh-v09-selected-terminal-replacement";
+  t.after(async () => {
+    spawnSync("git", ["worktree", "remove", "--force", worktree], { cwd: root, stdio: "ignore" });
+    spawnSync("git", ["branch", "-D", sourceBranch], { cwd: root, stdio: "ignore" });
+    await Promise.all([
+      removeFixture(root),
+      rm(requests, { recursive: true, force: true }),
+      rm(worktreeParent, { recursive: true, force: true }),
+      rm(codexHome, { recursive: true, force: true }),
+      rm(sourcePackage.root, { recursive: true, force: true }),
+      rm(targetPackage.root, { recursive: true, force: true }),
+    ]);
+  });
+
+  const sourceTask = task("v08-selected-terminal-discard");
+  const source = await createV08Source({
+    root,
+    requests,
+    worktree,
+    sourcePackage,
+    workflowTask: sourceTask,
+    branch: sourceBranch,
+    executorThreadId: "refresh-v08-selected-terminal-executor",
+    coordinatorThreadId: "refresh-v08-selected-terminal-coordinator",
+  });
+  await writeFile(resolve(worktree, "discarded.txt"), "discarded already-terminal work\n", "utf8");
+  const abandonPath = await jsonFile(requests, "selected-terminal-source-abandon", {
+    run_id: source.activation.run_id,
+    resume: source.activated.run.binding,
+    reason: "The selected source is intentionally abandoned before refresh preparation.",
+  });
+  const abandonedCall = invoke(source.runtimeCli, [
+    "run", "abandon", "--run-id", source.activation.run_id,
+    "--file", abandonPath, "--json",
+  ], root);
+  assertSuccess(abandonedCall, "selected source abandonment");
+  const originalTerminal = JSON.parse(abandonedCall.stdout).run.terminal;
+
+  const targetSkill = resolve(targetPackage.root, "skills/refresh/SKILL.md");
+  const inspectionCall = invoke(targetPackage.cli, [
+    "refresh", "inspect", "--invoking-skill", targetSkill, "--json",
+  ], root);
+  assertSuccess(inspectionCall, "selected already-terminal replay inspection");
+  const inspection = JSON.parse(inspectionCall.stdout);
+  assert.equal(inspection.route, "refresh-ready", inspection.reason);
+  assert.equal(inspection.authority.source.run_status, "abandoned");
+
+  const replacement = {
+    ...sourceTask,
+    task_id: "v09-selected-terminal-replacement",
+    model: "gpt-5.6-terra",
+    reasoning_effort: "high",
+    selector_rationale: "Terra-high is sufficient for the bounded replay replacement.",
+  };
+  const targetActivation = activation({
+    runId: "refresh-v09-selected-terminal-target",
+    workflowTask: replacement,
+    lineageId: "refresh-v09-selected-terminal-target-lineage",
+    threadId: source.coordinatorThreadId,
+    branch: targetBranch,
+  });
+  const preparePath = await jsonFile(requests, "selected-terminal-replay-prepare", {
+    source_namespace: "v0.8.3",
+    source_run_id: source.activation.run_id,
+    source_resume: source.activated.run.binding,
+    decisions: [{
+      source_task_id: sourceTask.task_id,
+      disposition: "discard",
+      rationale: "The exact unintegrated executor resources are disposable and will be reissued.",
+    }],
+    replacements: [{
+      source_task_id: sourceTask.task_id,
+      target_task_id: replacement.task_id,
+    }],
+    target_workflow: targetActivation.workflow,
+    target_fences: targetActivation.fences,
+    target_coordinator_thread_id: source.coordinatorThreadId,
+  });
+  const preparedCall = invoke(targetPackage.cli, [
+    "refresh", "prepare", "--invoking-skill", targetSkill,
+    "--file", preparePath, "--json",
+  ], root);
+  assertSuccess(preparedCall, "selected already-terminal replay preparation");
+  const handoff = JSON.parse(preparedCall.stdout).handoff;
+  assert.equal(handoff.intent.source.run_status, "abandoned");
+  assert.equal(handoff.cleanup.length, 1);
+  assert.equal(handoff.cleanup[0].git_authority.dirty, true);
+
+  await writeArchivedSession(codexHome, source.executorThreadId, source.worktree);
+  const observed = await observeRefreshPrivateArchives({
+    commonDir: source.contract.common_dir,
+    refreshId: handoff.refresh_id,
+    codexHome,
+  });
+  const apply = async (expectedHandoffDigest, hooks = {}) => applyRefresh({
+    commonDir: source.contract.common_dir,
+    refreshId: handoff.refresh_id,
+    expectedHandoffDigest,
+    archiveEvidence: observed.archive_evidence,
+    appliedAt: new Date().toISOString(),
+    codexHome,
+    hooks,
+  });
+
+  await assert.rejects(
+    apply(handoff.handoff_digest, { afterArchiveObserved() { throw new Error("after archive"); } }),
+    /after archive/,
+  );
+  let status = await refreshStatus({
+    commonDir: source.contract.common_dir,
+    refreshId: handoff.refresh_id,
+  });
+  assert.equal(status.status, "archive-observed");
+  await assert.rejects(
+    apply(status.handoff_digest, { afterWorktreeRemoval() { throw new Error("after worktree"); } }),
+    /after worktree/,
+  );
+  await assert.rejects(stat(source.worktree), /ENOENT/);
+  status = await refreshStatus({ commonDir: source.contract.common_dir, refreshId: handoff.refresh_id });
+  await assert.rejects(
+    apply(status.handoff_digest, { afterBranchDeletion() { throw new Error("after branch"); } }),
+    /after branch/,
+  );
+  assert.equal(spawnSync("git", ["show-ref", "--verify", "--quiet", `refs/heads/${sourceBranch}`], {
+    cwd: root,
+  }).status, 1);
+  status = await refreshStatus({ commonDir: source.contract.common_dir, refreshId: handoff.refresh_id });
+  const retired = await apply(status.handoff_digest);
+  assert.equal(retired.status, "source-retired");
+  assert.equal(retired.handoff.source_retirement.method, "already-terminal");
+  assert.ok(Date.parse(retired.handoff.source_retirement.retired_at) >= Date.parse(handoff.intent.prepared_at));
+
+  const preservedCall = invoke(source.runtimeCli, [
+    "run", "status", "--run-id", source.activation.run_id, "--json",
+  ], root);
+  assertSuccess(preservedCall, "already-terminal source evidence replay");
+  assert.deepEqual(JSON.parse(preservedCall.stdout).run.terminal, originalTerminal);
+
+  targetActivation.refresh_id = handoff.refresh_id;
+  targetActivation.activated_at = new Date().toISOString();
+  await assert.rejects(
+    consumeWithHooks({
+      targetPackage,
+      root,
+      activationRequest: targetActivation,
+      refreshId: handoff.refresh_id,
+      crashAfter: "afterTargetAdmission",
+    }),
+    /afterTargetAdmission/,
+  );
+  const targetActivationPath = await jsonFile(requests, "selected-terminal-target-activation", targetActivation);
+  const activatedCall = invoke(targetPackage.cli, [
+    "run", "activate", "--run-id", targetActivation.run_id,
+    "--refresh-id", handoff.refresh_id,
+    "--file", targetActivationPath, "--json",
+  ], root, { CODEX_THREAD_ID: source.coordinatorThreadId });
+  assertSuccess(activatedCall, "selected already-terminal target activation resume");
+  const activated = JSON.parse(activatedCall.stdout);
+  assert.equal(activated.refresh_origin.refresh_id, handoff.refresh_id);
+  await assert.rejects(stat(resolve(root, ".git/codex-flow/v0.8.3")), /ENOENT/);
+  await assert.rejects(stat(resolve(root, ".git/codex-flow/refresh-v1")), /ENOENT/);
 });
 
 test("v0.9 refresh rejects drift in a selected already-terminal source", async (t) => {

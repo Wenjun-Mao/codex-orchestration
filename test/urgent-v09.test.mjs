@@ -3,6 +3,7 @@ import { mkdir, readFile, symlink, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import test from "node:test";
 import { bindRecipient, rebindRecipient } from "../lib/recipients.mjs";
+import { RUNTIME_DIRECTORY } from "../lib/runtime-context.mjs";
 import {
   consumeUrgentSignal,
   expireUrgentSignal,
@@ -47,7 +48,7 @@ function signal(overrides = {}) {
 }
 
 function stateRoot(root) {
-  return resolve(root, ".git", "codex-flow", "v0.9.0");
+  return resolve(root, ".git", "codex-flow", RUNTIME_DIRECTORY);
 }
 
 async function fixture(prefix) {

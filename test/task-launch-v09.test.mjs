@@ -4,6 +4,7 @@ import { readFile, rm, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import test from "node:test";
 import { bindRecipient } from "../lib/recipients.mjs";
+import { RUNTIME_DIRECTORY } from "../lib/runtime-context.mjs";
 import {
   prepareTaskLaunch,
   reconcileTaskLaunch,
@@ -81,7 +82,7 @@ async function launchContext(root, suffix, { task = {} } = {}) {
     ...coordinator,
     binding_digest: coordinatorBindingDigest(coordinator),
   };
-  const stateRoot = resolve(commonDir, "codex-flow", "v0.9.0");
+  const stateRoot = resolve(commonDir, "codex-flow", RUNTIME_DIRECTORY);
   await bindRecipient({
     stateRoot,
     recipient: coordinator,
