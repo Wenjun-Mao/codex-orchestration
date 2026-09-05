@@ -10,8 +10,8 @@ coordinator.
 `wait_threads` is active coordination work, not an idle delivery boundary.
 Never remove a working manual or explicit collection path until a replacement
 is installed and trusted, where applicable, and verified for the exact
-sender-recipient mapping. The current hook remains experimental, uninstalled,
-and canary-only; it is not stable automatic full-final delivery.
+sender-recipient mapping through a live test. Automated full-final reporting is
+experimental and is neither provided nor guaranteed by this Flow release.
 
 At a safe boundary, the coordinator reads callback status, observes the chosen
 receipt, and performs disposition, integration or no-change reconciliation,

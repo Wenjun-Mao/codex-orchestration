@@ -26,7 +26,6 @@
     "foreign-active-run-sentinel.mjs": "governance-core",
     "git.mjs": "governance-core",
     "integration.mjs": "governance-core",
-    "policy/role-policy.mjs": "routing-policy",
     "policy/selector-policy.mjs": "routing-policy",
     "recipients.mjs": "governance-core",
     "repository-paths.mjs": "governance-core",

@@ -45,10 +45,11 @@ work; it is a preference, not an empirical optimum. A trivial task may use a
 lower-effort override with a stated rationale. Use Terra-high for bounded
 implementation/review, Terra-xhigh for difficult root-cause work, and Sol-high
 for coordination. Astra-high is optional for a consequential director
-judgment, not mandatory staffing. Ultra is forbidden for native subagents and
-exceptional for visible tasks. Pass selectors, rationales, and bounded fork
-history explicitly; never inherit, probe availability, silently escalate, or
-fall back. An override replaces the selector rationale.
+judgment, not mandatory staffing. Higher Sol effort requires an explicit need.
+Ultra is forbidden for native subagents and exceptional for visible tasks.
+Pass selectors, rationales, and bounded fork history explicitly; never inherit,
+probe availability, silently escalate, or fall back. An override replaces the
+selector rationale.
 
 ## Launch a visible task once
 
@@ -93,9 +94,10 @@ blocker, approval request, or high-risk drift. Use `urgent persist`, `urgent
 attempt`, make the returned direct call once, then `urgent reconcile`.
 
 Keep the working explicit collection path until a replacement is installed and
-trusted, where applicable, and its exact sender-recipient mapping is verified.
-The current hook is experimental, uninstalled, and canary-only; it is not
-stable automatic full-final delivery.
+trusted, where applicable, and its exact sender-recipient mapping is live
+verified.
+Automated full-final reporting is experimental and is neither provided nor
+guaranteed by this Flow release.
 
 Hand results to `codex-orchestration:integrate`. Close only after a fresh
 passing `run audit` re-derives every claim, launch, result, disposition,

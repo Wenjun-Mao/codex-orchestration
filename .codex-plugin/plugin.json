@@ -17,11 +17,8 @@
     "capabilities": ["Goal direction", "Bounded delivery delegation", "Model routing", "Durable result coordination", "Long-lived coordinator refresh", "Clean repository unplug"],
     "defaultPrompt": [
       "Direct this outcome, including tradeoffs, delegation, and final acceptance.",
-      "Plan this work across separate executor tasks with deliberate model routing.",
-      "Run this workflow with one coordinator and explicitly selected executor models.",
-      "Review and integrate the journaled task results.",
-      "Refresh this long-lived coordinator onto the loaded plugin release.",
-      "Unplug Codex Flow cleanly from this repository."
+      "Deliver this assignment through bounded executor tasks with explicit model routing and evidence.",
+      "Review and integrate durable results, or refresh the coordinator onto the loaded release."
     ]
   }
 }

@@ -26,11 +26,11 @@ Result or receipt delivery is not acceptance.
 
 Never remove a working manual or explicit collection path until its replacement
 is installed and trusted, where applicable, and verified for the exact
-sender-recipient mapping. The current hook is experimental, uninstalled, and
-canary-only; it is not stable automatic full-final delivery. Routine results
-must not Steer an active recipient, and `wait_threads` is active work rather
-than an idle delivery boundary. Preserve quiet callbacks and the separate rare
-urgent path.
+sender-recipient mapping through a live test. Automated full-final reporting is
+experimental and is neither provided nor guaranteed by this Flow release.
+Routine results must not Steer an active recipient, and `wait_threads` is active
+work rather than an idle delivery boundary. Preserve quiet callbacks and the
+separate rare urgent path.
 
 ## Optional advisor
 

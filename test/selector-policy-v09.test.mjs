@@ -9,14 +9,14 @@ import {
 
 test("routing policy maps each bounded work lane to an explicit selector", () => {
   assert.deepEqual(selectorPolicyLanes(), [
-    "scoped_execution",
+    "mechanical",
     "bounded_implementation",
-    "root_cause",
-    "coordination",
+    "integration",
+    "governance",
     "consequential_judgment",
   ]);
-  assert.deepEqual(selectSelectorPolicy("scoped_execution"), {
-    lane: "scoped_execution",
+  assert.deepEqual(selectSelectorPolicy("mechanical"), {
+    lane: "mechanical",
     model: "gpt-5.6-luna",
     reasoning_effort: "xhigh",
     selector_rationale: "Substantive, well-scoped execution with clear acceptance criteria.",
@@ -27,14 +27,14 @@ test("routing policy maps each bounded work lane to an explicit selector", () =>
     reasoning_effort: "high",
     selector_rationale: "Bounded nontrivial implementation or review.",
   });
-  assert.deepEqual(selectSelectorPolicy("root_cause"), {
-    lane: "root_cause",
+  assert.deepEqual(selectSelectorPolicy("integration"), {
+    lane: "integration",
     model: "gpt-5.6-terra",
     reasoning_effort: "xhigh",
     selector_rationale: "Difficult root-cause analysis or integration work.",
   });
-  assert.deepEqual(selectSelectorPolicy("coordination"), {
-    lane: "coordination",
+  assert.deepEqual(selectSelectorPolicy("governance"), {
+    lane: "governance",
     model: "gpt-5.6-sol",
     reasoning_effort: "high",
     selector_rationale: "Director work or bounded coordination, delivery, and integration decisions.",
@@ -92,7 +92,7 @@ test("v0.9 routes explicitly and requires a replacement rationale for overrides"
       boundedReadOnlySupport: true,
       independentMutation: false,
     },
-    lane: "scoped_execution",
+    lane: "mechanical",
     override: {
       model: "gpt-5.6-sol",
       reasoning_effort: "ultra",
@@ -105,7 +105,7 @@ test("v0.9 routes explicitly and requires a replacement rationale for overrides"
       boundedReadOnlySupport: false,
       independentMutation: true,
     },
-    lane: "coordination",
+    lane: "governance",
     override: {
       model: "gpt-5.6-sol",
       reasoning_effort: "xhigh",
@@ -121,7 +121,7 @@ test("a trivial task may deliberately override Luna-xhigh with a lower effort an
       boundedReadOnlySupport: false,
       independentMutation: true,
     },
-    lane: "scoped_execution",
+    lane: "mechanical",
     override: {
       model: "gpt-5.6-luna",
       reasoning_effort: "low",
@@ -132,7 +132,7 @@ test("a trivial task may deliberately override Luna-xhigh with a lower effort an
     model: "gpt-5.6-luna",
     reasoning_effort: "low",
     selector_rationale: "Trivial one-file transcription with exact expected output.",
-    policy_lane: "scoped_execution",
+    policy_lane: "mechanical",
     overridden: true,
   });
 });
@@ -146,8 +146,8 @@ test("v0.9 policy has no App-evidence input or output", () => {
 });
 
 test("v0.9 policy returns immutable values and rejects unknown lanes", () => {
-  const first = selectSelectorPolicy("coordination");
-  const second = selectSelectorPolicy("coordination");
+  const first = selectSelectorPolicy("governance");
+  const second = selectSelectorPolicy("governance");
   assert.notStrictEqual(first, second);
   assert.throws(() => {
     first.model = "gpt-5.6-luna";

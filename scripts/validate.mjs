@@ -434,12 +434,15 @@ assertMarkers(await readRequired("docs/adr/0043-native-first-modular-architectur
   "terminal receipt v4",
 ], "ADR 0043");
 
-if (!Array.isArray(plugin.interface?.defaultPrompt)
-  || !plugin.interface.defaultPrompt.some((item) => item.includes("Direct this outcome"))
-  || !plugin.interface.defaultPrompt.some((item) => item.includes("separate executor tasks"))
-  || !plugin.interface.defaultPrompt.some((item) => item.includes("explicitly selected executor models"))
-  || !plugin.interface.defaultPrompt.some((item) => item.includes("Refresh this long-lived coordinator"))) {
-  throw new Error("Plugin interface omits orchestration, routing, or refresh entrypoints");
+const defaultPrompts = plugin.interface?.defaultPrompt;
+if (!Array.isArray(defaultPrompts)
+  || defaultPrompts.length !== 3
+  || !defaultPrompts.some((item) => item.includes("Direct this outcome"))
+  || !defaultPrompts.some((item) => item.includes("bounded executor tasks")
+    && item.includes("explicit model routing"))
+  || !defaultPrompts.some((item) => item.includes("Review and integrate")
+    && item.includes("refresh the coordinator"))) {
+  throw new Error("Plugin interface must expose exactly three compatible direction, delivery, and review/refresh prompts");
 }
 
 console.log(

@@ -12,12 +12,13 @@ goal, tradeoffs, and acceptance in one stable task. Reporting language also
 risked treating native final text or an experimental hook as a replacement for
 the working explicit collection path before exact routing was proven.
 
-Current OpenAI guidance says reasoning effort should rise with task complexity
-and selectors should be explicit rather than inherited. Superpowers' model
-selection guidance likewise chooses the least capable sufficient tier, states
-the selector explicitly, and scales review to complexity and risk. These
-sources support explicit, task-shaped routing; they do not establish an
-empirical optimum for Codex Flow's named models.
+OpenAI documents reasoning effort as a quality, latency, and token tradeoff and
+suggests increasing it when work needs deeper planning or analysis. Flow's own
+policy—not an OpenAI requirement—requires explicit selectors and forbids
+inheritance, probes, silent escalation, and fallback. Superpowers' model
+selection guidance separately favors the least capable sufficient tier,
+explicit model selection, and review proportional to complexity and risk.
+Neither source establishes an empirical optimum for Flow's named models.
 
 Sources:
 
@@ -40,10 +41,11 @@ Delivery of a result or receipt is not acceptance.
 
 A working explicit collection path may retire only after its replacement is
 installed and trusted, where applicable, and verified for the exact
-sender-recipient mapping. Routine delivery must not Steer an active recipient;
-`wait_threads` is active coordination work, not an idle delivery boundary. The
-quiet callback and rare persisted urgent path remain unchanged. The current
-hook remains experimental, uninstalled, and canary-only.
+sender-recipient mapping through a live test. Routine delivery must not Steer
+an active recipient; `wait_threads` is active coordination work, not an idle
+delivery boundary. The quiet callback and rare persisted urgent path remain
+unchanged. Automated full-final reporting is experimental and is neither
+provided nor guaranteed by this Flow release.
 
 Routing defaults become Luna-xhigh for substantive well-scoped executor work,
 Terra-high for bounded implementation/review, Terra-xhigh for difficult
@@ -74,9 +76,12 @@ installation, or personal-skill dependency.
 
 The router exposes one `direct` skill and the existing `coordinate` and
 `execute` skills retain their lifecycle roles. Small reusable briefs reference
-Flow mechanics instead of restating them. Behavioral tests cover exclusive role
-ownership, brief shape, reporting-path retirement, explicit routing defaults,
-and justified lower-effort override. Package/runtime identity remains the
-selector-policy authority; no independent policy-version constant remains.
+Flow mechanics instead of restating them. Package checks cover discovery and
+shipped role/reference assets; selector tests cover compatible lane names,
+explicit routing defaults, and justified lower-effort override. Package/runtime
+identity remains the selector-policy authority; no independent policy-version
+constant remains. Plugin discovery consolidates direction, delegated delivery,
+and review/refresh into exactly three prompts; source validation enforces the
+observed native maximum.
 Schemas, receipt authority, refresh, archive, and lifecycle state semantics are
 unchanged.

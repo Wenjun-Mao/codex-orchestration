@@ -89,9 +89,9 @@ they do not become competing integration authorities.
 
 A working manual or explicit result-collection path remains in place until a
 replacement is installed and trusted, where applicable, and verified for the
-exact sender-recipient mapping. Experimental, uninstalled, canary-only hooks do
-not qualify as stable automatic delivery. Native `wait_threads` is active work,
-not an idle delivery boundary.
+exact sender-recipient mapping through a live test. Automated full-final
+reporting is experimental and is neither provided nor guaranteed by this Flow
+release. Native `wait_threads` is active work, not an idle delivery boundary.
 
 Urgent blockers, approval requests, and high-risk drift use a separate direct
 path. The event is persisted before one bounded interrupt attempt. The runtime

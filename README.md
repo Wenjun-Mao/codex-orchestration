@@ -121,11 +121,12 @@ The current explicit recommendation is:
 | Optional consequential director judgment | Astra, high |
 
 Luna-xhigh is a user-selected preference, not an empirical optimum. Trivial
-work may use a lower-effort override with a stated rationale. Ultra is
-forbidden for native subagents and exceptional for visible tasks. Every native
-call passes selectors and rationales explicitly. There is no inherited
-selector, availability probe, automatic fallback, model registry, or silent
-escalation. A deliberate override replaces the rationale.
+work may use a lower-effort override with a stated rationale. Higher Sol effort
+requires an explicit need. Ultra is forbidden for native subagents and
+exceptional for visible tasks. Every native call passes selectors and
+rationales explicitly. There is no inherited selector, availability probe,
+automatic fallback, model registry, or silent escalation. A deliberate
+override replaces the rationale.
 
 ## Quiet completion and urgent interruption
 
