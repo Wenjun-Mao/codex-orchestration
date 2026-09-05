@@ -1,8 +1,7 @@
 # v0.9 task lifecycle
 
-Current development package authority is `v0.9.2-dev.0`; accepted stable
-authority remains immutable `v0.9.1`. Every run snapshots its exact runtime
-and uses it until completion.
+Current stable package authority is `v0.9.2`. Every run snapshots that exact
+runtime and uses it until completion.
 
 ```text
 workflow contract

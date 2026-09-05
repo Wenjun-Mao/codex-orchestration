@@ -1,8 +1,9 @@
 # v0.9 coverage map
 
-v0.9 is the accepted native-first architecture reset. Immutable `v0.9.1`
-authority includes the lifecycle-authority corrections and the version-bound
-maintenance-refresh fix, with the automated and live gates recorded below.
+v0.9 is the accepted native-first architecture reset. Immutable `v0.9.2`
+authority includes the v0.9.1 lifecycle/refresh corrections plus the bounded
+director, coordinator, executor, reporting, and selector-policy checkpoint,
+with the automated and live gates recorded below.
 
 ## Automated authority
 

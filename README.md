@@ -5,9 +5,8 @@ independent, user-visible Codex tasks as one accountable workflow. Codex App
 still creates and runs tasks; this package binds their intent, dependencies,
 ownership, identity, Git effects, quiet results, integration, and cleanup.
 
-The current accepted public authority is immutable `v0.9.1`; this development
-candidate identifies as `v0.9.2-dev.0`. The package is private and
-`UNLICENSED`.
+The current accepted public authority is immutable `v0.9.2`. The package is
+private and `UNLICENSED`.
 
 ## v0.9 architecture
 
@@ -89,7 +88,7 @@ Every actionable run records:
   cleanup, and terminal audit records.
 
 State lives under the exact package namespace, currently
-`.git/codex-flow/v0.9.2-dev.0/`, and is not tracked in the repository. A run
+`.git/codex-flow/v0.9.2/`, and is not tracked in the repository. A run
 never hot-switches its runtime.
 
 The package requires no tracked setup and never reads, writes, validates, or

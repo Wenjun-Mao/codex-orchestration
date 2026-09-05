@@ -1,6 +1,6 @@
 # ADR 0048: Director, coordinator, and reporting boundaries
 
-- Status: accepted for v0.9.2 development
+- Status: accepted for v0.9.2
 - Date: 2026-09-05
 - Refines: ADR 0005 callback authority and ADR 0043 native-first architecture
 
