@@ -1,7 +1,9 @@
 # v0.9 coverage map
 
 v0.9 is the accepted native-first architecture reset. Immutable `v0.9.0`
-authority passed every automated gate and the live RC canary recorded below.
+remains accepted public authority. Candidate `v0.9.1-rc.2` includes the
+lifecycle-authority corrections and the version-bound maintenance-refresh fix;
+promotion remains gated on exact-source replay and the release checks below.
 
 ## Automated authority
 
@@ -15,7 +17,7 @@ authority passed every automated gate and the live RC canary recorded below.
 | Quiet completion and separate one-shot urgent interruption | `lifecycle-v09.test.mjs`, `urgent-v09.test.mjs` |
 | Explicit read-only native-subagent lifecycle and selector rejection | `subagent-v09.test.mjs` |
 | Public/private archive evidence | `codex-app-private-archive-v09.test.mjs` |
-| Exact v0.8.3 semantic refresh, selected already-terminal evidence, dirty discard, branch/worktree deletion, target consumption, and joined crash-replay boundaries | `refresh-v09.test.mjs` |
+| Exact v0.8.3 semantic refresh, selected already-terminal evidence, dirty discard, branch/worktree deletion, target consumption, joined crash-replay boundaries, and exact closed-v0.9.0 no-replacement maintenance refresh | `refresh-v09.test.mjs` |
 | Coordinator branch authority remains disjoint from executor cleanup branch fences at admission | `run-lifecycle-v09.test.mjs` |
 | Version-agnostic clean-start unplug | `unplug-v09.test.mjs` |
 | Schema/runtime parity and immutable release identity | `schema-runtime-parity-v09.test.mjs`, `release-identity.test.mjs` |
@@ -52,6 +54,14 @@ The complete result is recorded in
 [`2026-09-04-v0.9.0-rc4-live-app-canary.md`](field-tests/2026-09-04-v0.9.0-rc4-live-app-canary.md).
 The RC3 selector-evidence ordering failure was classified as core, fixed with a
 regression, and the exact failed segment passed under RC4 before promotion.
+
+The v0.9.1 maintenance canary then exercised two sequential real App tasks.
+Task A completed under workflow revision 1; its exact completed disposition
+lawfully admitted dependent task B under revision 2. Both tasks activated
+distinct reserved branches, returned unchanged clean receipts, passed combined
+verification, archived with typed private evidence, and left zero residue after
+exact cleanup and unplug. The complete result is recorded in
+[`2026-09-05-v0.9.1-rc1-live-app-canary.md`](field-tests/2026-09-05-v0.9.1-rc1-live-app-canary.md).
 
 ## Release gate
 

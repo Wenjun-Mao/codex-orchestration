@@ -18,6 +18,7 @@ import {
   observeRefreshPrivateArchives,
   refreshStatus,
 } from "../lib/compat/refresh.mjs";
+import { sha256 } from "../lib/core.mjs";
 import {
   captureRefreshGitAuthority,
   deleteRefreshExecutorBranch,
@@ -164,6 +165,125 @@ async function createAbandonedV08Run({
   ], root);
   assertSuccess(abandonedCall, "v0.8.3 prior run abandonment");
   return { activated, request, runtimeCli, abandoned: JSON.parse(abandonedCall.stdout) };
+}
+
+async function createClosedV09Run({
+  root,
+  requests,
+  sourcePackage,
+  runId = "refresh-v09-closed-source",
+}) {
+  const prompt = "Inspect the bounded refresh fixture and return its terminal result.";
+  const workflowTask = task(`${runId}-subagent`, {
+    execution_kind: "subagent",
+    mode: "read",
+    model: "gpt-5.6-luna",
+    reasoning_effort: "medium",
+    selector_rationale: "Luna-medium is sufficient for this bounded source fixture.",
+    fork_turns: "2",
+    write_paths: [],
+    shared_resources: [],
+  });
+  const request = activation({
+    runId,
+    workflowTask,
+    lineageId: `${runId}-lineage`,
+    threadId: `${runId}-coordinator`,
+    branch: "codex/unused-v09-source",
+    branchFences: [],
+  });
+  const activationPath = await jsonFile(requests, `${runId}-activation`, request);
+  const activatedCall = invoke(sourcePackage.cli, [
+    "run", "activate", "--run-id", runId, "--file", activationPath, "--json",
+  ], root, { CODEX_THREAD_ID: request.runtime.lineage.thread_id });
+  assertSuccess(activatedCall, "v0.9.0 source activation");
+  const activated = JSON.parse(activatedCall.stdout);
+  const runtimeCli = resolve(activated.runtime_authority.bundle_root, "bin", "codex-flow.mjs");
+
+  const contractPath = await jsonFile(requests, `${runId}-contract`, {
+    run_id: runId,
+    plan_id: request.workflow.plan_id,
+    task_id: workflowTask.task_id,
+    dependency_authorities: [],
+  });
+  const contractCall = invoke(runtimeCli, [
+    "workflow", "contract", "--run-id", runId, "--file", contractPath, "--json",
+  ], root);
+  assertSuccess(contractCall, "v0.9.0 source contract");
+  const contract = JSON.parse(contractCall.stdout);
+
+  const preparePath = await jsonFile(requests, `${runId}-subagent-prepare`, {
+    run_id: runId,
+    task_contract: contract,
+    model: workflowTask.model,
+    reasoning_effort: workflowTask.reasoning_effort,
+    fork_turns: workflowTask.fork_turns,
+    mode: workflowTask.mode,
+    prompt_digest: sha256(prompt),
+    worktree_path: root,
+  });
+  const preparedCall = invoke(runtimeCli, [
+    "subagent", "prepare", "--run-id", runId, "--file", preparePath, "--json",
+  ], root);
+  assertSuccess(preparedCall, "v0.9.0 source subagent preparation");
+  const operation = JSON.parse(preparedCall.stdout);
+
+  const attemptPath = await jsonFile(requests, `${runId}-subagent-attempt`, {
+    run_id: runId,
+    operation_id: operation.operation_id,
+    prompt,
+    timeout_seconds: 300,
+  });
+  assertSuccess(invoke(runtimeCli, [
+    "subagent", "attempt", "--run-id", runId, "--file", attemptPath, "--json",
+  ], root), "v0.9.0 source subagent attempt");
+  const reconcilePath = await jsonFile(requests, `${runId}-subagent-reconcile`, {
+    run_id: runId,
+    operation_id: operation.operation_id,
+    outcome: "accepted",
+    agent_id: `${runId}-agent`,
+  });
+  assertSuccess(invoke(runtimeCli, [
+    "subagent", "reconcile", "--run-id", runId, "--file", reconcilePath, "--json",
+  ], root), "v0.9.0 source subagent reconciliation");
+  const completePath = await jsonFile(requests, `${runId}-subagent-complete`, {
+    run_id: runId,
+    operation_id: operation.operation_id,
+    classification: "PASS",
+    summary: "The bounded source fixture is complete.",
+    evidence_digests: [sha256("v0.9.0 closed refresh fixture")],
+  });
+  assertSuccess(invoke(runtimeCli, [
+    "subagent", "complete", "--run-id", runId, "--file", completePath, "--json",
+  ], root), "v0.9.0 source subagent completion");
+  const disposePath = await jsonFile(requests, `${runId}-subagent-dispose`, {
+    run_id: runId,
+    operation_id: operation.operation_id,
+    disposition: "accepted",
+  });
+  assertSuccess(invoke(runtimeCli, [
+    "subagent", "dispose", "--run-id", runId, "--file", disposePath, "--json",
+  ], root), "v0.9.0 source subagent disposition");
+
+  const auditCall = invoke(runtimeCli, ["run", "audit", "--run-id", runId, "--json"], root);
+  assertSuccess(auditCall, "v0.9.0 source closure audit");
+  const audit = JSON.parse(auditCall.stdout).audit;
+  assert.equal(audit.terminal_ready, true);
+  const closePath = await jsonFile(requests, `${runId}-close`, {
+    run_id: runId,
+    resume: activated.run.binding,
+    audit_id: audit.audit_id,
+  });
+  const closeCall = invoke(runtimeCli, [
+    "run", "close", "--run-id", runId, "--file", closePath, "--json",
+  ], root);
+  assertSuccess(closeCall, "v0.9.0 source closure");
+  return {
+    activated,
+    closed: JSON.parse(closeCall.stdout),
+    request,
+    runtimeCli,
+  };
 }
 
 async function prepareSelectedAbandonedV08Refresh({ root, requests, sourcePackage, targetPackage }) {
@@ -830,6 +950,78 @@ test("v0.9 refresh recognizes a selected source already abandoned before prepara
   assert.ok(Date.parse(applied.handoff.source_retirement.retired_at) >= Date.parse(handoff.intent.prepared_at));
   assert.ok(Date.parse(source.abandoned.run.terminal.abandoned_at) <= Date.parse(handoff.intent.prepared_at));
   await assert.rejects(stat(resolve(root, ".git/codex-flow/v0.8.3")), /ENOENT/);
+});
+
+test("v0.9 refresh consumes a closed exact-v0.9.0 source with no replacements", async (t) => {
+  const root = await createGitFixture("codex-flow-refresh-v091-closed-v090-");
+  const requests = await mkdtemp(resolve(tmpdir(), "codex-flow-refresh-v091-closed-v090-requests-"));
+  const sourcePackage = await extractTaggedPackage("v0.9.0");
+  const targetPackage = await copyCurrentPackage();
+  t.after(async () => {
+    await Promise.all([
+      removeFixture(root),
+      rm(requests, { recursive: true, force: true }),
+      rm(sourcePackage.root, { recursive: true, force: true }),
+      rm(targetPackage.root, { recursive: true, force: true }),
+    ]);
+  });
+
+  const source = await createClosedV09Run({ root, requests, sourcePackage });
+  assert.equal(source.closed.run.status, "closed");
+  const cleanupCall = invoke(source.runtimeCli, [
+    "cleanup", "plan", "--run-id", source.request.run_id, "--json",
+  ], root);
+  assertSuccess(cleanupCall, "v0.9.0 source cleanup plan");
+  const cleanup = JSON.parse(cleanupCall.stdout);
+  assert.equal(cleanup.kind, "codex-flow-v09-cleanup-plan");
+  assert.deepEqual(cleanup.blocking_launch_ids, []);
+  assert.equal(Object.hasOwn(cleanup, "blocking_operation_ids"), false);
+
+  const targetSkill = resolve(targetPackage.root, "skills/refresh/SKILL.md");
+  const inspectionCall = invoke(targetPackage.cli, [
+    "refresh", "inspect", "--invoking-skill", targetSkill, "--json",
+  ], root);
+  assertSuccess(inspectionCall, "closed v0.9.0 refresh inspection");
+  const inspection = JSON.parse(inspectionCall.stdout);
+  assert.equal(inspection.route, "refresh-ready", inspection.reason);
+  assert.equal(inspection.authority.source.package_version, "0.9.0");
+
+  const preparePath = await jsonFile(requests, "refresh-closed-v090-prepare", {
+    source_namespace: "v0.9.0",
+    source_run_id: source.request.run_id,
+    source_resume: source.activated.run.binding,
+    decisions: [],
+    replacements: [],
+    target_workflow: null,
+    target_fences: {
+      path_fences: [],
+      resource_fences: [],
+      branch_fences: [],
+    },
+    target_coordinator_thread_id: source.request.runtime.lineage.thread_id,
+  });
+  const preparedCall = invoke(targetPackage.cli, [
+    "refresh", "prepare", "--invoking-skill", targetSkill, "--file", preparePath, "--json",
+  ], root);
+  assertSuccess(preparedCall, "closed v0.9.0 refresh preparation");
+  const handoff = JSON.parse(preparedCall.stdout).handoff;
+  assert.equal(handoff.cleanup.length, 0);
+
+  const applyPath = await jsonFile(requests, "refresh-closed-v090-apply", {
+    refresh_id: handoff.refresh_id,
+    expected_handoff_digest: handoff.handoff_digest,
+    archive_evidence: [],
+  });
+  const appliedCall = invoke(targetPackage.cli, [
+    "refresh", "apply", "--invoking-skill", targetSkill, "--file", applyPath, "--json",
+  ], root);
+  assertSuccess(appliedCall, "closed v0.9.0 refresh apply");
+  const applied = JSON.parse(appliedCall.stdout);
+  assert.equal(applied.status, "consumed-clean-start");
+  assert.equal(applied.handoff.source_retirement.method, "already-terminal");
+  assert.equal(applied.handoff.source_retirement.terminal_status, "closed");
+  await assert.rejects(stat(resolve(root, ".git/codex-flow/v0.9.0")), /ENOENT/);
+  await assert.rejects(stat(resolve(root, ".git/codex-flow/refresh-v1")), /ENOENT/);
 });
 
 test("v0.9 resumes discarded cleanup and consumption for a selected already-abandoned source", async (t) => {
