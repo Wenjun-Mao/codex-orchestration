@@ -1,26 +1,25 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  SELECTOR_POLICY_VERSION,
   routeWork,
   selectExecutionSurface,
   selectSelectorPolicy,
   selectorPolicyLanes,
 } from "../lib/policy/selector-policy.mjs";
 
-test("v0.9 policy maps each bounded work lane to an explicit selector", () => {
-  assert.equal(SELECTOR_POLICY_VERSION, "v0.9");
+test("routing policy maps each bounded work lane to an explicit selector", () => {
   assert.deepEqual(selectorPolicyLanes(), [
-    "mechanical",
+    "scoped_execution",
     "bounded_implementation",
-    "integration",
-    "governance",
+    "root_cause",
+    "coordination",
+    "consequential_judgment",
   ]);
-  assert.deepEqual(selectSelectorPolicy("mechanical"), {
-    lane: "mechanical",
+  assert.deepEqual(selectSelectorPolicy("scoped_execution"), {
+    lane: "scoped_execution",
     model: "gpt-5.6-luna",
-    reasoning_effort: "medium",
-    selector_rationale: "Mechanical, local, or read-only work with clear acceptance criteria.",
+    reasoning_effort: "xhigh",
+    selector_rationale: "Substantive, well-scoped execution with clear acceptance criteria.",
   });
   assert.deepEqual(selectSelectorPolicy("bounded_implementation"), {
     lane: "bounded_implementation",
@@ -28,17 +27,23 @@ test("v0.9 policy maps each bounded work lane to an explicit selector", () => {
     reasoning_effort: "high",
     selector_rationale: "Bounded nontrivial implementation or review.",
   });
-  assert.deepEqual(selectSelectorPolicy("integration"), {
-    lane: "integration",
+  assert.deepEqual(selectSelectorPolicy("root_cause"), {
+    lane: "root_cause",
     model: "gpt-5.6-terra",
     reasoning_effort: "xhigh",
-    selector_rationale: "Multi-module root-cause or integration work.",
+    selector_rationale: "Difficult root-cause analysis or integration work.",
   });
-  assert.deepEqual(selectSelectorPolicy("governance"), {
-    lane: "governance",
+  assert.deepEqual(selectSelectorPolicy("coordination"), {
+    lane: "coordination",
     model: "gpt-5.6-sol",
     reasoning_effort: "high",
-    selector_rationale: "Coordination and systemic decisions.",
+    selector_rationale: "Director work or bounded coordination, delivery, and integration decisions.",
+  });
+  assert.deepEqual(selectSelectorPolicy("consequential_judgment"), {
+    lane: "consequential_judgment",
+    model: "gpt-6-astra",
+    reasoning_effort: "high",
+    selector_rationale: "Optional support for a consequential director judgment.",
   });
 });
 
@@ -87,7 +92,7 @@ test("v0.9 routes explicitly and requires a replacement rationale for overrides"
       boundedReadOnlySupport: true,
       independentMutation: false,
     },
-    lane: "mechanical",
+    lane: "scoped_execution",
     override: {
       model: "gpt-5.6-sol",
       reasoning_effort: "ultra",
@@ -100,13 +105,36 @@ test("v0.9 routes explicitly and requires a replacement rationale for overrides"
       boundedReadOnlySupport: false,
       independentMutation: true,
     },
-    lane: "governance",
+    lane: "coordination",
     override: {
       model: "gpt-5.6-sol",
       reasoning_effort: "xhigh",
       selector_rationale: "Needed.",
     },
   }), /substantive stated need/);
+});
+
+test("a trivial task may deliberately override Luna-xhigh with a lower effort and rationale", () => {
+  assert.deepEqual(routeWork({
+    surfaceFacts: {
+      sharedEvolvingState: false,
+      boundedReadOnlySupport: false,
+      independentMutation: true,
+    },
+    lane: "scoped_execution",
+    override: {
+      model: "gpt-5.6-luna",
+      reasoning_effort: "low",
+      selector_rationale: "Trivial one-file transcription with exact expected output.",
+    },
+  }), {
+    surface: "visible-task",
+    model: "gpt-5.6-luna",
+    reasoning_effort: "low",
+    selector_rationale: "Trivial one-file transcription with exact expected output.",
+    policy_lane: "scoped_execution",
+    overridden: true,
+  });
 });
 
 test("v0.9 policy has no App-evidence input or output", () => {
@@ -118,8 +146,8 @@ test("v0.9 policy has no App-evidence input or output", () => {
 });
 
 test("v0.9 policy returns immutable values and rejects unknown lanes", () => {
-  const first = selectSelectorPolicy("governance");
-  const second = selectSelectorPolicy("governance");
+  const first = selectSelectorPolicy("coordination");
+  const second = selectSelectorPolicy("coordination");
   assert.notStrictEqual(first, second);
   assert.throws(() => {
     first.model = "gpt-5.6-luna";

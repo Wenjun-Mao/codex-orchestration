@@ -7,6 +7,12 @@ receipt into the repository journal. Native task finals and waits provide
 liveness only; they are not result authority and must not interrupt a working
 coordinator.
 
+`wait_threads` is active coordination work, not an idle delivery boundary.
+Never remove a working manual or explicit collection path until a replacement
+is installed and trusted, where applicable, and verified for the exact
+sender-recipient mapping. The current hook remains experimental, uninstalled,
+and canary-only; it is not stable automatic full-final delivery.
+
 At a safe boundary, the coordinator reads callback status, observes the chosen
 receipt, and performs disposition, integration or no-change reconciliation,
 combined verification, archival, and cleanup.

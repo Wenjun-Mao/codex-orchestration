@@ -1,7 +1,7 @@
 # Mission and product boundary
 
 - Status: accepted
-- Last reviewed: 2026-09-04 for the v0.9 native-first boundary
+- Last reviewed: 2026-09-05 for the v0.9 role and reporting boundary
 - Scope: durable product purpose and feature boundary
 
 This charter defines why Codex Orchestration exists and how proposed features
@@ -10,17 +10,16 @@ decisions.
 
 ## Mission
 
-Codex Orchestration enables a lead Codex task, often using a stronger model,
-to coordinate multiple separate, user-visible Codex tasks, often using cheaper
-or specialized models, as one safe and accountable repository workflow. It
-preserves delegation intent, dependencies, ownership, task and Git identity,
-non-disruptive result delivery, and exactly-once integration across task
-boundaries while leaving native task execution, model selection, and any
-host-managed worktree lifecycle to the Codex host.
+Codex Orchestration lets a director retain goals, strategic conversation,
+tradeoffs, and acceptance while a coordinator owns bounded delivery,
+delegation, integration, and verification and executors own scoped work and
+evidence. It preserves delegation intent, dependencies, ownership, task and Git
+identity, non-disruptive result delivery, and exactly-once integration while
+leaving native execution, model selection, and host-managed worktrees to Codex.
 
-The mission is model-flexible. Sol coordinating Terra is an important operating
-shape, not a permanent dependency on those model names. A future coordinator
-or executor model should fit the same contracts when the host supports it.
+The mission is model-flexible. Current selector choices are explicit operating
+preferences, not permanent dependencies or empirical optima. Future director,
+coordinator, or executor models should fit the same contracts when supported.
 
 ## Problem this solves
 
@@ -88,6 +87,12 @@ Each repository declares exactly one ordinary-completion authority. Native
 waits, task-final events, and notification adapters may provide liveness, but
 they do not become competing integration authorities.
 
+A working manual or explicit result-collection path remains in place until a
+replacement is installed and trusted, where applicable, and verified for the
+exact sender-recipient mapping. Experimental, uninstalled, canary-only hooks do
+not qualify as stable automatic delivery. Native `wait_threads` is active work,
+not an idle delivery boundary.
+
 Urgent blockers, approval requests, and high-risk drift use a separate direct
 path. The event is persisted before one bounded interrupt attempt. The runtime
 does not retry that attempt; host replay or ambiguity cannot authorize duplicate
@@ -108,10 +113,12 @@ coordinator lineage at generation 1, so old callbacks cannot cross the cutover.
 
 ### Bounded delegation
 
-Every executor task receives a generated contract with an explicit objective, dependency position, path and
-shared-resource ownership, deadline, model request, verification scope, and
-terminal-result contract. A directed acyclic dependency graph identifies which
-tasks may run concurrently and which must wait; dependency cycles are invalid.
+The director may do bounded direct work or assign one coordinator; there is no
+required task count. Every delegated assignment names outcome, scope,
+constraints, acceptance, and exactly one reporting recipient/path. Every
+executor receives a generated contract with explicit objective, dependency
+position, ownership, model request, verification, and result terms. Result or
+receipt delivery does not confer acceptance.
 
 ### Durable identity and evidence
 

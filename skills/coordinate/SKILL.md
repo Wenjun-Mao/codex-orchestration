@@ -1,6 +1,6 @@
 ---
 name: coordinate
-description: Activate and coordinate one Codex Flow run across separate visible Codex tasks, using native-first first-turn launch, explicit model routing, bounded ownership, and non-interrupting results.
+description: Deliver one director assignment through a bounded Codex Flow run, coordinating visible tasks, integration, verification, and one complete non-interrupting result with explicit model routing.
 ---
 
 # Coordinate Codex Work
@@ -8,6 +8,13 @@ description: Activate and coordinate one Codex Flow run across separate visible 
 Use the loaded v0.9 package only after the router performs one refresh
 inspection. A `resume-source` route stays on the immutable source runtime; a
 `refresh-ready` route belongs to `codex-orchestration:refresh`.
+
+Own bounded delivery, delegation, integration, and verification for the
+director's assignment. Do not take over the director's goals, strategic
+tradeoffs, or acceptance authority. Return one complete result containing the
+actual outcome and evidence to the assignment's named recipient/path; do not
+author a second narrative summary. Result or receipt delivery is not
+acceptance. Use the reusable [assignment and result briefs](../../templates/references/assignment-and-reporting.md).
 
 ## Activate and plan
 
@@ -33,13 +40,15 @@ Choose surface first, then consult the replaceable selector policy:
 - native subagent for bounded read-only supporting work;
 - visible task for independent mutating work with durable Git ownership.
 
-The initial least-capable-sufficient recommendation is Luna-medium for
-mechanical work, Terra-high for bounded implementation/review, Terra-xhigh for
-multi-module diagnosis/integration, and Sol-high for coordination/systemic
-decisions. Higher Sol effort needs an explicit reason. Ultra is forbidden for
-native subagents and exceptional for visible tasks. Pass selectors and bounded
-fork history explicitly; never inherit, probe availability, or silently fall
-back. An override replaces the selector rationale.
+The user-selected default is Luna-xhigh for substantive, well-scoped executor
+work; it is a preference, not an empirical optimum. A trivial task may use a
+lower-effort override with a stated rationale. Use Terra-high for bounded
+implementation/review, Terra-xhigh for difficult root-cause work, and Sol-high
+for coordination. Astra-high is optional for a consequential director
+judgment, not mandatory staffing. Ultra is forbidden for native subagents and
+exceptional for visible tasks. Pass selectors, rationales, and bounded fork
+history explicitly; never inherit, probe availability, silently escalate, or
+fall back. An override replaces the selector rationale.
 
 ## Launch a visible task once
 
@@ -77,10 +86,16 @@ post-creation mismatch remains non-retryable.
 
 ## Monitor and close
 
-Use native waits for liveness only. Routine visible-task completion is a quiet
+`wait_threads` is active coordination work, not an idle delivery boundary. Use
+native waits for liveness only. Routine visible-task completion is a quiet
 journal callback; direct messaging or Steer is reserved for a persisted urgent
 blocker, approval request, or high-risk drift. Use `urgent persist`, `urgent
 attempt`, make the returned direct call once, then `urgent reconcile`.
+
+Keep the working explicit collection path until a replacement is installed and
+trusted, where applicable, and its exact sender-recipient mapping is verified.
+The current hook is experimental, uninstalled, and canary-only; it is not
+stable automatic full-final delivery.
 
 Hand results to `codex-orchestration:integrate`. Close only after a fresh
 passing `run audit` re-derives every claim, launch, result, disposition,

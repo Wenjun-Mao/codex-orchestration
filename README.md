@@ -5,8 +5,9 @@ independent, user-visible Codex tasks as one accountable workflow. Codex App
 still creates and runs tasks; this package binds their intent, dependencies,
 ownership, identity, Git effects, quiet results, integration, and cleanup.
 
-The current accepted public authority is immutable `v0.9.1`. The package is
-private and `UNLICENSED`.
+The current accepted public authority is immutable `v0.9.1`; this development
+candidate identifies as `v0.9.2-dev.0`. The package is private and
+`UNLICENSED`.
 
 ## v0.9 architecture
 
@@ -88,7 +89,7 @@ Every actionable run records:
   cleanup, and terminal audit records.
 
 State lives under the exact package namespace, currently
-`.git/codex-flow/v0.9.1/`, and is not tracked in the repository. A run
+`.git/codex-flow/v0.9.2-dev.0/`, and is not tracked in the repository. A run
 never hot-switches its runtime.
 
 The package requires no tracked setup and never reads, writes, validates, or
@@ -104,20 +105,27 @@ Choose the execution surface first:
 | Native subagent | Bounded read-only supporting work |
 | Visible task | Independent mutating work needing durable Git lifecycle |
 
-The initial least-capable-sufficient recommendation is:
+The director owns goals, strategic conversation, tradeoffs, and acceptance.
+The coordinator owns bounded delivery, delegation, integration, and
+verification; executors own scoped implementation and evidence. A director may
+also perform bounded direct work, and no fixed task count is required.
+
+The current explicit recommendation is:
 
 | Work | Recommendation |
 | --- | --- |
-| Mechanical, local, or clear read-only work | Luna, medium |
+| Substantive, well-scoped executor work | Luna, xhigh |
 | Bounded nontrivial implementation or review | Terra, high |
-| Multi-module diagnosis or integration | Terra, xhigh |
-| Coordination or systemic decisions | Sol, high |
+| Difficult root-cause analysis or integration | Terra, xhigh |
+| Coordination or director work | Sol, high |
+| Optional consequential director judgment | Astra, high |
 
-Higher Sol effort requires a stated need. Ultra is forbidden for native
-subagents and exceptional for visible tasks. Every native call passes selectors
-explicitly. There is no inherited selector, availability probe, automatic
-fallback, model registry, or silent escalation. A deliberate override replaces
-the rationale.
+Luna-xhigh is a user-selected preference, not an empirical optimum. Trivial
+work may use a lower-effort override with a stated rationale. Ultra is
+forbidden for native subagents and exceptional for visible tasks. Every native
+call passes selectors and rationales explicitly. There is no inherited
+selector, availability probe, automatic fallback, model registry, or silent
+escalation. A deliberate override replaces the rationale.
 
 ## Quiet completion and urgent interruption
 

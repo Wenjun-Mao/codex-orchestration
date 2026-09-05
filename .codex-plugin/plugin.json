@@ -1,7 +1,7 @@
 {
   "name": "codex-orchestration",
-  "version": "0.9.1",
-  "description": "Orchestrate visible Codex tasks with explicit model routing, bounded ownership, and quiet durable results.",
+  "version": "0.9.2-dev.0",
+  "description": "Direct and orchestrate Codex work with explicit roles, model routing, bounded ownership, and quiet durable results.",
   "author": {
     "name": "Wenjun Mao"
   },
@@ -11,11 +11,12 @@
   "interface": {
     "displayName": "Codex Orchestration",
     "shortDescription": "Orchestrate visible Codex tasks safely.",
-    "longDescription": "Use one coordinator to plan and govern multiple user-visible Codex executor tasks with explicit model routing, bounded ownership, quiet durable results, audited integration, clean unplug, and bounded release refresh for long-lived coordinators.",
+    "longDescription": "Direct goals and acceptance while coordinators deliver through bounded user-visible Codex executor tasks with explicit model routing, quiet durable results, audited integration, clean unplug, and bounded release refresh.",
     "developerName": "Wenjun Mao",
     "category": "Productivity",
-    "capabilities": ["Multi-task planning", "Model routing", "Durable result coordination", "Long-lived coordinator refresh", "Clean repository unplug"],
+    "capabilities": ["Goal direction", "Bounded delivery delegation", "Model routing", "Durable result coordination", "Long-lived coordinator refresh", "Clean repository unplug"],
     "defaultPrompt": [
+      "Direct this outcome, including tradeoffs, delegation, and final acceptance.",
       "Plan this work across separate executor tasks with deliberate model routing.",
       "Run this workflow with one coordinator and explicitly selected executor models.",
       "Review and integrate the journaled task results.",

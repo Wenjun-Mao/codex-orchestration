@@ -5,6 +5,7 @@ import { access, readdir, readFile } from "node:fs/promises";
 import { basename, dirname, relative, resolve, sep } from "node:path";
 import { PACKAGE_VERSION } from "../lib/core.mjs";
 import { CODEX_FLOW_STATE_NAMESPACE } from "../lib/git.mjs";
+import * as selectorPolicy from "../lib/policy/selector-policy.mjs";
 import { RUNTIME_DIRECTORY } from "../lib/runtime-context.mjs";
 import {
   createWorkflowPlanRevision,
@@ -13,7 +14,7 @@ import {
 import { validateReleaseIdentity } from "./release-identity.mjs";
 
 const root = resolve(import.meta.dirname, "..");
-const EXPECTED_PACKAGE_VERSION = "0.9.1";
+const EXPECTED_PACKAGE_VERSION = "0.9.2-dev.0";
 
 const ACTIVE_SCHEMA_NAMES = Object.freeze([
   "archive-operation",
@@ -367,9 +368,10 @@ if (currentTests.includes("v07-lifecycle-fixture.mjs")) {
 }
 
 const skillContracts = new Map([
-  ["index", ["codex-orchestration:refresh", "first-turn assignment", "Native subagents"]],
-  ["coordinate", ["task launch prepare", "task launch attempt", "task launch reconcile", "full contract", "one native creation call"]],
-  ["execute", ["task launch start", "same first turn", "terminal-receipt-v4", "Routine terminal completion"]],
+  ["index", ["codex-orchestration:direct", "codex-orchestration:refresh", "first-turn assignment", "Native subagents"]],
+  ["direct", ["goals", "tradeoffs", "acceptance", "codex-orchestration:coordinate", "Astra-high"]],
+  ["coordinate", ["bounded delivery", "task launch prepare", "task launch attempt", "task launch reconcile", "full contract", "one native creation call"]],
+  ["execute", ["assigned implementation and evidence", "task launch start", "same first turn", "terminal-receipt-v4", "Routine terminal completion"]],
   ["integrate", ["launch_id", "content-addressed PASS verification", "Finalization"]],
   ["cleanup", ["cleanup plan --run-id", "launch", "read-only"]],
   ["refresh", ["authenticated v0.8", "Wait", "Discard", "run activate --refresh-id", "no migration"]],
@@ -383,11 +385,17 @@ for (const [name, markers] of skillContracts) {
   assertMarkers(source, markers, `skills/${name}/SKILL.md`);
 }
 
+if (Object.keys(selectorPolicy).some((name) => name.endsWith("_VERSION"))) {
+  throw new Error("Selector policy must use package/runtime identity, not an independent version export");
+}
+
 for (const [path, markers] of new Map([
-  ["templates/references/communication-loop.md", ["Routine completion", "quiet", "Urgent interruption"]],
+  ["templates/references/assignment-and-reporting.md", ["Assignment brief", "Result brief", "exact sender-recipient mapping", "Optional advisor"]],
+  ["templates/references/communication-loop.md", ["Routine completion", "quiet", "wait_threads", "Urgent interruption"]],
   ["templates/references/host-operations.md", ["full contract", "task launch start", "one native creation call", "opaque"]],
   ["templates/references/parallel-execution.md", ["acyclic dependency graph", "Visible tasks", "Native subagents"]],
-  ["templates/references/task-lifecycle.md", ["v0.9.1", "first prompt", "terminal-receipt-v4", "launch"]],
+  ["templates/references/task-lifecycle.md", ["v0.9.2-dev.0", "first prompt", "terminal-receipt-v4", "launch"]],
+  ["templates/roles/director.md", ["goals", "tradeoffs", "acceptance", "reporting recipient/path"]],
   ["templates/roles/coordinator.md", ["full assignment", "quiet journal", "Close only"]],
   ["templates/roles/executor.md", ["task launch start", "same first turn", "terminal-receipt-v4"]],
 ])) {
@@ -427,6 +435,7 @@ assertMarkers(await readRequired("docs/adr/0043-native-first-modular-architectur
 ], "ADR 0043");
 
 if (!Array.isArray(plugin.interface?.defaultPrompt)
+  || !plugin.interface.defaultPrompt.some((item) => item.includes("Direct this outcome"))
   || !plugin.interface.defaultPrompt.some((item) => item.includes("separate executor tasks"))
   || !plugin.interface.defaultPrompt.some((item) => item.includes("explicitly selected executor models"))
   || !plugin.interface.defaultPrompt.some((item) => item.includes("Refresh this long-lived coordinator"))) {

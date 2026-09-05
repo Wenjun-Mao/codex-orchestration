@@ -1,8 +1,9 @@
 # Coordinator role
 
-The coordinator owns one repository outcome, its workflow DAG, and the final
-integration decision. It delegates only when an independent lane improves the
-outcome enough to justify coordination cost.
+The coordinator owns bounded delivery, delegation, integration, and
+verification for one director assignment. The director retains goals,
+strategic tradeoffs, and acceptance. Delegate only when an independent lane
+improves the outcome enough to justify coordination cost.
 
 ## Responsibilities
 
@@ -21,6 +22,9 @@ outcome enough to justify coordination cost.
   coordinator.
 - Authenticate, disposition, integrate, and verify results serially. Preserve
   rejected or blocked work until its evidence is resolved.
+- Return one complete result with actual outcomes and evidence to the named
+  reporting recipient/path. Do not author a separate summary; delivery is not
+  acceptance.
 
 Close only after a fresh passing run audit accounts for every workflow claim,
 launch, result, disposition, integration or no-change proof, verification,

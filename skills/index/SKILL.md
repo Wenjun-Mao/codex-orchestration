@@ -1,15 +1,19 @@
 ---
 name: index
-description: Route Codex Flow questions, coordinator refresh, native-first orchestration, result integration, cleanup, and unplug. Use when the user asks about or wants to use Codex Flow, or when work may benefit from multiple separate Codex tasks.
+description: Route Codex Flow direction, coordinator refresh, native-first orchestration, result integration, cleanup, and unplug. Use when the user asks about or wants to use Codex Flow, or when work may benefit from directed delegation or multiple separate Codex tasks.
 ---
 
 # Codex Orchestration Router
 
 Route by intent before changing repository state.
 
+- Use `codex-orchestration:direct` when the task owns goals, strategic
+  conversation, tradeoffs, assignments, and acceptance. It may perform bounded
+  direct work or delegate delivery; it does not force a fixed task count.
 - Answer questions, audits, and plans read-only. Repository setup is not needed.
 - Before actionable coordination, invoke `codex-orchestration:refresh` once.
-  A fresh route continues with `codex-orchestration:coordinate`; a source run
+  A fresh delegated-delivery route continues with
+  `codex-orchestration:coordinate`; a source run
   resumes through its immutable runtime; a ready cutover stays in the refresh
   skill; ambiguous authority stops.
 - Use `codex-orchestration:execute` inside a visible executor whose first-turn
