@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { mkdtemp, rm, stat, writeFile } from "node:fs/promises";
+import { spawnSync } from "node:child_process";
+import { cp, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import test from "node:test";
@@ -8,6 +9,7 @@ import { sha256 } from "../lib/core.mjs";
 import {
   assertSuccess,
   createGitFixture,
+  packageRoot,
   removeFixture,
   runCli,
 } from "./helpers.mjs";
@@ -58,6 +60,31 @@ test("v0.9 help exposes launch authority and no retired bootstrap or release com
   assert.notEqual(retiredExecution.status, 0);
   assert.match(retiredExecution.stderr, /task requires the v0\.9 launch lifecycle/);
   assert.doesNotMatch(retiredExecution.stderr, /node:internal|at main/);
+});
+
+test("installed CLI rejects a plugin manifest cachebuster that diverges from package identity", async (t) => {
+  const installedRoot = await mkdtemp(resolve(tmpdir(), "codex-flow-installed-identity-"));
+  t.after(() => rm(installedRoot, { recursive: true, force: true }));
+  await Promise.all([
+    cp(resolve(packageRoot, ".codex-plugin"), resolve(installedRoot, ".codex-plugin"), { recursive: true }),
+    cp(resolve(packageRoot, "bin"), resolve(installedRoot, "bin"), { recursive: true }),
+    cp(resolve(packageRoot, "lib"), resolve(installedRoot, "lib"), { recursive: true }),
+    cp(resolve(packageRoot, "skills"), resolve(installedRoot, "skills"), { recursive: true }),
+    cp(resolve(packageRoot, "package.json"), resolve(installedRoot, "package.json")),
+  ]);
+  const manifestPath = resolve(installedRoot, ".codex-plugin", "plugin.json");
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+  manifest.version = `${manifest.version}+codex.fixture`;
+  await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
+
+  const result = spawnSync(process.execPath, [
+    resolve(installedRoot, "bin", "codex-flow.mjs"),
+    "refresh", "inspect",
+    "--invoking-skill", resolve(installedRoot, "skills", "refresh", "SKILL.md"),
+    "--json",
+  ], { cwd: packageRoot, encoding: "utf8" });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /package metadata must exactly match version 0\.9\.3-rc\.1/);
 });
 
 test("v0.9 CLI activates a clean run through current launch-era wiring", async (t) => {
