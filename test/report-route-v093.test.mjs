@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { rm } from "node:fs/promises";
+import { rename, rm } from "node:fs/promises";
 import { resolve } from "node:path";
 import test from "node:test";
 import {
@@ -125,14 +125,16 @@ test("a coordinator delegation binds the active run and exact approved plan back
   const root = await createGitFixture("codex-flow-report-route-director-");
   const context = await createActiveTaskLaunch(root, "director");
   t.after(() => destroy(context));
+  const legacyStateRoot = resolve(context.commonDir, "codex-flow", "v0.9.2-fixture");
+  await rename(context.stateRoot, legacyStateRoot);
   const director = {
     lineage_id: "director-lineage",
     thread_id: "director-thread",
     generation: 1,
   };
-  await bindRecipient({ stateRoot: context.stateRoot, recipient: director });
+  await bindRecipient({ stateRoot: legacyStateRoot, recipient: director });
   const result = await registerCoordinatorReportRoute({
-    stateRoot: context.stateRoot,
+    stateRoot: legacyStateRoot,
     runId: context.launch.run_id,
     senderThreadId: context.coordinator.thread_id,
     senderHostId: "fixture-host",
@@ -149,11 +151,11 @@ test("a coordinator delegation binds the active run and exact approved plan back
   assert.equal(result.route.assignment.kind, "coordinator-delegation");
   assert.equal(result.route.sender.thread_id, context.coordinator.thread_id);
   assert.equal(result.route.recipient.thread_id, director.thread_id);
-  assert.equal((await reportRoute({ stateRoot: context.stateRoot, routeId: result.route.route_id })).route_id, result.route.route_id);
+  assert.equal((await reportRoute({ stateRoot: legacyStateRoot, routeId: result.route.route_id })).route_id, result.route.route_id);
 
   await assert.rejects(
     () => registerCoordinatorReportRoute({
-      stateRoot: context.stateRoot,
+      stateRoot: legacyStateRoot,
       runId: context.launch.run_id,
       senderThreadId: context.coordinator.thread_id,
       senderHostId: "fixture-host",
