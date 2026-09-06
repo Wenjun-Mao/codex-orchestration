@@ -229,7 +229,7 @@ test("queue text labels the exact final as untrusted data", async (t) => {
 
 test("reporter authority reflects the packaged RC identity", async () => {
   const authority = await reporterAuthorityFor({ packageRoot });
-  assert.equal(authority.package_version, "0.9.3-rc.2");
+  assert.equal(authority.package_version, "0.9.3-rc.3");
   assert.match(authority.routes_sha256, /^[0-9a-f]{64}$/);
   assert.match(authority.records_sha256, /^[0-9a-f]{64}$/);
 });

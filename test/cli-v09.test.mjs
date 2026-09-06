@@ -84,7 +84,7 @@ test("installed CLI rejects a plugin manifest cachebuster that diverges from pac
     "--json",
   ], { cwd: packageRoot, encoding: "utf8" });
   assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /package metadata must exactly match version 0\.9\.3-rc\.2/);
+  assert.match(result.stderr, /package metadata must exactly match version 0\.9\.3-rc\.3/);
 });
 
 test("v0.9 CLI activates a clean run through current launch-era wiring", async (t) => {

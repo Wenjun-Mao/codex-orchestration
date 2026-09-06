@@ -14,7 +14,7 @@ import {
 import { validateReleaseIdentity } from "./release-identity.mjs";
 
 const root = resolve(import.meta.dirname, "..");
-const EXPECTED_PACKAGE_VERSION = "0.9.3-rc.2";
+const EXPECTED_PACKAGE_VERSION = "0.9.3-rc.3";
 
 const ACTIVE_SCHEMA_NAMES = Object.freeze([
   "archive-operation",
@@ -266,8 +266,8 @@ for (const field of [
 if (packageJson.scripts["test:v07"] || packageJson.scripts["test:v08"]) {
   throw new Error("Current package scripts must not expose predecessor test authority");
 }
-if (plugin.hooks !== "./hooks/hooks.json") {
-  throw new Error("Plugin must use the packaged queued-report completion hook definition");
+if (Object.hasOwn(plugin, "hooks")) {
+  throw new Error("Plugin manifest must rely on supported hooks/hooks.json discovery");
 }
 const pluginHooks = JSON.parse(await readRequired("hooks/hooks.json"));
 const stopHandlers = pluginHooks?.hooks?.Stop;
