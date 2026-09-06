@@ -337,6 +337,12 @@ test("foreign active-run sentinel blocks admission and bounds foreign namespace 
   const root = await createGitFixture("codex-flow-v09-foreign-run-");
   t.after(() => removeFixture(root));
   const commonDir = resolve(root, ".git");
+  await mkdir(resolve(commonDir, "codex-flow", "report-locators", "records"), { recursive: true });
+  await writeFile(
+    resolve(commonDir, "codex-flow", "report-locators", "records", "fixture.json"),
+    "{}\n",
+    "utf8",
+  );
   const { bundleSource } = await runtimeBundleFor(root, "foreign-run");
   const runtime = runtimeFor(root, bundleSource);
   await acquireRuntimeContext({

@@ -968,6 +968,12 @@ test("v0.9 refresh consumes a closed exact-v0.9.0 source with no replacements", 
 
   const source = await createClosedV09Run({ root, requests, sourcePackage });
   assert.equal(source.closed.run.status, "closed");
+  await mkdir(resolve(root, ".git", "codex-flow", "report-locators", "records"), { recursive: true });
+  await writeFile(
+    resolve(root, ".git", "codex-flow", "report-locators", "records", "fixture.json"),
+    "{}\n",
+    "utf8",
+  );
   const cleanupCall = invoke(source.runtimeCli, [
     "cleanup", "plan", "--run-id", source.request.run_id, "--json",
   ], root);
