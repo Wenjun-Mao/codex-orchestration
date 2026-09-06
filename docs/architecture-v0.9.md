@@ -138,7 +138,8 @@ pre-bound director generation. The Stop adapter resolves only that exact
 sender locator, delegates capture/deduplication/lifecycle to governance core,
 then makes at most one bounded queue submission. No global task scan or second
 report state machine exists. Task disposition closes its launch route; run
-closure or abandonment closes any remaining routes and fences late Stop events.
+closure or abandonment closes any remaining routes and fences late `Stop` or
+thread-spawn `SubagentStop` events.
 
 The same first-prompt rule applies to the coordinator handoff: the coordinator
 is dispatched with the complete approved assignment, plan digest or immutable

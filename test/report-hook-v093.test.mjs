@@ -43,6 +43,16 @@ function event(threadId, final = "line one\n雪 ☃") {
   };
 }
 
+function subagentEvent(threadId, final = "thread-spawn final\n雪 ☃") {
+  return {
+    ...event(threadId, final),
+    hook_event_name: "SubagentStop",
+    agent_id: threadId,
+    agent_type: "default",
+    agent_transcript_path: "/tmp/checkpoint-transcript.jsonl",
+  };
+}
+
 async function fixture(t, suffix) {
   const root = await createGitFixture(`codex-flow-report-hook-${suffix}-`);
   const context = await createActiveTaskLaunch(root, suffix);
@@ -98,6 +108,40 @@ test("a Stop uses the canonical route and delivery record for one exact Unicode 
   });
   assert.equal(duplicate.status, "already-accepted");
   assert.equal(calls.length, 1);
+});
+
+test("a thread-spawn SubagentStop uses the same authenticated final-output route", async (t) => {
+  const { context, route } = await fixture(t, "subagent-stop");
+  const calls = [];
+  const finalText = "thread-spawn final\n雪 ☃";
+  const result = await captureStopReport({
+    event: subagentEvent(context.executorThreadId, finalText),
+    route,
+    stateRoot: context.stateRoot,
+    nativeQueue: nativeQueue(),
+    submit: async (value) => {
+      calls.push(value);
+      return { outcome: "accepted", queued_submission_id: "queue-subagent", queue_attempted: true, diagnostics: {} };
+    },
+    now: () => TIME + 1_000,
+  });
+  assert.equal(result.status, "submitted");
+  assert.equal(result.state, "accepted");
+  assert.equal(calls.length, 1);
+  assert.match(calls[0].queueText, /thread-spawn final\n雪/);
+  const record = await reportDelivery({ stateRoot: context.stateRoot, reportId: result.report_id });
+  assert.equal(record.envelope.text, finalText);
+
+  const mismatch = await fixture(t, "subagent-mismatch");
+  const rejected = await captureStopReport({
+    event: { ...subagentEvent(mismatch.context.executorThreadId), agent_id: "different-task" },
+    route: mismatch.route,
+    stateRoot: mismatch.context.stateRoot,
+    nativeQueue: nativeQueue(),
+    submit: async () => { throw new Error("identity mismatch must not queue"); },
+  });
+  assert.equal(rejected.status, "rejected");
+  assert.equal(rejected.reason, "subagent-identity-mismatch");
 });
 
 test("changed, continued, and oversize finals keep core evidence without another queue attempt", async (t) => {
@@ -185,7 +229,7 @@ test("queue text labels the exact final as untrusted data", async (t) => {
 
 test("reporter authority reflects the packaged RC identity", async () => {
   const authority = await reporterAuthorityFor({ packageRoot });
-  assert.equal(authority.package_version, "0.9.3-rc.1");
+  assert.equal(authority.package_version, "0.9.3-rc.2");
   assert.match(authority.routes_sha256, /^[0-9a-f]{64}$/);
   assert.match(authority.records_sha256, /^[0-9a-f]{64}$/);
 });

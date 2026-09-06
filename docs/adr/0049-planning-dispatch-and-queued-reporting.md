@@ -49,7 +49,7 @@ bound to its own implementation and evidence assignment.
 Automatic full-final reporting is a thin same-local-host native-queue adapter
 boundary. A registered route binds exact sender and recipient task/host
 identities, assignment identity, and applicable runtime/generation authority
-before work is armed. The Stop hook captures the task's complete final text
+before work is armed. The completion hook captures the task's complete final text
 once, submits a bounded untrusted report envelope to the native queue, and
 deduplicates by assignment, turn, recipient binding, and final digest. Queue
 acceptance is only submission evidence, not recipient delivery, review, or
@@ -61,15 +61,19 @@ Visible-task activation registers the executor route before the start command
 returns. Coordinator first-turn acceptance registers a distinct active-run
 route bound to the approved-plan digest and director generation. A
 repository-local sender locator pins immutable reporter hashes and the exact
-supported native configuration so a Stop hook can resolve its route from the
-sender worktree without a global task scan or an unavailable hook-only
+supported native configuration so a `Stop` or thread-spawn `SubagentStop` hook
+can resolve its route from the sender worktree without a global task scan or an unavailable hook-only
 environment variable. The adapter owns that locator; repository route and
 delivery records remain the sole governance state machines.
 
 Route lifetime follows assignment lifetime. Completing a task disposition
 closes that launch's route, and closing or abandoning a run closes every
 remaining route owned by the run. A closed route cannot be re-armed, so late
-Stop events cannot revive terminal reporting authority.
+completion events cannot revive terminal reporting authority. Codex App tasks
+created through the native task surface are thread-spawn sessions and therefore
+complete through `SubagentStop`; independently opened root tasks complete through
+`Stop`. Both events share the same exact final fields, sender fencing, and one-shot
+report path, while `SubagentStop.agent_id` must equal the routed session identity.
 
 ## Rejected alternatives
 

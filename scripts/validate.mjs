@@ -14,7 +14,7 @@ import {
 import { validateReleaseIdentity } from "./release-identity.mjs";
 
 const root = resolve(import.meta.dirname, "..");
-const EXPECTED_PACKAGE_VERSION = "0.9.3-rc.1";
+const EXPECTED_PACKAGE_VERSION = "0.9.3-rc.2";
 
 const ACTIVE_SCHEMA_NAMES = Object.freeze([
   "archive-operation",
@@ -267,20 +267,28 @@ if (packageJson.scripts["test:v07"] || packageJson.scripts["test:v08"]) {
   throw new Error("Current package scripts must not expose predecessor test authority");
 }
 if (plugin.hooks !== "./hooks/hooks.json") {
-  throw new Error("Plugin must use the packaged queued-report Stop hook definition");
+  throw new Error("Plugin must use the packaged queued-report completion hook definition");
 }
 const pluginHooks = JSON.parse(await readRequired("hooks/hooks.json"));
 const stopHandlers = pluginHooks?.hooks?.Stop;
-if (!Array.isArray(stopHandlers) || stopHandlers.length !== 1 || Object.keys(pluginHooks.hooks).length !== 1) {
-  throw new Error("Queued-report hook must register exactly one Stop event");
-}
-const commandHook = stopHandlers[0]?.hooks?.[0];
+const subagentStopHandlers = pluginHooks?.hooks?.SubagentStop;
 if (
-  commandHook?.type !== "command"
-  || commandHook.command !== "node \"$PLUGIN_ROOT/bin/codex-flow-report-hook.mjs\""
-  || commandHook.timeout !== 3
+  !Array.isArray(stopHandlers)
+  || stopHandlers.length !== 1
+  || !Array.isArray(subagentStopHandlers)
+  || subagentStopHandlers.length !== 1
+  || Object.keys(pluginHooks.hooks).sort().join(",") !== "Stop,SubagentStop"
 ) {
-  throw new Error("Queued-report Stop hook must use the bounded immutable package entrypoint");
+  throw new Error("Queued-report hook must register exactly one Stop and one SubagentStop event");
+}
+for (const commandHook of [stopHandlers[0]?.hooks?.[0], subagentStopHandlers[0]?.hooks?.[0]]) {
+  if (
+    commandHook?.type !== "command"
+    || commandHook.command !== "node \"$PLUGIN_ROOT/bin/codex-flow-report-hook.mjs\""
+    || commandHook.timeout !== 3
+  ) {
+    throw new Error("Queued-report completion hooks must use the bounded immutable package entrypoint");
+  }
 }
 
 for (const path of RETIRED_AUTHORITY_PATHS) {

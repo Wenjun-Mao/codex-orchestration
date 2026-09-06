@@ -116,7 +116,8 @@ For a new same-local-host director assignment, register the coordinator route
 from the exact active run, approved-plan digest, current coordinator task, and
 pre-bound director recipient before delegated work can finish. New visible-task
 `task launch start` calls register their exact executor-to-coordinator routes
-and pin the installed reporter automatically. The Stop hook captures only the
+and pin the installed reporter automatically. The native completion hook
+(`SubagentStop` for task-surface children, `Stop` for root tasks) captures only the
 complete final and makes one native queue attempt; acceptance remains transport
 evidence, not delivery, review, or Flow acceptance. Cross-host and untrusted
 installations retain the explicit manual path.

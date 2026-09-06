@@ -37,7 +37,8 @@ delivery is not acceptance.
 For v0.9.3 same-local-host assignments, register and pin the exact upstream
 route before useful work: coordinator-to-director from the active run and
 approved-plan digest, and executor-to-coordinator as part of `task launch
-start`. The Stop hook captures only the complete final and makes one native
+start`. The native `Stop`/thread-spawn `SubagentStop` completion hook captures
+only the complete final and makes one native
 queue attempt. Queue acceptance is not delivery, review, or Flow acceptance.
 Never remove the explicit manual path until the hook is installed, trusted, and
 live-verified for the exact sender-recipient mapping. Cross-host routes remain manual. Routine

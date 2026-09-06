@@ -1,6 +1,18 @@
 {
-  "description": "Capture one authenticated task final for the native queued-report route.",
+  "description": "Capture one authenticated task final from either native root or thread-spawn completion.",
   "hooks": {
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$PLUGIN_ROOT/bin/codex-flow-report-hook.mjs\"",
+            "timeout": 3,
+            "statusMessage": "Queueing authenticated task report"
+          }
+        ]
+      }
+    ],
     "Stop": [
       {
         "hooks": [

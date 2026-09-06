@@ -91,7 +91,7 @@ A working manual result path remains available for cross-host, untrusted, or
 unsupported cases. In v0.9.3, a registered same-local-host assignment pins its
 exact upstream route and reporter before useful work: coordinator-to-director
 from the active run and approved plan, and executor-to-coordinator during task
-start. The Stop hook captures the complete final and makes one native queue
+start. The native `Stop`/thread-spawn `SubagentStop` hook captures the complete final and makes one native queue
 attempt. Queue acceptance remains distinct from recipient delivery, review,
 and Flow acceptance. Native `wait_threads` is active work, not an idle delivery
 boundary.
