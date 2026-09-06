@@ -400,7 +400,7 @@ if (currentTests.includes("v07-lifecycle-fixture.mjs")) {
 const skillContracts = new Map([
   ["index", ["codex-orchestration:direct", "codex-orchestration:refresh", "first-turn assignment", "Native subagents"]],
   ["direct", ["goals", "tradeoffs", "acceptance", "codex-orchestration:coordinate", "Astra-high"]],
-  ["coordinate", ["bounded delivery", "task launch prepare", "task launch attempt", "task launch reconcile", "full contract", "one native creation call"]],
+  ["coordinate", ["bounded delivery", "zero child tasks", "coordinator retains integration", "task launch prepare", "full contract", "one native creation call"]],
   ["execute", ["assigned implementation and evidence", "task launch start", "same first turn", "terminal-receipt-v4", "Routine terminal completion"]],
   ["integrate", ["launch_id", "content-addressed PASS verification", "Finalization"]],
   ["cleanup", ["cleanup plan --run-id", "launch", "read-only"]],
@@ -440,6 +440,11 @@ assertMarkers(await readRequired("docs/adr/0050-authenticated-report-locator-ret
   "persists a content-addressed retirement record",
   "The missing namespace is never sufficient authority",
 ], "ADR 0050");
+assertMarkers(await readRequired("docs/adr/0051-lean-coordinator-delivery.md"), [
+  "Coordinator is an ownership boundary",
+  "bounded_coordination",
+  "retains delivery, integration, verification, reporting, release, and cleanup",
+], "ADR 0051");
 
 assertMarkers(await readRequired("README.md"), [
   "Native-first visible-task launch",
@@ -477,7 +482,7 @@ const defaultPrompts = plugin.interface?.defaultPrompt;
 if (!Array.isArray(defaultPrompts)
   || defaultPrompts.length !== 3
   || !defaultPrompts.some((item) => item.includes("Direct this outcome"))
-  || !defaultPrompts.some((item) => item.includes("bounded executor tasks")
+  || !defaultPrompts.some((item) => item.includes("bounded assignment")
     && item.includes("explicit model routing"))
   || !defaultPrompts.some((item) => item.includes("Review and integrate")
     && item.includes("refresh the coordinator"))) {

@@ -41,10 +41,13 @@ owns executor waiting, progress management, recovery, verification, and the
 complete result. Review its actual result and evidence when it arrives or when
 the user asks; delivery of a result or receipt is not acceptance.
 
-Use Sol-high for director or coordination work. Astra-high is optional for a
-consequential director judgment, never mandatory staffing. Pass every selector
-and its rationale explicitly; do not probe availability, inherit, silently
-escalate, or fall back.
+Use Sol-high for director work and for coordination involving substantial
+uncertainty, systemic decisions, or complex multi-executor work. A settled
+bounded coordinator assignment with established verification may explicitly
+use Terra-high and zero child tasks. Astra-high is optional for a consequential
+director judgment, never mandatory staffing. Pass every selector and its
+rationale explicitly; do not probe availability, inherit, silently escalate,
+or fall back.
 
 An advisor may provide bounded independent analysis. Advice is neither a
 command nor acceptance and cannot appoint or direct the coordinator.

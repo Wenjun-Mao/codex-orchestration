@@ -7,7 +7,8 @@ evidence is accepted.
 
 ## Surfaces
 
-- **Coordinator task:** sequential decisions and shared evolving state.
+- **Coordinator task:** bounded delivery ownership, including sequential
+  decisions and shared evolving state. It may have zero child tasks.
 - **Native subagents:** bounded read-only research or review that returns to
   the current task. They never own task branches, callback journals,
   integration, archive, or cleanup.
@@ -20,3 +21,7 @@ generated artifacts, integration, and combined verification.
 
 Choose each model and reasoning effort deliberately after choosing the
 surface. Never inherit selectors or silently replace one surface with another.
+Terra-high may coordinate settled bounded work with established verification;
+Sol-high remains recommended for substantial uncertainty, systemic decisions,
+or complex multi-executor coordination. These are explicit policy
+recommendations, not claims of empirical optimality.

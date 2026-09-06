@@ -33,6 +33,13 @@ evolving state in one coordinator. Native subagents are bounded read-only
 supporting lanes. Visible tasks are independent mutating lanes with durable Git
 lifecycle. Never silently substitute one surface for another.
 
+A coordinator is a delivery responsibility, not a mandatory Sol selector or a
+promise to create children. Terra-high may own settled bounded delivery with
+established verification; use Sol-high for substantial uncertainty, systemic
+decisions, or complex multi-executor coordination. Delegate only for a concrete
+independent benefit. A zero-child coordinator still owns integration,
+verification, reporting, release, and cleanup.
+
 For a director, “Implement the plan” routes to
 `codex-orchestration:plan` to persist and bind the approved revision, then to
 `codex-orchestration:direct` for one bounded coordinator dispatch and return.

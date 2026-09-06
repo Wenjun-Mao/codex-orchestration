@@ -3,7 +3,10 @@
 The coordinator owns bounded delivery, delegation, integration, and
 verification for one director assignment. The director retains goals,
 strategic tradeoffs, and acceptance. Delegate only when an independent lane
-improves the outcome enough to justify coordination cost.
+improves the outcome enough to justify coordination cost. The coordinator may
+complete the whole bounded assignment directly; zero child tasks is valid and
+does not transfer integration, verification, reporting, release, or cleanup to
+the director.
 
 The director's approved plan is the intent authority. Verify the exact plan
 digest and the authenticated approved bytes or immutable snapshot in the full

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   routeWork,
+  selectCoordinatorDelivery,
   selectExecutionSurface,
   selectSelectorPolicy,
   selectorPolicyLanes,
@@ -12,6 +13,7 @@ test("routing policy maps each bounded work lane to an explicit selector", () =>
     "mechanical",
     "bounded_implementation",
     "integration",
+    "bounded_coordination",
     "governance",
     "consequential_judgment",
   ]);
@@ -37,7 +39,7 @@ test("routing policy maps each bounded work lane to an explicit selector", () =>
     lane: "governance",
     model: "gpt-5.6-sol",
     reasoning_effort: "high",
-    selector_rationale: "Director work or bounded coordination, delivery, and integration decisions.",
+    selector_rationale: "Substantial uncertainty, systemic decisions, or complex multi-executor coordination.",
   });
   assert.deepEqual(selectSelectorPolicy("consequential_judgment"), {
     lane: "consequential_judgment",
@@ -45,6 +47,41 @@ test("routing policy maps each bounded work lane to an explicit selector", () =>
     reasoning_effort: "high",
     selector_rationale: "Optional support for a consequential director judgment.",
   });
+});
+
+test("settled coordinators may deliver solo while complex work receives justified staffing", () => {
+  assert.deepEqual(selectCoordinatorDelivery({
+    settledScope: true,
+    establishedVerification: true,
+    substantialUncertainty: false,
+    systemicDecision: false,
+    complexMultiExecutorCoordination: false,
+    childHasConcreteBenefit: false,
+  }), {
+    delivery_shape: "coordinator-direct",
+    staffing_rationale: "No separate bounded lane has enough benefit to justify coordination cost.",
+    selector: {
+      lane: "bounded_coordination",
+      model: "gpt-5.6-terra",
+      reasoning_effort: "high",
+      selector_rationale: "Settled bounded delivery with established verification and coordinator-owned closure.",
+    },
+    coordinator_retains: ["delivery", "integration", "verification", "reporting", "release", "cleanup"],
+  });
+  const complex = selectCoordinatorDelivery({
+    settledScope: false,
+    establishedVerification: false,
+    substantialUncertainty: true,
+    systemicDecision: true,
+    complexMultiExecutorCoordination: true,
+    childHasConcreteBenefit: true,
+  });
+  assert.equal(complex.delivery_shape, "bounded-child-recommended");
+  assert.equal(complex.selector.model, "gpt-5.6-sol");
+  assert.match(complex.staffing_rationale, /concrete independent benefit/);
+  assert.deepEqual(complex.coordinator_retains, [
+    "delivery", "integration", "verification", "reporting", "release", "cleanup",
+  ]);
 });
 
 test("v0.9 chooses the execution surface before model selectors", () => {

@@ -1,6 +1,6 @@
 ---
 name: coordinate
-description: Deliver one director assignment through a bounded Codex Flow run, coordinating visible tasks, integration, verification, and one complete non-interrupting result with explicit model routing.
+description: Deliver one director assignment through a bounded Codex Flow run, directly or with useful child tasks, while owning integration, verification, and one complete non-interrupting result with explicit model routing.
 ---
 
 # Coordinate Codex Work
@@ -9,7 +9,7 @@ Use the loaded v0.9 package only after the router performs one refresh
 inspection. A `resume-source` route stays on the immutable source runtime; a
 `refresh-ready` route belongs to `codex-orchestration:refresh`.
 
-Own bounded delivery, delegation, integration, and verification for the
+Own bounded delivery, optional delegation, integration, and verification for the
 director's assignment. Do not take over the director's goals, strategic
 tradeoffs, or acceptance authority. Confirm that the initial full assignment
 contains the exact approved plan digest and authenticated bytes or immutable
@@ -26,8 +26,11 @@ If a material change to intent, acceptance, risk, scope, or external authority
 is needed, stop at the boundary and return a decision request to the
 director/user for a new approved plan revision. Routine technical refinements
 remain coordinator-owned.
-A coordinator is allowed to orchestrate executors within this assignment; an
-executor contract must not be relabeled to grant coordinator authority.
+A coordinator may complete its entire bounded assignment directly. Delegate
+only when a child has a concrete benefit; zero child tasks is a valid delivery
+shape. An executor contract must not be relabeled to grant coordinator
+authority. Whether or not children exist, the coordinator retains integration,
+verification, reporting, release, and cleanup responsibility.
 
 ## Activate and plan
 
@@ -63,7 +66,9 @@ The user-selected default is Luna-xhigh for substantive, well-scoped executor
 work; it is a preference, not an empirical optimum. A trivial task may use a
 lower-effort override with a stated rationale. Use Terra-high for bounded
 implementation/review, Terra-xhigh for difficult root-cause work, and Sol-high
-for coordination. Astra-high is optional for a consequential director
+for substantial uncertainty, systemic decisions, or complex multi-executor
+coordination. Terra-high may coordinate settled bounded delivery with
+established verification. Astra-high is optional for a consequential director
 judgment, not mandatory staffing. Higher Sol effort requires an explicit need.
 Ultra is forbidden for native subagents and exceptional for visible tasks.
 Pass selectors, rationales, and bounded fork history explicitly; never inherit,
@@ -125,3 +130,6 @@ installations retain the explicit manual path.
 Hand results to `codex-orchestration:integrate`. Close only after a fresh
 passing `run audit` re-derives every claim, launch, result, disposition,
 integration/no-change proof, verification, archive, cleanup finding, and fence.
+Direct coordinator work uses the same verification, release authorization,
+reporting, and cleanup gates; those responsibilities do not return to the
+director merely because the run has no child task.

@@ -19,5 +19,11 @@ creation result, or narrate delivery. The coordinator owns technical execution
 and returns one complete result. Review its actual results and evidence;
 result or receipt delivery is not acceptance.
 
+Coordinator describes delivery ownership, not a required child count or one
+fixed model. A settled bounded assignment with established verification may use
+Terra-high and zero children. Substantial uncertainty, systemic decisions, or
+complex multi-executor coordination retain the Sol-high recommendation. The
+coordinator still owns verification, release, reporting, and cleanup.
+
 An optional advisor may return bounded independent analysis. Its advice is not
 a command, assignment, or acceptance decision.

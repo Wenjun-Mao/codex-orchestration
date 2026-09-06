@@ -125,7 +125,11 @@ test("planning and dispatch contracts do not promote executor authority", async 
 
   assertIncludes(planSkill, "coordinator's technical execution");
   assertIncludes(directSkill, "The coordinator owns executor waiting");
-  assertIncludes(coordinateSkill, "A coordinator is allowed to orchestrate");
+  assertIncludes(coordinateSkill, "A coordinator may complete its entire bounded assignment directly");
+  assertIncludes(coordinateSkill, "zero child tasks is a valid delivery shape");
+  assertIncludes(coordinateSkill, "integration, verification, reporting, release, and cleanup responsibility");
+  assertIncludes(directSkill, "Terra-high and zero child tasks");
+  assertIncludes(directSkill, "complex multi-executor work");
   assertIncludes(coordinateSkill, "executor contract must not be relabeled");
   assertIncludes(executorRole, "Do not appoint a coordinator");
   assertIncludes(executorRole, "broaden ownership");

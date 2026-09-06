@@ -11,13 +11,13 @@
   "interface": {
     "displayName": "Codex Orchestration",
     "shortDescription": "Orchestrate visible Codex tasks safely.",
-    "longDescription": "Direct goals and acceptance while coordinators deliver through bounded user-visible Codex executor tasks with explicit model routing, quiet durable results, audited integration, clean unplug, and bounded release refresh.",
+    "longDescription": "Direct goals and acceptance while coordinators deliver bounded work directly or through useful Codex child tasks with explicit model routing, quiet durable results, audited integration, clean unplug, and bounded release refresh.",
     "developerName": "Wenjun Mao",
     "category": "Productivity",
     "capabilities": ["Goal direction", "Bounded delivery delegation", "Model routing", "Durable result coordination", "Long-lived coordinator refresh", "Clean repository unplug"],
     "defaultPrompt": [
       "Direct this outcome, including tradeoffs, delegation, and final acceptance.",
-      "Deliver this assignment through bounded executor tasks with explicit model routing and evidence.",
+      "Deliver this bounded assignment directly or through useful child tasks with explicit model routing and evidence.",
       "Review and integrate durable results, or refresh the coordinator onto the loaded release."
     ]
   }
