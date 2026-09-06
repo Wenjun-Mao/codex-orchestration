@@ -1135,8 +1135,7 @@ test("v0.9 refresh consumes a closed exact-v0.9.0 source with no replacements", 
     source_coordinator_thread_id: applied.handoff.intent.source.coordinator.thread_id,
     target_coordinator_thread_id: applied.handoff.intent.target.coordinator_thread_id,
     source_tree_digest: applied.handoff.source_retirement.final_source_tree.tree_digest,
-    source_retired_at: applied.handoff.source_retirement.retired_at,
-    consumed_at: applied.handoff.target_consumption.consumed_at,
+    consumption_observed_at: new Date().toISOString(),
   };
   const refreshAuthority = {
     ...refreshAuthoritySeed,
