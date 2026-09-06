@@ -1121,7 +1121,7 @@ test("v0.9 refresh consumes a closed exact-v0.9.0 source with no replacements", 
 
   const reportObservation = {
     status: "none-observed-before-source-removal",
-    observer_thread_id: sender.thread_id,
+    observer_thread_id: recipientSeed.thread_id,
     observed_at: source.closed.run.updated_at,
     records_digest: sha256(stableStringify([])),
   };
@@ -1167,6 +1167,30 @@ test("v0.9 refresh consumes a closed exact-v0.9.0 source with no replacements", 
       recoveredAt: new Date().toISOString(),
     }),
     /disposition identity is invalid/,
+  );
+  const misattributedSeed = {
+    ...dispositionSeed,
+    report_observation: {
+      ...reportObservation,
+      observer_thread_id: sender.thread_id,
+    },
+  };
+  const misattributedDisposition = {
+    schema_version: 1,
+    kind: "codex-flow-v095-orphan-locator-recovery-v1",
+    disposition_id: `refresh-locator-recovery-v1-${sha256(stableStringify(misattributedSeed))}`,
+    ...misattributedSeed,
+  };
+  await assert.rejects(
+    () => recoverRefreshReportLocator({
+      commonDir,
+      refreshAuthority,
+      locator: orphanLocator,
+      route: orphanRoute,
+      disposition: misattributedDisposition,
+      recoveredAt: new Date().toISOString(),
+    }),
+    /disposition does not match its exact authority/,
   );
   await stat(locatorPath);
   const recoveredAt = new Date().toISOString();

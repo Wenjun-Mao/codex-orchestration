@@ -37,6 +37,8 @@ One bounded compatibility recovery may retire the known v0.9.3 orphan only
 after authenticating a content-addressed consumed-refresh authority, its
 retained final handoff and source-tree digests, the exact active route bytes
 and locator digest, and an explicit director-approved recovery disposition.
+The report-inventory observation belongs to that exact route recipient; the
+recovery must not relabel director evidence as a sender observation.
 The recovery authority is durable by design because clean-start consumption
 deletes the full operational handoff. Requiring that deleted payload would
 make recovery depend on transient task history. The missing namespace is never
