@@ -16,6 +16,7 @@ import test from "node:test";
 import {
   applyRefresh,
   observeRefreshPrivateArchives,
+  refreshSourceCutoverBlocker,
   refreshStatus,
 } from "../lib/compat/refresh.mjs";
 import { sha256 } from "../lib/core.mjs";
@@ -68,6 +69,17 @@ function task(taskId, overrides = {}) {
     ...overrides,
   };
 }
+
+test("refresh cutover accepts an active v0.9 launch representation without confusing it with v0.8 creation", () => {
+  const source = {
+    task_states: [{
+      task: task("v09-active-launch"),
+      launch: { status: "active" },
+      integrations: [{ state: "reconciled" }],
+    }],
+  };
+  assert.equal(refreshSourceCutoverBlocker(source), null);
+});
 
 function activation({
   runId,
