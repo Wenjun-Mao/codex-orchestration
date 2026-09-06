@@ -5,22 +5,32 @@ for mechanics rather than repeating its lifecycle.
 
 ## Assignment brief
 
+- **Approved plan:** source path plus the exact content digest or immutable
+  snapshot supplied to the coordinator.
 - **Outcome:** one observable result.
 - **Scope:** owned paths, resources, and work boundary.
 - **Constraints:** prohibited actions and preserved authority.
 - **Acceptance:** checks and evidence the recipient will review.
 - **Reporting:** exactly one recipient and one path.
 
+The plan is saved and bound before dispatch. A linked worktree must not depend
+on an uncommitted file in the director checkout. The coordinator may add
+technical detail without changing approved intent; a material change returns to
+the director/user for approval.
+
 ## Result brief
 
-- **Outcome and status:** `complete` or `blocked` against the assignment.
+- **Outcome and status:** `complete` or `blocked` against the approved plan and
+  assignment.
 - **Actual results:** changes or findings actually produced.
-- **Evidence:** verification actually run and its outcome.
-- **Concerns:** remaining gaps, risks, or `none`.
+- **Evidence:** verification actually run, its outcome, and artifact links.
+- **Concerns:** unresolved gaps or risks, or `none`.
+- **Next decision:** the decision needed from the recipient, or `none`.
 - **Reporting:** the assignment's exact recipient and path.
 
-Do not create a separate narrative summary: the result brief is the report.
-Result or receipt delivery is not acceptance.
+Write one complete final report. Do not create a separate narrative summary or
+ask the task to duplicate the report into another file first. Result or receipt
+delivery is not acceptance.
 
 ## Reporting transition
 

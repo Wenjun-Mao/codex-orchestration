@@ -11,10 +11,23 @@ inspection. A `resume-source` route stays on the immutable source runtime; a
 
 Own bounded delivery, delegation, integration, and verification for the
 director's assignment. Do not take over the director's goals, strategic
-tradeoffs, or acceptance authority. Return one complete result containing the
-actual outcome and evidence to the assignment's named recipient/path; do not
-author a second narrative summary. Result or receipt delivery is not
-acceptance. Use the reusable [assignment and result briefs](../../templates/references/assignment-and-reporting.md).
+tradeoffs, or acceptance authority. Confirm that the initial full assignment
+contains the exact approved plan digest and authenticated bytes or immutable
+snapshot. Do not rewrite the approved plan as a second mandatory planning
+layer; add technical breakdown only within its intent.
+
+Return one complete result containing status, actual outcome, verification
+evidence and artifact links, unresolved risks, and the next decision if any to
+the assignment's exactly one named recipient/path. Do not author a second
+narrative summary. Result or receipt delivery is not acceptance. Use the
+reusable [assignment and result briefs](../../templates/references/assignment-and-reporting.md).
+
+If a material change to intent, acceptance, risk, scope, or external authority
+is needed, stop at the boundary and return a decision request to the
+director/user for a new approved plan revision. Routine technical refinements
+remain coordinator-owned.
+A coordinator is allowed to orchestrate executors within this assignment; an
+executor contract must not be relabeled to grant coordinator authority.
 
 ## Activate and plan
 
@@ -27,6 +40,12 @@ unavailable evidence distinct.
 Use `run activate|status|resume|rebind|audit|close|abandon`. Every stateful
 command names `run_id`. Activation snapshots the exact runtime under the v0.9
 namespace and fails closed on incompatible state or conflicting fences.
+
+The director's dispatch is complete when the coordinator has received the real
+approved assignment in its initial prompt and the bounded creation/identity
+state has been reported. The coordinator owns executor waiting and progress
+management after that point. A routine result is quiet and non-interrupting;
+do not turn it into a director-style monitoring loop.
 
 Use `workflow create|revise|status|contract` for one content-addressed plan.
 Every task names its outcome, nullable causal question, cheapest safe direct

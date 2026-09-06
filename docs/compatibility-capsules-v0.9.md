@@ -4,6 +4,13 @@ Compatibility is finite and evidence-bound. A retained capsule addresses one
 named host or immediately preceding release gap; it is not a tolerant runtime
 reader, journal migration framework, or silent fallback.
 
+The v0.9.3 planning and director-dispatch contract is not a compatibility
+capsule. It uses the current plan, workflow, launch, and recipient authorities;
+it does not parse predecessor plans or invent a second approval engine. New
+automatic report routes are opt-in for new assignments and remain bounded to
+the supported same-local-host native queue. Existing v0.9.2 assignments are
+not retroactively registered or hot-switched.
+
 | Capsule | Narrow authority | Failure behavior | Compatibility exit condition |
 | --- | --- | --- | --- |
 | Authenticated v0.8 semantic refresh export | Invoke the exact source snapshot to validate and export one bounded semantic handoff for a long-lived coordinator. v0.9 receives task briefs, dependency topology, baseline, and cleanup evidence; it never parses v0.8 journals. | Unsupported version, malformed export, runtime drift, task/archive disagreement, or Git ambiguity blocks before target activation. | Retire when supported long-lived coordinators no longer retain v0.8 runs, following a separately reviewed compatibility checkpoint. |

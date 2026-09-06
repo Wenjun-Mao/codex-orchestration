@@ -23,12 +23,49 @@ The `lib/` root and `lib/core/` contain governance; `lib/policy/`,
 change boundaries. Validation rejects a module whose declared layer disagrees
 with that location.
 
+## Director plan and coordinator handoff
+
+The v0.9.3 planning contract adds a durable boundary above the execution DAG:
+
+```text
+director + user settle intent
+          |
+          v
+saved approved plan + exact content digest/snapshot
+          |
+          v
+one full coordinator assignment and bounded dispatch
+          |
+          v
+coordinator adds technical detail, delivers, integrates, and verifies
+```
+
+There is one approved project plan, not separate director, coordinator, and
+executor plans. The plan source path is retained for navigation, but authority
+is the exact approved content. A linked worktree receives authenticated bytes
+or an immutable snapshot; it never depends on an uncommitted director file.
+The director owns outcome, scope, non-goals, tradeoffs, acceptance, delegated
+authority, and escalation. The coordinator owns technical breakdown,
+dependency ordering, executor selection, integration, verification, and
+authorized release work. Material changes to intent, acceptance, risk, scope,
+or external authority require a new approved revision.
+
+The skill-level `plan` contract may persist a planning document in ordinary
+mode but does not implement product changes. Native Plan mode is optional. For
+“Implement the plan”, the director persists/binds, dispatches one coordinator,
+reports the bounded dispatch state once, and returns to strategic conversation;
+it does not locally implement or enter a progress-monitoring loop. The
+coordinator receives the real approved assignment in its initial prompt and
+returns one complete result to exactly one named recipient/path. Result
+transport is not acceptance.
+
 ## Stable Flow governance core
 
 The core owns only host-independent workflow semantics:
 
 - run/runtime authority and repository reservation fences;
 - content-addressed workflow revisions and generated task contracts;
+- exact approved-plan content and director-to-coordinator assignment boundary;
 - DAG, dependency, ownership, and shared-resource admission;
 - one-shot visible-task launch and native-subagent operations;
 - the identity join between a contract, launch, executor claim, selector
@@ -91,6 +128,14 @@ task identity and actual worktree. It removes the earlier bootstrap-only model
 turn, coordinator bind wait, and second release message without weakening Git
 ordering. Local start reconciliation is idempotent around pre-switch and
 post-switch crashes; native creation remains one-shot.
+
+The same first-prompt rule applies to the coordinator handoff: the coordinator
+is dispatched with the complete approved assignment, plan digest or immutable
+snapshot, constraints, acceptance checks, and one reporting route. A
+coordinator is allowed to orchestrate; an executor contract cannot be relabeled
+to grant that authority. A director may inspect progress when the user asks or
+an actionable report warrants review, but normal dispatch ends its turn and
+does not add a wait or polling scheduler.
 
 Terminal receipt v4 binds to `launch_id`, not a separate release identity.
 Downstream disposition, integration, verification, archive, cleanup, and audit

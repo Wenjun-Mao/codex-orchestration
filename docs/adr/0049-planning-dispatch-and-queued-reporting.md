@@ -1,0 +1,91 @@
+# ADR 0049: Durable planning and director dispatch
+
+- Status: accepted for v0.9.3 implementation
+- Date: 2026-09-06
+- Refines: ADR 0048 director, coordinator, and reporting boundaries
+
+## Context
+
+ADR 0048 separated strategic ownership from bounded delivery, but the package
+still lacked a named planning contract. A director could settle intent in
+conversation without leaving an authenticated plan that a linked coordinator
+could read, and “Implement the plan” could pull the director into local
+implementation or progress monitoring. The result boundary was similarly
+underspecified: a coordinator could return through an assignment path without
+one explicit complete report for review.
+
+The v0.9.3 plan also establishes a same-local-host queued-reporting boundary.
+That transport must preserve a complete final and avoid interrupting a busy
+recipient, while remaining distinct from terminal receipts and acceptance.
+
+## Decision
+
+Add `codex-orchestration:plan` as the durable project-plan contract. The
+director and user settle one plan containing outcome, scope and non-goals,
+important decisions, checkpoints and dependencies, acceptance evidence,
+execution authority, and escalation conditions. The plan is saved before
+dispatch, marked as an approved revision, and bound to exact content through a
+digest or immutable snapshot. Its readable source path is retained for
+navigation, but the path alone is not authority. A linked worktree receives
+the authenticated approved bytes or an immutable snapshot; it must not depend
+on an uncommitted director checkout.
+
+The plan skill may write planning documents in ordinary mode but does not
+implement product changes. Native Plan mode remains optional. There is one
+approved project plan, not separate director, coordinator, and executor plans.
+The coordinator may add technical detail without changing approved intent; a
+material change to intent, acceptance, risk, scope, or external authority
+requires a new director/user approval.
+
+The director contract for “Implement the plan” is persist/bind the approved
+plan, dispatch one coordinator, report the bounded dispatch state once, and
+return to strategic conversation. It does not repeatedly wait, inspect
+progress, retry a provisional creation result, or narrate implementation. The
+coordinator receives the real approved assignment in its initial prompt, owns
+delivery, and returns one complete result brief to exactly one named
+recipient/path. The coordinator may orchestrate executors; an executor remains
+bound to its own implementation and evidence assignment.
+
+Automatic full-final reporting is a thin same-local-host native-queue adapter
+boundary. A registered route binds exact sender and recipient task/host
+identities, assignment identity, and applicable runtime/generation authority
+before work is armed. The Stop hook captures the task's complete final text
+once, submits a bounded untrusted report envelope to the native queue, and
+deduplicates by assignment, turn, recipient binding, and final digest. Queue
+acceptance is only submission evidence, not recipient delivery, review, or
+acceptance. Busy recipients are not Steered; pending or ambiguous submissions
+are retained for manual recovery and are never blindly retried. Cross-host
+delivery remains manual and out of scope for this release.
+
+## Rejected alternatives
+
+- Keep the approved plan only in conversation or a mutable director path. A
+  linked coordinator cannot authenticate or reliably read either one.
+- Require three rewritten plans. Rewriting duplicates approval authority and
+  makes ordinary technical refinement look like a change of intent.
+- Let “Implement the plan” mean local director implementation or open-ended
+  babysitting. That collapses the ownership boundary and prevents strategic
+  continuity.
+- Steer a recipient or poll for idle state when a final is available. Native
+  queue scheduling owns the turn boundary; polling creates a second scheduler.
+- Treat queue acceptance as delivery or acceptance. Transport evidence does
+  not prove a recipient reviewed the result or that the work satisfies the
+  approved plan.
+
+## Consequences and guardrails
+
+The router exposes `plan` for durable planning, `direct` for director-owned
+dispatch and acceptance, and `coordinate` for bounded delivery. The reusable
+assignment/result brief keeps the role boundary small and consistent. Focused
+contract tests cover exact approved-plan handoff, dispatch-and-return ordering,
+forbidden director waiting/implementation loops, coordinator-first-turn
+assignments, and one complete result report. Existing lifecycle, receipt,
+disposition, integration, verification, archive, cleanup, and refresh
+authority remain unchanged.
+
+The supported automatic-reporting boundary is same-local-host only and is
+opt-in through new registered assignments. Manual collection remains until the
+native queue adapter is installed, trusted, and live-verified for the exact
+sender-recipient mapping. Report transport never replaces terminal receipts,
+callback admission, disposition, integration, verification, or director
+acceptance.

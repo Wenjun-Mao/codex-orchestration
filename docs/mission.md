@@ -120,6 +120,24 @@ executor receives a generated contract with explicit objective, dependency
 position, ownership, model request, verification, and result terms. Result or
 receipt delivery does not confer acceptance.
 
+For work described as “Implement the plan”, the director first saves and binds
+one approved project plan revision to its exact content digest or immutable
+snapshot. The plan records outcome, scope and non-goals, consequential
+decisions, checkpoints and dependencies, acceptance evidence, execution
+authority, and escalation conditions. The coordinator receives the
+authenticated approved bytes or snapshot in its real initial assignment, along
+with the readable source path. A linked worktree never depends on an
+uncommitted director file.
+
+The director owns the approved intent and performs one bounded dispatch, then
+returns to strategic conversation. It does not implement locally, repeatedly
+wait or monitor progress, retry a provisional creation response, or narrate
+delivery. The coordinator may add technical detail within intent and owns
+executor waiting, recovery, integration, and verification. Material changes to
+intent, acceptance, risk, scope, or external authority require a new approved
+revision. The coordinator returns one complete result to the assignment's one
+named recipient/path; the director reviews that result before acceptance.
+
 ### Durable identity and evidence
 
 The authorizing workflow revision, generated task contract, one-shot launch,
@@ -187,6 +205,8 @@ Codex Orchestration is not:
 - a replacement for native subagents;
 - a daemon, permanent secretary task, MCP server, or general agent framework;
 - a second implementation of native project, task, Handoff, or archive APIs;
+- a second approval engine or a requirement that every role rewrite the same
+  project plan;
 - tied permanently to Sol, Terra, or any current model family;
 - an observability, evidence, or validation system that grows without enabling
   a named primary outcome; or

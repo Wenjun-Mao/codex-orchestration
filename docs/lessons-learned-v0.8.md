@@ -40,3 +40,10 @@ The lean prevention is therefore:
 These gates prove protocol compatibility. They do not prove that orchestration
 or a routing policy improves quality or cost; that remains a separate frozen,
 held-out evaluation.
+
+## v0.9.3 planning and dispatch carry-forward
+
+| Failure | Root cause | Missed release gate | Durable guardrail and regression | Compatibility exit condition |
+| --- | --- | --- | --- | --- |
+| A director's “Implement the plan” turn remained tied to delivery, or a coordinator could not authenticate the intent it was meant to execute. | Strategic approval lived in conversation or an uncommitted director path, while the execution workflow had only a technical DAG and no exact approved-plan handoff. | No behavioral test required a saved approved revision, exact content binding, linked-worktree readability, and director return without waiting or local implementation. | `codex-orchestration:plan` saves one approved plan and binds its exact digest or immutable snapshot before dispatch. The full coordinator assignment carries those approved bytes, its source path, scope, acceptance, and one reporting route. Contract tests cover plan/dispatch ordering, no director monitoring loop, and coordinator-first-turn assignment. | Permanent role and intent boundary; it is not predecessor compatibility code. |
+| A coordinator's final was unavailable to the director, or transport was mistaken for acceptance. | Reporting had no explicit one-recipient route and no bounded distinction between a complete result, queue submission, delivery, review, and acceptance. | No same-host test covered a busy recipient, complete final capture, one-shot submission, ambiguity, or duplicate/conflicting completion. | New registered assignments bind exact sender/recipient task and host identity. The native queue carries one complete bounded report without Steer; queue acceptance remains transport evidence, and the director reviews the result against the approved plan. Cross-host delivery stays manual. | Retire the thin adapter only when native Codex provides the same authenticated routing, non-interrupting scheduling, and evidence boundary. |

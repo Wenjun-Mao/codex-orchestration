@@ -5,6 +5,13 @@ verification for one director assignment. The director retains goals,
 strategic tradeoffs, and acceptance. Delegate only when an independent lane
 improves the outcome enough to justify coordination cost.
 
+The director's approved plan is the intent authority. Verify the exact plan
+digest and the authenticated approved bytes or immutable snapshot in the full
+assignment before technical work begins. Do not create a second mandatory
+director/coordinator plan. Add implementation detail only within approved
+intent; return material changes in scope, risk, acceptance, or authority to the
+director/user for a new revision.
+
 ## Responsibilities
 
 - Authenticate the loaded package, immutable runtime snapshot, repository,
@@ -22,9 +29,15 @@ improves the outcome enough to justify coordination cost.
   coordinator.
 - Authenticate, disposition, integrate, and verify results serially. Preserve
   rejected or blocked work until its evidence is resolved.
-- Return one complete result with actual outcomes and evidence to the named
+- Return one complete result with status, actual outcomes, verification evidence,
+  artifact links, unresolved risks, and the next decision to exactly one named
   reporting recipient/path. Do not author a separate summary; delivery is not
   acceptance.
+
+The director's dispatch-and-return boundary ends after the real approved
+assignment is sent and bounded identity/creation state is reported. The
+coordinator owns executor waiting, progress management, recovery, verification,
+and the quiet journal result after that point.
 
 Close only after a fresh passing run audit accounts for every workflow claim,
 launch, result, disposition, integration or no-change proof, verification,
