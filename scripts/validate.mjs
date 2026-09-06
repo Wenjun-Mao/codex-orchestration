@@ -14,7 +14,7 @@ import {
 import { validateReleaseIdentity } from "./release-identity.mjs";
 
 const root = resolve(import.meta.dirname, "..");
-const EXPECTED_PACKAGE_VERSION = "0.9.2";
+const EXPECTED_PACKAGE_VERSION = "0.9.3-rc.1";
 
 const ACTIVE_SCHEMA_NAMES = Object.freeze([
   "archive-operation",
@@ -247,7 +247,7 @@ if (packageJson.license !== "UNLICENSED" || plugin.license !== packageJson.licen
   throw new Error("Source and plugin must preserve the UNLICENSED boundary");
 }
 for (const path of [
-  ".codex-plugin/", "bin/", "lib/", "schemas/", "examples/", "skills/",
+  ".codex-plugin/", "bin/", "hooks/", "lib/", "schemas/", "examples/", "skills/",
   "templates/", "docs/adr/", "docs/coverage-v0.9.md", "docs/architecture-v0.9.md",
   "docs/compatibility-capsules-v0.9.md", "docs/lessons-learned-v0.8.md",
   "docs/mission.md", "README.md",
@@ -262,6 +262,22 @@ for (const field of [
 }
 if (packageJson.scripts["test:v07"] || packageJson.scripts["test:v08"]) {
   throw new Error("Current package scripts must not expose predecessor test authority");
+}
+if (plugin.hooks !== "./hooks/hooks.json") {
+  throw new Error("Plugin must use the packaged queued-report Stop hook definition");
+}
+const pluginHooks = JSON.parse(await readRequired("hooks/hooks.json"));
+const stopHandlers = pluginHooks?.hooks?.Stop;
+if (!Array.isArray(stopHandlers) || stopHandlers.length !== 1 || Object.keys(pluginHooks.hooks).length !== 1) {
+  throw new Error("Queued-report hook must register exactly one Stop event");
+}
+const commandHook = stopHandlers[0]?.hooks?.[0];
+if (
+  commandHook?.type !== "command"
+  || commandHook.command !== "node \"$PLUGIN_ROOT/bin/codex-flow-report-hook.mjs\""
+  || commandHook.timeout !== 3
+) {
+  throw new Error("Queued-report Stop hook must use the bounded immutable package entrypoint");
 }
 
 for (const path of RETIRED_AUTHORITY_PATHS) {
@@ -303,7 +319,10 @@ const libModules = (await walk(resolve(root, "lib")))
 assertExactInventory(libModules, Object.keys(layerRegistry.modules), "Module layer registry");
 function physicalModuleLayer(moduleName) {
   if (moduleName.startsWith("policy/")) return "routing-policy";
-  if (moduleName.startsWith("adapters/codex-app/")) return "codex-app-adapter";
+  if (
+    moduleName.startsWith("adapters/codex-app/")
+    || ["codex-app-report-adapter.mjs", "report-hook.mjs"].includes(moduleName)
+  ) return "codex-app-adapter";
   if (moduleName.startsWith("compat/")) return "compatibility-capsule";
   return "governance-core";
 }
