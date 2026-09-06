@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://private.local/codex-flow/report-delivery.schema.json",
+  "title": "Codex Flow one-shot queued report evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "kind", "report_id", "route_id", "source", "source_text_digest", "source_byte_length", "envelope", "state", "attempt", "queue_acceptance", "diagnostic", "conflict", "manual_reason", "captured_at", "updated_at"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "kind": { "const": "codex-flow-v093-report-delivery" },
+    "report_id": { "type": "string", "pattern": "^report-record-v1-[0-9a-f]{64}$" },
+    "route_id": { "type": "string", "pattern": "^report-route-v1-[0-9a-f]{64}$" },
+    "source": { "$ref": "#/$defs/source" },
+    "source_text_digest": { "$ref": "#/$defs/digest" },
+    "source_byte_length": { "type": "integer", "minimum": 1 },
+    "envelope": { "oneOf": [{ "type": "null" }, { "$ref": "report-envelope.schema.json" }] },
+    "state": { "enum": ["captured", "submitting", "accepted", "ambiguous", "conflict", "manual-required"] },
+    "attempt": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/attempt" }] },
+    "queue_acceptance": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/queueAcceptance" }] },
+    "diagnostic": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/diagnostic" }] },
+    "conflict": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/conflict" }] },
+    "manual_reason": { "oneOf": [{ "type": "null" }, { "enum": ["oversize-final", "conflicting-final"] }] },
+    "captured_at": { "$ref": "#/$defs/timestamp" },
+    "updated_at": { "$ref": "#/$defs/timestamp" }
+  },
+  "$defs": {
+    "safeId": { "type": "string", "minLength": 1, "maxLength": 256, "pattern": "^[A-Za-z0-9._-]+$" },
+    "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "timestamp": { "type": "string", "format": "date-time", "maxLength": 64 },
+    "source": {
+      "type": "object", "additionalProperties": false, "required": ["host_id", "thread_id", "turn_id", "output_kind"],
+      "properties": { "host_id": { "$ref": "#/$defs/safeId" }, "thread_id": { "$ref": "#/$defs/safeId" }, "turn_id": { "$ref": "#/$defs/safeId" }, "output_kind": { "const": "final-assistant-output" } }
+    },
+    "attempt": {
+      "type": "object", "additionalProperties": false, "required": ["attempt_id", "started_at"],
+      "properties": { "attempt_id": { "type": "string", "pattern": "^report-attempt-v1-[0-9a-f]{64}$" }, "started_at": { "$ref": "#/$defs/timestamp" } }
+    },
+    "queueAcceptance": {
+      "type": "object", "additionalProperties": false, "required": ["client_message_id", "accepted_at"],
+      "properties": { "client_message_id": { "type": "string", "minLength": 1, "maxLength": 256 }, "accepted_at": { "$ref": "#/$defs/timestamp" } }
+    },
+    "diagnostic": {
+      "type": "object", "additionalProperties": false, "required": ["code", "detail_digest", "observed_at"],
+      "properties": { "code": { "enum": ["queue-rejected", "queue-ambiguous", "queue-timeout", "queue-protocol-error", "post-acceptance-diagnostic"] }, "detail_digest": { "$ref": "#/$defs/digest" }, "observed_at": { "$ref": "#/$defs/timestamp" } }
+    },
+    "conflict": {
+      "type": "object", "additionalProperties": false, "required": ["text_digest", "byte_length", "observed_at"],
+      "properties": { "text_digest": { "$ref": "#/$defs/digest" }, "byte_length": { "type": "integer", "minimum": 1 }, "observed_at": { "$ref": "#/$defs/timestamp" } }
+    }
+  }
+}
