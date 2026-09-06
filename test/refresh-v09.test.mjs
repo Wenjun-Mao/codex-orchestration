@@ -1125,7 +1125,25 @@ test("v0.9 refresh consumes a closed exact-v0.9.0 source with no replacements", 
     observed_at: source.closed.run.updated_at,
     records_digest: sha256(stableStringify([])),
   };
+  const refreshAuthoritySeed = {
+    schema_version: 1,
+    kind: "codex-flow-v095-consumed-refresh-recovery-authority-v1",
+    refresh_id: applied.handoff.refresh_id,
+    handoff_digest: applied.handoff.handoff_digest,
+    source_namespace: applied.handoff.intent.source.namespace,
+    source_run_id: applied.handoff.intent.source.run_id,
+    source_coordinator_thread_id: applied.handoff.intent.source.coordinator.thread_id,
+    target_coordinator_thread_id: applied.handoff.intent.target.coordinator_thread_id,
+    source_tree_digest: applied.handoff.source_retirement.final_source_tree.tree_digest,
+    source_retired_at: applied.handoff.source_retirement.retired_at,
+    consumed_at: applied.handoff.target_consumption.consumed_at,
+  };
+  const refreshAuthority = {
+    ...refreshAuthoritySeed,
+    authority_digest: sha256(stableStringify(refreshAuthoritySeed)),
+  };
   const dispositionSeed = {
+    refresh_authority_digest: refreshAuthority.authority_digest,
     handoff_digest: applied.handoff.handoff_digest,
     locator_sha256: sha256(stableStringify(orphanLocator)),
     route_sha256: sha256(stableStringify(orphanRoute)),
@@ -1143,7 +1161,7 @@ test("v0.9 refresh consumes a closed exact-v0.9.0 source with no replacements", 
   await assert.rejects(
     () => recoverRefreshReportLocator({
       commonDir,
-      handoff: applied.handoff,
+      refreshAuthority,
       locator: orphanLocator,
       route: orphanRoute,
       disposition: { ...disposition, source_tree_digest: "f".repeat(64) },
@@ -1152,20 +1170,26 @@ test("v0.9 refresh consumes a closed exact-v0.9.0 source with no replacements", 
     /disposition identity is invalid/,
   );
   await stat(locatorPath);
-  const recovered = await recoverRefreshReportLocator({
-    commonDir,
-    handoff: applied.handoff,
+  const recoveredAt = new Date().toISOString();
+  const recoveryPath = await jsonFile(requests, "refresh-closed-v090-recover-locator", {
+    refresh_authority: refreshAuthority,
     locator: orphanLocator,
     route: orphanRoute,
     disposition,
-    recoveredAt: new Date().toISOString(),
+    recovered_at: recoveredAt,
   });
+  const recoveredCall = invoke(targetPackage.cli, [
+    "refresh", "recover-locator", "--invoking-skill", targetSkill,
+    "--file", recoveryPath, "--json",
+  ], root);
+  assertSuccess(recoveredCall, "closed v0.9.0 orphan locator recovery");
+  const recovered = JSON.parse(recoveredCall.stdout);
   assert.equal(recovered.status, "retired");
   assert.equal(recovered.retirement.recovery.disposition_id, disposition.disposition_id);
   await assert.rejects(stat(locatorPath), /ENOENT/);
   const replay = await recoverRefreshReportLocator({
     commonDir,
-    handoff: applied.handoff,
+    refreshAuthority,
     locator: orphanLocator,
     route: orphanRoute,
     disposition,

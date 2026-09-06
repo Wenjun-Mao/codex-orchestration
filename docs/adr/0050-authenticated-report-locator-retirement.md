@@ -34,10 +34,14 @@ run closure or abandonment, and refresh source retirement invoke this adapter
 boundary after governance-core route closure.
 
 One bounded compatibility recovery may retire the known v0.9.3 orphan only
-after authenticating the full consumed refresh handoff, its retained source
-tree digest, the exact active route bytes and locator digest, and an explicit
-recovery disposition. The missing namespace is never sufficient authority.
-This exception does not scan or migrate arbitrary predecessor state.
+after authenticating a content-addressed consumed-refresh authority, its
+retained final handoff and source-tree digests, the exact active route bytes
+and locator digest, and an explicit director-approved recovery disposition.
+The recovery authority is durable by design because clean-start consumption
+deletes the full operational handoff. Requiring that deleted payload would
+make recovery depend on transient task history. The missing namespace is never
+sufficient authority. This exception does not scan or migrate arbitrary
+predecessor state.
 
 ## Rejected alternatives
 

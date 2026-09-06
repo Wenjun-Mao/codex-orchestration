@@ -1813,12 +1813,12 @@ async function commandRefreshV09(args) {
   const request = await readJsonInput(values.file);
   if (subcommand === "recover-locator") {
     requireExactFields(request, {
-      required: ["handoff", "locator", "route", "disposition", "recovered_at"],
+      required: ["refresh_authority", "locator", "route", "disposition", "recovered_at"],
       optional: [],
     }, "refresh recover-locator request");
     v09Output(await recoverRefreshReportLocator({
       commonDir: git.commonDir,
-      handoff: request.handoff,
+      refreshAuthority: request.refresh_authority,
       locator: request.locator,
       route: request.route,
       disposition: request.disposition,
