@@ -70,6 +70,15 @@ no-replacement refresh through namespace removal. This checkpoint does not add
 launch-based v0.9 discard support. The result is recorded in
 [`2026-09-05-v0.9.1-rc2-v090-refresh-replay.md`](field-tests/2026-09-05-v0.9.1-rc2-v090-refresh-replay.md).
 
+The v0.9.3 RC sequence then exercised the current App's real completion hooks
+and native queue. RC4 corrected the originating hook-event, package-discovery,
+and delivery-key contracts exposed by RC1 through RC3. Fresh post-restart
+ordinary-busy and literal-`wait_threads` cases both captured an exact 48-byte
+Unicode final and delivered it only as a distinct recipient turn after the
+active turn ended. The complete evidence and retained identifiers are recorded
+in
+[`2026-09-06-v0.9.3-rc-live-app-acceptance.md`](field-tests/2026-09-06-v0.9.3-rc-live-app-acceptance.md).
+
 ## Release gate
 
 ```text
