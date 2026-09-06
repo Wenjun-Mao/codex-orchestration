@@ -57,6 +57,12 @@ acceptance. Busy recipients are not Steered; pending or ambiguous submissions
 are retained for manual recovery and are never blindly retried. Cross-host
 delivery remains manual and out of scope for this release.
 
+The native `clientUserMessageId` is the SHA-256 digest of the persisted report
+record ID. The report state machine keeps its readable prefixed ID, while the
+adapter receives the exact digest-shaped idempotency key its boundary requires.
+Tests must exercise this caller-to-adapter mapping rather than only substituting
+a queue function that accepts arbitrary keys.
+
 Visible-task activation registers the executor route before the start command
 returns. Coordinator first-turn acceptance registers a distinct active-run
 route bound to the approved-plan digest and director generation. A

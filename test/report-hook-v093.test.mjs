@@ -93,6 +93,7 @@ test("a Stop uses the canonical route and delivery record for one exact Unicode 
   assert.equal(first.status, "submitted");
   assert.equal(first.state, "accepted");
   assert.equal(calls.length, 1);
+  assert.equal(calls[0].deliveryKey, sha256(first.report_id));
   assert.match(calls[0].queueText, /UNTRUSTED TASK REPORT/);
   assert.match(calls[0].queueText, /雪/);
   const record = await reportDelivery({ stateRoot: context.stateRoot, reportId: first.report_id });
@@ -229,7 +230,7 @@ test("queue text labels the exact final as untrusted data", async (t) => {
 
 test("reporter authority reflects the packaged RC identity", async () => {
   const authority = await reporterAuthorityFor({ packageRoot });
-  assert.equal(authority.package_version, "0.9.3-rc.3");
+  assert.equal(authority.package_version, "0.9.3-rc.4");
   assert.match(authority.routes_sha256, /^[0-9a-f]{64}$/);
   assert.match(authority.records_sha256, /^[0-9a-f]{64}$/);
 });
