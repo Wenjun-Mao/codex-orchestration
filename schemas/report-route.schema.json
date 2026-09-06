@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://private.local/codex-flow/report-route.schema.json",
+  "title": "Codex Flow authenticated same-host report route",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "kind", "route_id", "assignment", "sender", "recipient", "state", "lifecycle"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "kind": { "const": "codex-flow-v093-report-route" },
+    "route_id": { "type": "string", "pattern": "^report-route-v1-[0-9a-f]{64}$" },
+    "assignment": { "$ref": "#/$defs/assignment" },
+    "sender": { "$ref": "#/$defs/sender" },
+    "recipient": { "$ref": "#/$defs/recipient" },
+    "state": { "enum": ["active", "closed"] },
+    "lifecycle": { "$ref": "#/$defs/lifecycle" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "state": { "const": "active" } } },
+      "then": { "properties": { "lifecycle": { "properties": { "closed_at": { "type": "null" }, "closure_reason": { "type": "null" } } } } }
+    },
+    {
+      "if": { "properties": { "state": { "const": "closed" } } },
+      "then": { "properties": { "lifecycle": { "required": ["closed_at", "closure_reason"], "properties": { "closed_at": { "$ref": "#/$defs/timestamp" }, "closure_reason": { "enum": ["terminal", "archived", "refresh", "unplug", "manual"] } } } } }
+    }
+  ],
+  "$defs": {
+    "safeId": { "type": "string", "minLength": 1, "maxLength": 256, "pattern": "^[A-Za-z0-9._-]+$" },
+    "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "timestamp": { "type": "string", "format": "date-time", "maxLength": 64 },
+    "absolutePath": { "type": "string", "pattern": "^/", "maxLength": 4096 },
+    "assignment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["assignment_id", "run_id", "runtime_context_digest", "configuration_digest", "repository_id", "common_dir", "plan_id", "revision_digest", "task_id", "task_digest", "contract_id", "launch_id"],
+      "properties": {
+        "assignment_id": { "type": "string", "pattern": "^task-launch-v1-[0-9a-f]{64}$" },
+        "run_id": { "$ref": "#/$defs/safeId" },
+        "runtime_context_digest": { "$ref": "#/$defs/digest" },
+        "configuration_digest": { "$ref": "#/$defs/digest" },
+        "repository_id": { "$ref": "#/$defs/safeId" },
+        "common_dir": { "$ref": "#/$defs/absolutePath" },
+        "plan_id": { "$ref": "#/$defs/safeId" },
+        "revision_digest": { "$ref": "#/$defs/digest" },
+        "task_id": { "$ref": "#/$defs/safeId" },
+        "task_digest": { "$ref": "#/$defs/digest" },
+        "contract_id": { "$ref": "#/$defs/digest" },
+        "launch_id": { "type": "string", "pattern": "^task-launch-v1-[0-9a-f]{64}$" }
+      }
+    },
+    "sender": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["host_id", "thread_id"],
+      "properties": { "host_id": { "$ref": "#/$defs/safeId" }, "thread_id": { "$ref": "#/$defs/safeId" } }
+    },
+    "recipient": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["host_id", "lineage_id", "thread_id", "generation", "binding_digest"],
+      "properties": {
+        "host_id": { "$ref": "#/$defs/safeId" },
+        "lineage_id": { "$ref": "#/$defs/safeId" },
+        "thread_id": { "$ref": "#/$defs/safeId" },
+        "generation": { "type": "integer", "minimum": 1, "maximum": 2147483647 },
+        "binding_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "lifecycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["opened_at", "closed_at", "closure_reason"],
+      "properties": {
+        "opened_at": { "$ref": "#/$defs/timestamp" },
+        "closed_at": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/timestamp" }] },
+        "closure_reason": { "oneOf": [{ "type": "null" }, { "enum": ["terminal", "archived", "refresh", "unplug", "manual"] }] }
+      }
+    }
+  }
+}

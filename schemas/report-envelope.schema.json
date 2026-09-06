@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://private.local/codex-flow/report-envelope.schema.json",
+  "title": "Codex Flow queued report envelope",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "kind", "classification", "text", "text_digest", "byte_length"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "kind": { "const": "codex-flow-v093-report-envelope" },
+    "classification": { "const": "untrusted-report-data" },
+    "text": { "type": "string", "minLength": 1, "maxLength": 262144 },
+    "text_digest": { "$ref": "#/$defs/digest" },
+    "byte_length": { "type": "integer", "minimum": 1, "maximum": 65536 }
+  },
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+  }
+}
