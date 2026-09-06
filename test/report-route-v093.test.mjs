@@ -1,13 +1,18 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { rm } from "node:fs/promises";
+import { resolve } from "node:path";
 import test from "node:test";
 import {
   closeReportRoute,
+  registerCoordinatorReportRoute,
   registerReportRoute,
   reportRoute,
   reportRoutes,
 } from "../lib/report-routes.mjs";
+import { bindRecipient } from "../lib/recipients.mjs";
+import { recipientBindingDigest } from "../lib/task-results.mjs";
+import { sha256 } from "../lib/core.mjs";
 import { createActiveTaskLaunch } from "./v09-lifecycle-fixture.mjs";
 import { createGitFixture } from "./helpers.mjs";
 
@@ -95,5 +100,54 @@ test("report routes reject cross-host and preserve closure as a late-report fenc
       now: TIME + 2_000,
     }),
     /Closed report route cannot be re-armed/,
+  );
+});
+
+test("a coordinator delegation binds the active run and exact approved plan back to a director", async (t) => {
+  const root = await createGitFixture("codex-flow-report-route-director-");
+  const context = await createActiveTaskLaunch(root, "director");
+  t.after(() => destroy(context));
+  const director = {
+    lineage_id: "director-lineage",
+    thread_id: "director-thread",
+    generation: 1,
+  };
+  await bindRecipient({ stateRoot: context.stateRoot, recipient: director });
+  const result = await registerCoordinatorReportRoute({
+    stateRoot: context.stateRoot,
+    runId: context.launch.run_id,
+    senderThreadId: context.coordinator.thread_id,
+    senderHostId: "fixture-host",
+    recipient: {
+      host_id: "fixture-host",
+      ...director,
+      binding_digest: recipientBindingDigest(director),
+    },
+    approvedPlanPath: resolve(root, ".gitkeep"),
+    approvedPlanDigest: sha256("fixture\n"),
+    now: TIME,
+  });
+  assert.equal(result.status, "registered");
+  assert.equal(result.route.assignment.kind, "coordinator-delegation");
+  assert.equal(result.route.sender.thread_id, context.coordinator.thread_id);
+  assert.equal(result.route.recipient.thread_id, director.thread_id);
+  assert.equal((await reportRoute({ stateRoot: context.stateRoot, routeId: result.route.route_id })).route_id, result.route.route_id);
+
+  await assert.rejects(
+    () => registerCoordinatorReportRoute({
+      stateRoot: context.stateRoot,
+      runId: context.launch.run_id,
+      senderThreadId: context.coordinator.thread_id,
+      senderHostId: "fixture-host",
+      recipient: {
+        host_id: "fixture-host",
+        ...director,
+        binding_digest: recipientBindingDigest(director),
+      },
+      approvedPlanPath: resolve(root, ".gitkeep"),
+      approvedPlanDigest: "0".repeat(64),
+      now: TIME,
+    }),
+    /Approved plan digest/,
   );
 });

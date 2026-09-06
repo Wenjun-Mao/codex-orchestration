@@ -2,6 +2,7 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import { realpath } from "node:fs/promises";
+import { homedir } from "node:os";
 import { parseArgs } from "node:util";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -134,6 +135,18 @@ import {
   coordinatorBindingDigest,
   createWorkflowPlanRevision,
 } from "../lib/workflow-plan.mjs";
+import { recipientBindingDigest } from "../lib/task-results.mjs";
+import {
+  closeReportRoute,
+  registerCoordinatorReportRoute,
+  registerReportRoute,
+  reportRoute,
+} from "../lib/report-routes.mjs";
+import { installRepositoryReportLocator } from "../lib/report-hook.mjs";
+import {
+  CODEX_APP_BINARY_PATH,
+  CODEX_APP_CLI_VERSION,
+} from "../lib/codex-app-report-adapter.mjs";
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -149,6 +162,9 @@ Usage:
   codex-flow task launch prepare|attempt|reconcile --run-id ID --file request.json [--json]
   codex-flow task launch start --run-id ID --launch-id ID --nonce HEX [--json]
   codex-flow task launch status --run-id ID --launch-id ID [--json]
+  codex-flow report route coordinator --run-id ID --file request.json [--json]
+  codex-flow report route status --run-id ID --route-id ID [--json]
+  codex-flow report route close --run-id ID --file request.json [--json]
   codex-flow subagent prepare|attempt|reconcile|complete|dispose --run-id ID --file request.json [--json]
   codex-flow subagent status --run-id ID --operation-id ID [--json]
   codex-flow callback deliver|observe --run-id ID --file request.json [--json]
@@ -305,6 +321,14 @@ function commandNow(request, field = "recorded_at") {
 
 function v09Repository() {
   return discoverGit(process.cwd());
+}
+
+function supportedNativeQueue() {
+  return {
+    binary_path: CODEX_APP_BINARY_PATH,
+    expected_version: CODEX_APP_CLI_VERSION,
+    sqlite_home: resolve(homedir(), ".codex"),
+  };
 }
 
 function assertRunIdentity(value, runId, label) {
@@ -934,7 +958,25 @@ async function commandTaskLaunchV09(args, mutationAuthority = null) {
       repositoryPath: git.root,
       now: Date.now(),
     });
-    v09Output(assertRunIdentity(result, runId, "task launch"));
+    const reporting = await registerReportRoute({
+      stateRoot: git.stateRoot,
+      launchId,
+      senderHostId: mutationAuthority.run.binding.host.host_id,
+      recipientHostId: mutationAuthority.run.binding.host.host_id,
+    });
+    await installRepositoryReportLocator({
+      stateRoot: git.stateRoot,
+      route: reporting.route,
+      packageRoot,
+      nativeQueue: supportedNativeQueue(),
+    });
+    v09Output({
+      ...assertRunIdentity(result, runId, "task launch"),
+      report_route: {
+        status: reporting.status,
+        route_id: reporting.route.route_id,
+      },
+    });
     return;
   }
   const shapes = {
@@ -1039,6 +1081,90 @@ async function commandTaskV09(args, mutationAuthority = null) {
     throw new CliError("task requires the v0.9 launch lifecycle");
   }
   return commandTaskLaunchV09(rest, mutationAuthority);
+}
+
+async function commandReportV09(args, mutationAuthority = null) {
+  const [scope, subcommand, ...rest] = args;
+  if (scope !== "route") throw new CliError("report requires the route lifecycle");
+  const values = parseV09Options(rest, { "route-id": { type: "string" } });
+  const git = v09Repository();
+  const runId = explicitRunId(values);
+  if (subcommand === "status") {
+    const routeId = requireText(values["route-id"], "--route-id", { max: 128, safeId: true });
+    const result = await reportRoute({ stateRoot: git.stateRoot, routeId });
+    if (result.assignment.run_id !== runId) throw new CliError("Report route does not belong to --run-id", 73);
+    v09Output(result);
+    return;
+  }
+  if (subcommand === "coordinator") {
+    const { request } = await runScopedRequest(values, "report route coordinator", {
+      required: ["sender_thread_id", "recipient", "approved_plan_path", "approved_plan_digest"],
+    });
+    if (mutationAuthority === null) throw new CliError("Coordinator report route requires active run authority", 73);
+    await assertRunBoundRuntimeExecution({
+      git,
+      runId,
+      requestFile: values.file,
+      runtime: mutationAuthority.runtime,
+      command: ["report", "route", "coordinator"],
+      label: "Coordinator report route registration",
+    });
+    assertCurrentCoordinatorTask(mutationAuthority.run.binding.lineage, "report route coordinator");
+    requireExactFields(request.recipient, {
+      required: ["host_id", "lineage_id", "thread_id", "generation"],
+    }, "report route coordinator recipient");
+    if (request.recipient.generation !== 1) {
+      throw new CliError("A new director recipient route must begin at generation 1", 73);
+    }
+    await bindRecipient({
+      stateRoot: git.stateRoot,
+      recipient: {
+        lineage_id: request.recipient.lineage_id,
+        thread_id: request.recipient.thread_id,
+        generation: request.recipient.generation,
+      },
+      fenceToken: mutationAuthority.run.binding.fence_token,
+    });
+    const recipient = {
+      ...request.recipient,
+      binding_digest: recipientBindingDigest({
+        lineage_id: request.recipient.lineage_id,
+        thread_id: request.recipient.thread_id,
+        generation: request.recipient.generation,
+      }),
+    };
+    const result = await registerCoordinatorReportRoute({
+      stateRoot: git.stateRoot,
+      runId,
+      senderThreadId: request.sender_thread_id,
+      senderHostId: mutationAuthority.run.binding.host.host_id,
+      recipient,
+      approvedPlanPath: request.approved_plan_path,
+      approvedPlanDigest: request.approved_plan_digest,
+    });
+    await installRepositoryReportLocator({
+      stateRoot: git.stateRoot,
+      route: result.route,
+      packageRoot,
+      nativeQueue: supportedNativeQueue(),
+    });
+    v09Output(result);
+    return;
+  }
+  if (subcommand === "close") {
+    const { request } = await runScopedRequest(values, "report route close", {
+      required: ["route_id", "reason"],
+    });
+    const current = await reportRoute({ stateRoot: git.stateRoot, routeId: request.route_id });
+    if (current.assignment.run_id !== runId) throw new CliError("Report route does not belong to --run-id", 73);
+    v09Output(await closeReportRoute({
+      stateRoot: git.stateRoot,
+      routeId: current.route_id,
+      reason: request.reason,
+    }));
+    return;
+  }
+  throw new CliError("report route requires coordinator, status, or close");
 }
 
 async function commandSubagentV09(args) {
@@ -1681,6 +1807,9 @@ function isV09RunBoundMutation(command, args) {
   if (command === "task") {
     return subcommand === "launch" && ["prepare", "attempt", "reconcile", "start"].includes(args[1]);
   }
+  if (command === "report") {
+    return subcommand === "route" && ["coordinator", "close"].includes(args[1]);
+  }
   if (command === "subagent") {
     return ["prepare", "attempt", "reconcile", "complete", "dispose"].includes(subcommand);
   }
@@ -1739,6 +1868,7 @@ async function main() {
   if (command === "run") return commandRunV09(args);
   if (command === "workflow") return dispatchV09Command(command, args, commandWorkflowV09);
   if (command === "task") return dispatchV09Command(command, args, commandTaskV09);
+  if (command === "report") return dispatchV09Command(command, args, commandReportV09);
   if (command === "subagent") return dispatchV09Command(command, args, commandSubagentV09);
   if (command === "callback") return dispatchV09Command(command, args, commandCallbackV09);
   if (command === "urgent") return dispatchV09Command(command, args, commandUrgentV09);

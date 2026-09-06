@@ -31,10 +31,17 @@
     "timestamp": { "type": "string", "format": "date-time", "maxLength": 64 },
     "absolutePath": { "type": "string", "pattern": "^/", "maxLength": 4096 },
     "assignment": {
+      "oneOf": [
+        { "$ref": "#/$defs/taskLaunchAssignment" },
+        { "$ref": "#/$defs/coordinatorAssignment" }
+      ]
+    },
+    "taskLaunchAssignment": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["assignment_id", "run_id", "runtime_context_digest", "configuration_digest", "repository_id", "common_dir", "plan_id", "revision_digest", "task_id", "task_digest", "contract_id", "launch_id"],
+      "required": ["kind", "assignment_id", "run_id", "runtime_context_digest", "configuration_digest", "repository_id", "common_dir", "plan_id", "revision_digest", "task_id", "task_digest", "contract_id", "launch_id"],
       "properties": {
+        "kind": { "const": "task-launch" },
         "assignment_id": { "type": "string", "pattern": "^task-launch-v1-[0-9a-f]{64}$" },
         "run_id": { "$ref": "#/$defs/safeId" },
         "runtime_context_digest": { "$ref": "#/$defs/digest" },
@@ -47,6 +54,24 @@
         "task_digest": { "$ref": "#/$defs/digest" },
         "contract_id": { "$ref": "#/$defs/digest" },
         "launch_id": { "type": "string", "pattern": "^task-launch-v1-[0-9a-f]{64}$" }
+      }
+    },
+    "coordinatorAssignment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "assignment_id", "run_id", "runtime_context_digest", "configuration_digest", "repository_digest", "common_dir", "plan_id", "revision_digest", "approved_plan_path", "approved_plan_digest"],
+      "properties": {
+        "kind": { "const": "coordinator-delegation" },
+        "assignment_id": { "type": "string", "pattern": "^coordinator-assignment-v1-[0-9a-f]{64}$" },
+        "run_id": { "$ref": "#/$defs/safeId" },
+        "runtime_context_digest": { "$ref": "#/$defs/digest" },
+        "configuration_digest": { "$ref": "#/$defs/digest" },
+        "repository_digest": { "$ref": "#/$defs/digest" },
+        "common_dir": { "$ref": "#/$defs/absolutePath" },
+        "plan_id": { "$ref": "#/$defs/safeId" },
+        "revision_digest": { "$ref": "#/$defs/digest" },
+        "approved_plan_path": { "$ref": "#/$defs/absolutePath" },
+        "approved_plan_digest": { "$ref": "#/$defs/digest" }
       }
     },
     "sender": {

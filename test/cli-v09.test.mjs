@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import test from "node:test";
 import { RUNTIME_DIRECTORY } from "../lib/runtime-context.mjs";
+import { sha256 } from "../lib/core.mjs";
 import {
   assertSuccess,
   createGitFixture,
@@ -39,6 +40,7 @@ test("v0.9 help exposes launch authority and no retired bootstrap or release com
   assertSuccess(help, "top-level help");
   assert.match(help.stdout, /task launch prepare\|attempt\|reconcile/);
   assert.match(help.stdout, /task launch start --run-id/);
+  assert.match(help.stdout, /report route coordinator --run-id/);
   assert.match(help.stdout, /full first-turn assignment/);
   assert.doesNotMatch(help.stdout, /task create|release prepare|resolve-private/);
   assert.doesNotMatch(help.stdout, /v0\.7\.8|v0\.8\.1|bootstrap-only/);
@@ -119,4 +121,37 @@ test("v0.9 CLI activates a clean run through current launch-era wiring", async (
   const status = runCli(["run", "status", "--run-id", runId, "--json"], { cwd: root });
   assertSuccess(status, "run status");
   assert.equal(JSON.parse(status.stdout).run.run_id, runId);
+
+  const reportRequest = {
+    run_id: runId,
+    sender_thread_id: coordinatorThreadId,
+    recipient: {
+      host_id: "local",
+      lineage_id: "cli-v09-director-lineage",
+      thread_id: "cli-v09-director",
+      generation: 1,
+    },
+    approved_plan_path: requestPath,
+    approved_plan_digest: sha256(`${JSON.stringify(request)}\n`),
+  };
+  const reportRequestPath = resolve(requests, "report-route.json");
+  await writeFile(reportRequestPath, `${JSON.stringify(reportRequest)}\n`, "utf8");
+  const registered = runCli([
+    "report", "route", "coordinator", "--run-id", runId, "--file", reportRequestPath, "--json",
+  ], {
+    cwd: root,
+    env: { CODEX_THREAD_ID: coordinatorThreadId },
+  });
+  assertSuccess(registered, "coordinator report route");
+  const reporting = JSON.parse(registered.stdout);
+  assert.equal(reporting.route.assignment.kind, "coordinator-delegation");
+  assert.equal(reporting.route.recipient.thread_id, "cli-v09-director");
+  await stat(resolve(
+    root,
+    ".git",
+    "codex-flow",
+    "report-locators",
+    "records",
+    `${sha256(coordinatorThreadId)}.json`,
+  ));
 });

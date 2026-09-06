@@ -34,12 +34,14 @@ delivery is not acceptance.
 
 ## Reporting transition
 
-Never remove a working manual or explicit collection path until its replacement
-is installed and trusted, where applicable, and verified for the exact
-sender-recipient mapping through a live test. Automated full-final reporting is
-experimental and is neither provided nor guaranteed by this Flow release.
-Routine results must not Steer an active recipient, and `wait_threads` is active
-work rather than an idle delivery boundary. Preserve quiet callbacks and the
+For v0.9.3 same-local-host assignments, register and pin the exact upstream
+route before useful work: coordinator-to-director from the active run and
+approved-plan digest, and executor-to-coordinator as part of `task launch
+start`. The Stop hook captures only the complete final and makes one native
+queue attempt. Queue acceptance is not delivery, review, or Flow acceptance.
+Never remove the explicit manual path until the hook is installed, trusted, and
+live-verified for the exact sender-recipient mapping. Cross-host routes remain manual. Routine
+results must not Steer an active recipient; preserve quiet callbacks and the
 separate rare urgent path.
 
 ## Optional advisor

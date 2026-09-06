@@ -9,8 +9,9 @@ The initial user prompt contains the full contract, launch ID, nonce, and exact
 `task launch start` command. Run that command before inspecting or mutating
 source. It authenticates `CODEX_THREAD_ID`, the run-bound runtime, contract,
 nonce, Git common directory, pristine baseline, non-coordinator worktree, and
-reserved branch. If it cannot complete, stop with its exact blocker. There is
-no release message to wait for.
+reserved branch, then registers and pins the same-host upstream report route.
+If any part cannot complete, stop with its exact blocker. There is no release
+message to wait for.
 
 After start succeeds, begin the assignment in the same first turn. Stay within
 the contract's objective, dependencies, paths, resources, baseline, and

@@ -57,6 +57,15 @@ acceptance. Busy recipients are not Steered; pending or ambiguous submissions
 are retained for manual recovery and are never blindly retried. Cross-host
 delivery remains manual and out of scope for this release.
 
+Visible-task activation registers the executor route before the start command
+returns. Coordinator first-turn acceptance registers a distinct active-run
+route bound to the approved-plan digest and director generation. A
+repository-local sender locator pins immutable reporter hashes and the exact
+supported native configuration so a Stop hook can resolve its route from the
+sender worktree without a global task scan or an unavailable hook-only
+environment variable. The adapter owns that locator; repository route and
+delivery records remain the sole governance state machines.
+
 ## Rejected alternatives
 
 - Keep the approved plan only in conversation or a mutable director path. A

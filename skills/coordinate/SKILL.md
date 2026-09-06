@@ -112,11 +112,14 @@ journal callback; direct messaging or Steer is reserved for a persisted urgent
 blocker, approval request, or high-risk drift. Use `urgent persist`, `urgent
 attempt`, make the returned direct call once, then `urgent reconcile`.
 
-Keep the working explicit collection path until a replacement is installed and
-trusted, where applicable, and its exact sender-recipient mapping is live
-verified.
-Automated full-final reporting is experimental and is neither provided nor
-guaranteed by this Flow release.
+For a new same-local-host director assignment, register the coordinator route
+from the exact active run, approved-plan digest, current coordinator task, and
+pre-bound director recipient before delegated work can finish. New visible-task
+`task launch start` calls register their exact executor-to-coordinator routes
+and pin the installed reporter automatically. The Stop hook captures only the
+complete final and makes one native queue attempt; acceptance remains transport
+evidence, not delivery, review, or Flow acceptance. Cross-host and untrusted
+installations retain the explicit manual path.
 
 Hand results to `codex-orchestration:integrate`. Close only after a fresh
 passing `run audit` re-derives every claim, launch, result, disposition,

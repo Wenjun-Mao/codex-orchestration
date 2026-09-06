@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { execFileSync } from "node:child_process";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
+import { rm } from "node:fs/promises";
 import test from "node:test";
 import {
   CODEX_APP_BINARY_PATH,
@@ -10,167 +11,181 @@ import {
 import {
   assertReporterAuthority,
   captureStopReport,
+  installReportHookLocator,
+  installRepositoryReportLocator,
   queuedReportText,
   reporterAuthorityFor,
   resolveReportHookRoute,
 } from "../lib/report-hook.mjs";
-import { sha256, stableStringify } from "../lib/core.mjs";
-import { createGitFixture, removeFixture } from "./helpers.mjs";
+import { reportDelivery } from "../lib/report-records.mjs";
+import { registerReportRoute } from "../lib/report-routes.mjs";
+import { sha256 } from "../lib/core.mjs";
+import { createGitFixture } from "./helpers.mjs";
+import { createActiveTaskLaunch } from "./v09-lifecycle-fixture.mjs";
 
-function route() {
+const TIME = Date.parse("2026-09-06T05:00:00.000Z");
+const packageRoot = resolve(import.meta.dirname, "..");
+
+function nativeQueue() {
   return {
-    schema_version: 1,
-    kind: "codex-flow-report-route-v1",
-    route_id: "route-current",
-    assignment_id: "assignment-current",
-    sender: { thread_id: "sender-current", host_id: "local" },
-    recipient: {
-      thread_id: "recipient-current",
-      host_id: "local",
-      lineage_id: "recipient-lineage",
-      generation: 1,
-    },
-    runtime_context_digest: "b".repeat(64),
-    reporter: {
-      package_version: "0.9.3-rc.1",
-      entrypoint_sha256: "c".repeat(64),
-      report_hook_sha256: "d".repeat(64),
-      adapter_sha256: "e".repeat(64),
-      core_sha256: "f".repeat(64),
-      git_sha256: "a".repeat(64),
-    },
-    native_queue: {
-      binary_path: CODEX_APP_BINARY_PATH,
-      expected_version: CODEX_APP_CLI_VERSION,
-      sqlite_home: resolve(homedir(), ".codex"),
-    },
+    binary_path: CODEX_APP_BINARY_PATH,
+    expected_version: CODEX_APP_CLI_VERSION,
+    sqlite_home: resolve(homedir(), ".codex"),
   };
 }
 
-function event(final = "line one\n雪 ☃") {
+function event(threadId, final = "line one\n雪 ☃") {
   return {
     hook_event_name: "Stop",
-    session_id: "sender-current",
+    session_id: threadId,
     turn_id: "turn-current",
     last_assistant_message: final,
   };
 }
 
-async function fixtureState() {
-  const root = await createGitFixture("codex-flow-report-hook-");
-  return { root, stateRoot: join(root, ".git", "codex-flow", "v0.9.3") };
+async function fixture(t, suffix) {
+  const root = await createGitFixture(`codex-flow-report-hook-${suffix}-`);
+  const context = await createActiveTaskLaunch(root, suffix);
+  const pluginData = await createGitFixture(`codex-flow-plugin-data-${suffix}-`, { commit: false });
+  t.after(async () => {
+    try {
+      execFileSync("git", ["worktree", "remove", "--force", context.executorPath], { cwd: context.root });
+    } catch {
+      // A failing assertion may already have removed the fixture worktree.
+    }
+    await rm(context.root, { recursive: true, force: true });
+    await rm(pluginData, { recursive: true, force: true });
+  });
+  const { route } = await registerReportRoute({
+    stateRoot: context.stateRoot,
+    launchId: context.launch.launch_id,
+    senderHostId: "local",
+    recipientHostId: "local",
+    now: TIME,
+  });
+  return { context, route, pluginData };
 }
 
-test("a Stop captures exact Unicode final text and makes one persisted native attempt", async (t) => {
-  const fixture = await fixtureState();
-  t.after(() => removeFixture(fixture.root));
+test("a Stop uses the canonical route and delivery record for one exact Unicode final", async (t) => {
+  const { context, route } = await fixture(t, "exact");
   const calls = [];
   const first = await captureStopReport({
-    event: event(),
-    route: route(),
-    stateRoot: fixture.stateRoot,
+    event: event(context.executorThreadId),
+    route,
+    stateRoot: context.stateRoot,
+    nativeQueue: nativeQueue(),
     submit: async (value) => {
       calls.push(value);
       return { outcome: "accepted", queued_submission_id: "queue-one", queue_attempted: true, diagnostics: {} };
     },
-    now: () => Date.parse("2026-09-06T00:00:00.000Z"),
+    now: () => TIME + 1_000,
   });
   assert.equal(first.status, "submitted");
   assert.equal(first.state, "accepted");
   assert.equal(calls.length, 1);
   assert.match(calls[0].queueText, /UNTRUSTED TASK REPORT/);
   assert.match(calls[0].queueText, /雪/);
-  const record = JSON.parse(await readFile(join(fixture.stateRoot, "queued-reports", "records", `${first.report_id}.json`), "utf8"));
-  assert.equal(record.final.text, "line one\n雪 ☃");
-  assert.equal(record.submission.queued_submission_id, "queue-one");
+  const record = await reportDelivery({ stateRoot: context.stateRoot, reportId: first.report_id });
+  assert.equal(record.envelope.text, "line one\n雪 ☃");
+  assert.equal(record.queue_acceptance.client_message_id, "queue-one");
 
   const duplicate = await captureStopReport({
-    event: event(), route: route(), stateRoot: fixture.stateRoot,
+    event: event(context.executorThreadId),
+    route,
+    stateRoot: context.stateRoot,
+    nativeQueue: nativeQueue(),
     submit: async () => { throw new Error("duplicate must not queue"); },
   });
-  assert.equal(duplicate.status, "already-recorded");
+  assert.equal(duplicate.status, "already-accepted");
   assert.equal(calls.length, 1);
 });
 
-test("a changed final is conflict evidence, and a continued Stop never captures a provisional final", async (t) => {
-  const fixture = await fixtureState();
-  t.after(() => removeFixture(fixture.root));
+test("changed, continued, and oversize finals keep core evidence without another queue attempt", async (t) => {
+  const first = await fixture(t, "conflict");
   await captureStopReport({
-    event: event("first"), route: route(), stateRoot: fixture.stateRoot,
+    event: event(first.context.executorThreadId, "first"), route: first.route,
+    stateRoot: first.context.stateRoot, nativeQueue: nativeQueue(),
     submit: async () => ({ outcome: "ambiguous", reason: "eof", queue_attempted: true, diagnostics: {} }),
   });
   const conflict = await captureStopReport({
-    event: event("changed"), route: route(), stateRoot: fixture.stateRoot,
+    event: event(first.context.executorThreadId, "changed"), route: first.route,
+    stateRoot: first.context.stateRoot, nativeQueue: nativeQueue(),
     submit: async () => { throw new Error("conflict must not queue"); },
   });
   assert.equal(conflict.status, "conflict");
   const continuation = await captureStopReport({
-    event: { ...event("provisional"), stop_hook_active: true }, route: route(), stateRoot: fixture.stateRoot,
+    event: { ...event(first.context.executorThreadId, "provisional"), stop_hook_active: true },
+    route: first.route, stateRoot: first.context.stateRoot, nativeQueue: nativeQueue(),
     submit: async () => { throw new Error("continuation must not queue"); },
   });
   assert.deepEqual(continuation, { status: "ignored", reason: "continued-stop" });
-});
 
-test("missing and oversize final output become inspectable rejection evidence without copying the body", async (t) => {
-  const fixture = await fixtureState();
-  t.after(() => removeFixture(fixture.root));
-  const oversized = await captureStopReport({
-    event: event("x".repeat(24 * 1024 + 1)), route: route(), stateRoot: fixture.stateRoot,
+  const oversize = await fixture(t, "oversize");
+  const manual = await captureStopReport({
+    event: event(oversize.context.executorThreadId, "x".repeat(24 * 1024 + 1)),
+    route: oversize.route, stateRoot: oversize.context.stateRoot, nativeQueue: nativeQueue(),
     submit: async () => { throw new Error("oversize must not queue"); },
   });
-  assert.equal(oversized.status, "rejected");
-  const rejection = await readFile(join(fixture.stateRoot, "queued-reports", "rejections", `${oversized.rejection_id}.json`), "utf8");
-  assert.match(rejection, /final-too-large/);
-  assert.equal(rejection.includes("x".repeat(128)), false);
+  assert.equal(manual.status, "manual-required");
+  const record = await reportDelivery({ stateRoot: oversize.context.stateRoot, reportId: manual.report_id });
+  assert.equal(record.envelope, null);
+  assert.equal(record.manual_reason, "oversize-final");
 });
 
-test("the host-local locator points to a digest-checked repository route, not a global route scan", async (t) => {
-  const fixture = await fixtureState();
-  const pluginData = await createGitFixture("codex-flow-plugin-data-", { commit: false });
-  t.after(async () => {
-    await removeFixture(fixture.root);
-    await removeFixture(pluginData);
+test("the host-local locator pins core route bytes and every reporter dependency", async (t) => {
+  const { context, route, pluginData } = await fixture(t, "locator");
+  const locator = await installReportHookLocator({
+    pluginData,
+    stateRoot: context.stateRoot,
+    route,
+    packageRoot,
+    nativeQueue: nativeQueue(),
   });
-  const reportRoute = route();
-  const recordPath = join(fixture.stateRoot, "report-routes", "records", "route-current.json");
-  await mkdir(resolve(recordPath, ".."), { recursive: true });
-  await writeFile(recordPath, `${stableStringify(reportRoute)}\n`, "utf8");
-  const locatorPath = join(pluginData, "report-hooks", "locators", `${sha256("sender-current")}.json`);
-  await mkdir(resolve(locatorPath, ".."), { recursive: true });
-  await writeFile(locatorPath, `${stableStringify({
-    schema_version: 1,
-    kind: "codex-flow-report-route-locator-v1",
-    sender_thread_id: "sender-current",
-    state_root: fixture.stateRoot,
-    route_id: "route-current",
-    route_sha256: sha256(stableStringify(reportRoute)),
-  })}\n`, "utf8");
-  const resolved = await resolveReportHookRoute({ pluginData, senderThreadId: "sender-current" });
-  assert.equal(resolved.route.route_id, "route-current");
-  assert.equal(resolved.stateRoot, fixture.stateRoot);
+  const resolved = await resolveReportHookRoute({ pluginData, senderThreadId: context.executorThreadId });
+  assert.equal(resolved.route.route_id, route.route_id);
+  assert.equal(resolved.stateRoot, context.stateRoot);
+  assert.equal(resolved.locator.route_sha256, locator.route_sha256);
+  await assertReporterAuthority({ reporter: locator.reporter, packageRoot });
+  await assert.rejects(
+    () => assertReporterAuthority({
+      reporter: { ...locator.reporter, core_sha256: "0".repeat(64) },
+      packageRoot,
+    }),
+    /reporter authority/,
+  );
+
+  await installRepositoryReportLocator({
+    stateRoot: context.stateRoot,
+    route,
+    packageRoot,
+    nativeQueue: nativeQueue(),
+  });
+  const repositoryResolved = await resolveReportHookRoute({
+    pluginData: "",
+    senderThreadId: context.executorThreadId,
+    cwd: context.executorPath,
+  });
+  assert.equal(repositoryResolved.route.route_id, route.route_id);
 });
 
-test("queue text labels the final as untrusted data and preserves its digest", () => {
+test("queue text labels the exact final as untrusted data", async (t) => {
+  const { context, route } = await fixture(t, "envelope");
   const finalText = "work complete\n雪";
   const text = queuedReportText({
-    route: route(), sourceThreadId: "sender-current", sourceTurnId: "turn-current",
-    finalSha256: sha256(finalText), finalText,
+    route,
+    sourceThreadId: context.executorThreadId,
+    sourceTurnId: "turn-current",
+    finalSha256: sha256(finalText),
+    finalText,
   });
   assert.match(text, /not user input/);
   assert.match(text, new RegExp(sha256(finalText)));
   assert.match(text, /雪/);
 });
 
-test("a bound route pins every packaged reporter dependency instead of hot-switching", async () => {
-  const packageRoot = resolve(import.meta.dirname, "..");
+test("reporter authority reflects the packaged RC identity", async () => {
   const authority = await reporterAuthorityFor({ packageRoot });
   assert.equal(authority.package_version, "0.9.3-rc.1");
-  await assertReporterAuthority({ route: { ...route(), reporter: authority }, packageRoot });
-  await assert.rejects(
-    () => assertReporterAuthority({
-      route: { ...route(), reporter: { ...authority, core_sha256: "0".repeat(64) } },
-      packageRoot,
-    }),
-    /reporter authority/,
-  );
+  assert.match(authority.routes_sha256, /^[0-9a-f]{64}$/);
+  assert.match(authority.records_sha256, /^[0-9a-f]{64}$/);
 });

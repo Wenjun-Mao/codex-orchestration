@@ -87,11 +87,14 @@ Each repository declares exactly one ordinary-completion authority. Native
 waits, task-final events, and notification adapters may provide liveness, but
 they do not become competing integration authorities.
 
-A working manual or explicit result-collection path remains in place until a
-replacement is installed and trusted, where applicable, and verified for the
-exact sender-recipient mapping through a live test. Automated full-final
-reporting is experimental and is neither provided nor guaranteed by this Flow
-release. Native `wait_threads` is active work, not an idle delivery boundary.
+A working manual result path remains available for cross-host, untrusted, or
+unsupported cases. In v0.9.3, a registered same-local-host assignment pins its
+exact upstream route and reporter before useful work: coordinator-to-director
+from the active run and approved plan, and executor-to-coordinator during task
+start. The Stop hook captures the complete final and makes one native queue
+attempt. Queue acceptance remains distinct from recipient delivery, review,
+and Flow acceptance. Native `wait_threads` is active work, not an idle delivery
+boundary.
 
 Urgent blockers, approval requests, and high-risk drift use a separate direct
 path. The event is persisted before one bounded interrupt attempt. The runtime

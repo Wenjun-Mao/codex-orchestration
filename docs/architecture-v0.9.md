@@ -129,6 +129,16 @@ turn, coordinator bind wait, and second release message without weakening Git
 ordering. Local start reconciliation is idempotent around pre-switch and
 post-switch crashes; native creation remains one-shot.
 
+In v0.9.3 the same start command also registers the exact active launch's
+same-host executor-to-coordinator report route and writes a repository-local,
+sender-keyed locator that pins the immutable reporter and native queue
+configuration. A coordinator separately registers its director route from the
+active run, current coordinator identity, exact approved-plan digest, and a
+pre-bound director generation. The Stop adapter resolves only that exact
+sender locator, delegates capture/deduplication/lifecycle to governance core,
+then makes at most one bounded queue submission. No global task scan or second
+report state machine exists.
+
 The same first-prompt rule applies to the coordinator handoff: the coordinator
 is dispatched with the complete approved assignment, plan digest or immutable
 snapshot, constraints, acceptance checks, and one reporting route. A

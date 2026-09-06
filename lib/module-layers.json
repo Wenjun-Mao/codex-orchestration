@@ -29,6 +29,8 @@
     "integration.mjs": "governance-core",
     "policy/selector-policy.mjs": "routing-policy",
     "recipients.mjs": "governance-core",
+    "report-records.mjs": "governance-core",
+    "report-routes.mjs": "governance-core",
     "report-hook.mjs": "codex-app-adapter",
     "repository-paths.mjs": "governance-core",
     "run-audit.mjs": "governance-core",
