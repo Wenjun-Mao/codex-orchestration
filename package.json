@@ -1,15 +1,16 @@
 {
   "name": "@wjmao/codex-flow",
-  "version": "0.9.2",
+  "version": "0.9.3-rc.1",
   "description": "Dependency-free repository tooling for coordinated Codex task workflows.",
   "private": true,
   "type": "module",
   "bin": {
-    "codex-flow": "./bin/codex-flow.mjs"
+    "codex-flow": "./bin/codex-flow.mjs",
+    "codex-flow-report-hook": "./bin/codex-flow-report-hook.mjs"
   },
   "scripts": {
     "test": "npm run test:v09",
-    "test:v09": "node --test --test-concurrency=1 test/*-v09.test.mjs test/recipient.test.mjs test/release-identity.test.mjs",
+    "test:v09": "node --test --test-concurrency=1 test/*-v09.test.mjs test/*-v093.test.mjs test/recipient.test.mjs test/release-identity.test.mjs",
     "validate": "node scripts/validate.mjs",
     "prepack": "node scripts/release-identity.mjs",
     "pack:check": "npm pack --dry-run"
@@ -20,6 +21,7 @@
   "files": [
     ".codex-plugin/",
     "bin/",
+    "hooks/",
     "lib/",
     "schemas/",
     "examples/",

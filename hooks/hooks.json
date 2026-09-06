@@ -1,0 +1,17 @@
+{
+  "description": "Capture one authenticated task final for the native queued-report route.",
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$PLUGIN_ROOT/bin/codex-flow-report-hook.mjs\"",
+            "timeout": 3,
+            "statusMessage": "Queueing authenticated task report"
+          }
+        ]
+      }
+    ]
+  }
+}
