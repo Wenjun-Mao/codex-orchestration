@@ -66,6 +66,11 @@ sender worktree without a global task scan or an unavailable hook-only
 environment variable. The adapter owns that locator; repository route and
 delivery records remain the sole governance state machines.
 
+Route lifetime follows assignment lifetime. Completing a task disposition
+closes that launch's route, and closing or abandoning a run closes every
+remaining route owned by the run. A closed route cannot be re-armed, so late
+Stop events cannot revive terminal reporting authority.
+
 ## Rejected alternatives
 
 - Keep the approved plan only in conversation or a mutable director path. A
@@ -88,7 +93,7 @@ dispatch and acceptance, and `coordinate` for bounded delivery. The reusable
 assignment/result brief keeps the role boundary small and consistent. Focused
 contract tests cover exact approved-plan handoff, dispatch-and-return ordering,
 forbidden director waiting/implementation loops, coordinator-first-turn
-assignments, and one complete result report. Existing lifecycle, receipt,
+assignments, one complete result report, and terminal route closure. Existing lifecycle, receipt,
 disposition, integration, verification, archive, cleanup, and refresh
 authority remain unchanged.
 

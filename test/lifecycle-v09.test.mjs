@@ -27,6 +27,10 @@ import {
 import { cleanupPlan } from "../lib/cleanup.mjs";
 import { auditRunClosure } from "../lib/run-audit.mjs";
 import {
+  registerReportRoute,
+  reportRoute,
+} from "../lib/report-routes.mjs";
+import {
   persistWorkflowTaskContract,
   reviseWorkflowJournal,
 } from "../lib/workflow-journal.mjs";
@@ -53,6 +57,12 @@ test("v0.9 completes launch through quiet callback, no-change proof, archive, cl
   let context = null;
   try {
     context = await createActiveTaskLaunch(root, "complete");
+    const reporting = await registerReportRoute({
+      stateRoot: context.stateRoot,
+      launchId: context.launch.launch_id,
+      senderHostId: "local",
+      recipientHostId: "local",
+    });
     const receipt = terminalReceiptV4(context, {
       kind: "unchanged",
       baseline_revision: context.baseline,
@@ -97,6 +107,12 @@ test("v0.9 completes launch through quiet callback, no-change proof, archive, cl
       verificationId: verification.verification_id,
     });
     assert.equal(completedDisposition.state, "completed");
+    const closedRoute = await reportRoute({
+      stateRoot: context.stateRoot,
+      routeId: reporting.route.route_id,
+    });
+    assert.equal(closedRoute.state, "closed");
+    assert.equal(closedRoute.lifecycle.closure_reason, "terminal");
 
     const activeObservation = {
       execution_kind: "task-thread",

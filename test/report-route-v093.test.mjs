@@ -13,6 +13,7 @@ import {
 import { bindRecipient } from "../lib/recipients.mjs";
 import { recipientBindingDigest } from "../lib/task-results.mjs";
 import { sha256 } from "../lib/core.mjs";
+import { closeRun, readRun } from "../lib/run-lifecycle.mjs";
 import { createActiveTaskLaunch } from "./v09-lifecycle-fixture.mjs";
 import { createGitFixture } from "./helpers.mjs";
 
@@ -58,6 +59,23 @@ test("report route binds exactly one active launch sender to its current same-ho
   });
   assert.equal(replay.status, "already-registered");
   assert.equal((await reportRoutes({ stateRoot: context.stateRoot, state: "active" })).length, 1);
+
+  const { run } = await readRun({
+    gitCommonDirectory: context.commonDir,
+    runId: context.launch.run_id,
+  });
+  await closeRun({
+    gitCommonDirectory: context.commonDir,
+    runId: run.run_id,
+    resume: run.binding,
+    closedAt: new Date(TIME + 2_000).toISOString(),
+  });
+  const terminalRoute = await reportRoute({
+    stateRoot: context.stateRoot,
+    routeId: created.route.route_id,
+  });
+  assert.equal(terminalRoute.state, "closed");
+  assert.equal(terminalRoute.lifecycle.closure_reason, "terminal");
 });
 
 test("report routes reject cross-host and preserve closure as a late-report fence", async (t) => {
