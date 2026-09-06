@@ -5,8 +5,35 @@ independent, user-visible Codex tasks as one accountable workflow. Codex App
 still creates and runs tasks; this package binds their intent, dependencies,
 ownership, identity, Git effects, quiet results, integration, and cleanup.
 
-The current accepted public authority is immutable `v0.9.2`. The package is
-private and `UNLICENSED`.
+Accepted releases are immutable annotated tags. The source is MIT licensed;
+`package.json` remains private because npm is not a supported distribution
+channel.
+
+## Install and first use
+
+Codex Orchestration currently ships through its maintainer's personal Codex
+plugin marketplace, not npm or a public marketplace. With that marketplace
+configured, install the exact release in the Codex plugin browser or run:
+
+```text
+codex plugin add codex-orchestration@personal
+```
+
+Then restart the ChatGPT desktop app or start a new Codex CLI session so the
+new plugin catalog and hooks load. This matches the [official OpenAI plugin
+guidance](https://learn.chatgpt.com/docs/plugins), which says installed plugin
+capabilities become available to new chats and CLI users should start a new
+session. Do not copy skills or edit installed cache files by hand.
+
+Start with a natural-language request such as “Use Codex Flow to direct this
+outcome” or “Deliver this bounded assignment with Codex Flow.” The plugin will
+route to the appropriate director, coordinator, integration, refresh, or
+cleanup workflow. Existing runs keep their immutable runtime snapshot after an
+upgrade; finish them there or use the authenticated refresh workflow.
+
+Native queued reporting is supported only between tasks on the same local host.
+For another host, relay the final result manually and preserve its source task
+identity; cross-host automatic delivery is not claimed.
 
 ## v0.9 architecture
 
@@ -87,9 +114,9 @@ Every actionable run records:
 - terminal receipt, disposition, integration/no-change, verification, archive,
   cleanup, and terminal audit records.
 
-State lives under the exact package namespace, currently
-`.git/codex-flow/v0.9.2/`, and is not tracked in the repository. A run
-never hot-switches its runtime.
+State lives under the exact package namespace,
+`.git/codex-flow/v<package-version>/`, and is not tracked in the repository. A
+run never hot-switches its runtime.
 
 The package requires no tracked setup and never reads, writes, validates, or
 depends on repository or global instruction files.
@@ -116,7 +143,8 @@ The current explicit recommendation is:
 | Substantive, well-scoped executor work | Luna, xhigh |
 | Bounded nontrivial implementation or review | Terra, high |
 | Difficult root-cause analysis or integration | Terra, xhigh |
-| Coordination or director work | Sol, high |
+| Settled bounded coordinator delivery with established verification | Terra, high |
+| Systemic decisions or complex multi-executor coordination | Sol, high |
 | Optional consequential director judgment | Astra, high |
 
 Luna-xhigh is a user-selected preference, not an empirical optimum. Trivial
@@ -129,10 +157,18 @@ override replaces the rationale.
 
 ## Quiet completion and urgent interruption
 
-Routine completion is a durable quiet callback. The task's final text and
-native wait state are liveness only. The coordinator selects a terminal receipt
-v4 at a safe boundary and authenticates it against `launch_id`, task contract,
-selector evidence, and Git outcome before disposition.
+Routine executor completion is a durable quiet callback. The task's final text
+and native wait state are liveness only. The coordinator selects a terminal
+receipt v4 at a safe boundary and authenticates it against `launch_id`, task
+contract, selector evidence, and Git outcome before disposition.
+
+Coordinator-to-director completion uses an authenticated sender/recipient report
+route. A sender-scoped locator lets the installed Stop hook submit the exact
+final text to the native queue without interrupting an ordinary-busy director;
+queue acceptance proves transport submission, and the director receives the
+report on a separate safe turn. Route closure retires the locator. Missing or
+ambiguous authority fails closed and uses the explicit recovery or manual
+blocker path instead of replaying a report blindly.
 
 Urgent blockers, approval needs, ownership collisions, and high-risk drift use
 a separate persisted one-shot interrupt. An ambiguous delivery cannot be
@@ -216,12 +252,17 @@ same-coordinator App canary described in
 
 ## Maintainer references
 
+- [Contributing](CONTRIBUTING.md)
+- [Security policy](SECURITY.md)
+- [Changelog](CHANGELOG.md)
 - [Mission and product boundary](docs/mission.md)
 - [v0.9 architecture](docs/architecture-v0.9.md)
 - [Finite compatibility capsules](docs/compatibility-capsules-v0.9.md)
 - [Lessons carried from v0.5–v0.8](docs/lessons-learned-v0.8.md)
 - [v0.9 coverage](docs/coverage-v0.9.md)
 - [ADR 0043: native-first modular architecture](docs/adr/0043-native-first-modular-architecture.md)
+- [ADR 0052: MIT source license](docs/adr/0052-mit-source-license.md)
+- [ADR 0053: consolidated release candidates](docs/adr/0053-consolidated-release-candidates.md)
 
 Historical tags and ADRs remain evidence. Historical executable compatibility
 is not part of the current package unless listed in the finite compatibility

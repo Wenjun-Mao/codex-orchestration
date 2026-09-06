@@ -1,8 +1,16 @@
 {
   "name": "@wjmao/codex-flow",
-  "version": "0.9.5",
+  "version": "0.9.6-rc.1",
   "description": "Dependency-free repository tooling for coordinated Codex task workflows.",
   "private": true,
+  "homepage": "https://github.com/Wenjun-Mao/codex-orchestration#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Wenjun-Mao/codex-orchestration.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Wenjun-Mao/codex-orchestration/issues"
+  },
   "type": "module",
   "bin": {
     "codex-flow": "./bin/codex-flow.mjs",
@@ -33,7 +41,11 @@
     "docs/compatibility-capsules-v0.9.md",
     "docs/lessons-learned-v0.8.md",
     "docs/mission.md",
-    "README.md"
+    "README.md",
+    "LICENSE",
+    "CONTRIBUTING.md",
+    "SECURITY.md",
+    "CHANGELOG.md"
   ],
-  "license": "UNLICENSED"
+  "license": "MIT"
 }

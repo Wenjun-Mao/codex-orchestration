@@ -1,11 +1,13 @@
 {
   "name": "codex-orchestration",
-  "version": "0.9.5",
+  "version": "0.9.6-rc.1",
   "description": "Direct and orchestrate Codex work with explicit roles, model routing, bounded ownership, and quiet durable results.",
   "author": {
     "name": "Wenjun Mao"
   },
-  "license": "UNLICENSED",
+  "homepage": "https://github.com/Wenjun-Mao/codex-orchestration#readme",
+  "repository": "https://github.com/Wenjun-Mao/codex-orchestration",
+  "license": "MIT",
   "keywords": ["codex", "orchestration", "delegation", "callbacks"],
   "skills": "./skills/",
   "interface": {

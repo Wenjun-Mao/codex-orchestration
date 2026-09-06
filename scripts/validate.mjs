@@ -14,7 +14,7 @@ import {
 import { validateReleaseIdentity } from "./release-identity.mjs";
 
 const root = resolve(import.meta.dirname, "..");
-const EXPECTED_PACKAGE_VERSION = "0.9.5";
+const EXPECTED_PACKAGE_VERSION = "0.9.6-rc.1";
 
 const ACTIVE_SCHEMA_NAMES = Object.freeze([
   "archive-operation",
@@ -246,14 +246,30 @@ if (CODEX_FLOW_STATE_NAMESPACE !== expectedNamespace || RUNTIME_DIRECTORY !== ex
 }
 validateReleaseIdentity(root, packageJson);
 if (packageJson.private !== true) throw new Error("Package must remain private");
-if (packageJson.license !== "UNLICENSED" || plugin.license !== packageJson.license) {
-  throw new Error("Source and plugin must preserve the UNLICENSED boundary");
+if (packageJson.license !== "MIT" || plugin.license !== packageJson.license) {
+  throw new Error("Source and plugin must declare the MIT SPDX license");
 }
+const repositoryUrl = "https://github.com/Wenjun-Mao/codex-orchestration";
+if (
+  packageJson.homepage !== `${repositoryUrl}#readme`
+  || packageJson.repository?.type !== "git"
+  || packageJson.repository?.url !== `git+${repositoryUrl}.git`
+  || packageJson.bugs?.url !== `${repositoryUrl}/issues`
+  || plugin.homepage !== packageJson.homepage
+  || plugin.repository !== repositoryUrl
+) throw new Error("Package and plugin repository metadata must identify the authenticated public repository");
+const license = await readRequired("LICENSE");
+if (
+  !license.startsWith("MIT License\n\nCopyright (c) 2026 Wenjun Mao\n")
+  || !license.includes("Permission is hereby granted, free of charge")
+  || !license.includes('THE SOFTWARE IS PROVIDED "AS IS"')
+) throw new Error("LICENSE must contain the approved standard MIT grant and copyright");
 for (const path of [
   ".codex-plugin/", "bin/", "hooks/", "lib/", "schemas/", "examples/", "skills/",
   "templates/", "docs/adr/", "docs/coverage-v0.9.md", "docs/architecture-v0.9.md",
   "docs/compatibility-capsules-v0.9.md", "docs/lessons-learned-v0.8.md",
-  "docs/mission.md", "README.md",
+  "docs/mission.md", "README.md", "LICENSE", "CONTRIBUTING.md", "SECURITY.md",
+  "CHANGELOG.md",
 ]) {
   if (!packageJson.files.includes(path)) throw new Error(`Published package omits ${path}`);
 }
@@ -445,6 +461,16 @@ assertMarkers(await readRequired("docs/adr/0051-lean-coordinator-delivery.md"), 
   "bounded_coordination",
   "retains delivery, integration, verification, reporting, release, and cleanup",
 ], "ADR 0051");
+assertMarkers(await readRequired("docs/adr/0052-mit-source-license.md"), [
+  "standard MIT License",
+  "2026 Wenjun Mao",
+  "private: true",
+], "ADR 0052");
+assertMarkers(await readRequired("docs/adr/0053-consolidated-release-candidates.md"), [
+  "skip unnecessary intermediate stable publishing, installation, and repeated full testing",
+  "Retain necessary release candidates",
+  "never moved, overwritten, or reused",
+], "ADR 0053");
 
 assertMarkers(await readRequired("README.md"), [
   "Native-first visible-task launch",
@@ -453,7 +479,25 @@ assertMarkers(await readRequired("README.md"), [
   "Codex App adapter",
   "task launch prepare",
   "terminal receipt v4",
+  "codex plugin add codex-orchestration@personal",
+  "same local host",
+  "sender-scoped locator",
 ], "README.md");
+assertMarkers(await readRequired("CONTRIBUTING.md"), [
+  "npm test",
+  "ADR 0053",
+  "Do not move or reuse a published version or tag",
+], "CONTRIBUTING.md");
+assertMarkers(await readRequired("SECURITY.md"), [
+  "GitHub private vulnerability reporting",
+  `${repositoryUrl}/security/advisories/new`,
+  "does not promise a response SLA",
+], "SECURITY.md");
+assertMarkers(await readRequired("CHANGELOG.md"), [
+  "0.9.6 - Unreleased",
+  "0.9.5 - 2026-09-06",
+  "launch evidence still fails closed",
+], "CHANGELOG.md");
 assertMarkers(await readRequired("docs/architecture-v0.9.md"), [
   "Replaceable routing policy",
   "Stable Flow governance core",

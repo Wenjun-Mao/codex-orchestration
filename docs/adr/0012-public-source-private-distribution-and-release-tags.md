@@ -2,7 +2,8 @@
 
 ## Status
 
-Accepted.
+Accepted. The deferred licensing decision is superseded by ADR 0052; package
+distribution and immutable release-tag decisions remain in force.
 
 ## Context
 
