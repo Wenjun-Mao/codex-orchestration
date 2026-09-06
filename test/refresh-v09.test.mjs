@@ -20,7 +20,7 @@ import {
   refreshSourceCutoverBlocker,
   refreshStatus,
 } from "../lib/compat/refresh.mjs";
-import { sha256, stableStringify } from "../lib/core.mjs";
+import { sha256, stableStringify, withProcessLock } from "../lib/core.mjs";
 import { reportRouteIdFor, validateReportRoute } from "../lib/report-routes.mjs";
 import { recipientBindingDigest } from "../lib/task-results.mjs";
 import {
@@ -1192,6 +1192,24 @@ test("v0.9 refresh consumes a closed exact-v0.9.0 source with no replacements", 
     }),
     /disposition does not match its exact authority/,
   );
+  const repositoryLock = resolve(commonDir, "codex-flow", "foreign-active-run.lock");
+  await withProcessLock({
+    path: repositoryLock,
+    guardRoot: commonDir,
+    label: "test repository refresh lock",
+  }, async () => {
+    await assert.rejects(
+      () => recoverRefreshReportLocator({
+        commonDir,
+        refreshAuthority,
+        locator: orphanLocator,
+        route: orphanRoute,
+        disposition,
+        recoveredAt: new Date().toISOString(),
+      }),
+      /Orphan report locator recovery is already in progress/,
+    );
+  });
   await stat(locatorPath);
   const recoveredAt = new Date().toISOString();
   const recoveryPath = await jsonFile(requests, "refresh-closed-v090-recover-locator", {

@@ -45,6 +45,11 @@ make recovery depend on transient task history. The missing namespace is never
 sufficient authority. This exception does not scan or migrate arbitrary
 predecessor state.
 
+Recovery holds the repository refresh lock while it rechecks source-namespace
+absence and then takes the sender locator lock to re-read the exact active
+pointer before persisting retirement. This closes the race between the absence
+observation and locator retirement without broadening the recovery target.
+
 ## Rejected alternatives
 
 - Overwrite or delete a conflicting locator during registration. This loses
