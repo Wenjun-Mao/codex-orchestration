@@ -34,6 +34,14 @@ can name launch authority directly. Cleanup-complete terminal v0.9 sources need
 no discard entries and may complete an already-terminal, no-replacement
 refresh through their own snapshot.
 
+A v0.9 direct-coordinator task can be terminal without a generated task
+contract or launch. Its authenticated source state carries `launch: null`, which
+means there is no executor resource to archive or delete. A discard decision may
+therefore reissue its semantic assignment with no cleanup entry. This is an
+explicit versioned absence, not permission inferred from a missing field:
+states with neither identity field, both identity fields, or a non-null v0.9
+launch fail closed.
+
 ## Rejected alternatives
 
 - Accept both blocker arrays or item identity fields regardless of source
@@ -45,9 +53,10 @@ refresh through their own snapshot.
 
 ## Consequences and guardrails
 
-An exact-tag v0.9.0 regression creates and closes a source run through its
-runtime CLI, verifies its launch-based cleanup response, then executes target
-inspect, prepare, and apply with no replacements. The existing exact-tag v0.8.3
-refresh tests continue to cover operation-based discard cleanup. The source
-export envelope and source retirement command remain package-, bundle-,
-runtime-, and snapshot-bound; only the cleanup response grammar differs.
+Exact-tag regressions cover a closed v0.9.0 source, a terminal v0.9.5 direct
+coordinator with `launch: null`, and v0.8.3 operation-based discard cleanup.
+The direct-coordinator regression executes inspect, prepare, source retirement,
+and replacement activation while negative checks reject resource-bearing or
+malformed authority. The source export envelope and source retirement command
+remain package-, bundle-, runtime-, and snapshot-bound; only the cleanup
+response grammar differs.
