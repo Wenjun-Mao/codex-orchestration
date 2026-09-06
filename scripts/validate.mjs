@@ -14,7 +14,7 @@ import {
 import { validateReleaseIdentity } from "./release-identity.mjs";
 
 const root = resolve(import.meta.dirname, "..");
-const EXPECTED_PACKAGE_VERSION = "0.9.6-rc.1";
+const EXPECTED_PACKAGE_VERSION = "0.9.6";
 
 const ACTIVE_SCHEMA_NAMES = Object.freeze([
   "archive-operation",
@@ -494,7 +494,7 @@ assertMarkers(await readRequired("SECURITY.md"), [
   "does not promise a response SLA",
 ], "SECURITY.md");
 assertMarkers(await readRequired("CHANGELOG.md"), [
-  "0.9.6 - Unreleased",
+  "0.9.6 - 2026-09-06",
   "0.9.5 - 2026-09-06",
   "launch evidence still fails closed",
 ], "CHANGELOG.md");
