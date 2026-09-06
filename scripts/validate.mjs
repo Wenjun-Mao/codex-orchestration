@@ -14,7 +14,7 @@ import {
 import { validateReleaseIdentity } from "./release-identity.mjs";
 
 const root = resolve(import.meta.dirname, "..");
-const EXPECTED_PACKAGE_VERSION = "0.9.3";
+const EXPECTED_PACKAGE_VERSION = "0.9.5-rc.1";
 
 const ACTIVE_SCHEMA_NAMES = Object.freeze([
   "archive-operation",
@@ -421,16 +421,25 @@ if (Object.keys(selectorPolicy).some((name) => name.endsWith("_VERSION"))) {
 
 for (const [path, markers] of new Map([
   ["templates/references/assignment-and-reporting.md", ["Assignment brief", "Result brief", "exact sender-recipient mapping", "Optional advisor"]],
-  ["templates/references/communication-loop.md", ["Routine completion", "quiet", "wait_threads", "Urgent interruption"]],
+  ["templates/references/communication-loop.md", ["Routine completion", "quiet", "Queue acceptance proves only transport submission", "Urgent interruption"]],
   ["templates/references/host-operations.md", ["full contract", "task launch start", "one native creation call", "opaque"]],
   ["templates/references/parallel-execution.md", ["acyclic dependency graph", "Visible tasks", "Native subagents"]],
-  ["templates/references/task-lifecycle.md", ["v0.9.2", "first prompt", "terminal-receipt-v4", "launch"]],
+  ["templates/references/task-lifecycle.md", ["exact installed package authority", "first prompt", "terminal-receipt-v4", "launch"]],
   ["templates/roles/director.md", ["goals", "tradeoffs", "acceptance", "reporting recipient/path"]],
   ["templates/roles/coordinator.md", ["full assignment", "quiet journal", "Close only"]],
   ["templates/roles/executor.md", ["task launch start", "same first turn", "terminal-receipt-v4"]],
 ])) {
   assertMarkers(await readRequired(path), markers, path);
 }
+if ((await readRequired("templates/references/communication-loop.md")).includes(
+  "Automated full-final reporting is experimental and is neither provided nor guaranteed",
+)) throw new Error("Communication loop contradicts the installed same-host report contract");
+
+assertMarkers(await readRequired("docs/adr/0050-authenticated-report-locator-retirement.md"), [
+  "sender-scoped process lock",
+  "persists a content-addressed retirement record",
+  "The missing namespace is never sufficient authority",
+], "ADR 0050");
 
 assertMarkers(await readRequired("README.md"), [
   "Native-first visible-task launch",

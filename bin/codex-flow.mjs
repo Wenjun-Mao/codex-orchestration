@@ -87,6 +87,7 @@ import {
   inspectRefresh,
   observeRefreshPrivateArchives,
   prepareRefresh,
+  recoverRefreshReportLocator,
   refreshStatus,
 } from "../lib/compat/refresh.mjs";
 import {
@@ -142,7 +143,13 @@ import {
   registerReportRoute,
   reportRoute,
 } from "../lib/report-routes.mjs";
-import { installRepositoryReportLocator } from "../lib/report-hook.mjs";
+import {
+  assertRepositoryReportLocatorAvailable,
+  installRepositoryReportLocator,
+  retireRepositoryReportLocator,
+  retireRepositoryReportLocatorsForRun,
+  withRepositoryReportLocatorRegistration,
+} from "../lib/report-hook.mjs";
 import {
   CODEX_APP_BINARY_PATH,
   CODEX_APP_CLI_VERSION,
@@ -186,6 +193,7 @@ Usage:
   codex-flow refresh inspect --invoking-skill PATH [--json]
   codex-flow refresh observe-private --invoking-skill PATH --refresh-id ID [--json]
   codex-flow refresh prepare|apply --invoking-skill PATH --file request.json [--json]
+  codex-flow refresh recover-locator --invoking-skill PATH --file request.json [--json]
   codex-flow refresh status --invoking-skill PATH [--refresh-id ID] [--json]
 
 Every run-scoped command requires an explicit --run-id. Complex mutations read
@@ -836,7 +844,16 @@ async function commandRunV09(args) {
         closedAt: request.closed_at ?? new Date().toISOString(),
       });
     }
-    v09Output(result);
+    if (["close", "abandon"].includes(subcommand)) {
+      const locatorRetirements = await retireRepositoryReportLocatorsForRun({
+        stateRoot: git.stateRoot,
+        runId,
+        reason: "terminal",
+      });
+      v09Output({ ...result, locator_retirements: locatorRetirements });
+    } else {
+      v09Output(result);
+    }
     return;
   }
   throw new CliError("run requires activate, status, resume, rebind, audit, close, or abandon");
@@ -950,25 +967,37 @@ async function commandTaskLaunchV09(args, mutationAuthority = null) {
       label: "Task launch start",
     });
     await taskLaunchAuthority(git, launchId, runId);
-    const result = await startTaskLaunch({
+    const { result, reporting } = await withRepositoryReportLocatorRegistration({
       stateRoot: git.stateRoot,
-      launchId,
-      launchNonce: nonce,
-      executorThreadId,
-      repositoryPath: git.root,
-      now: Date.now(),
-    });
-    const reporting = await registerReportRoute({
-      stateRoot: git.stateRoot,
-      launchId,
-      senderHostId: mutationAuthority.run.binding.host.host_id,
-      recipientHostId: mutationAuthority.run.binding.host.host_id,
-    });
-    await installRepositoryReportLocator({
-      stateRoot: git.stateRoot,
-      route: reporting.route,
-      packageRoot,
-      nativeQueue: supportedNativeQueue(),
+      senderThreadId: executorThreadId,
+    }, async () => {
+      await assertRepositoryReportLocatorAvailable({
+        stateRoot: git.stateRoot,
+        senderThreadId: executorThreadId,
+        packageRoot,
+        nativeQueue: supportedNativeQueue(),
+      });
+      const started = await startTaskLaunch({
+        stateRoot: git.stateRoot,
+        launchId,
+        launchNonce: nonce,
+        executorThreadId,
+        repositoryPath: git.root,
+        now: Date.now(),
+      });
+      const route = await registerReportRoute({
+        stateRoot: git.stateRoot,
+        launchId,
+        senderHostId: mutationAuthority.run.binding.host.host_id,
+        recipientHostId: mutationAuthority.run.binding.host.host_id,
+      });
+      await installRepositoryReportLocator({
+        stateRoot: git.stateRoot,
+        route: route.route,
+        packageRoot,
+        nativeQueue: supportedNativeQueue(),
+      });
+      return { result: started, reporting: route };
     });
     v09Output({
       ...assertRunIdentity(result, runId, "task launch"),
@@ -1116,15 +1145,6 @@ async function commandReportV09(args, mutationAuthority = null) {
     if (request.recipient.generation !== 1) {
       throw new CliError("A new director recipient route must begin at generation 1", 73);
     }
-    await bindRecipient({
-      stateRoot: git.stateRoot,
-      recipient: {
-        lineage_id: request.recipient.lineage_id,
-        thread_id: request.recipient.thread_id,
-        generation: request.recipient.generation,
-      },
-      fenceToken: mutationAuthority.run.binding.fence_token,
-    });
     const recipient = {
       ...request.recipient,
       binding_digest: recipientBindingDigest({
@@ -1133,20 +1153,41 @@ async function commandReportV09(args, mutationAuthority = null) {
         generation: request.recipient.generation,
       }),
     };
-    const result = await registerCoordinatorReportRoute({
+    const result = await withRepositoryReportLocatorRegistration({
       stateRoot: git.stateRoot,
-      runId,
       senderThreadId: request.sender_thread_id,
-      senderHostId: mutationAuthority.run.binding.host.host_id,
-      recipient,
-      approvedPlanPath: request.approved_plan_path,
-      approvedPlanDigest: request.approved_plan_digest,
-    });
-    await installRepositoryReportLocator({
-      stateRoot: git.stateRoot,
-      route: result.route,
-      packageRoot,
-      nativeQueue: supportedNativeQueue(),
+    }, async () => {
+      await assertRepositoryReportLocatorAvailable({
+        stateRoot: git.stateRoot,
+        senderThreadId: request.sender_thread_id,
+        packageRoot,
+        nativeQueue: supportedNativeQueue(),
+      });
+      await bindRecipient({
+        stateRoot: git.stateRoot,
+        recipient: {
+          lineage_id: request.recipient.lineage_id,
+          thread_id: request.recipient.thread_id,
+          generation: request.recipient.generation,
+        },
+        fenceToken: mutationAuthority.run.binding.fence_token,
+      });
+      const registered = await registerCoordinatorReportRoute({
+        stateRoot: git.stateRoot,
+        runId,
+        senderThreadId: request.sender_thread_id,
+        senderHostId: mutationAuthority.run.binding.host.host_id,
+        recipient,
+        approvedPlanPath: request.approved_plan_path,
+        approvedPlanDigest: request.approved_plan_digest,
+      });
+      await installRepositoryReportLocator({
+        stateRoot: git.stateRoot,
+        route: registered.route,
+        packageRoot,
+        nativeQueue: supportedNativeQueue(),
+      });
+      return registered;
     });
     v09Output(result);
     return;
@@ -1157,11 +1198,17 @@ async function commandReportV09(args, mutationAuthority = null) {
     });
     const current = await reportRoute({ stateRoot: git.stateRoot, routeId: request.route_id });
     if (current.assignment.run_id !== runId) throw new CliError("Report route does not belong to --run-id", 73);
-    v09Output(await closeReportRoute({
+    const closed = await closeReportRoute({
       stateRoot: git.stateRoot,
       routeId: current.route_id,
       reason: request.reason,
-    }));
+    });
+    const locator = await retireRepositoryReportLocator({
+      stateRoot: git.stateRoot,
+      routeId: current.route_id,
+      reason: request.reason,
+    });
+    v09Output({ ...closed, locator_retirement: locator });
     return;
   }
   throw new CliError("report route requires coordinator, status, or close");
@@ -1464,6 +1511,11 @@ async function commandDispositionV09(args) {
       verificationId: request.verification_id ?? null,
       now: commandNow(request, "finalized_at"),
     });
+    await retireRepositoryReportLocatorsForRun({
+      stateRoot: git.stateRoot,
+      runId,
+      reason: "terminal",
+    });
   }
   v09Output(assertRunIdentity(result, runId, "task disposition"));
 }
@@ -1709,8 +1761,8 @@ async function commandUnplugV09(args) {
 
 async function commandRefreshV09(args) {
   const [subcommand, ...rest] = args;
-  if (!["inspect", "prepare", "observe-private", "apply", "status"].includes(subcommand)) {
-    throw new CliError("refresh requires inspect, prepare, observe-private, apply, or status");
+  if (!["inspect", "prepare", "observe-private", "apply", "recover-locator", "status"].includes(subcommand)) {
+    throw new CliError("refresh requires inspect, prepare, observe-private, apply, recover-locator, or status");
   }
   const values = parseV09Options(rest, {
     "invoking-skill": { type: "string" },
@@ -1759,6 +1811,21 @@ async function commandRefreshV09(args) {
   }
   if (!values.file) throw new CliError(`refresh ${subcommand} requires --file <request.json>`);
   const request = await readJsonInput(values.file);
+  if (subcommand === "recover-locator") {
+    requireExactFields(request, {
+      required: ["handoff", "locator", "route", "disposition", "recovered_at"],
+      optional: [],
+    }, "refresh recover-locator request");
+    v09Output(await recoverRefreshReportLocator({
+      commonDir: git.commonDir,
+      handoff: request.handoff,
+      locator: request.locator,
+      route: request.route,
+      disposition: request.disposition,
+      recoveredAt: request.recovered_at,
+    }));
+    return;
+  }
   if (subcommand === "prepare") {
     requireExactFields(request, {
       required: [

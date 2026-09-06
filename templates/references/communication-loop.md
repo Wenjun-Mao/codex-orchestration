@@ -10,8 +10,12 @@ coordinator.
 `wait_threads` is active coordination work, not an idle delivery boundary.
 Never remove a working manual or explicit collection path until a replacement
 is installed and trusted, where applicable, and verified for the exact
-sender-recipient mapping through a live test. Automated full-final reporting is
-experimental and is neither provided nor guaranteed by this Flow release.
+sender-recipient mapping through a live test. A registered same-local-host
+route may queue one complete final through the installed completion hook. Queue
+acceptance proves only transport submission; actual arrival, review, and Flow
+acceptance remain separate. Cross-host, unregistered, rejected, pending, or
+ambiguous delivery retains the explicit manual path and is never blindly
+retried.
 
 At a safe boundary, the coordinator reads callback status, observes the chosen
 receipt, and performs disposition, integration or no-change reconciliation,

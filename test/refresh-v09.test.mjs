@@ -10,16 +10,23 @@ import {
   stat,
   writeFile,
 } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { resolve } from "node:path";
 import test from "node:test";
 import {
   applyRefresh,
   observeRefreshPrivateArchives,
+  recoverRefreshReportLocator,
   refreshSourceCutoverBlocker,
   refreshStatus,
 } from "../lib/compat/refresh.mjs";
-import { sha256 } from "../lib/core.mjs";
+import { sha256, stableStringify } from "../lib/core.mjs";
+import { reportRouteIdFor, validateReportRoute } from "../lib/report-routes.mjs";
+import { recipientBindingDigest } from "../lib/task-results.mjs";
+import {
+  CODEX_APP_BINARY_PATH,
+  CODEX_APP_CLI_VERSION,
+} from "../lib/codex-app-report-adapter.mjs";
 import {
   captureRefreshGitAuthority,
   deleteRefreshExecutorBranch,
@@ -980,12 +987,83 @@ test("v0.9 refresh consumes a closed exact-v0.9.0 source with no replacements", 
 
   const source = await createClosedV09Run({ root, requests, sourcePackage });
   assert.equal(source.closed.run.status, "closed");
-  await mkdir(resolve(root, ".git", "codex-flow", "report-locators", "records"), { recursive: true });
+  const commonDir = await realpath(resolve(root, ".git"));
+  const sourceStateRoot = resolve(commonDir, "codex-flow", "v0.9.0");
+  const sender = {
+    host_id: "fixture-host",
+    thread_id: source.request.runtime.lineage.thread_id,
+  };
+  const recipientSeed = {
+    lineage_id: "refresh-recovery-director-lineage",
+    thread_id: "refresh-recovery-director",
+    generation: 1,
+  };
+  const routeDraft = {
+    assignment: {
+      kind: "coordinator-delegation",
+      assignment_id: `coordinator-assignment-v1-${"a".repeat(64)}`,
+      run_id: source.request.run_id,
+      runtime_context_digest: source.activated.runtime_authority.runtime_context_digest,
+      configuration_digest: source.closed.run.binding.config_hash,
+      repository_digest: source.closed.run.binding.repository_hash,
+      common_dir: commonDir,
+      plan_id: source.closed.run.workflow_plan_id,
+      revision_digest: source.closed.run.workflow_revision_digest,
+      approved_plan_path: resolve(requests, "approved-recovery-plan.md"),
+      approved_plan_digest: "b".repeat(64),
+    },
+    sender,
+    recipient: {
+      host_id: sender.host_id,
+      ...recipientSeed,
+      binding_digest: recipientBindingDigest(recipientSeed),
+    },
+  };
+  const orphanRoute = validateReportRoute({
+    schema_version: 1,
+    kind: "codex-flow-v093-report-route",
+    route_id: reportRouteIdFor(routeDraft),
+    ...routeDraft,
+    state: "active",
+    lifecycle: {
+      opened_at: source.activated.run.admitted_at,
+      closed_at: null,
+      closure_reason: null,
+    },
+  });
+  const orphanLocator = {
+    schema_version: 1,
+    kind: "codex-flow-report-route-locator-v1",
+    sender_thread_id: sender.thread_id,
+    state_root: sourceStateRoot,
+    route_id: orphanRoute.route_id,
+    route_sha256: sha256(stableStringify(orphanRoute)),
+    reporter: {
+      package_version: "0.9.0",
+      entrypoint_sha256: "1".repeat(64),
+      report_hook_sha256: "2".repeat(64),
+      adapter_sha256: "3".repeat(64),
+      records_sha256: "4".repeat(64),
+      routes_sha256: "5".repeat(64),
+      core_sha256: "6".repeat(64),
+      git_sha256: "7".repeat(64),
+    },
+    native_queue: {
+      binary_path: CODEX_APP_BINARY_PATH,
+      expected_version: CODEX_APP_CLI_VERSION,
+      sqlite_home: resolve(homedir(), ".codex"),
+    },
+  };
+  await mkdir(resolve(sourceStateRoot, "reports", "routes", "records"), { recursive: true });
   await writeFile(
-    resolve(root, ".git", "codex-flow", "report-locators", "records", "fixture.json"),
-    "{}\n",
+    resolve(sourceStateRoot, "reports", "routes", "records", `${orphanRoute.route_id}.json`),
+    `${stableStringify(orphanRoute)}\n`,
     "utf8",
   );
+  const locatorRecords = resolve(commonDir, "codex-flow", "report-locators", "records");
+  const locatorPath = resolve(locatorRecords, `${sha256(sender.thread_id)}.json`);
+  await mkdir(locatorRecords, { recursive: true });
+  await writeFile(locatorPath, `${stableStringify(orphanLocator)}\n`, "utf8");
   const cleanupCall = invoke(source.runtimeCli, [
     "cleanup", "plan", "--run-id", source.request.run_id, "--json",
   ], root);
@@ -1040,6 +1118,60 @@ test("v0.9 refresh consumes a closed exact-v0.9.0 source with no replacements", 
   assert.equal(applied.handoff.source_retirement.terminal_status, "closed");
   await assert.rejects(stat(resolve(root, ".git/codex-flow/v0.9.0")), /ENOENT/);
   await assert.rejects(stat(resolve(root, ".git/codex-flow/refresh-v1")), /ENOENT/);
+
+  const reportObservation = {
+    status: "none-observed-before-source-removal",
+    observer_thread_id: sender.thread_id,
+    observed_at: source.closed.run.updated_at,
+    records_digest: sha256(stableStringify([])),
+  };
+  const dispositionSeed = {
+    handoff_digest: applied.handoff.handoff_digest,
+    locator_sha256: sha256(stableStringify(orphanLocator)),
+    route_sha256: sha256(stableStringify(orphanRoute)),
+    source_tree_digest: applied.handoff.source_retirement.final_source_tree.tree_digest,
+    approved_by: { host_id: sender.host_id, thread_id: recipientSeed.thread_id },
+    approved_at: new Date().toISOString(),
+    report_observation: reportObservation,
+  };
+  const disposition = {
+    schema_version: 1,
+    kind: "codex-flow-v095-orphan-locator-recovery-v1",
+    disposition_id: `refresh-locator-recovery-v1-${sha256(stableStringify(dispositionSeed))}`,
+    ...dispositionSeed,
+  };
+  await assert.rejects(
+    () => recoverRefreshReportLocator({
+      commonDir,
+      handoff: applied.handoff,
+      locator: orphanLocator,
+      route: orphanRoute,
+      disposition: { ...disposition, source_tree_digest: "f".repeat(64) },
+      recoveredAt: new Date().toISOString(),
+    }),
+    /disposition identity is invalid/,
+  );
+  await stat(locatorPath);
+  const recovered = await recoverRefreshReportLocator({
+    commonDir,
+    handoff: applied.handoff,
+    locator: orphanLocator,
+    route: orphanRoute,
+    disposition,
+    recoveredAt: new Date().toISOString(),
+  });
+  assert.equal(recovered.status, "retired");
+  assert.equal(recovered.retirement.recovery.disposition_id, disposition.disposition_id);
+  await assert.rejects(stat(locatorPath), /ENOENT/);
+  const replay = await recoverRefreshReportLocator({
+    commonDir,
+    handoff: applied.handoff,
+    locator: orphanLocator,
+    route: orphanRoute,
+    disposition,
+    recoveredAt: new Date().toISOString(),
+  });
+  assert.equal(replay.status, "already-retired");
 });
 
 test("v0.9 resumes discarded cleanup and consumption for a selected already-abandoned source", async (t) => {

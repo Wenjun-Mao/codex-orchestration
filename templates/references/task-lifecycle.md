@@ -1,7 +1,7 @@
 # v0.9 task lifecycle
 
-Current stable package authority is `v0.9.2`. Every run snapshots that exact
-runtime and uses it until completion.
+Every run snapshots its exact installed package authority and uses that
+immutable runtime until completion or an authenticated refresh handoff.
 
 ```text
 workflow contract

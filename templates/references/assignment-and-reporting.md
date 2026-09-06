@@ -34,7 +34,7 @@ delivery is not acceptance.
 
 ## Reporting transition
 
-For v0.9.3 same-local-host assignments, register and pin the exact upstream
+For supported same-local-host assignments, register and pin the exact upstream
 route before useful work: coordinator-to-director from the active run and
 approved-plan digest, and executor-to-coordinator as part of `task launch
 start`. The native `Stop`/thread-spawn `SubagentStop` completion hook captures
@@ -44,6 +44,13 @@ Never remove the explicit manual path until the hook is installed, trusted, and
 live-verified for the exact sender-recipient mapping. Cross-host routes remain manual. Routine
 results must not Steer an active recipient; preserve quiet callbacks and the
 separate rare urgent path.
+
+The sender locator is active authority, not permanent configuration. Close the
+exact route at assignment or run termination, prove that every report is
+accepted or absent, persist its authenticated retirement record, and only then
+remove the locator. A pending, ambiguous, conflicting, or manual-required
+report blocks retirement. A later run may reuse the same sender identity only
+after that exact lifecycle completes.
 
 ## Optional advisor
 
