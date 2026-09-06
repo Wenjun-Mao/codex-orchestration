@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import test from "node:test";
 import { RUNTIME_DIRECTORY } from "../lib/runtime-context.mjs";
-import { sha256 } from "../lib/core.mjs";
+import { PACKAGE_VERSION, sha256 } from "../lib/core.mjs";
 import {
   assertSuccess,
   createGitFixture,
@@ -84,7 +84,7 @@ test("installed CLI rejects a plugin manifest cachebuster that diverges from pac
     "--json",
   ], { cwd: packageRoot, encoding: "utf8" });
   assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /package metadata must exactly match version 0\.9\.3/);
+  assert.ok(result.stderr.includes(`package metadata must exactly match version ${PACKAGE_VERSION}`));
 });
 
 test("v0.9 CLI activates a clean run through current launch-era wiring", async (t) => {
