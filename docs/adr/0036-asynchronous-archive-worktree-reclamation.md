@@ -2,7 +2,9 @@
 
 ## Status
 
-Accepted for the v0.7.6 development checkpoint.
+Accepted for the v0.7.6 development checkpoint. The host-only reclamation rule
+is superseded for exact accepted iteration members by ADR 0055; archive state
+and non-iteration cleanup retain this decision.
 
 ## Context
 

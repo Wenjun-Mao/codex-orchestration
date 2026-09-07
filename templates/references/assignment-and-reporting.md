@@ -62,6 +62,11 @@ use the authenticated package and exact assignment:
 - Recovery: `assignment status --assignment-id ID` exposes pending work. Resume
   the owning phase with the same identity and, for acceptance, the same report.
 
+Accepted members whose exact worktree remains may be reclaimed by these same
+commands after fresh archived/no-active evidence. The command revalidates the
+persisted iteration authority and uses non-force Git removal; never substitute
+a manual worktree deletion or repeat an accepted archive call.
+
 Route retirement follows resolved reporting and required closeout. A pending
 iteration stays pending; later assignments cannot inherit its authority.
 

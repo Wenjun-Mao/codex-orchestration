@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { basename, resolve } from "node:path";
 import test from "node:test";
 import { acceptAssignmentResult } from "../lib/assignment-acceptance.mjs";
+import { observeCodexAppPrivateArchive } from "../lib/adapters/codex-app/private-archive-observer.mjs";
 import {
   assignmentAuthority,
   bindAssignmentRefreshExecution,
@@ -444,6 +446,66 @@ test("assignment acceptance is fail-closed for an active coordinator and resumes
   assert.equal(calls, 2);
 });
 
+test("assignment acceptance reclaims an exact archived coordinator before retiring reporting", async (t) => {
+  const context = await fixture(t);
+  const report = await acceptedFinal(context, "flow-owned-cleanup", "Complete.", 4_500);
+  const codexHome = await mkdtemp(resolve(tmpdir(), "codex-flow-assignment-private-archive-"));
+  await mkdir(resolve(codexHome, "sessions"), { recursive: true });
+  await mkdir(resolve(codexHome, "archived_sessions"), { recursive: true });
+  await writeFile(
+    resolve(codexHome, "archived_sessions", `rollout-${context.coordinator.thread_id}.jsonl`),
+    `${JSON.stringify({
+      timestamp: new Date(TIME + 4_550).toISOString(),
+      type: "session_meta",
+      payload: {
+        id: context.coordinator.thread_id,
+        cwd: context.coordinatorPath,
+        thread_source: "agent_created_thread",
+        cli_version: "0.153.4",
+      },
+    })}\n`,
+    "utf8",
+  );
+  t.after(() => rm(codexHome, { recursive: true, force: true }));
+  const observeArchivedThread = ({ threadId }) => observeCodexAppPrivateArchive({
+    threadId,
+    codexHome,
+    now: TIME + 4_650,
+  });
+  let archiveCalls = 0;
+  let retirementCalls = 0;
+  const first = await acceptAssignmentResult({
+    stateRoot: context.state_root,
+    assignmentId: context.route.assignment.assignment_id,
+    reportId: report.report_id,
+    directorThreadId: context.director.thread_id,
+    archiveThread: async () => {
+      archiveCalls += 1;
+      return { outcome: "accepted", archive_attempted: true, diagnostics: { categories: [] } };
+    },
+    observeArchivedThread,
+    retireLocator: async () => { retirementCalls += 1; return { status: "retired" }; },
+    now: TIME + 4_600,
+  });
+  assert.equal(first.status, "closeout-pending");
+  assert.equal(retirementCalls, 0);
+
+  const retired = await acceptAssignmentResult({
+    stateRoot: context.state_root,
+    assignmentId: context.route.assignment.assignment_id,
+    reportId: report.report_id,
+    directorThreadId: context.director.thread_id,
+    archiveThread: async () => { throw new Error("accepted archive must not replay"); },
+    observeArchivedThread,
+    retireLocator: async () => { retirementCalls += 1; return { status: "retired" }; },
+    now: TIME + 4_700,
+  });
+  assert.equal(retired.status, "retired");
+  assert.equal(archiveCalls, 1);
+  assert.equal(retirementCalls, 1);
+  assert.equal(git(context.primaryRoot, ["branch", "--list", context.coordinatorBranch]), "");
+});
+
 test("iteration closeout fences the coordinator until child archival and exact branch cleanup complete", async (t) => {
   const { root, context, assignment } = await acceptedChildFixture(
     t,
@@ -611,6 +673,299 @@ test("iteration closeout archives a registered detached coordinator without bran
   assert.equal(coordinator.archive_attempt.branch_tip, detachedTip);
   assert.equal(coordinator.branch, "detached");
   assert.equal(git(context.primaryRoot, ["branch", "--list", "codex/coordinator*"]), "");
+});
+
+test("iteration closeout reclaims exact archived child and coordinator worktrees without archive replay", async (t) => {
+  const {
+    root, coordinatorPath, coordinatorBranch, context, assignment,
+  } = await acceptedChildFixture(t, "flow-owned-reclamation", { disposableCoordinator: true });
+  const calls = [];
+  const archiveThread = async ({ threadId }) => {
+    calls.push(threadId);
+    return { outcome: "accepted", archive_attempted: true, diagnostics: { categories: [] } };
+  };
+  const observeArchivedThread = async ({ threadId }) => ({
+    kind: "private-archive-observation",
+    thread_id: threadId,
+    active_session_absent: true,
+  });
+
+  const childPending = await closeoutIteration({
+    commonDir: context.commonDir,
+    iterationId: assignment.iteration_id,
+    allowCoordinator: true,
+    archiveThread,
+    observeArchivedThread,
+    now: TIME + 19_100,
+  });
+  assert.equal(childPending.status, "pending");
+  assert.deepEqual(calls, [context.executorThreadId]);
+
+  const coordinatorPending = await closeoutIteration({
+    commonDir: context.commonDir,
+    iterationId: assignment.iteration_id,
+    allowCoordinator: true,
+    archiveThread,
+    observeArchivedThread,
+    now: TIME + 19_200,
+  });
+  assert.equal(coordinatorPending.status, "pending");
+  assert.deepEqual(calls, [context.executorThreadId, context.coordinator.thread_id]);
+  assert.equal(await readFile(resolve(coordinatorPath, ".gitkeep"), "utf8"), "fixture\n");
+
+  const closed = await closeoutIteration({
+    commonDir: context.commonDir,
+    iterationId: assignment.iteration_id,
+    allowCoordinator: true,
+    archiveThread: async () => { throw new Error("accepted archive must not replay"); },
+    observeArchivedThread,
+    now: TIME + 19_300,
+  });
+  assert.equal(closed.status, "closed");
+  assert.equal(calls.length, 2);
+  assert.equal(await rm(context.executorPath, { recursive: false }).then(() => true, (error) => error.code === "ENOENT"), true);
+  assert.equal(await rm(coordinatorPath, { recursive: false }).then(() => true, (error) => error.code === "ENOENT"), true);
+  assert.equal(git(root, ["branch", "--list", context.executorBranch]), "");
+  assert.equal(git(root, ["branch", "--list", coordinatorBranch]), "");
+});
+
+test("iteration closeout reclaims an exact detached coordinator without deleting any branch", async (t) => {
+  const context = await fixture(t, { detachedCoordinator: true });
+  const assignment = await assignmentAuthority({
+    stateRoot: context.state_root,
+    assignmentId: context.route.assignment.assignment_id,
+  });
+  await writeFile(resolve(context.coordinatorPath, "detached-reclamation.txt"), "preserved\n", "utf8");
+  git(context.coordinatorPath, ["add", "detached-reclamation.txt"]);
+  git(context.coordinatorPath, ["commit", "--quiet", "-m", "detached reclamation result"]);
+  const detachedTip = git(context.coordinatorPath, ["rev-parse", "HEAD"]);
+  git(context.primaryRoot, ["merge", "--quiet", "--no-ff", detachedTip, "-m", "integrate detached reclamation result"]);
+  const branchesBefore = git(context.primaryRoot, ["branch", "--format=%(refname:short)"]);
+  let archiveCalls = 0;
+  const archiveThread = async () => {
+    archiveCalls += 1;
+    return { outcome: "accepted", archive_attempted: true, diagnostics: { categories: [] } };
+  };
+
+  const pending = await closeoutIteration({
+    commonDir: context.commonDir,
+    iterationId: assignment.iteration_id,
+    allowCoordinator: true,
+    archiveThread,
+    now: TIME + 19_400,
+  });
+  assert.equal(pending.status, "pending");
+  const closed = await closeoutIteration({
+    commonDir: context.commonDir,
+    iterationId: assignment.iteration_id,
+    allowCoordinator: true,
+    archiveThread: async () => { throw new Error("accepted archive must not replay"); },
+    observeArchivedThread: async ({ threadId }) => ({ thread_id: threadId, active_session_absent: true }),
+    now: TIME + 19_500,
+  });
+  assert.equal(closed.status, "closed");
+  assert.equal(archiveCalls, 1);
+  assert.equal(closed.iteration.members.find((entry) => entry.role === "coordinator").archive_attempt.branch_tip, detachedTip);
+  assert.equal(git(context.primaryRoot, ["branch", "--format=%(refname:short)"]), branchesBefore);
+});
+
+test("iteration reclamation refuses dirty and attachment-drifted accepted worktrees", async (t) => {
+  const dirty = await fixture(t);
+  const dirtyAssignment = await assignmentAuthority({
+    stateRoot: dirty.state_root,
+    assignmentId: dirty.route.assignment.assignment_id,
+  });
+  let dirtyArchiveCalls = 0;
+  await closeoutIteration({
+    commonDir: dirty.commonDir,
+    iterationId: dirtyAssignment.iteration_id,
+    allowCoordinator: true,
+    archiveThread: async () => {
+      dirtyArchiveCalls += 1;
+      return { outcome: "accepted", archive_attempted: true, diagnostics: { categories: [] } };
+    },
+    now: TIME + 19_600,
+  });
+  await writeFile(resolve(dirty.coordinatorPath, "post-archive-dirty.txt"), "dirty\n", "utf8");
+  await assert.rejects(
+    () => closeoutIteration({
+      commonDir: dirty.commonDir,
+      iterationId: dirtyAssignment.iteration_id,
+      allowCoordinator: true,
+      archiveThread: async () => { throw new Error("accepted archive must not replay"); },
+      observeArchivedThread: async ({ threadId }) => ({ thread_id: threadId, active_session_absent: true }),
+      now: TIME + 19_700,
+    }),
+    /changed after cleanup authority was persisted/,
+  );
+  assert.equal(dirtyArchiveCalls, 1);
+
+  const drift = await fixture(t);
+  const driftAssignment = await assignmentAuthority({
+    stateRoot: drift.state_root,
+    assignmentId: drift.route.assignment.assignment_id,
+  });
+  let driftArchiveCalls = 0;
+  await closeoutIteration({
+    commonDir: drift.commonDir,
+    iterationId: driftAssignment.iteration_id,
+    allowCoordinator: true,
+    archiveThread: async () => {
+      driftArchiveCalls += 1;
+      return { outcome: "accepted", archive_attempted: true, diagnostics: { categories: [] } };
+    },
+    now: TIME + 19_800,
+  });
+  git(drift.coordinatorPath, ["checkout", "--quiet", "--detach"]);
+  await assert.rejects(
+    () => closeoutIteration({
+      commonDir: drift.commonDir,
+      iterationId: driftAssignment.iteration_id,
+      allowCoordinator: true,
+      archiveThread: async () => { throw new Error("accepted archive must not replay"); },
+      observeArchivedThread: async ({ threadId }) => ({ thread_id: threadId, active_session_absent: true }),
+      now: TIME + 19_900,
+    }),
+    /attachment drifted before reclamation/,
+  );
+  assert.equal(driftArchiveCalls, 1);
+
+  const movedDetached = await fixture(t, { detachedCoordinator: true });
+  const movedAssignment = await assignmentAuthority({
+    stateRoot: movedDetached.state_root,
+    assignmentId: movedDetached.route.assignment.assignment_id,
+  });
+  let movedArchiveCalls = 0;
+  await closeoutIteration({
+    commonDir: movedDetached.commonDir,
+    iterationId: movedAssignment.iteration_id,
+    allowCoordinator: true,
+    archiveThread: async () => {
+      movedArchiveCalls += 1;
+      return { outcome: "accepted", archive_attempted: true, diagnostics: { categories: [] } };
+    },
+    now: TIME + 20_000,
+  });
+  const movedPath = `${movedDetached.coordinatorPath}-moved`;
+  git(movedDetached.primaryRoot, ["worktree", "move", movedDetached.coordinatorPath, movedPath]);
+  try {
+    await assert.rejects(
+      () => closeoutIteration({
+        commonDir: movedDetached.commonDir,
+        iterationId: movedAssignment.iteration_id,
+        allowCoordinator: true,
+        archiveThread: async () => { throw new Error("accepted archive must not replay"); },
+        observeArchivedThread: async ({ threadId }) => ({ thread_id: threadId, active_session_absent: true }),
+        now: TIME + 20_050,
+      }),
+      /remains attached at an ambiguous path/,
+    );
+  } finally {
+    git(movedDetached.primaryRoot, ["worktree", "move", movedPath, movedDetached.coordinatorPath]);
+  }
+  assert.equal(movedArchiveCalls, 1);
+});
+
+test("iteration reclamation resumes after interruption following exact worktree removal", async (t) => {
+  const context = await fixture(t);
+  const assignment = await assignmentAuthority({
+    stateRoot: context.state_root,
+    assignmentId: context.route.assignment.assignment_id,
+  });
+  let archiveCalls = 0;
+  await closeoutIteration({
+    commonDir: context.commonDir,
+    iterationId: assignment.iteration_id,
+    allowCoordinator: true,
+    archiveThread: async () => {
+      archiveCalls += 1;
+      return { outcome: "accepted", archive_attempted: true, diagnostics: { categories: [] } };
+    },
+    now: TIME + 20_100,
+  });
+  await assert.rejects(
+    () => closeoutIteration({
+      commonDir: context.commonDir,
+      iterationId: assignment.iteration_id,
+      allowCoordinator: true,
+      archiveThread: async () => { throw new Error("accepted archive must not replay"); },
+      observeArchivedThread: async ({ threadId }) => ({ thread_id: threadId, active_session_absent: true }),
+      removeWorktree: ({ primaryPath, worktreePath }) => {
+        git(primaryPath, ["worktree", "remove", worktreePath]);
+        throw new Error("simulated crash after non-force worktree removal");
+      },
+      now: TIME + 20_200,
+    }),
+    /simulated crash after non-force worktree removal/,
+  );
+  const interrupted = await iterationStatus({ commonDir: context.commonDir, iterationId: assignment.iteration_id });
+  assert.equal(interrupted.state, "closeout-pending");
+  assert.equal(interrupted.members.find((entry) => entry.role === "coordinator").state, "archive-pending");
+
+  const closed = await closeoutIteration({
+    commonDir: context.commonDir,
+    iterationId: assignment.iteration_id,
+    allowCoordinator: true,
+    archiveThread: async () => { throw new Error("accepted archive must not replay"); },
+    now: TIME + 20_300,
+  });
+  assert.equal(closed.status, "closed");
+  assert.equal(archiveCalls, 1);
+  assert.equal(git(context.primaryRoot, ["branch", "--list", context.coordinatorBranch]), "");
+});
+
+test("iteration reclamation refuses a worktree shared by another persisted iteration", async (t) => {
+  const context = await fixture(t);
+  const assignment = await assignmentAuthority({
+    stateRoot: context.state_root,
+    assignmentId: context.route.assignment.assignment_id,
+  });
+  const original = await iterationStatus({ commonDir: context.commonDir, iterationId: assignment.iteration_id });
+  const otherAssignmentId = "coordinator-assignment-v1-shared-path-fixture";
+  const sharedSeed = {
+    assignment_id: otherAssignmentId,
+    label: "v0.9.7 shared",
+    members: original.members,
+    state: "open",
+    created_at: new Date(TIME + 20_400).toISOString(),
+    updated_at: new Date(TIME + 20_400).toISOString(),
+  };
+  const sharedIteration = {
+    schema_version: 1,
+    kind: "codex-flow-v097-iteration",
+    iteration_id: `iteration-v1-${sha256(otherAssignmentId)}`,
+    ...sharedSeed,
+    record_digest: sha256(stableStringify(sharedSeed)),
+  };
+  await writeFile(
+    resolve(context.commonDir, "codex-flow", "iterations-v1", "records", `${sharedIteration.iteration_id}.json`),
+    `${stableStringify(sharedIteration)}\n`,
+    "utf8",
+  );
+  let archiveCalls = 0;
+  await closeoutIteration({
+    commonDir: context.commonDir,
+    iterationId: assignment.iteration_id,
+    allowCoordinator: true,
+    archiveThread: async () => {
+      archiveCalls += 1;
+      return { outcome: "accepted", archive_attempted: true, diagnostics: { categories: [] } };
+    },
+    now: TIME + 20_500,
+  });
+  await assert.rejects(
+    () => closeoutIteration({
+      commonDir: context.commonDir,
+      iterationId: assignment.iteration_id,
+      allowCoordinator: true,
+      archiveThread: async () => { throw new Error("accepted archive must not replay"); },
+      observeArchivedThread: async ({ threadId }) => ({ thread_id: threadId, active_session_absent: true }),
+      now: TIME + 20_600,
+    }),
+    /shared by another persisted member/,
+  );
+  assert.equal(archiveCalls, 1);
+  assert.equal(git(context.coordinatorPath, ["status", "--porcelain"]), "");
 });
 
 test("registered detached coordinator closeout rejects attachment drift and unpreserved work", async (t) => {

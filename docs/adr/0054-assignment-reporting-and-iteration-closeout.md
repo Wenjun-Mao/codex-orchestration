@@ -108,8 +108,12 @@ already-populated shared recipient registry exposed fence conflation.
 Archive dispatch is a single atomic claim persisted before the native host
 boundary. Concurrent callers cannot issue the same archive operation, and an
 ambiguous result requires exact private observation instead of replay. Closeout
-captures each eligible member's clean branch tip before dispatch. After App
-worktree reclamation it deletes that tip only when it remains an unattached
+captures each eligible member's clean branch tip before dispatch. Under ADR
+0055, an accepted iteration member may also be reclaimed by Flow after fresh
+archived/no-active evidence and locked revalidation of its exact clean,
+unshared, integrated worktree authority. Reclamation uses non-force Git removal
+and fails closed on refusal. After verified worktree absence it deletes the tip
+only when it remains an unattached
 `codex/` task branch. A coordinator additionally requires one exact linked
 worktree that is neither the caller nor primary checkout, and its tip must
 already be an ancestor of the authenticated primary-checkout baseline before
