@@ -4,15 +4,16 @@
 
 Before task creation, the director runs `assignment prepare --file request.json
 --json` through the authenticated package. The request contains
-`approved_plan_path`, `approved_plan_digest`, `recipient`, `iteration_label`,
+`approved_plan_path`, `recipient`, `iteration_label`,
 `purpose`, `outcome`, `scope`, `acceptance_criteria`, `constraints`, and `reasons`.
 The recipient is the director's exact `host_id`, `lineage_id`, `thread_id`, and
 `generation`; the command derives its binding digest.
 
 Use the returned title and complete text as the initial assignment. Preparation
-persists the approved-plan snapshot and reporting destination before the sender
-exists; the coordinator later binds its identity to that preparation. No
-bootstrap or second assignment message is needed.
+captures the plan from that path, computes its digest, and persists its snapshot
+and reporting destination before the sender exists. The brief links to the saved
+copy; the coordinator later binds its identity to that preparation. No commit,
+manual checksum, bootstrap, or second assignment message is needed.
 
 Include reasons only when they affect execution, verification, or escalation.
 Follow-ups carry the delta, not the prior conversation or a staffing essay.

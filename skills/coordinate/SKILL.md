@@ -6,7 +6,7 @@ description: Deliver one approved Codex Flow assignment, with optional child tas
 # Deliver an Assignment
 
 Follow `codex-orchestration:refresh` once before actionable coordination.
-Use its authenticated runtime and verify the approved plan bytes/digest.
+Use its authenticated runtime and read the prepared plan snapshot.
 Refine the technical breakdown without rewriting intent; return material changes
 to scope, acceptance, risk, or external authority to the director.
 
@@ -27,7 +27,8 @@ configured, observed, and unavailable evidence distinct.
 
 Register the [reporting route](../../templates/references/assignment-and-reporting.md)
 from the initial prompt's preparation ID before substantive work; retain the
-returned assignment identity for closeout.
+returned assignment identity for closeout. Registration validates the saved
+plan automatically.
 
 Represent local work and child work with their actual ownership and execution
 kind. A task begins only after its dependencies have accepted durable evidence.
