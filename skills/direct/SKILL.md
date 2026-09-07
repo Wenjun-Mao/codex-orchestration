@@ -22,9 +22,11 @@ Do not poll progress or narrate its work. Perform local implementation only
 when explicitly assigned by the user; do not absorb unfinished delivery.
 
 When the complete result arrives, review actual artifacts and verification
-against the approved plan. Record acceptance through the assignment's acceptance
-command, which initiates eligible closeout. Report delivery alone is not
-acceptance; pending closeout is not completion.
+against the approved plan. If accepted, run `assignment accept --assignment-id
+ID --file request.json` for that report; it records review and initiates remaining
+closeout. Use the [reporting contract](../../templates/references/assignment-and-reporting.md)
+for request fields and recovery. Report delivery alone is not acceptance;
+pending closeout is not completion.
 
 An advisor may answer a bounded question but cannot issue assignments or accept
 work. Material scope, risk, or authority changes require a new approved plan.

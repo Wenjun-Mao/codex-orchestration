@@ -23,7 +23,10 @@ second summary or copy the report into a separate file for delivery.
 
 ## Reporting and retirement
 
-Register the exact same-host sender-recipient route before work can finish.
+Register the exact same-host sender-recipient route with `report route
+coordinator --run-id ID --file request.json` before work can finish. Supply
+`iteration_label` and `purpose` alongside the authenticated route fields;
+the command records assignment/iteration membership.
 Use the pinned completion hook to capture complete finals at genuine task idle.
 Waits and commentary are not reporting boundaries. Keep the explicit manual
 path until the hook is installed, trusted, and live-verified for the exact
@@ -34,10 +37,20 @@ not actual delivery, verification, or director acceptance. Preserve ambiguous
 submissions without replay.
 
 Coordinator reporting belongs to the assignment, including restart requests
-and cleanup finals, not just an active execution run. Record director acceptance
-against the actual final through the acceptance command. Retire its route only
-after reporting and required closeout resolve. A pending iteration stays
-pending; later assignments cannot inherit its reporting authority.
+and cleanup finals, not just an active execution run. Run-independent commands
+use the authenticated package and exact assignment:
+
+- Coordinator: `assignment closeout --assignment-id ID --file request.json`,
+  with `{ "assignment_id": "ID", "phase": "coordinator" }`, handles eligible
+  children before run closure without retiring coordinator reporting.
+- Director: after reviewing the actual final and evidence, `assignment accept
+  --assignment-id ID --file request.json`, with `{ "assignment_id": "ID",
+  "report_id": "REPORT_ID" }`, records acceptance and attempts remaining closeout.
+- Recovery: `assignment status --assignment-id ID` exposes pending work. Resume
+  the owning phase with the same identity and, for acceptance, the same report.
+
+Route retirement follows resolved reporting and required closeout. A pending
+iteration stays pending; later assignments cannot inherit its authority.
 
 ## Optional advisor
 

@@ -17,9 +17,9 @@ result authority.
    blocked work remains fenced.
 4. Run verification at the reconciled state. Finalize only with its
    content-addressed PASS evidence.
-5. Use the returned finalization/closeout commands for eligible archival and
-   cleanup. An archived task may still have a host-managed worktree; that is not
-   permission to repeat the archive call.
+5. Use `assignment closeout` in the coordinator phase for eligible child
+   archival and cleanup. An archived task may still have a host-managed
+   worktree; that is not permission to repeat the archive call.
 
 Use `codex-orchestration:cleanup` for unresolved closeout. Do not include secrets
 or private host transcripts in returned evidence.

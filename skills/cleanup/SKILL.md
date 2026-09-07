@@ -5,9 +5,11 @@ description: Inspect or resume exact Codex Flow iteration closeout when ordinary
 
 # Resolve Pending Closeout
 
-Use the assignment's closeout/status commands for its exact iteration.
-Acceptance and finalization handle ordinary cleanup; do not reconstruct member
-lists or manually edit the registry.
+Inspect `assignment status --assignment-id ID`. Resume the coordinator phase
+with `assignment closeout --assignment-id ID --file request.json`; the director
+resumes accepted closeout with `assignment accept` for the same reviewed report.
+See the [request fields](../../templates/references/assignment-and-reporting.md).
+Do not reconstruct member lists or manually edit the registry.
 
 Distinguish accepted work, archived task visibility, worktree reclamation,
 and local-branch cleanup. Reconcile independently confirmed prior archival;
