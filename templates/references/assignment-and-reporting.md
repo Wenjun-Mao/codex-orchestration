@@ -2,10 +2,17 @@
 
 ## Assignment brief
 
-Use the generated mechanical fields: assignment identity, approved-plan
-snapshot/digest, runtime references, title, entry commands, and reporting route.
-Add only task-specific outcome, scope, constraints, and acceptance criteria.
-The approved bytes must be readable in the recipient's worktree.
+Before task creation, the director runs `assignment prepare --file request.json
+--json` through the authenticated package. The request contains
+`approved_plan_path`, `approved_plan_digest`, `recipient`, `iteration_label`,
+`purpose`, `outcome`, `scope`, `acceptance_criteria`, `constraints`, and `reasons`.
+The recipient is the director's exact `host_id`, `lineage_id`, `thread_id`, and
+`generation`; the command derives its binding digest.
+
+Use the returned title and complete text as the initial assignment. Preparation
+persists the approved-plan snapshot and reporting destination before the sender
+exists; the coordinator later binds its identity to that preparation. No
+bootstrap or second assignment message is needed.
 
 Include reasons only when they affect execution, verification, or escalation.
 Follow-ups carry the delta, not the prior conversation or a staffing essay.
@@ -23,10 +30,11 @@ second summary or copy the report into a separate file for delivery.
 
 ## Reporting and retirement
 
-Register the exact same-host sender-recipient route with `report route
-coordinator --run-id ID --file request.json` before work can finish. Supply
-`iteration_label` and `purpose` alongside the authenticated route fields;
-the command records assignment/iteration membership.
+After activating its run, the coordinator runs `report route coordinator
+--run-id ID --file request.json` before substantive work. The request contains
+only `run_id`, `sender_thread_id`, and the initial prompt's `preparation_id`.
+Registration derives the remaining mechanics and records same-host
+assignment/iteration membership.
 Use the pinned completion hook to capture complete finals at genuine task idle.
 Waits and commentary are not reporting boundaries. Keep the explicit manual
 path until the hook is installed, trusted, and live-verified for the exact
