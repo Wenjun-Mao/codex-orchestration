@@ -42,6 +42,10 @@ decision records remain the detailed release evidence.
   the one-shot App creation result is reconciled, or when that result carries
   opaque host information, while still rejecting known conflicting host
   evidence.
+- Treat replacement of the live personal-marketplace source as an installation
+  event because the local marketplace watcher may synchronize its cache
+  immediately; stage release candidates outside the watched source path and
+  retain an exact rollback copy.
 
 ## 0.9.6 - 2026-09-06
 
