@@ -38,6 +38,10 @@ decision records remain the detailed release evidence.
   path, exclusive membership, attachment, cleanliness, captured result tip, and
   primary preservation under the iteration lock, uses non-force Git removal,
   resumes safely after interruption, and never replays accepted archival.
+- Allow an authenticated executor start to register its report route before
+  the one-shot App creation result is reconciled, or when that result carries
+  opaque host information, while still rejecting known conflicting host
+  evidence.
 
 ## 0.9.6 - 2026-09-06
 

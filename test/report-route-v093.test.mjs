@@ -86,6 +86,16 @@ test("report routes reject cross-host and preserve closure as a late-report fenc
     () => registerReportRoute({
       stateRoot: context.stateRoot,
       launchId: context.launch.launch_id,
+      senderHostId: "remote",
+      recipientHostId: "remote",
+      now: TIME,
+    }),
+    /sender host conflicts with task creation evidence/,
+  );
+  await assert.rejects(
+    () => registerReportRoute({
+      stateRoot: context.stateRoot,
+      launchId: context.launch.launch_id,
       senderHostId: "local",
       recipientHostId: "remote",
       now: TIME,
