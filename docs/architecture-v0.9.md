@@ -155,10 +155,12 @@ An assignment's iteration registry records members only from authenticated
 assignment and launch commands. The assignment-derived executor title is the
 exact title passed to the host and recorded by the registry. Closeout archives
 eligible children before the coordinator through a bounded native adapter,
-persists an ambiguous boundary before each call, and reconciles interruptions
-through exact private archive observation without replay. After host worktree
-reclamation, it consumes the child's callback/disposition/integration authority
-and atomically deletes only the matching local branch. Active, provisional,
+atomically claims an ambiguous boundary before each call, and reconciles
+interruptions through exact private archive observation without replay. After
+host worktree reclamation, it consumes the child's callback/disposition/
+integration authority and deletes only the captured matching tip of an
+unattached `codex/` task branch for an eligible executor or disposable
+coordinator. Source-style branches are protected. Active, provisional,
 ambiguous, unclean, conflicting, or not-yet-reclaimed members remain pending
 rather than being reported as closed.
 

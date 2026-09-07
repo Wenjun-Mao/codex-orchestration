@@ -60,7 +60,7 @@ export async function createActiveTaskLaunch(root, suffix, {
   executorPath = resolve(root, `../${basename(root)}-${suffix}-executor`),
   reconcileCreation = true,
 } = {}) {
-  const commonDir = await realpath(resolve(root, ".git"));
+  const commonDir = await realpath(git(root, ["rev-parse", "--path-format=absolute", "--git-common-dir"]));
   const stateRoot = resolve(commonDir, "codex-flow", RUNTIME_DIRECTORY);
   const baseline = git(root, ["rev-parse", "HEAD"]);
   const coordinator = {

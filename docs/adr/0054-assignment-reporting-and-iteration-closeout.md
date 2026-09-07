@@ -66,3 +66,11 @@ v0.9.7 creates the first assignment-lived authority. Tests cover namespace
 removal before later finals, multiple finals, acceptance ordering, archive
 activity/ambiguity, local mutation/no-change proof, schema parity, and adapter
 idempotence.
+
+Archive dispatch is a single atomic claim persisted before the native host
+boundary. Concurrent callers cannot issue the same archive operation, and an
+ambiguous result requires exact private observation instead of replay. Closeout
+captures each eligible member's clean branch tip before dispatch. After App
+worktree reclamation it deletes that tip only when it remains an unattached
+`codex/` task branch; source-style branches remain protected. This applies to
+disposable coordinators as well as accepted executors.

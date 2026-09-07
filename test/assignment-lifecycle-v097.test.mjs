@@ -86,16 +86,29 @@ async function acceptedFinal(context, turnId, text, offset) {
   })).report;
 }
 
-async function acceptedChildFixture(t, suffix) {
-  const root = await createGitFixture(`codex-flow-v097-child-closeout-${suffix}-`);
+async function acceptedChildFixture(t, suffix, { disposableCoordinator = false } = {}) {
+  const primaryRoot = await createGitFixture(`codex-flow-v097-child-closeout-${suffix}-`);
+  const coordinatorBranch = disposableCoordinator ? `codex/coordinator-${suffix}` : "main";
+  const coordinatorPath = disposableCoordinator
+    ? resolve(primaryRoot, `../${primaryRoot.split("/").at(-1)}-${suffix}-coordinator`)
+    : primaryRoot;
+  if (disposableCoordinator) {
+    git(primaryRoot, ["worktree", "add", "--quiet", "-b", coordinatorBranch, coordinatorPath]);
+  }
   const taskTitle = "Executor · v0.9.7 · Assignment reporting";
-  const context = await createActiveTaskLaunch(root, suffix, { taskTitle });
+  const context = await createActiveTaskLaunch(coordinatorPath, suffix, { taskTitle });
   t.after(async () => {
     spawnSync("git", ["worktree", "remove", "--force", context.executorPath], {
-      cwd: root,
+      cwd: primaryRoot,
       encoding: "utf8",
     });
-    await rm(root, { recursive: true, force: true });
+    if (disposableCoordinator) {
+      spawnSync("git", ["worktree", "remove", "--force", coordinatorPath], {
+        cwd: primaryRoot,
+        encoding: "utf8",
+      });
+    }
+    await rm(primaryRoot, { recursive: true, force: true });
   });
   const director = {
     lineage_id: `director-lineage-${suffix}`,
@@ -109,10 +122,12 @@ async function acceptedChildFixture(t, suffix) {
     senderThreadId: context.coordinator.thread_id,
     senderHostId: "fixture-host",
     recipient: { host_id: "fixture-host", ...director, binding_digest: recipientBindingDigest(director) },
-    approvedPlanPath: resolve(root, ".gitkeep"),
+    approvedPlanPath: resolve(coordinatorPath, ".gitkeep"),
     approvedPlanDigest: sha256("fixture\n"),
     iterationLabel: "v0.9.7",
     purpose: "Assignment reporting",
+    repositoryRoot: disposableCoordinator ? coordinatorPath : null,
+    repositoryBranch: disposableCoordinator ? coordinatorBranch : null,
     now: TIME,
   });
   const assignment = await assignmentAuthority({
@@ -176,7 +191,7 @@ async function acceptedChildFixture(t, suffix) {
     executorThreadId: context.executorThreadId,
     verificationId: verification.verification_id,
   });
-  return { root, context, assignment };
+  return { root: primaryRoot, coordinatorPath, coordinatorBranch, context, assignment };
 }
 
 test("assignment reporting survives normal run close and removal of its execution namespace", async (t) => {
@@ -329,6 +344,94 @@ test("iteration closeout fences the coordinator until child archival and exact b
     }).status,
     0,
   );
+});
+
+test("iteration closeout atomically claims native archival across concurrent callers", async (t) => {
+  const { context, assignment } = await acceptedChildFixture(t, "archive-claim");
+  let archiveCalls = 0;
+  let releaseArchive;
+  let signalArchiveStarted;
+  const archiveStarted = new Promise((resolveStarted) => { signalArchiveStarted = resolveStarted; });
+  const archiveReleased = new Promise((resolveReleased) => { releaseArchive = resolveReleased; });
+  const archiveThread = async () => {
+    archiveCalls += 1;
+    signalArchiveStarted();
+    await archiveReleased;
+    return { outcome: "accepted", archive_attempted: true, diagnostics: { categories: [] } };
+  };
+
+  const first = closeoutIteration({
+    commonDir: context.commonDir,
+    iterationId: assignment.iteration_id,
+    archiveThread,
+    now: TIME + 15_000,
+  });
+  await archiveStarted;
+  const concurrent = await closeoutIteration({
+    commonDir: context.commonDir,
+    iterationId: assignment.iteration_id,
+    archiveThread,
+    now: TIME + 15_001,
+  });
+  assert.equal(concurrent.status, "pending");
+  assert.equal(archiveCalls, 1);
+  releaseArchive();
+  const completed = await first;
+  assert.equal(completed.status, "pending");
+  assert.equal(archiveCalls, 1);
+});
+
+test("iteration closeout removes the exact disposable coordinator branch after its worktree is reclaimed", async (t) => {
+  const {
+    root, coordinatorPath, coordinatorBranch, context, assignment,
+  } = await acceptedChildFixture(t, "coordinator-cleanup", { disposableCoordinator: true });
+  const calls = [];
+  const archiveThread = async ({ threadId }) => {
+    calls.push(threadId);
+    return { outcome: "accepted", archive_attempted: true, diagnostics: { categories: [] } };
+  };
+
+  await closeoutIteration({
+    commonDir: context.commonDir,
+    iterationId: assignment.iteration_id,
+    allowCoordinator: true,
+    archiveThread,
+    now: TIME + 17_000,
+  });
+  git(root, ["worktree", "remove", context.executorPath]);
+  assert.equal(git(coordinatorPath, ["branch", "--show-current"]), coordinatorBranch);
+  assert.equal(
+    (await iterationStatus({ commonDir: context.commonDir, iterationId: assignment.iteration_id }))
+      .members.find((member) => member.role === "coordinator").worktree_path,
+    coordinatorPath,
+  );
+  const coordinatorPending = await closeoutIteration({
+    commonDir: context.commonDir,
+    iterationId: assignment.iteration_id,
+    allowCoordinator: true,
+    archiveThread,
+    now: TIME + 18_000,
+  });
+  assert.equal(coordinatorPending.status, "pending");
+  assert.deepEqual(calls, [context.executorThreadId, context.coordinator.thread_id]);
+  git(root, ["worktree", "remove", coordinatorPath]);
+  const closed = await closeoutIteration({
+    commonDir: context.commonDir,
+    iterationId: assignment.iteration_id,
+    allowCoordinator: true,
+    archiveThread,
+    now: TIME + 19_000,
+  });
+  assert.equal(closed.status, "closed");
+  assert.equal(calls.length, 2);
+  assert.notEqual(
+    spawnSync("git", ["show-ref", "--verify", `refs/heads/${coordinatorBranch}`], {
+      cwd: root,
+      encoding: "utf8",
+    }).status,
+    0,
+  );
+  assert.equal(git(root, ["branch", "--show-current"]), "main");
 });
 
 test("an interrupted native archive is observed and resumed without replay", async (t) => {

@@ -13,8 +13,9 @@ decision records remain the detailed release evidence.
 - Add command-managed iteration membership, generated coordinator briefs, and
   acceptance-triggered, resumable native task archival. Executor launches use
   the same role/iteration/purpose title recorded by the registry; child-first
-  closeout consumes exact Git authority, deletes the authenticated local branch
-  after host worktree reclamation, and never replays an ambiguous archive call.
+  closeout atomically claims each native call, consumes exact Git authority,
+  deletes authenticated disposable executor and coordinator branches after host
+  worktree reclamation, and never replays an ambiguous archive call.
 
 ## 0.9.6 - 2026-09-06
 
