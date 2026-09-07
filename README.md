@@ -208,6 +208,12 @@ relabelled as a legacy creation operation and fails closed. The target never
 parses or migrates source journals. Unsupported older state uses the explicit
 unplug path.
 
+Current v0.9 sources also expose coordinator-owned workflow claims. Refresh
+reissues an unfinished coordinator claim with fresh task and selector identity,
+without inventing child archive, worktree, or branch cleanup. A completed
+coordinator claim remains in the authenticated baseline; only a genuinely
+work-free source uses the no-replacement clean-start path.
+
 ## Command surface
 
 Run `codex-flow --help` for the exact inventory. Principal families are:

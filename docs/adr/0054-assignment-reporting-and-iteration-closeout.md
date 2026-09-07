@@ -75,10 +75,19 @@ that branches from an older binding. The assignment locator remains unchanged
 because it addresses shared assignment state and an immutable content-addressed
 reporter, rather than either execution namespace. A v0.9.6 route does not
 acquire these semantics retroactively; v0.9.7 creates the first assignment-lived
-authority. Tests cover namespace
-removal before later finals, multiple finals, acceptance ordering, archive
-activity/ambiguity, local mutation/no-change proof, schema parity, and adapter
-idempotence.
+authority.
+
+Refresh decisions cover unfinished coordinator claims as well as visible
+executors. An unfinished coordinator claim can only be discarded for semantic
+reissue; it carries its exact local-work operation identity but grants no child
+archive, worktree, or branch cleanup authority. Completed coordinator work,
+integrated executor work, and accepted no-change work remain in the baseline
+and are not pulled into the replacement dependency closure. Empty decisions
+therefore mean a true no-work clean start, not an implicit coordinator bypass.
+Tests cover namespace removal before later finals, multiple finals, acceptance
+ordering, archive activity/ambiguity, local mutation/no-change proof, exact
+coordinator refresh and interrupted assignment rebinding, schema parity, and
+adapter idempotence.
 
 Archive dispatch is a single atomic claim persisted before the native host
 boundary. Concurrent callers cannot issue the same archive operation, and an
