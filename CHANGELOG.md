@@ -19,7 +19,8 @@ decision records remain the detailed release evidence.
   closeout atomically claims each native call, consumes exact Git authority,
   deletes authenticated disposable executor and coordinator branches after host
   worktree reclamation, rejects coordinator work not yet preserved in the
-  protected source checkout, and never replays an ambiguous archive call.
+  protected source checkout, observes already-archived coordinators without a
+  duplicate host call, and never replays an ambiguous archive call.
 
 ## 0.9.6 - 2026-09-06
 

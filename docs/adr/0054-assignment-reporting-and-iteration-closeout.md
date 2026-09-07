@@ -83,4 +83,7 @@ worktree that is neither the caller nor primary checkout, and its tip must
 already be an ancestor of the authenticated primary-checkout baseline before
 archive dispatch and branch deletion. Source, caller, dirty, detached, and
 unpreserved coordinator work remain protected. This applies to disposable
-coordinators as well as accepted executors.
+coordinators as well as accepted executors. When a user already archived the
+coordinator and its worktree is gone, exact private archive observation plus
+the same source-ancestry proof completes closeout without replaying a native
+archive call.

@@ -476,6 +476,49 @@ test("iteration closeout removes the exact disposable coordinator branch after i
   assert.equal(git(root, ["branch", "--show-current"]), "main");
 });
 
+test("iteration closeout observes a manually archived coordinator without replaying native archival", async (t) => {
+  const {
+    root, coordinatorPath, coordinatorBranch, context, assignment,
+  } = await acceptedChildFixture(t, "coordinator-already-archived", { disposableCoordinator: true });
+  const calls = [];
+  const archiveThread = async ({ threadId }) => {
+    calls.push(threadId);
+    return { outcome: "accepted", archive_attempted: true, diagnostics: { categories: [] } };
+  };
+  await closeoutIteration({
+    commonDir: context.commonDir,
+    iterationId: assignment.iteration_id,
+    allowCoordinator: true,
+    archiveThread,
+    now: TIME + 20_000,
+  });
+  git(root, ["worktree", "remove", context.executorPath]);
+  git(root, ["worktree", "remove", coordinatorPath]);
+  const closed = await closeoutIteration({
+    commonDir: context.commonDir,
+    iterationId: assignment.iteration_id,
+    allowCoordinator: true,
+    archiveThread,
+    observeArchivedThread: async ({ threadId }) => ({
+      kind: "private-archive-observation",
+      thread_id: threadId,
+    }),
+    now: TIME + 21_000,
+  });
+  assert.equal(closed.status, "closed");
+  assert.deepEqual(calls, [context.executorThreadId]);
+  const coordinator = closed.iteration.members.find((member) => member.role === "coordinator");
+  assert.equal(coordinator.state, "archived");
+  assert.equal(coordinator.archive_attempt.reason, "private-archive-observed");
+  assert.notEqual(
+    spawnSync("git", ["show-ref", "--verify", `refs/heads/${coordinatorBranch}`], {
+      cwd: root,
+      encoding: "utf8",
+    }).status,
+    0,
+  );
+});
+
 test("iteration closeout refuses an unmerged coordinator commit before native archival", async (t) => {
   const {
     root, coordinatorPath, context, assignment,

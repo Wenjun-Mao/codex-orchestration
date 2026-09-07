@@ -166,7 +166,9 @@ coordinator. A coordinator must be an exact clean linked worktree, distinct
 from the caller and primary checkout, whose tip is already contained by the
 authenticated primary-checkout baseline. Source, caller, detached, unpreserved,
 active, provisional, ambiguous, unclean, conflicting, or not-yet-reclaimed
-members remain pending rather than being reported as closed.
+members remain pending rather than being reported as closed. A coordinator the
+user already archived is recovered only through exact private observation and
+the same preserved-tip checks, without another native archive attempt.
 
 The same first-prompt rule applies to the coordinator handoff: the coordinator
 is dispatched with the complete approved assignment, a readable link to the
