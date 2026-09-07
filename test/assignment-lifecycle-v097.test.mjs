@@ -4,7 +4,11 @@ import { readFile, rm, writeFile } from "node:fs/promises";
 import { basename, resolve } from "node:path";
 import test from "node:test";
 import { acceptAssignmentResult } from "../lib/assignment-acceptance.mjs";
-import { assignmentAuthority } from "../lib/assignment-authority.mjs";
+import {
+  assignmentAuthority,
+  bindAssignmentRefreshExecution,
+  openAssignmentForSender,
+} from "../lib/assignment-authority.mjs";
 import {
   assignmentPreparation,
   prepareCoordinatorAssignment,
@@ -262,6 +266,73 @@ test("coordinator route registration is idempotent after assignment iteration pe
     iterationId: assignment.iteration_id,
   });
   assert.equal(iteration.created_at, new Date(TIME).toISOString());
+});
+
+test("assignment refresh binding appends once and rejects conflicting or stale transitions", async (t) => {
+  const context = await fixture(t);
+  const beforeRoute = await reportRoute({
+    stateRoot: context.state_root,
+    routeId: context.route.route_id,
+  });
+  const before = await assignmentAuthority({
+    stateRoot: context.state_root,
+    assignmentId: context.route.assignment.assignment_id,
+  });
+  const source = before.execution_bindings[0];
+  const sourceAuthority = {
+    run_id: source.run_id,
+    runtime_context_digest: source.runtime_context_digest,
+    plan_id: source.plan_id,
+    namespace: source.namespace,
+  };
+  const target = {
+    run_id: "assignment-refresh-target",
+    runtime_context_digest: sha256("target runtime"),
+    configuration_digest: sha256("target configuration"),
+    repository_digest: sha256("target repository"),
+    repository_root: context.coordinatorPath,
+    repository_branch: context.coordinatorBranch,
+    plan_id: "assignment-refresh-target-plan",
+    revision_digest: sha256("target revision"),
+    namespace: "v0.9.7-refresh-target",
+    bound_at: new Date(TIME + 1_000).toISOString(),
+  };
+  const request = {
+    commonDir: context.commonDir,
+    sender: context.route.sender,
+    source: sourceAuthority,
+    targetExecutionBinding: target,
+  };
+
+  const bound = await bindAssignmentRefreshExecution(request);
+  assert.equal(bound.status, "bound");
+  assert.deepEqual(bound.assignment.execution_bindings, [source, target]);
+  const replay = await bindAssignmentRefreshExecution(request);
+  assert.equal(replay.status, "already-bound");
+  assert.deepEqual(replay.assignment.execution_bindings, [source, target]);
+  assert.deepEqual(await reportRoute({
+    stateRoot: context.state_root,
+    routeId: context.route.route_id,
+  }), beforeRoute);
+  assert.equal((await openAssignmentForSender({
+    stateRoot: context.state_root,
+    hostId: context.route.sender.host_id,
+    threadId: context.route.sender.thread_id,
+    runId: target.run_id,
+  })).assignment_id, before.assignment_id);
+
+  await assert.rejects(bindAssignmentRefreshExecution({
+    ...request,
+    targetExecutionBinding: { ...target, configuration_digest: sha256("conflict") },
+  }), /target conflicts/);
+  await assert.rejects(bindAssignmentRefreshExecution({
+    ...request,
+    targetExecutionBinding: {
+      ...target,
+      run_id: "assignment-refresh-second-target",
+      namespace: "v0.9.7-second-target",
+    },
+  }), /source is not its latest/);
 });
 
 test("pre-dispatch preparation generates the useful first prompt from bound authority", async (t) => {

@@ -22,6 +22,9 @@ decision records remain the detailed release evidence.
   protected source checkout, observes already-archived coordinators without a
   duplicate host call (including after a blocked/no-archive result), and never
   replays an ambiguous archive call.
+- Bind an assignment's exact replacement execution during authenticated refresh
+  before consuming the handoff or deleting the source namespace; exact retries
+  are idempotent and conflicting or stale transitions fail closed.
 
 ## 0.9.6 - 2026-09-06
 

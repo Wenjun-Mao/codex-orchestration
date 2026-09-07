@@ -67,11 +67,25 @@ step. Existing v1 preparations remain readable and are not rewritten.
 Assignment state is a current bounded root and is included in exact unplug
 inventory. New assignments receive fresh identities even for the same sender.
 Old run callbacks remain fenced and cannot gain mutation authority from a live
-assignment route. A v0.9.6 route does not acquire these semantics retroactively;
-v0.9.7 creates the first assignment-lived authority. Tests cover namespace
+assignment route. Authenticated refresh appends the exact admitted target
+execution under the assignment lock before marking the handoff consumed or
+deleting the source namespace. It retains historical execution bindings, treats
+an exact retry as already bound, and rejects a changed target or a transition
+that branches from an older binding. The assignment locator remains unchanged
+because it addresses shared assignment state and an immutable content-addressed
+reporter, rather than either execution namespace. A v0.9.6 route does not
+acquire these semantics retroactively; v0.9.7 creates the first assignment-lived
+authority. Tests cover namespace
 removal before later finals, multiple finals, acceptance ordering, archive
 activity/ambiguity, local mutation/no-change proof, schema parity, and adapter
 idempotence.
+
+RC8 added root-level `package.json` to runtime bundles but omitted that exact
+path from its refresh-export bootstrap allowlist. A finite compatibility capsule
+authenticates the known RC8 bundle and refresh-source hash, patches only that
+allowlist in a temporary copy, and then invokes RC8's own exporter. It never
+mutates stored source state or substitutes target-package workflow semantics;
+any identity or patch-site drift blocks.
 
 Archive dispatch is a single atomic claim persisted before the native host
 boundary. Concurrent callers cannot issue the same archive operation, and an

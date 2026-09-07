@@ -139,8 +139,11 @@ active run, current coordinator identity, tool-validated approved-plan snapshot,
 and a pre-bound director generation. In v0.9.7 that registration creates an
 assignment-lived authority and iteration record outside the removable run
 namespace. The run remains execution evidence, but closing it does not retire
-the coordinator route. The Stop adapter resolves only that exact
-sender locator, delegates capture/deduplication/lifecycle to governance core,
+the coordinator route. Refresh appends the exact admitted replacement execution
+to the same assignment before consuming the handoff or deleting source state;
+historical bindings and their callback fences remain unchanged. The Stop
+adapter resolves only that exact sender locator, delegates
+capture/deduplication/lifecycle to governance core,
 then makes at most one bounded queue submission. No global task scan or second
 report state machine exists. Task disposition closes its executor launch route;
 director acceptance closes the assignment route only after its selected report

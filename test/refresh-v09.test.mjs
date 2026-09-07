@@ -29,6 +29,12 @@ import {
   CODEX_APP_CLI_VERSION,
 } from "../lib/codex-app-report-adapter.mjs";
 import {
+  assignmentAuthority,
+  openAssignmentForSender,
+} from "../lib/assignment-authority.mjs";
+import { bindRecipient } from "../lib/recipients.mjs";
+import { registerCoordinatorReportRoute } from "../lib/report-routes.mjs";
+import {
   captureRefreshGitAuthority,
   deleteRefreshExecutorBranch,
   removeRefreshExecutorWorktree,
@@ -209,6 +215,7 @@ async function createAbandonedDirectCoordinatorRun({
   requests,
   sourcePackage,
   runId = "refresh-v095-direct-coordinator",
+  beforeAbandon = null,
 }) {
   const workflowTask = task(`${runId}-delivery`, {
     mode: "read",
@@ -229,6 +236,9 @@ async function createAbandonedDirectCoordinatorRun({
   ], root, { CODEX_THREAD_ID: request.runtime.lineage.thread_id });
   assertSuccess(activatedCall, "v0.9.5 direct coordinator source activation");
   const activated = JSON.parse(activatedCall.stdout);
+  const beforeAbandonResult = beforeAbandon === null
+    ? null
+    : await beforeAbandon({ activated, request, workflowTask });
   const runtimeCli = resolve(activated.runtime_authority.bundle_root, "bin", "codex-flow.mjs");
   const abandonPath = await jsonFile(requests, `${runId}-abandon`, {
     run_id: runId,
@@ -245,6 +255,7 @@ async function createAbandonedDirectCoordinatorRun({
     request,
     runtimeCli,
     workflowTask,
+    beforeAbandonResult,
   };
 }
 
@@ -339,6 +350,194 @@ test("v0.9 refresh replaces an abandoned direct coordinator without inventing cl
   assert.equal(activated.refresh_origin.refresh_id, handoff.refresh_id);
   await assert.rejects(stat(resolve(root, ".git/codex-flow/v0.9.5")), /ENOENT/);
   await assert.rejects(stat(resolve(root, ".git/codex-flow/refresh-v1")), /ENOENT/);
+});
+
+test("assignment-lived reporting binds the exact target before refresh source deletion", async (t) => {
+  const root = await createGitFixture("codex-flow-refresh-v097-assignment-");
+  const requests = await mkdtemp(resolve(tmpdir(), "codex-flow-refresh-v097-assignment-requests-"));
+  const sourcePackage = await extractTaggedPackage("5ab0a9fa62bcab4de801dd96494bdb2ac4ea72c4");
+  const targetPackage = await copyCurrentPackage();
+  t.after(async () => {
+    await Promise.all([
+      removeFixture(root),
+      rm(requests, { recursive: true, force: true }),
+      rm(sourcePackage.root, { recursive: true, force: true }),
+      rm(targetPackage.root, { recursive: true, force: true }),
+    ]);
+  });
+
+  const recipient = {
+    lineage_id: "refresh-assignment-director-lineage",
+    thread_id: "refresh-assignment-director",
+    generation: 1,
+  };
+  const planPath = resolve(root, "refresh-assignment-plan.md");
+  const source = await createAbandonedDirectCoordinatorRun({
+    root,
+    requests,
+    sourcePackage,
+    runId: "refresh-v097-assignment-source",
+    beforeAbandon: async ({ activated, request }) => {
+      await writeFile(planPath, "# Refresh assignment fixture\n", "utf8");
+      await bindRecipient({ stateRoot: activated.state_authority.state_root, recipient });
+      const result = await registerCoordinatorReportRoute({
+        stateRoot: activated.state_authority.state_root,
+        runId: request.run_id,
+        senderThreadId: request.runtime.lineage.thread_id,
+        senderHostId: request.runtime.host.host_id,
+        recipient: {
+          host_id: request.runtime.host.host_id,
+          ...recipient,
+          binding_digest: recipientBindingDigest(recipient),
+        },
+        approvedPlanPath: planPath,
+        approvedPlanDigest: sha256("# Refresh assignment fixture\n"),
+        iterationLabel: "v0.9.7",
+        purpose: "Refresh assignment binding",
+        repositoryRoot: root,
+        repositoryBranch: "main",
+      });
+      await rm(planPath);
+      return result;
+    },
+  });
+  const registered = source.beforeAbandonResult;
+  const originalAssignment = await assignmentAuthority({
+    stateRoot: registered.state_root,
+    assignmentId: registered.route.assignment.assignment_id,
+  });
+  assert.equal(originalAssignment.execution_bindings.length, 1);
+
+  const targetSkill = resolve(targetPackage.root, "skills/refresh/SKILL.md");
+  const inspectionCall = invoke(targetPackage.cli, [
+    "refresh", "inspect", "--invoking-skill", targetSkill, "--json",
+  ], root);
+  assertSuccess(inspectionCall, "assignment refresh inspection");
+  const inspection = JSON.parse(inspectionCall.stdout);
+  assert.equal(inspection.route, "refresh-ready", inspection.reason);
+  assert.equal(inspection.authority.source.package_version, "0.9.7-rc.8");
+
+  const replacement = {
+    ...source.workflowTask,
+    task_id: "refresh-v097-assignment-target-delivery",
+  };
+  const targetActivation = activation({
+    runId: "refresh-v097-assignment-target",
+    workflowTask: replacement,
+    lineageId: "refresh-v097-assignment-target-lineage",
+    threadId: source.request.runtime.lineage.thread_id,
+    branch: "main",
+    branchFences: [],
+  });
+  const preparePath = await jsonFile(requests, "refresh-v097-assignment-prepare", {
+    source_namespace: "v0.9.7-rc.8",
+    source_run_id: source.request.run_id,
+    source_resume: source.activated.run.binding,
+    decisions: [{
+      source_task_id: source.workflowTask.task_id,
+      disposition: "discard",
+      rationale: "The terminal direct delivery is reissued under the corrected target.",
+    }],
+    replacements: [{
+      source_task_id: source.workflowTask.task_id,
+      target_task_id: replacement.task_id,
+    }],
+    target_workflow: targetActivation.workflow,
+    target_fences: targetActivation.fences,
+    target_coordinator_thread_id: source.request.runtime.lineage.thread_id,
+  });
+  const preparedCall = invoke(targetPackage.cli, [
+    "refresh", "prepare", "--invoking-skill", targetSkill,
+    "--file", preparePath, "--json",
+  ], root);
+  assertSuccess(preparedCall, "assignment refresh preparation");
+  const handoff = JSON.parse(preparedCall.stdout).handoff;
+  const applyPath = await jsonFile(requests, "refresh-v097-assignment-apply", {
+    refresh_id: handoff.refresh_id,
+    expected_handoff_digest: handoff.handoff_digest,
+    archive_evidence: [],
+  });
+  const appliedCall = invoke(targetPackage.cli, [
+    "refresh", "apply", "--invoking-skill", targetSkill,
+    "--file", applyPath, "--json",
+  ], root);
+  assertSuccess(appliedCall, "assignment refresh apply");
+
+  targetActivation.refresh_id = handoff.refresh_id;
+  targetActivation.activated_at = new Date().toISOString();
+  await assert.rejects(consumeWithHooks({
+    targetPackage,
+    root,
+    activationRequest: targetActivation,
+    refreshId: handoff.refresh_id,
+    crashAfter: "afterAssignmentBinding",
+  }), /afterAssignmentBinding/);
+  const interrupted = await assignmentAuthority({
+    stateRoot: registered.state_root,
+    assignmentId: originalAssignment.assignment_id,
+  });
+  assert.equal(interrupted.execution_bindings.length, 2);
+  assert.deepEqual(interrupted.execution_bindings[0], originalAssignment.execution_bindings[0]);
+  assert.equal(interrupted.execution_bindings[1].run_id, targetActivation.run_id);
+  assert.equal((await refreshStatus({
+    commonDir: registered.route.assignment.common_dir,
+    refreshId: handoff.refresh_id,
+  })).status, "source-retired");
+
+  const targetActivationPath = await jsonFile(requests, "refresh-v097-assignment-target", targetActivation);
+  const activatedCall = invoke(targetPackage.cli, [
+    "run", "activate", "--run-id", targetActivation.run_id,
+    "--refresh-id", handoff.refresh_id, "--file", targetActivationPath, "--json",
+  ], root, { CODEX_THREAD_ID: source.request.runtime.lineage.thread_id });
+  assertSuccess(activatedCall, "assignment refresh target activation replay");
+  const rebound = await assignmentAuthority({
+    stateRoot: registered.state_root,
+    assignmentId: originalAssignment.assignment_id,
+  });
+  assert.deepEqual(rebound.execution_bindings, interrupted.execution_bindings);
+  assert.equal((await openAssignmentForSender({
+    stateRoot: registered.state_root,
+    hostId: source.request.runtime.host.host_id,
+    threadId: source.request.runtime.lineage.thread_id,
+    runId: targetActivation.run_id,
+  })).assignment_id, originalAssignment.assignment_id);
+  await assert.rejects(stat(resolve(root, ".git/codex-flow/v0.9.7-rc.8")), /ENOENT/);
+  await assert.rejects(stat(resolve(root, ".git/codex-flow/refresh-v1")), /ENOENT/);
+});
+
+test("RC8 refresh bootstrap repair rejects a different source hash", async (t) => {
+  const root = await createGitFixture("codex-flow-refresh-v097-rc8-capsule-");
+  const requests = await mkdtemp(resolve(tmpdir(), "codex-flow-refresh-v097-rc8-capsule-requests-"));
+  const sourcePackage = await extractTaggedPackage("5ab0a9fa62bcab4de801dd96494bdb2ac4ea72c4");
+  const targetPackage = await copyCurrentPackage();
+  t.after(async () => {
+    await Promise.all([
+      removeFixture(root),
+      rm(requests, { recursive: true, force: true }),
+      rm(sourcePackage.root, { recursive: true, force: true }),
+      rm(targetPackage.root, { recursive: true, force: true }),
+    ]);
+  });
+  const refreshSourcePath = resolve(sourcePackage.root, "lib/compat/refresh-source.mjs");
+  await writeFile(
+    refreshSourcePath,
+    `${await readFile(refreshSourcePath, "utf8")}\n// Deliberate source-hash drift for the capsule boundary.\n`,
+    "utf8",
+  );
+  await createAbandonedDirectCoordinatorRun({
+    root,
+    requests,
+    sourcePackage,
+    runId: "refresh-v097-rc8-capsule-source",
+  });
+  const targetSkill = resolve(targetPackage.root, "skills/refresh/SKILL.md");
+  const inspectionCall = invoke(targetPackage.cli, [
+    "refresh", "inspect", "--invoking-skill", targetSkill, "--json",
+  ], root);
+  assertSuccess(inspectionCall, "RC8 capsule hash-drift inspection");
+  const inspection = JSON.parse(inspectionCall.stdout);
+  assert.equal(inspection.route, "blocked");
+  assert.match(inspection.reason, /safe runtime path/);
 });
 
 async function createClosedV09Run({
