@@ -160,9 +160,11 @@ interruptions through exact private archive observation without replay. After
 host worktree reclamation, it consumes the child's callback/disposition/
 integration authority and deletes only the captured matching tip of an
 unattached `codex/` task branch for an eligible executor or disposable
-coordinator. Source-style branches are protected. Active, provisional,
-ambiguous, unclean, conflicting, or not-yet-reclaimed members remain pending
-rather than being reported as closed.
+coordinator. A coordinator must be an exact clean linked worktree, distinct
+from the caller and primary checkout, whose tip is already contained by the
+authenticated primary-checkout baseline. Source, caller, detached, unpreserved,
+active, provisional, ambiguous, unclean, conflicting, or not-yet-reclaimed
+members remain pending rather than being reported as closed.
 
 The same first-prompt rule applies to the coordinator handoff: the coordinator
 is dispatched with the complete approved assignment, plan digest or immutable

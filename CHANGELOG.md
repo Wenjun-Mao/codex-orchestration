@@ -15,7 +15,8 @@ decision records remain the detailed release evidence.
   the same role/iteration/purpose title recorded by the registry; child-first
   closeout atomically claims each native call, consumes exact Git authority,
   deletes authenticated disposable executor and coordinator branches after host
-  worktree reclamation, and never replays an ambiguous archive call.
+  worktree reclamation, rejects coordinator work not yet preserved in the
+  protected source checkout, and never replays an ambiguous archive call.
 
 ## 0.9.6 - 2026-09-06
 

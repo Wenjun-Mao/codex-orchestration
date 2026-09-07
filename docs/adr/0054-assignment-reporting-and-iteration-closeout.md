@@ -72,5 +72,9 @@ boundary. Concurrent callers cannot issue the same archive operation, and an
 ambiguous result requires exact private observation instead of replay. Closeout
 captures each eligible member's clean branch tip before dispatch. After App
 worktree reclamation it deletes that tip only when it remains an unattached
-`codex/` task branch; source-style branches remain protected. This applies to
-disposable coordinators as well as accepted executors.
+`codex/` task branch. A coordinator additionally requires one exact linked
+worktree that is neither the caller nor primary checkout, and its tip must
+already be an ancestor of the authenticated primary-checkout baseline before
+archive dispatch and branch deletion. Source, caller, dirty, detached, and
+unpreserved coordinator work remain protected. This applies to disposable
+coordinators as well as accepted executors.

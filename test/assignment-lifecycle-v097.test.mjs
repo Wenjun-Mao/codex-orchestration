@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { rm } from "node:fs/promises";
-import { resolve } from "node:path";
+import { rm, writeFile } from "node:fs/promises";
+import { basename, resolve } from "node:path";
 import test from "node:test";
 import { acceptAssignmentResult } from "../lib/assignment-acceptance.mjs";
 import { assignmentAuthority } from "../lib/assignment-authority.mjs";
@@ -41,11 +41,15 @@ function git(root, args) {
 }
 
 async function fixture(t) {
-  const root = await createGitFixture("codex-flow-v097-assignment-");
-  const context = await createActiveTaskLaunch(root, "assignment");
+  const primaryRoot = await createGitFixture("codex-flow-v097-assignment-");
+  const coordinatorPath = resolve(primaryRoot, `../${basename(primaryRoot)}-coordinator`);
+  const coordinatorBranch = "codex/coordinator-assignment";
+  git(primaryRoot, ["worktree", "add", "--quiet", "-b", coordinatorBranch, coordinatorPath]);
+  const context = await createActiveTaskLaunch(coordinatorPath, "assignment");
   t.after(async () => {
-    try { execFileSync("git", ["worktree", "remove", "--force", context.executorPath], { cwd: root }); } catch {}
-    await rm(root, { recursive: true, force: true });
+    spawnSync("git", ["worktree", "remove", "--force", context.executorPath], { cwd: primaryRoot, encoding: "utf8" });
+    spawnSync("git", ["worktree", "remove", "--force", coordinatorPath], { cwd: primaryRoot, encoding: "utf8" });
+    await rm(primaryRoot, { recursive: true, force: true });
   });
   const director = { lineage_id: "director-lineage", thread_id: "director-thread", generation: 1 };
   await bindRecipient({ stateRoot: context.stateRoot, recipient: director });
@@ -55,13 +59,19 @@ async function fixture(t) {
     senderThreadId: context.coordinator.thread_id,
     senderHostId: "fixture-host",
     recipient: { host_id: "fixture-host", ...director, binding_digest: recipientBindingDigest(director) },
-    approvedPlanPath: resolve(root, ".gitkeep"),
+    approvedPlanPath: resolve(coordinatorPath, ".gitkeep"),
     approvedPlanDigest: sha256("fixture\n"),
     iterationLabel: "v0.9.7",
     purpose: "Assignment reporting",
+    repositoryRoot: coordinatorPath,
+    repositoryBranch: coordinatorBranch,
     now: TIME,
   });
-  return { ...context, director, ...registered };
+  return { ...context, primaryRoot, coordinatorPath, coordinatorBranch, director, ...registered };
+}
+
+function reclaimCoordinator(context) {
+  git(context.primaryRoot, ["worktree", "remove", context.coordinatorPath]);
 }
 
 async function acceptedFinal(context, turnId, text, offset) {
@@ -90,7 +100,7 @@ async function acceptedChildFixture(t, suffix, { disposableCoordinator = false }
   const primaryRoot = await createGitFixture(`codex-flow-v097-child-closeout-${suffix}-`);
   const coordinatorBranch = disposableCoordinator ? `codex/coordinator-${suffix}` : "main";
   const coordinatorPath = disposableCoordinator
-    ? resolve(primaryRoot, `../${primaryRoot.split("/").at(-1)}-${suffix}-coordinator`)
+    ? resolve(primaryRoot, `../${basename(primaryRoot)}-${suffix}-coordinator`)
     : primaryRoot;
   if (disposableCoordinator) {
     git(primaryRoot, ["worktree", "add", "--quiet", "-b", coordinatorBranch, coordinatorPath]);
@@ -210,7 +220,10 @@ test("assignment reporting survives normal run close and removal of its executio
     assignmentId: context.route.assignment.assignment_id,
     reportId: complete.report_id,
     directorThreadId: context.director.thread_id,
-    archiveThread: async () => ({ outcome: "accepted", archive_attempted: true, diagnostics: { categories: [] } }),
+    archiveThread: async () => {
+      reclaimCoordinator(context);
+      return { outcome: "accepted", archive_attempted: true, diagnostics: { categories: [] } };
+    },
     retireLocator: async () => ({ status: "retired" }),
     now: TIME + 4_000,
   });
@@ -283,7 +296,11 @@ test("assignment acceptance is fail-closed for an active coordinator and resumes
     assignmentId: context.route.assignment.assignment_id,
     reportId: report.report_id,
     directorThreadId: context.director.thread_id,
-    archiveThread: async () => { calls += 1; return { outcome: "accepted", archive_attempted: true, diagnostics: { categories: [] } }; },
+    archiveThread: async () => {
+      calls += 1;
+      reclaimCoordinator(context);
+      return { outcome: "accepted", archive_attempted: true, diagnostics: { categories: [] } };
+    },
     retireLocator: async () => ({ status: "retired" }),
     now: TIME + 3_000,
   });
@@ -302,7 +319,11 @@ test("assignment acceptance is fail-closed for an active coordinator and resumes
 });
 
 test("iteration closeout fences the coordinator until child archival and exact branch cleanup complete", async (t) => {
-  const { root, context, assignment } = await acceptedChildFixture(t, "child-first");
+  const { root, context, assignment } = await acceptedChildFixture(
+    t,
+    "child-first",
+    { disposableCoordinator: true },
+  );
   const calls = [];
   const archiveThread = async ({ threadId }) => {
     calls.push(threadId);
@@ -432,6 +453,114 @@ test("iteration closeout removes the exact disposable coordinator branch after i
     0,
   );
   assert.equal(git(root, ["branch", "--show-current"]), "main");
+});
+
+test("iteration closeout refuses an unmerged coordinator commit before native archival", async (t) => {
+  const {
+    root, coordinatorPath, context, assignment,
+  } = await acceptedChildFixture(t, "coordinator-unmerged", { disposableCoordinator: true });
+  const calls = [];
+  const archiveThread = async ({ threadId }) => {
+    calls.push(threadId);
+    return { outcome: "accepted", archive_attempted: true, diagnostics: { categories: [] } };
+  };
+  await closeoutIteration({
+    commonDir: context.commonDir,
+    iterationId: assignment.iteration_id,
+    allowCoordinator: true,
+    archiveThread,
+    now: TIME + 30_000,
+  });
+  git(root, ["worktree", "remove", context.executorPath]);
+  await writeFile(resolve(coordinatorPath, "coordinator-change.txt"), "unmerged\n", "utf8");
+  git(coordinatorPath, ["add", "coordinator-change.txt"]);
+  git(coordinatorPath, ["commit", "--quiet", "-m", "unmerged coordinator change"]);
+  await assert.rejects(
+    () => closeoutIteration({
+      commonDir: context.commonDir,
+      iterationId: assignment.iteration_id,
+      allowCoordinator: true,
+      archiveThread,
+      now: TIME + 31_000,
+    }),
+    /not preserved in the source checkout/,
+  );
+  assert.deepEqual(calls, [context.executorThreadId]);
+});
+
+test("iteration closeout refuses dirty and detached coordinator worktrees", async (t) => {
+  const dirty = await acceptedChildFixture(t, "coordinator-dirty", { disposableCoordinator: true });
+  const archiveThread = async () => ({ outcome: "accepted", archive_attempted: true, diagnostics: { categories: [] } });
+  await closeoutIteration({
+    commonDir: dirty.context.commonDir,
+    iterationId: dirty.assignment.iteration_id,
+    allowCoordinator: true,
+    archiveThread,
+    now: TIME + 32_000,
+  });
+  git(dirty.root, ["worktree", "remove", dirty.context.executorPath]);
+  await writeFile(resolve(dirty.coordinatorPath, "dirty.txt"), "dirty\n", "utf8");
+  await assert.rejects(
+    () => closeoutIteration({
+      commonDir: dirty.context.commonDir,
+      iterationId: dirty.assignment.iteration_id,
+      allowCoordinator: true,
+      archiveThread,
+      now: TIME + 33_000,
+    }),
+    /does not match its cleanup authority/,
+  );
+
+  const detached = await acceptedChildFixture(t, "coordinator-detached", { disposableCoordinator: true });
+  await closeoutIteration({
+    commonDir: detached.context.commonDir,
+    iterationId: detached.assignment.iteration_id,
+    allowCoordinator: true,
+    archiveThread,
+    now: TIME + 34_000,
+  });
+  git(detached.root, ["worktree", "remove", detached.context.executorPath]);
+  git(detached.coordinatorPath, ["checkout", "--quiet", "--detach"]);
+  await assert.rejects(
+    () => closeoutIteration({
+      commonDir: detached.context.commonDir,
+      iterationId: detached.assignment.iteration_id,
+      allowCoordinator: true,
+      archiveThread,
+      now: TIME + 35_000,
+    }),
+    /not an eligible linked task worktree/,
+  );
+});
+
+test("iteration closeout refuses to archive the caller checkout", async (t) => {
+  const fixtureContext = await acceptedChildFixture(t, "coordinator-caller", { disposableCoordinator: true });
+  const archiveThread = async () => ({ outcome: "accepted", archive_attempted: true, diagnostics: { categories: [] } });
+  await closeoutIteration({
+    commonDir: fixtureContext.context.commonDir,
+    iterationId: fixtureContext.assignment.iteration_id,
+    allowCoordinator: true,
+    archiveThread,
+    now: TIME + 36_000,
+  });
+  git(fixtureContext.root, ["worktree", "remove", fixtureContext.context.executorPath]);
+  git(fixtureContext.coordinatorPath, ["checkout", "--quiet", "--detach"]);
+  const originalCwd = process.cwd();
+  process.chdir(fixtureContext.coordinatorPath);
+  try {
+    await assert.rejects(
+      () => closeoutIteration({
+        commonDir: fixtureContext.context.commonDir,
+        iterationId: fixtureContext.assignment.iteration_id,
+        allowCoordinator: true,
+        archiveThread,
+        now: TIME + 37_000,
+      }),
+      /refuses a caller or source checkout/,
+    );
+  } finally {
+    process.chdir(originalCwd);
+  }
 });
 
 test("an interrupted native archive is observed and resumed without replay", async (t) => {
