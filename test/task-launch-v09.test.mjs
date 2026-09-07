@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { readFile, rm, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import test from "node:test";
 import { bindRecipient } from "../lib/recipients.mjs";
-import { RUNTIME_DIRECTORY } from "../lib/runtime-context.mjs";
+import { registerReportRoute } from "../lib/report-routes.mjs";
+import { sha256 } from "../lib/core.mjs";
+import { RUNTIME_DIRECTORY, runtimeBundleFilesRoot } from "../lib/runtime-context.mjs";
 import {
   prepareTaskLaunch,
   reconcileTaskLaunch,
@@ -54,7 +56,7 @@ function workflowTask(suffix, overrides = {}) {
   };
 }
 
-async function launchContext(root, suffix, { task = {} } = {}) {
+async function launchContext(root, suffix, { task = {}, baseTime = BASE_TIME } = {}) {
   const baseline = git(root, ["rev-parse", "HEAD"]);
   const commonDir = git(root, ["rev-parse", "--path-format=absolute", "--git-common-dir"]);
   const coordinator = {
@@ -76,7 +78,7 @@ async function launchContext(root, suffix, { task = {} } = {}) {
     plan,
     branchFences: [`codex/launch-${suffix}`],
     lineage: coordinator,
-    now: BASE_TIME,
+    now: baseTime,
   });
   const coordinatorBinding = {
     ...coordinator,
@@ -93,7 +95,7 @@ async function launchContext(root, suffix, { task = {} } = {}) {
     runId,
     planId: plan.plan_id,
     planRevision: plan,
-    now: BASE_TIME + 1_000,
+    now: baseTime + 1_000,
   });
   const contract = await persistWorkflowTaskContract({
     stateRoot,
@@ -102,7 +104,7 @@ async function launchContext(root, suffix, { task = {} } = {}) {
     taskId: plan.tasks[0].task_id,
     currentBaseline: { revision: baseline },
     dependencyAuthorities: [],
-    now: BASE_TIME + 2_000,
+    now: baseTime + 2_000,
   });
   const requestedSelectors = {
     project_id: `project-${suffix}`,
@@ -126,6 +128,8 @@ async function launchContext(root, suffix, { task = {} } = {}) {
     runId,
     contract,
     requestedSelectors,
+    baseTime,
+    runtime: activated.runtime,
   };
 }
 
@@ -134,14 +138,14 @@ async function preparedAttempt(context) {
     stateRoot: context.stateRoot,
     taskContract: context.contract,
     requestedSelectors: context.requestedSelectors,
-    now: BASE_TIME + 3_000,
+    now: context.baseTime + 3_000,
   });
   const attempted = await recordTaskLaunchAttempt({
     stateRoot: context.stateRoot,
     launchId: prepared.launch_id,
     hostSessionId: `session-${context.runId}`,
     timeoutSeconds: 300,
-    now: BASE_TIME + 4_000,
+    now: context.baseTime + 4_000,
   });
   return { prepared, attempted };
 }
@@ -161,7 +165,7 @@ async function removeWorktree(context, path) {
   await rm(path, { recursive: true, force: true });
 }
 
-function readyEvidence(context, launch, observedAt = BASE_TIME + 6_000) {
+function readyEvidence(context, launch, observedAt = context.baseTime + 6_000) {
   return {
     stateRoot: context.stateRoot,
     launchId: launch.launch_id,
@@ -279,12 +283,118 @@ test("executor start can establish exact identity before or after the host resul
     assert.equal(result.start_claim.executor_thread_id, executorThreadId);
     assert.equal(git(worktree, ["branch", "--show-current"]), context.requestedSelectors.worktree.executor_branch);
     if (order === "start-first") {
+      const reporting = await registerReportRoute({
+        stateRoot: context.stateRoot,
+        launchId: attempted.launch_id,
+        senderHostId: "local",
+        recipientHostId: "local",
+        now: BASE_TIME + 5_500,
+      });
+      assert.equal(reporting.status, "registered");
+      assert.equal(reporting.route.sender.thread_id, executorThreadId);
       result = await reconcileTaskLaunch(readyEvidence(context, attempted));
       assert.equal(result.status, "active");
     }
     const status = await taskLaunchStatus({ stateRoot: context.stateRoot, launchId: attempted.launch_id });
     assert.equal(status.start_claim.executor_thread_id, executorThreadId);
     assert.equal(status.creation_evidence.ready_thread_id, executorThreadId);
+  }
+});
+
+test("runtime CLI installs reporting across creation-evidence orderings and resumes a partial start", async (t) => {
+  for (const order of [
+    "start-first",
+    "result-first",
+    "opaque-first",
+    "opaque-after-start",
+    "partial-start",
+  ]) {
+    const baseTime = Date.now() - 10_000;
+    const root = await createGitFixture(`codex-flow-v09-cli-${order}-`);
+    const context = await launchContext(root, `cli-${order}`, { baseTime });
+    const { attempted } = await preparedAttempt(context);
+    const worktree = await linkedWorktree(context);
+    t.after(async () => {
+      await removeWorktree(context, worktree);
+      await rm(root, { recursive: true, force: true });
+    });
+    const executorThreadId = `executor-${context.runId}`;
+    const runtimeCli = resolve(
+      runtimeBundleFilesRoot(context.commonDir, context.runtime.bundle.bundle_sha256),
+      "bin",
+      "codex-flow.mjs",
+    );
+    const reconcileRequestPath = resolve(root, `reconcile-${order}.json`);
+    const opaque = order.startsWith("opaque-");
+    await writeFile(reconcileRequestPath, `${JSON.stringify({
+      run_id: context.runId,
+      launch_id: attempted.launch_id,
+      outcome: opaque ? "opaque" : "ready",
+      host_id: "fixture-host",
+      ...(opaque
+        ? { opaque_result: { classification: "unrecognized", fixture: order } }
+        : { ready_thread_id: executorThreadId }),
+    })}\n`, "utf8");
+    const reconcile = () => spawnSync(process.execPath, [
+      runtimeCli,
+      "task", "launch", "reconcile",
+      "--run-id", context.runId,
+      "--file", reconcileRequestPath,
+      "--json",
+    ], {
+      cwd: root,
+      env: { ...process.env, CODEX_THREAD_ID: context.coordinator.thread_id },
+      encoding: "utf8",
+    });
+    if (["result-first", "opaque-first"].includes(order)) {
+      const reconciled = reconcile();
+      assert.equal(reconciled.status, 0, reconciled.stderr || reconciled.stdout);
+      assert.equal(JSON.parse(reconciled.stdout).status, "awaiting-start");
+    }
+    if (order === "partial-start") {
+      await assert.rejects(startTaskLaunch({
+        stateRoot: context.stateRoot,
+        launchId: attempted.launch_id,
+        launchNonce: attempted.launch_nonce,
+        executorThreadId,
+        repositoryPath: worktree,
+        now: baseTime + 5_000,
+        hooks: { afterPreparedIntent: () => { throw new Error("fixture partial start"); } },
+      }), /fixture partial start/);
+    }
+    const started = spawnSync(process.execPath, [
+      runtimeCli,
+      "task", "launch", "start",
+      "--run-id", context.runId,
+      "--launch-id", attempted.launch_id,
+      "--nonce", attempted.launch_nonce,
+      "--json",
+    ], {
+      cwd: worktree,
+      env: { ...process.env, CODEX_THREAD_ID: executorThreadId },
+      encoding: "utf8",
+    });
+    assert.equal(started.status, 0, started.stderr || started.stdout);
+    const output = JSON.parse(started.stdout);
+    assert.equal(output.status, "active");
+    assert.match(output.report_route.route_id, /^report-route-v1-/);
+    const locator = JSON.parse(await readFile(resolve(
+      context.commonDir,
+      "codex-flow",
+      "report-locators",
+      "records",
+      `${sha256(executorThreadId)}.json`,
+    ), "utf8"));
+    assert.equal(locator.sender_thread_id, executorThreadId);
+    assert.equal(locator.route_id, output.report_route.route_id);
+    if (!["result-first", "opaque-first"].includes(order)) {
+      const reconciled = reconcile();
+      assert.equal(reconciled.status, 0, reconciled.stderr || reconciled.stdout);
+      assert.equal(JSON.parse(reconciled.stdout).status, "active");
+    }
+    const status = await taskLaunchStatus({ stateRoot: context.stateRoot, launchId: attempted.launch_id });
+    assert.equal(status.start_claim.executor_thread_id, executorThreadId);
+    assert.equal(status.creation_evidence.host_id, opaque ? "unknown" : "fixture-host");
   }
 });
 

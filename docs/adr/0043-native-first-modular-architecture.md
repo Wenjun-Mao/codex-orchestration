@@ -87,6 +87,10 @@ v0.8.1 recovery bridges remain available only from immutable tags.
   deterministic activation gate.
 - The App may return a provisional or unfamiliar result without blocking an
   executor that can make an exact start claim.
+- An exact start claim may register its same-host report route before creation
+  evidence arrives. Known host evidence is checked when present; absence and
+  opaque creation evidence are unavailable information, not contradictory host
+  values.
 - A task that never starts remains unactivated and may require the bounded
   mapping capsule solely for archival.
 - Branch attachment moves from coordinator sequencing to executor activation;
@@ -106,6 +110,9 @@ v0.8.1 recovery bridges remain available only from immutable tags.
   cases, and every crash boundary around branch attachment.
 - Complete lifecycle tests join launch through callback, disposition,
   integration/no-change, verification, archive, cleanup, and audit.
+- Real launch-order tests register reporting before and after ready or opaque
+  App-result reconciliation, including partial-start resumption, while retaining
+  host-conflict rejection once known evidence exists.
 - Exact predecessor compatibility tests invoke immutable v0.8.3 authority.
 - App-facing stable promotion requires a same-coordinator live RC canary that
   proves one initial prompt, same-turn work, no release message, and separate
