@@ -25,6 +25,9 @@ decision records remain the detailed release evidence.
 - Bind an assignment's exact replacement execution during authenticated refresh
   before consuming the handoff or deleting the source namespace; exact retries
   are idempotent and conflicting or stale transitions fail closed.
+- Preserve one director recipient binding across sequential coordinator
+  assignments instead of conflating a fresh sender run's execution fence with
+  the recipient lineage fence.
 
 ## 0.9.6 - 2026-09-06
 

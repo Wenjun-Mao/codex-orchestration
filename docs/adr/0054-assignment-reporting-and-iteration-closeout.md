@@ -48,6 +48,14 @@ and immutable snapshot from the approved path. Registration validates that
 snapshot; models do not supply a checksum, commit, or manual byte-authentication
 step. Existing v1 preparations remain readable and are not rewritten.
 
+The director recipient lineage is shared assignment authority, not execution
+authority owned by any one coordinator run. A new coordinator route resolves
+the prepared recipient against the current exact lineage binding and preserves
+that binding byte-for-byte. It never supplies the sender run's fence token as a
+recipient token. Initial recipient binding and explicit generation advances
+remain governed by the recipient registry; mismatched or stale identities are
+rejected rather than rebound during route registration.
+
 ## Rejected alternatives
 
 - Keep a terminal run namespace solely for reporting. This couples unrelated
@@ -87,7 +95,11 @@ therefore mean a true no-work clean start, not an implicit coordinator bypass.
 Tests cover namespace removal before later finals, multiple finals, acceptance
 ordering, archive activity/ambiguity, local mutation/no-change proof, exact
 coordinator refresh and interrupted assignment rebinding, schema parity, and
-adapter idempotence.
+adapter idempotence. They also cover consecutive coordinator runs with distinct
+sender fences targeting the same director, exact recipient-byte preservation,
+registration replay, partial-registration recovery, and stale identity
+rejection. This closes the missed live gate where only a fresh sender entering
+an already-populated shared recipient registry exposed fence conflation.
 
 Archive dispatch is a single atomic claim persisted before the native host
 boundary. Concurrent callers cannot issue the same archive operation, and an

@@ -1283,7 +1283,6 @@ async function commandReportV09(args, mutationAuthority = null) {
           thread_id: recipient.thread_id,
           generation: recipient.generation,
         },
-        fenceToken: mutationAuthority.run.binding.fence_token,
       });
       await bindRecipient({
         stateRoot: reportingStateRoot,
@@ -1292,7 +1291,6 @@ async function commandReportV09(args, mutationAuthority = null) {
           thread_id: recipient.thread_id,
           generation: recipient.generation,
         },
-        fenceToken: mutationAuthority.run.binding.fence_token,
       });
       const registered = await registerCoordinatorReportRoute({
         stateRoot: git.stateRoot,
