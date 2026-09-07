@@ -14,7 +14,7 @@ import {
 import { validateReleaseIdentity } from "./release-identity.mjs";
 
 const root = resolve(import.meta.dirname, "..");
-const EXPECTED_PACKAGE_VERSION = "0.9.7-rc.6";
+const EXPECTED_PACKAGE_VERSION = "0.9.7-rc.7";
 
 const ACTIVE_SCHEMA_NAMES = Object.freeze([
   "assignment-authority",
@@ -292,22 +292,38 @@ if (Object.hasOwn(plugin, "hooks")) {
 const pluginHooks = JSON.parse(await readRequired("hooks/hooks.json"));
 const stopHandlers = pluginHooks?.hooks?.Stop;
 const subagentStopHandlers = pluginHooks?.hooks?.SubagentStop;
+const sessionStartHandlers = pluginHooks?.hooks?.SessionStart;
+const subagentStartHandlers = pluginHooks?.hooks?.SubagentStart;
 if (
   !Array.isArray(stopHandlers)
   || stopHandlers.length !== 1
   || !Array.isArray(subagentStopHandlers)
   || subagentStopHandlers.length !== 1
-  || Object.keys(pluginHooks.hooks).sort().join(",") !== "Stop,SubagentStop"
+  || !Array.isArray(sessionStartHandlers)
+  || sessionStartHandlers.length !== 1
+  || !Array.isArray(subagentStartHandlers)
+  || subagentStartHandlers.length !== 1
+  || sessionStartHandlers[0]?.matcher !== "startup|resume|clear|compact"
+  || Object.keys(pluginHooks.hooks).sort().join(",") !== "SessionStart,Stop,SubagentStart,SubagentStop"
 ) {
-  throw new Error("Queued-report hook must register exactly one Stop and one SubagentStop event");
+  throw new Error("Queued-report hooks must register exact session, subagent, and completion events");
 }
 for (const commandHook of [stopHandlers[0]?.hooks?.[0], subagentStopHandlers[0]?.hooks?.[0]]) {
   if (
     commandHook?.type !== "command"
-    || commandHook.command !== "node \"$PLUGIN_ROOT/bin/codex-flow-report-hook.mjs\""
+    || commandHook.command !== "node \"$PLUGIN_DATA/report-hooks/launchers/report-hook-launcher-v1.mjs\""
     || commandHook.timeout !== 3
   ) {
-    throw new Error("Queued-report completion hooks must use the bounded immutable package entrypoint");
+    throw new Error("Queued-report completion hooks must use the stable staged launcher");
+  }
+}
+for (const commandHook of [sessionStartHandlers[0]?.hooks?.[0], subagentStartHandlers[0]?.hooks?.[0]]) {
+  if (
+    commandHook?.type !== "command"
+    || commandHook.command !== "node \"$PLUGIN_ROOT/bin/codex-flow-report-launcher-install.mjs\""
+    || commandHook.timeout !== 3
+  ) {
+    throw new Error("Queued-report start hooks must install the immutable staged launcher");
   }
 }
 

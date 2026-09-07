@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
-import { readdir, readFile, rm } from "node:fs/promises";
+import { cp, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import test from "node:test";
 import {
   CODEX_APP_BINARY_PATH,
@@ -20,6 +20,7 @@ import {
   resolveReportHookRoute,
   withRepositoryReportLocatorRegistration,
 } from "../lib/report-hook.mjs";
+import { installStableReportLauncher } from "../lib/adapters/codex-app/report-runtime.mjs";
 import { reportDelivery } from "../lib/report-records.mjs";
 import { closeReportRoute, registerReportRoute } from "../lib/report-routes.mjs";
 import { sha256, stableStringify } from "../lib/core.mjs";
@@ -216,9 +217,72 @@ test("the host-local locator pins core route bytes and every reporter dependency
   assert.equal(repositoryResolved.route.route_id, route.route_id);
 });
 
+test("a staged reporter survives removal of its registering package and unregistered tasks stay harmless", async (t) => {
+  const { context, route, pluginData } = await fixture(t, "staged-runtime");
+  const runtimePackage = resolve(pluginData, "registering-package");
+  await mkdir(runtimePackage, { recursive: true });
+  await cp(resolve(packageRoot, "bin"), resolve(runtimePackage, "bin"), { recursive: true });
+  await cp(resolve(packageRoot, "lib"), resolve(runtimePackage, "lib"), { recursive: true });
+  await cp(resolve(packageRoot, "package.json"), resolve(runtimePackage, "package.json"));
+  await writeFile(resolve(runtimePackage, "lib", "codex-app-report-adapter.mjs"), `
+export const CODEX_APP_BINARY_PATH = ${JSON.stringify(CODEX_APP_BINARY_PATH)};
+export const CODEX_APP_CLI_VERSION = ${JSON.stringify(CODEX_APP_CLI_VERSION)};
+export function validateNativeQueueConfiguration(value) { return value; }
+export async function submitNativeQueuedReport() {
+  return { outcome: "accepted", queued_submission_id: "staged-runtime-queue", queue_attempted: true, diagnostics: {} };
+}
+`, "utf8");
+
+  const installerOutput = execFileSync(
+    process.execPath,
+    [resolve(packageRoot, "bin", "codex-flow-report-launcher-install.mjs")],
+    {
+      env: { ...process.env, PLUGIN_DATA: pluginData },
+      input: `${JSON.stringify({ hook_event_name: "SessionStart", source: "startup" })}\n`,
+      encoding: "utf8",
+    },
+  );
+  assert.equal(installerOutput, "{}\n");
+  const installed = await installStableReportLauncher({ pluginData, packageRoot });
+  assert.equal(installed.status, "existing");
+  const locator = await installRepositoryReportLocator({
+    stateRoot: context.stateRoot,
+    route,
+    packageRoot: runtimePackage,
+    nativeQueue: nativeQueue(),
+  });
+  assert.match(locator.reporter.runtime_sha256, /^[0-9a-f]{64}$/);
+  await rm(runtimePackage, { recursive: true, force: true });
+
+  const exactFinal = "staged runtime final after package removal 雪";
+  const output = execFileSync(process.execPath, [installed.launcher_path], {
+    cwd: context.executorPath,
+    env: { ...process.env, PLUGIN_DATA: pluginData },
+    input: `${JSON.stringify({ ...event(context.executorThreadId, exactFinal), cwd: context.executorPath })}\n`,
+    encoding: "utf8",
+  });
+  assert.equal(output, "{}\n");
+  const records = await readdir(resolve(context.stateRoot, "reports", "deliveries", "records"));
+  assert.equal(records.length, 1);
+  const delivery = await reportDelivery({
+    stateRoot: context.stateRoot,
+    reportId: records[0].replace(/\.json$/, ""),
+  });
+  assert.equal(delivery.state, "accepted");
+  assert.equal(delivery.envelope.text, exactFinal);
+
+  const ignored = execFileSync(process.execPath, [installed.launcher_path], {
+    cwd: pluginData,
+    env: { ...process.env, PLUGIN_DATA: pluginData },
+    input: `${JSON.stringify({ ...event("unregistered-thread", "ordinary final"), cwd: pluginData })}\n`,
+    encoding: "utf8",
+  });
+  assert.equal(ignored, "{}\n");
+});
+
 test("closed routes retire their exact sender locator through a durable replayable tombstone", async (t) => {
   const { context, route } = await fixture(t, "retirement");
-  await installRepositoryReportLocator({
+  const locator = await installRepositoryReportLocator({
     stateRoot: context.stateRoot,
     route,
     packageRoot,
@@ -237,6 +301,16 @@ test("closed routes retire their exact sender locator through a durable replayab
   });
   assert.equal(first.status, "retired");
   assert.equal(first.retirement.closed_route_sha256, sha256(stableStringify(closed.route)));
+  const runtimeManifestPath = resolve(
+    context.commonDir,
+    "codex-flow",
+    "report-locators",
+    "runtimes",
+    sha256(context.executorThreadId),
+    locator.reporter.runtime_sha256,
+    "runtime.json",
+  );
+  await assert.rejects(readFile(runtimeManifestPath), /ENOENT/);
   const resolved = await resolveReportHookRoute({
     pluginData: "",
     senderThreadId: context.executorThreadId,
@@ -451,7 +525,7 @@ test("queue text labels the exact final as untrusted data", async (t) => {
 
 test("reporter authority reflects the packaged release identity", async () => {
   const authority = await reporterAuthorityFor({ packageRoot });
-  assert.equal(authority.package_version, "0.9.7-rc.6");
+  assert.equal(authority.package_version, "0.9.7-rc.7");
   assert.match(authority.routes_sha256, /^[0-9a-f]{64}$/);
   assert.match(authority.records_sha256, /^[0-9a-f]{64}$/);
 });

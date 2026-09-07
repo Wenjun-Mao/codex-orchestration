@@ -38,6 +38,7 @@
     "report-records.mjs": "governance-core",
     "report-routes.mjs": "governance-core",
     "report-hook.mjs": "codex-app-adapter",
+    "adapters/codex-app/report-runtime.mjs": "codex-app-adapter",
     "repository-paths.mjs": "governance-core",
     "run-audit.mjs": "governance-core",
     "run-lifecycle.mjs": "governance-core",
