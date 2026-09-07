@@ -232,6 +232,38 @@ test("assignment reporting survives normal run close and removal of its executio
   assert.equal((await reportRoute({ stateRoot: context.state_root, routeId: context.route.route_id })).state, "closed");
 });
 
+test("coordinator route registration is idempotent after assignment iteration persistence", async (t) => {
+  const context = await fixture(t);
+  const replay = await registerCoordinatorReportRoute({
+    stateRoot: context.stateRoot,
+    runId: context.launch.run_id,
+    senderThreadId: context.coordinator.thread_id,
+    senderHostId: "fixture-host",
+    recipient: {
+      host_id: "fixture-host",
+      ...context.director,
+      binding_digest: recipientBindingDigest(context.director),
+    },
+    approvedPlanPath: resolve(context.coordinatorPath, ".gitkeep"),
+    approvedPlanDigest: sha256("fixture\n"),
+    iterationLabel: "v0.9.7",
+    purpose: "Assignment reporting",
+    repositoryRoot: context.coordinatorPath,
+    repositoryBranch: context.coordinatorBranch,
+    now: TIME + 1_000,
+  });
+  assert.equal(replay.status, "already-registered");
+  const assignment = await assignmentAuthority({
+    stateRoot: context.state_root,
+    assignmentId: context.route.assignment.assignment_id,
+  });
+  const iteration = await iterationStatus({
+    commonDir: context.commonDir,
+    iterationId: assignment.iteration_id,
+  });
+  assert.equal(iteration.created_at, new Date(TIME).toISOString());
+});
+
 test("pre-dispatch preparation generates the useful first prompt from bound authority", async (t) => {
   const root = await createGitFixture("codex-flow-v097-preparation-");
   t.after(() => rm(root, { recursive: true, force: true }));

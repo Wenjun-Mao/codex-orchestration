@@ -85,6 +85,11 @@ is sender-scoped, is removed with exact locator retirement, and remains covered
 by existing repository unplug ownership. No mutable latest pointer, daemon, or
 global route registry is introduced.
 
+Pinned execution-runtime bundles include the package metadata required to stage
+that reporter runtime. Route registration is locally resumable after partial
+assignment, iteration, or route persistence: replay preserves the original
+iteration timestamps and completes the missing locator transition.
+
 Route lifetime follows assignment lifetime. Completing a task disposition
 closes that launch's route, and closing or abandoning a run closes every
 remaining route owned by the run. A closed route cannot be re-armed, so late

@@ -1,6 +1,6 @@
 {
   "name": "@wjmao/codex-flow",
-  "version": "0.9.7-rc.7",
+  "version": "0.9.7-rc.8",
   "description": "Dependency-free repository tooling for coordinated Codex task workflows.",
   "private": true,
   "homepage": "https://github.com/Wenjun-Mao/codex-orchestration#readme",

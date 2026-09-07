@@ -71,6 +71,7 @@ function runtimeFor(root, bundleSource, {
 async function runtimeBundleFor(root, suffix) {
   const packageRoot = resolve(root, `plugin-source-${suffix}`);
   const files = new Map([
+    ["package.json", "{\"name\":\"runtime-fixture\",\"version\":\"0.0.0\",\"type\":\"module\"}\n"],
     ["bin/codex-flow.mjs", "#!/usr/bin/env node\n"],
     ["lib/runtime.mjs", "export const runtime = true;\n"],
     ["schemas/runtime.schema.json", "{}\n"],
@@ -522,6 +523,7 @@ test("runtime reads retain the exact bundle after the plugin source disappears",
     new RegExp(`codex-flow/${RUNTIME_DIRECTORY.replaceAll(".", "\\.")}/runtimes/[0-9a-f]{64}/files$`),
   );
   await stat(resolve(acquired.bundle_root, "bin", "codex-flow.mjs"));
+  await stat(resolve(acquired.bundle_root, "package.json"));
   await rm(packageRoot, { recursive: true, force: true });
   const read = await readRuntimeContext({
     gitCommonDirectory: commonDir,
