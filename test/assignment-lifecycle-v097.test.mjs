@@ -122,6 +122,21 @@ test("pre-dispatch preparation generates the useful first prompt from bound auth
     await assignmentPreparation({ stateRoot: prepared.state_root, preparationId: prepared.preparation.preparation_id }),
     prepared.preparation,
   );
+  const replay = await prepareCoordinatorAssignment({
+    commonDir,
+    approvedPlanPath: resolve(root, ".gitkeep"),
+    approvedPlanDigest: sha256("fixture\n"),
+    recipient: { host_id: "local", ...director, binding_digest: recipientBindingDigest(director) },
+    iterationLabel: "v0.9.7",
+    purpose: "Reporting",
+    outcome: "Deliver the approved assignment.",
+    scope: ["Implement the bounded runtime slice."],
+    acceptanceCriteria: ["The exact final reaches the director."],
+    constraints: ["Keep same-host scope."],
+    reasons: ["Preserve v0.9.6 authority until cutover."],
+    now: TIME + 60_000,
+  });
+  assert.deepEqual(replay.preparation, prepared.preparation);
 });
 
 test("assignment acceptance is fail-closed for an active coordinator and resumes without duplicate archival", async (t) => {
