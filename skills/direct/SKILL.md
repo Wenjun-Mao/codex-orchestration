@@ -5,14 +5,14 @@ description: Own Codex Flow goals, strategic decisions, delegated assignments, a
 
 # Direct an Outcome
 
-Use `codex-orchestration:plan` to save and bind approval before delegated
-delivery. Give the coordinator the approved bytes or an immutable snapshot it
-can read; a path in the director's uncommitted checkout is insufficient.
+Use `codex-orchestration:plan` to save the approved plan before delegated
+delivery.
 
 Run `assignment prepare --file request.json --json` using the
 [assignment brief](../../templates/references/assignment-and-reporting.md).
-Use its generated title and full first prompt. Select delegated staffing
-through the package's selector policy; children are optional.
+The command snapshots the plan for the coordinator. Use its generated title
+and full first prompt. Select delegated staffing through the package's selector
+policy; children are optional.
 
 Dispatch one coordinator with the real assignment as its first prompt. Check
 exact identity/acceptance once, report ready, pending, or blocked, and return.
