@@ -38,7 +38,8 @@ Registration derives the remaining mechanics and records same-host
 assignment/iteration membership.
 The director recipient binding is shared across its assignments. Registration
 preserves that exact lineage binding; a fresh coordinator run never substitutes
-its sender fence for the recipient fence.
+its sender fence for the recipient fence. Generation one is required only for a
+missing registry; an exact existing current generation remains valid.
 Use the pinned completion hook to capture complete finals at genuine task idle.
 Waits and commentary are not reporting boundaries. Keep the explicit manual
 path until the hook is installed, trusted, and live-verified for the exact

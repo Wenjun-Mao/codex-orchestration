@@ -27,7 +27,8 @@ decision records remain the detailed release evidence.
   are idempotent and conflicting or stale transitions fail closed.
 - Preserve one director recipient binding across sequential coordinator
   assignments instead of conflating a fresh sender run's execution fence with
-  the recipient lineage fence.
+  the recipient lineage fence, including exact current recipient generations
+  beyond the initial generation.
 
 ## 0.9.6 - 2026-09-06
 

@@ -23,9 +23,11 @@ import { abandonRun } from "../lib/run-lifecycle.mjs";
 import { recipientBindingDigest } from "../lib/task-results.mjs";
 import { createWorkflowPlanRevision } from "../lib/workflow-plan.mjs";
 import {
+  assertSuccess,
   activateFixtureRun,
   createGitFixture,
   removeFixture,
+  runCli,
 } from "./helpers.mjs";
 
 const TIME = Date.parse("2026-09-07T16:00:00.000Z");
@@ -253,4 +255,50 @@ test("fresh coordinator fences preserve one shared director binding and recover 
     () => register(second, secondPreparation, TIME + 11_000),
     /generation is stale/,
   );
+
+  const currentRecipient = {
+    host_id: "fixture-host",
+    ...nextDirector,
+    binding_digest: recipientBindingDigest(nextDirector),
+  };
+  const generationTwoBytes = await readFile(recipientRecord, "utf8");
+  await abandonRun({
+    gitCommonDirectory: commonDir,
+    runId: second.run.run_id,
+    resume: second.run.binding,
+    reason: "Finish the second sequential route-registration fixture.",
+    abandonedAt: new Date(TIME + 12_000).toISOString(),
+  });
+  const third = await coordinatorRun(root, "third", 13);
+  const thirdPreparation = await prepareCoordinatorAssignment({
+    commonDir,
+    approvedPlanPath: planPath,
+    recipient: currentRecipient,
+    iterationLabel: "Shared director third",
+    purpose: "Current generation route",
+    outcome: "Register through the actual CLI with current generation two.",
+    scope: ["Register the generation-two route."],
+    acceptanceCriteria: ["The CLI preserves the current recipient bytes."],
+    constraints: [],
+    reasons: [],
+    now: TIME + 14_000,
+  });
+  const cliRequestPath = resolve(root, "coordinator-route-request.json");
+  await writeFile(cliRequestPath, `${JSON.stringify({
+    run_id: third.run.run_id,
+    sender_thread_id: third.lineage.thread_id,
+    preparation_id: thirdPreparation.preparation.preparation_id,
+  })}\n`, "utf8");
+  const cliRegistration = runCli([
+    "report", "route", "coordinator",
+    "--run-id", third.run.run_id,
+    "--file", cliRequestPath,
+    "--json",
+  ], {
+    cwd: root,
+    env: { CODEX_THREAD_ID: third.lineage.thread_id },
+  });
+  assertSuccess(cliRegistration, "generation-two coordinator route registration");
+  assert.equal(JSON.parse(cliRegistration.stdout).status, "registered");
+  assert.equal(await readFile(recipientRecord, "utf8"), generationTwoBytes);
 });

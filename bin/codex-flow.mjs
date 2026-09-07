@@ -1261,9 +1261,6 @@ async function commandReportV09(args, mutationAuthority = null) {
       stateRoot: assignmentStateRoot(git.commonDir),
       preparationId: request.preparation_id,
     });
-    if (preparation.recipient.generation !== 1) {
-      throw new CliError("A new director recipient route must begin at generation 1", 73);
-    }
     const recipient = preparation.recipient;
     const reportingStateRoot = assignmentStateRoot(git.commonDir);
     const result = await withRepositoryReportLocatorRegistration({

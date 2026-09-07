@@ -54,7 +54,10 @@ the prepared recipient against the current exact lineage binding and preserves
 that binding byte-for-byte. It never supplies the sender run's fence token as a
 recipient token. Initial recipient binding and explicit generation advances
 remain governed by the recipient registry; mismatched or stale identities are
-rejected rather than rebound during route registration.
+rejected rather than rebound during route registration. Generation one remains
+mandatory only when a registry is first created. A later registration may
+preserve an exact already-current generation without converting that operation
+into an initial bind or a rebind.
 
 ## Rejected alternatives
 
@@ -98,8 +101,9 @@ coordinator refresh and interrupted assignment rebinding, schema parity, and
 adapter idempotence. They also cover consecutive coordinator runs with distinct
 sender fences targeting the same director, exact recipient-byte preservation,
 registration replay, partial-registration recovery, and stale identity
-rejection. This closes the missed live gate where only a fresh sender entering
-an already-populated shared recipient registry exposed fence conflation.
+rejection, including actual CLI registration for an already-current generation
+two. This closes the missed live gate where only a fresh sender entering an
+already-populated shared recipient registry exposed fence conflation.
 
 Archive dispatch is a single atomic claim persisted before the native host
 boundary. Concurrent callers cannot issue the same archive operation, and an
