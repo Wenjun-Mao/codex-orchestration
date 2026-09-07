@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { rm, writeFile } from "node:fs/promises";
+import { readFile, rm, writeFile } from "node:fs/promises";
 import { basename, resolve } from "node:path";
 import test from "node:test";
 import { acceptAssignmentResult } from "../lib/assignment-acceptance.mjs";
@@ -8,8 +8,9 @@ import { assignmentAuthority } from "../lib/assignment-authority.mjs";
 import {
   assignmentPreparation,
   prepareCoordinatorAssignment,
+  validateAssignmentPreparation,
 } from "../lib/assignment-preparation.mjs";
-import { sha256 } from "../lib/core.mjs";
+import { sha256, stableStringify } from "../lib/core.mjs";
 import { deliverCallback, observeCallback } from "../lib/callbacks.mjs";
 import { finalizeTaskDisposition, prepareTaskDisposition } from "../lib/dispositions.mjs";
 import {
@@ -214,7 +215,6 @@ test("assignment reporting survives normal run close and removal of its executio
   const complete = await acceptedFinal(context, "complete-turn", "Implementation and validation are complete.", 3_000);
   assert.notEqual(restart.report_id, complete.report_id);
   assert.equal((await reportRoute({ stateRoot: context.state_root, routeId: context.route.route_id })).state, "active");
-
   const accepted = await acceptAssignmentResult({
     stateRoot: context.state_root,
     assignmentId: context.route.assignment.assignment_id,
@@ -236,11 +236,12 @@ test("pre-dispatch preparation generates the useful first prompt from bound auth
   const root = await createGitFixture("codex-flow-v097-preparation-");
   t.after(() => rm(root, { recursive: true, force: true }));
   const commonDir = resolve(root, ".git");
+  const planPath = resolve(root, "approved-uncommitted-plan.md");
+  await writeFile(planPath, "# Approved plan\n\nShip the bounded change.\n", "utf8");
   const director = { lineage_id: "prepared-director-lineage", thread_id: "prepared-director", generation: 1 };
   const prepared = await prepareCoordinatorAssignment({
     commonDir,
-    approvedPlanPath: resolve(root, ".gitkeep"),
-    approvedPlanDigest: sha256("fixture\n"),
+    approvedPlanPath: planPath,
     recipient: { host_id: "local", ...director, binding_digest: recipientBindingDigest(director) },
     iterationLabel: "v0.9.7",
     purpose: "Reporting",
@@ -255,14 +256,26 @@ test("pre-dispatch preparation generates the useful first prompt from bound auth
   assert.match(prepared.text, new RegExp(prepared.preparation.preparation_id));
   assert.match(prepared.text, /codex-orchestration:coordinate/);
   assert.match(prepared.text, /Preserve v0\.9\.6 authority until cutover/);
+  assert.match(prepared.text, /Approved plan snapshot \(source: [^)]+\.md\): \[open the approved plan\]\(<\//);
+  assert.doesNotMatch(prepared.text, new RegExp(prepared.preparation.approved_plan.digest));
+  assert.doesNotMatch(prepared.text, /checksum|authenticate.*bytes|plan hash/i);
+  assert.equal(await readFile(prepared.preparation.approved_plan.snapshot_path, "utf8"), "# Approved plan\n\nShip the bounded change.\n");
+  const legacyDraft = { ...prepared.preparation, schema_version: 1, preparation_id: "pending" };
+  const { preparation_id: ignoredId, created_at: ignoredTime, ...legacySeed } = legacyDraft;
+  const legacy = validateAssignmentPreparation({
+    ...legacyDraft,
+    preparation_id: `assignment-preparation-v1-${sha256(stableStringify(legacySeed))}`,
+  });
+  assert.equal(legacy.schema_version, 1);
+  await writeFile(planPath, "# Later source edit\n", "utf8");
+  assert.equal(await readFile(prepared.preparation.approved_plan.snapshot_path, "utf8"), "# Approved plan\n\nShip the bounded change.\n");
   assert.deepEqual(
     await assignmentPreparation({ stateRoot: prepared.state_root, preparationId: prepared.preparation.preparation_id }),
     prepared.preparation,
   );
   const replay = await prepareCoordinatorAssignment({
     commonDir,
-    approvedPlanPath: resolve(root, ".gitkeep"),
-    approvedPlanDigest: sha256("fixture\n"),
+    approvedPlanPath: prepared.preparation.approved_plan.snapshot_path,
     recipient: { host_id: "local", ...director, binding_digest: recipientBindingDigest(director) },
     iterationLabel: "v0.9.7",
     purpose: "Reporting",
@@ -274,6 +287,14 @@ test("pre-dispatch preparation generates the useful first prompt from bound auth
     now: TIME + 60_000,
   });
   assert.deepEqual(replay.preparation, prepared.preparation);
+  await writeFile(prepared.preparation.approved_plan.snapshot_path, "corrupt\n", "utf8");
+  await assert.rejects(
+    () => assignmentPreparation({
+      stateRoot: prepared.state_root,
+      preparationId: prepared.preparation.preparation_id,
+    }),
+    /plan was tampered/,
+  );
 });
 
 test("assignment acceptance is fail-closed for an active coordinator and resumes without duplicate archival", async (t) => {

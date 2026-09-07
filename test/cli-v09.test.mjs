@@ -159,7 +159,6 @@ test("v0.9 CLI activates a clean run through current launch-era wiring", async (
       generation: 1,
     },
     approved_plan_path: requestPath,
-    approved_plan_digest: sha256(`${JSON.stringify(request)}\n`),
     iteration_label: "CLI v0.9 test",
     purpose: "Coordinator reporting",
     outcome: "Exercise the assignment preparation and activation contract.",
@@ -176,6 +175,9 @@ test("v0.9 CLI activates a clean run through current launch-era wiring", async (
   });
   assertSuccess(prepared, "coordinator assignment preparation");
   const preparation = JSON.parse(prepared.stdout).preparation;
+  const savedPlan = await readFile(preparation.approved_plan.snapshot_path, "utf8");
+  await writeFile(requestPath, "source changed after preparation\n", "utf8");
+  assert.equal(await readFile(preparation.approved_plan.snapshot_path, "utf8"), savedPlan);
   const reportRequest = {
     run_id: runId,
     sender_thread_id: coordinatorThreadId,
@@ -183,6 +185,16 @@ test("v0.9 CLI activates a clean run through current launch-era wiring", async (
   };
   const reportRequestPath = resolve(requests, "report-route.json");
   await writeFile(reportRequestPath, `${JSON.stringify(reportRequest)}\n`, "utf8");
+  await writeFile(preparation.approved_plan.snapshot_path, "corrupt snapshot\n", "utf8");
+  const corrupted = runCli([
+    "report", "route", "coordinator", "--run-id", runId, "--file", reportRequestPath, "--json",
+  ], {
+    cwd: root,
+    env: { CODEX_THREAD_ID: coordinatorThreadId },
+  });
+  assert.notEqual(corrupted.status, 0);
+  assert.match(`${corrupted.stdout}\n${corrupted.stderr}`, /plan was tampered/);
+  await writeFile(preparation.approved_plan.snapshot_path, savedPlan, "utf8");
   const registered = runCli([
     "report", "route", "coordinator", "--run-id", runId, "--file", reportRequestPath, "--json",
   ], {
@@ -193,6 +205,24 @@ test("v0.9 CLI activates a clean run through current launch-era wiring", async (
   const reporting = JSON.parse(registered.stdout);
   assert.equal(reporting.route.assignment.kind, "coordinator-delegation");
   assert.equal(reporting.route.recipient.thread_id, "cli-v09-director");
+  const briefRequestPath = resolve(requests, "assignment-brief.json");
+  await writeFile(briefRequestPath, `${JSON.stringify({
+    assignment_id: reporting.route.assignment.assignment_id,
+    outcome: "Deliver the approved assignment.",
+    scope: ["Complete the bounded work."],
+    acceptance_criteria: ["Return verified evidence."],
+    constraints: [],
+    reasons: [],
+  })}\n`, "utf8");
+  const briefResult = runCli([
+    "assignment", "brief", "--assignment-id", reporting.route.assignment.assignment_id,
+    "--file", briefRequestPath, "--json",
+  ], { cwd: root });
+  assertSuccess(briefResult, "coordinator assignment brief");
+  const brief = JSON.parse(briefResult.stdout);
+  assert.match(brief.text, /Approved plan snapshot \(source: [^)]+\): \[open the approved plan\]\(<\//);
+  assert.doesNotMatch(brief.text, new RegExp(preparation.approved_plan.digest));
+  assert.doesNotMatch(brief.text, /checksum|authenticate.*bytes|plan hash/i);
   await stat(resolve(
     root,
     ".git",

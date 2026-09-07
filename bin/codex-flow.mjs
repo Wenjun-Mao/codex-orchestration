@@ -228,6 +228,9 @@ Usage:
   codex-flow refresh recover-locator --invoking-skill PATH --file request.json [--json]
   codex-flow refresh status --invoking-skill PATH [--refresh-id ID] [--json]
 
+Assignment preparation snapshots approved_plan_path and derives its content
+identity; callers do not supply a digest or Git commit.
+
 Every run-scoped command requires an explicit --run-id. Complex mutations read
 one JSON request from --file and reject a mismatched request.run_id before any
 state change. Native App calls remain external: the CLI emits one exact host
@@ -1348,7 +1351,7 @@ async function commandAssignmentV097(args) {
     const request = await readJsonInput(values.file);
     requireExactFields(request, {
       required: [
-        "approved_plan_path", "approved_plan_digest", "recipient", "iteration_label", "purpose",
+        "approved_plan_path", "recipient", "iteration_label", "purpose",
         "outcome", "scope", "acceptance_criteria", "constraints", "reasons",
       ],
     }, "assignment prepare request");
@@ -1366,7 +1369,6 @@ async function commandAssignmentV097(args) {
     v09Output(await prepareCoordinatorAssignment({
       commonDir: git.commonDir,
       approvedPlanPath: request.approved_plan_path,
-      approvedPlanDigest: request.approved_plan_digest,
       recipient,
       iterationLabel: request.iteration_label,
       purpose: request.purpose,

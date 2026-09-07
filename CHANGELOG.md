@@ -8,6 +8,9 @@ decision records remain the detailed release evidence.
 - Keep coordinator reporting valid for its assignment after execution-run
   closure or namespace removal, while preserving per-turn deduplication and
   fail-closed native queue semantics.
+- Let assignment preparation derive and validate immutable approved-plan
+  snapshots from a readable source path, including uncommitted approved plans,
+  without model-supplied hashes or commits.
 - Add truthful coordinator-local workflow claims with executed verification
   for both mutations and verified no-change results.
 - Add command-managed iteration membership, generated coordinator briefs, and

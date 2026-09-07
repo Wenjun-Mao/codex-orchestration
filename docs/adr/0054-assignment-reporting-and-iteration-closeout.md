@@ -42,8 +42,11 @@ are persisted per member. Active, provisional, ambiguous, dirty, unintegrated,
 or still-attached resources remain resumable pending work.
 
 Coordinator briefs combine model-authored outcome, scope, acceptance, and
-action-changing reasons with command-derived IDs, plan digest, route, title,
-and entry mechanics.
+action-changing reasons with command-derived IDs, a readable saved-plan link,
+route, title, and entry mechanics. `assignment prepare` derives the plan digest
+and immutable snapshot from the approved path. Registration validates that
+snapshot; models do not supply a checksum, commit, or manual byte-authentication
+step. Existing v1 preparations remain readable and are not rewritten.
 
 ## Rejected alternatives
 
@@ -55,6 +58,9 @@ and entry mechanics.
   and fleet scans are not authority.
 - Retry ambiguous native archive operations automatically. That risks duplicate
   effects after an uncertain host response.
+- Require the director or coordinator to compute and transcribe a plan digest
+  or Git commit. The command already owns immutable snapshot creation and can
+  bind the content without model-managed ceremony.
 
 ## Consequences and guardrails
 

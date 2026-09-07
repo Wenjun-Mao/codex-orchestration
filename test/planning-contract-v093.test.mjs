@@ -39,16 +39,17 @@ test("the plan contract binds one approved revision before coordinator dispatch"
   assertIncludes(planSkill, "scope/non-goals");
   assertIncludes(planSkill, "acceptance evidence");
   assertIncludes(planSkill, "execution authority");
-  assertIncludes(planSkill, "exact content digest or immutable snapshot");
-  assertIncludes(planSkill, "A mutable path is not approval evidence");
+  assertIncludes(planSkill, "Assignment preparation saves a fixed copy");
+  assertIncludes(planSkill, "later edits to the source document do not change that assignment");
   assertIncludes(planSkill, "does not authorize implementation");
   assertIncludes(planSkill, "Material changes to scope, acceptance, risk, or external authority");
-  assertSequence(planSkill, "After approval", "bind its exact content digest", "before dispatch");
+  assertSequence(planSkill, "After approval", "Assignment preparation saves", "before dispatch");
 
   assertIncludes(assignment, "Before task creation");
   assertIncludes(assignment, "assignment prepare");
-  assertIncludes(assignment, "approved_plan_digest");
-  assertIncludes(assignment, "persists the approved-plan snapshot");
+  assertIncludes(assignment, "computes its digest");
+  assertIncludes(assignment, "persists its snapshot");
+  assertIncludes(assignment, "No commit, manual checksum");
   assertSequence(assignment, "Before task creation", "coordinator later binds its identity");
 });
 
@@ -89,7 +90,7 @@ test("coordinator and result briefs preserve role authority and one complete rep
   for (const contract of [coordinateSkill, coordinatorRole]) {
     assert.ok(normalized(contract).includes("assignment"), "Expected assignment authority");
   }
-  assertIncludes(coordinateSkill, "approved plan");
+  assertIncludes(coordinateSkill, "prepared plan snapshot");
   assertIncludes(coordinateSkill, "Refine the technical breakdown without rewriting intent");
   assertIncludes(coordinateSkill, "Return material changes");
   assertIncludes(coordinateSkill, "Return one complete final");

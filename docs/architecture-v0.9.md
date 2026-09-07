@@ -31,19 +31,21 @@ The v0.9.3 planning contract adds a durable boundary above the execution DAG:
 director + user settle intent
           |
           v
-saved approved plan + exact content digest/snapshot
+saved approved plan path
           |
           v
-one full coordinator assignment and bounded dispatch
+tool-derived immutable snapshot + one full coordinator assignment
           |
           v
 coordinator adds technical detail, delivers, integrates, and verifies
 ```
 
 There is one approved project plan, not separate director, coordinator, and
-executor plans. The plan source path is retained for navigation, but authority
-is the exact approved content. A linked worktree receives authenticated bytes
-or an immutable snapshot; it never depends on an uncommitted director file.
+executor plans. Assignment preparation accepts its path, derives the content
+identity, and saves an immutable readable snapshot before dispatch. The source
+may be uncommitted; later source edits do not alter the assignment. Registration
+validates the saved snapshot automatically, while models neither compute nor
+manually authenticate plan hashes or commits.
 The director owns outcome, scope, non-goals, tradeoffs, acceptance, delegated
 authority, and escalation. The coordinator owns technical breakdown,
 dependency ordering, executor selection, integration, verification, and
@@ -133,8 +135,8 @@ In v0.9.3 the same start command also registers the exact active launch's
 same-host executor-to-coordinator report route and writes a repository-local,
 sender-keyed locator that pins the immutable reporter and native queue
 configuration. A coordinator separately registers its director route from the
-active run, current coordinator identity, exact approved-plan digest, and a
-pre-bound director generation. In v0.9.7 that registration creates an
+active run, current coordinator identity, tool-validated approved-plan snapshot,
+and a pre-bound director generation. In v0.9.7 that registration creates an
 assignment-lived authority and iteration record outside the removable run
 namespace. The run remains execution evidence, but closing it does not retire
 the coordinator route. The Stop adapter resolves only that exact
@@ -167,8 +169,8 @@ active, provisional, ambiguous, unclean, conflicting, or not-yet-reclaimed
 members remain pending rather than being reported as closed.
 
 The same first-prompt rule applies to the coordinator handoff: the coordinator
-is dispatched with the complete approved assignment, plan digest or immutable
-snapshot, constraints, acceptance checks, and one reporting route. A
+is dispatched with the complete approved assignment, a readable link to the
+saved plan snapshot, constraints, acceptance checks, and one reporting route. A
 coordinator is allowed to orchestrate; an executor contract cannot be relabeled
 to grant that authority. A director may inspect progress when the user asks or
 an actionable report warrants review, but normal dispatch ends its turn and
