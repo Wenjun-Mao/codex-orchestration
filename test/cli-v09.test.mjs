@@ -149,9 +149,7 @@ test("v0.9 CLI activates a clean run through current launch-era wiring", async (
   assertSuccess(status, "run status");
   assert.equal(JSON.parse(status.stdout).run.run_id, runId);
 
-  const reportRequest = {
-    run_id: runId,
-    sender_thread_id: coordinatorThreadId,
+  const preparationRequest = {
     recipient: {
       host_id: "local",
       lineage_id: "cli-v09-director-lineage",
@@ -160,6 +158,26 @@ test("v0.9 CLI activates a clean run through current launch-era wiring", async (
     },
     approved_plan_path: requestPath,
     approved_plan_digest: sha256(`${JSON.stringify(request)}\n`),
+    iteration_label: "CLI v0.9 test",
+    purpose: "Coordinator reporting",
+    outcome: "Exercise the assignment preparation and activation contract.",
+    scope: ["Register one coordinator route."],
+    acceptance_criteria: ["The route binds the prepared recipient."],
+    constraints: [],
+    reasons: [],
+  };
+  const preparationRequestPath = resolve(requests, "assignment-preparation.json");
+  await writeFile(preparationRequestPath, `${JSON.stringify(preparationRequest)}\n`, "utf8");
+  const prepared = runCli(["assignment", "prepare", "--file", preparationRequestPath, "--json"], {
+    cwd: root,
+    env: { CODEX_THREAD_ID: "cli-v09-director" },
+  });
+  assertSuccess(prepared, "coordinator assignment preparation");
+  const preparation = JSON.parse(prepared.stdout).preparation;
+  const reportRequest = {
+    run_id: runId,
+    sender_thread_id: coordinatorThreadId,
+    preparation_id: preparation.preparation_id,
   };
   const reportRequestPath = resolve(requests, "report-route.json");
   await writeFile(reportRequestPath, `${JSON.stringify(reportRequest)}\n`, "utf8");

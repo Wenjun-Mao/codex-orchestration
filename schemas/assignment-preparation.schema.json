@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "https://private.local/codex-flow/assignment-preparation.schema.json",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_version", "kind", "preparation_id", "common_dir", "approved_plan", "recipient", "iteration_label", "purpose", "title", "outcome", "scope", "acceptance_criteria", "constraints", "reasons", "created_at"],
+  "properties": {
+    "schema_version": {"const": 1}, "kind": {"const": "codex-flow-v097-assignment-preparation"},
+    "preparation_id": {"type": "string", "pattern": "^assignment-preparation-v1-[0-9a-f]{64}$"}, "common_dir": {"type": "string", "pattern": "^/"},
+    "approved_plan": {"type": "object", "additionalProperties": false, "required": ["digest", "snapshot_path"], "properties": {"digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"}, "snapshot_path": {"type": "string", "pattern": "^/"}}},
+    "recipient": {"type": "object", "additionalProperties": false, "required": ["host_id", "lineage_id", "thread_id", "generation", "binding_digest"], "properties": {"host_id": {"$ref": "#/$defs/id"}, "lineage_id": {"$ref": "#/$defs/id"}, "thread_id": {"$ref": "#/$defs/id"}, "generation": {"type": "integer", "minimum": 1}, "binding_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}},
+    "iteration_label": {"type": "string", "minLength": 1, "maxLength": 80}, "purpose": {"type": "string", "minLength": 1, "maxLength": 120}, "title": {"type": "string", "minLength": 1, "maxLength": 120}, "outcome": {"type": "string", "minLength": 1, "maxLength": 2400},
+    "scope": {"$ref": "#/$defs/list"}, "acceptance_criteria": {"$ref": "#/$defs/list"}, "constraints": {"$ref": "#/$defs/list"}, "reasons": {"$ref": "#/$defs/list"}, "created_at": {"type": "string", "format": "date-time"}
+  },
+  "$defs": {"id": {"type": "string", "minLength": 1, "maxLength": 256, "pattern": "^[A-Za-z0-9_.-]+$"}, "list": {"type": "array", "maxItems": 16, "items": {"type": "string", "minLength": 1, "maxLength": 1200}}}
+}

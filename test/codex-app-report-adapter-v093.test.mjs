@@ -7,6 +7,7 @@ import {
   CODEX_APP_BINARY_PATH,
   CODEX_APP_CLI_VERSION,
   nativeQueueDiagnostics,
+  submitNativeThreadArchive,
   submitNativeQueuedReport,
   validateNativeQueueConfiguration,
 } from "../lib/codex-app-report-adapter.mjs";
@@ -103,4 +104,23 @@ test("diagnostics retain only bounded classification evidence", () => {
   assert.equal(diagnostics.stderr_bytes, 23);
   assert.deepEqual(diagnostics.categories, ["migration", "recovery"]);
   assert.match(diagnostics.stderr_sha256, /^[0-9a-f]{64}$/);
+});
+
+test("native closeout archives only an exact idle thread and fails closed on activity", async () => {
+  const archive = (scenario) => submitNativeThreadArchive({
+    configuration: configuration(),
+    threadId: "closeout-thread",
+    spawnFactory: fakeFactory(scenario),
+    versionReader: async () => currentVersion(),
+  });
+  const accepted = await archive("archive-accepted");
+  assert.equal(accepted.outcome, "accepted");
+  assert.equal(accepted.archive_attempted, true);
+  const active = await archive("archive-active");
+  assert.equal(active.outcome, "blocked");
+  assert.equal(active.reason, "thread-active");
+  assert.equal(active.archive_attempted, false);
+  const ambiguous = await archive("archive-ambiguous");
+  assert.equal(ambiguous.outcome, "ambiguous");
+  assert.equal(ambiguous.archive_attempted, true);
 });

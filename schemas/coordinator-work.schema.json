@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://private.local/codex-flow/coordinator-work.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "kind", "local_work_id", "run_id", "runtime_context_digest",
+    "configuration_digest", "repository_id", "common_dir", "coordinator_binding",
+    "plan_id", "revision_digest", "task_id", "task_digest", "contract_id",
+    "baseline", "result", "verification", "state", "started_at", "completed_at"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "kind": { "const": "codex-flow-v097-coordinator-work" },
+    "local_work_id": { "type": "string", "pattern": "^coordinator-work-v1-[0-9a-f]{64}$" },
+    "run_id": { "$ref": "#/$defs/safeId" },
+    "runtime_context_digest": { "$ref": "#/$defs/digest" },
+    "configuration_digest": { "$ref": "#/$defs/digest" },
+    "repository_id": { "$ref": "#/$defs/safeId" },
+    "common_dir": { "type": "string", "pattern": "^/", "maxLength": 2048 },
+    "coordinator_binding": { "$ref": "#/$defs/coordinatorBinding" },
+    "plan_id": { "$ref": "#/$defs/safeId" },
+    "revision_digest": { "$ref": "#/$defs/digest" },
+    "task_id": { "$ref": "#/$defs/safeId" },
+    "task_digest": { "$ref": "#/$defs/digest" },
+    "contract_id": { "$ref": "#/$defs/digest" },
+    "baseline": { "$ref": "#/$defs/repositorySnapshot" },
+    "result": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/result" }] },
+    "verification": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/verification" }] },
+    "state": { "enum": ["started", "completed"] },
+    "started_at": { "$ref": "#/$defs/timestamp" },
+    "completed_at": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/timestamp" }] }
+  },
+  "$defs": {
+    "safeId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9_.-]+$" },
+    "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "commit": { "type": "string", "pattern": "^[0-9a-f]{40,64}$" },
+    "timestamp": { "type": "string", "format": "date-time", "maxLength": 64 },
+    "coordinatorBinding": {
+      "type": "object", "additionalProperties": false,
+      "required": ["lineage_id", "thread_id", "generation", "binding_digest"],
+      "properties": {
+        "lineage_id": { "$ref": "#/$defs/safeId" }, "thread_id": { "$ref": "#/$defs/safeId" },
+        "generation": { "type": "integer", "minimum": 1 }, "binding_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "repositorySnapshot": {
+      "type": "object", "additionalProperties": false,
+      "required": ["root", "common_dir", "branch", "revision", "cleanliness"],
+      "properties": {
+        "root": { "type": "string", "pattern": "^/" }, "common_dir": { "type": "string", "pattern": "^/" },
+        "branch": { "type": "string" }, "revision": { "$ref": "#/$defs/commit" }, "cleanliness": { "const": "clean" }
+      }
+    },
+    "result": {
+      "type": "object", "additionalProperties": false,
+      "required": ["kind", "baseline_revision", "final_revision"],
+      "properties": {
+        "kind": { "enum": ["no-change", "mutation"] }, "baseline_revision": { "$ref": "#/$defs/commit" },
+        "final_revision": { "$ref": "#/$defs/commit" }
+      }
+    },
+    "verification": {
+      "type": "object", "additionalProperties": false,
+      "required": ["verification_id", "classification", "subject_revision", "checks", "evidence_digest"],
+      "properties": {
+        "verification_id": { "type": "string", "pattern": "^coordinator-verification-v1-[0-9a-f]{64}$" },
+        "classification": { "const": "PASS" }, "subject_revision": { "$ref": "#/$defs/commit" },
+        "checks": { "type": "array", "minItems": 1, "maxItems": 64, "items": { "$ref": "#/$defs/check" } },
+        "evidence_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "check": {
+      "type": "object", "additionalProperties": false,
+      "required": ["check_id", "argv", "exit_code", "stdout_digest", "stderr_digest"],
+      "properties": {
+        "check_id": { "$ref": "#/$defs/safeId" }, "argv": { "type": "array", "minItems": 1, "maxItems": 64, "items": { "type": "string", "maxLength": 2048 } },
+        "exit_code": { "const": 0 }, "stdout_digest": { "$ref": "#/$defs/digest" }, "stderr_digest": { "$ref": "#/$defs/digest" }
+      }
+    }
+  }
+}

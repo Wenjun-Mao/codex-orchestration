@@ -137,14 +137,14 @@
         },
         "cleanliness": { "enum": ["clean", "dirty"] },
         "expected_source": {
-          "enum": ["activation-baseline", "combined-verification"]
+          "enum": ["activation-baseline", "combined-verification", "coordinator-verification"]
         },
         "expected_verification_id": {
           "oneOf": [
             { "type": "null" },
             {
               "type": "string",
-              "pattern": "^verification-v1-[0-9a-f]{64}$"
+              "pattern": "^(?:verification|coordinator-verification)-v1-[0-9a-f]{64}$"
             }
           ]
         },
@@ -208,6 +208,7 @@
             "generated-task-contract",
             "task-launch",
             "subagent-operation",
+            "coordinator-work",
             "callback",
             "disposition",
             "integration",
@@ -239,6 +240,7 @@
             "selector-replan-required",
             "selector-replan-exhausted",
             "subagent-incomplete",
+            "coordinator-work-incomplete",
             "callback-missing",
             "callback-unconsumed",
             "disposition-missing",
@@ -268,6 +270,7 @@
             "claim",
             "task-launch",
             "subagent-operation",
+            "coordinator-work",
             "callback",
             "disposition",
             "integration",
@@ -301,6 +304,7 @@
         "workflow_claims",
         "task_launches",
         "subagent_operations",
+        "coordinator_work",
         "callbacks",
         "dispositions",
         "integrations",
@@ -314,6 +318,7 @@
         "workflow_claims": { "$ref": "#/$defs/count" },
         "task_launches": { "$ref": "#/$defs/count" },
         "subagent_operations": { "$ref": "#/$defs/count" },
+        "coordinator_work": { "$ref": "#/$defs/count" },
         "callbacks": { "$ref": "#/$defs/count" },
         "dispositions": { "$ref": "#/$defs/count" },
         "integrations": { "$ref": "#/$defs/count" },

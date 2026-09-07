@@ -49,6 +49,15 @@ function receive(message) {
     send({ id: 2, result: { queuedSubmission: { id: "queue-ack" } } });
     if (scenario === "delayed-diagnostic") process.stderr.write("recovery after acknowledgement\n");
   }
+  if (message.method === "thread/read") {
+    const type = scenario === "archive-active" ? "active" : "idle";
+    send({ id: 2, result: { thread: { id: message.params.threadId, status: { type, ...(type === "active" ? { activeFlags: [] } : {}) } } } });
+    return;
+  }
+  if (message.method === "thread/archive") {
+    if (scenario === "archive-ambiguous") return;
+    send({ id: 3, result: {} });
+  }
 }
 
 if (scenario === "stubborn") {

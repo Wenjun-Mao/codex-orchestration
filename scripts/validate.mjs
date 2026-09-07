@@ -14,15 +14,19 @@ import {
 import { validateReleaseIdentity } from "./release-identity.mjs";
 
 const root = resolve(import.meta.dirname, "..");
-const EXPECTED_PACKAGE_VERSION = "0.9.6";
+const EXPECTED_PACKAGE_VERSION = "0.9.7-rc.1";
 
 const ACTIVE_SCHEMA_NAMES = Object.freeze([
+  "assignment-authority",
+  "assignment-preparation",
   "archive-operation",
   "callback-record",
   "cleanup-plan",
   "codex-app-host-evidence",
+  "coordinator-work",
   "generated-task-contract",
   "integration-record",
+  "iteration",
   "refresh-handoff-v1",
   "refresh-inspection",
   "refresh-origin",

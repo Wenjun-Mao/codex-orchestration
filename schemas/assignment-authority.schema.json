@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://private.local/codex-flow/assignment-authority.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "kind", "assignment_id", "route_id", "common_dir", "repository_digest", "approved_plan", "sender", "recipient", "execution_bindings", "iteration_id", "iteration_label", "purpose", "state", "acceptance", "created_at", "updated_at"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "kind": { "const": "codex-flow-v097-assignment-authority" },
+    "assignment_id": { "type": "string", "pattern": "^coordinator-assignment-v1-[0-9a-f]{64}$" },
+    "route_id": { "type": "string", "pattern": "^report-route-v1-[0-9a-f]{64}$" },
+    "common_dir": { "type": "string", "pattern": "^/" },
+    "repository_digest": { "$ref": "#/$defs/digest" },
+    "approved_plan": { "$ref": "#/$defs/plan" },
+    "sender": { "$ref": "#/$defs/sender" },
+    "recipient": { "$ref": "#/$defs/recipient" },
+    "execution_bindings": { "type": "array", "minItems": 1, "maxItems": 64, "items": { "$ref": "#/$defs/executionBinding" } },
+    "iteration_id": { "type": "string", "pattern": "^iteration-v1-[0-9a-f]{64}$" },
+    "iteration_label": { "type": "string", "minLength": 1, "maxLength": 80 },
+    "purpose": { "type": "string", "minLength": 1, "maxLength": 120 },
+    "state": { "enum": ["open", "accepted", "cancelled", "retired"] },
+    "acceptance": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/acceptance" }] },
+    "created_at": { "$ref": "#/$defs/timestamp" },
+    "updated_at": { "$ref": "#/$defs/timestamp" }
+  },
+  "$defs": {
+    "safeId": { "type": "string", "minLength": 1, "maxLength": 256, "pattern": "^[A-Za-z0-9_.-]+$" },
+    "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "timestamp": { "type": "string", "format": "date-time", "maxLength": 64 },
+    "plan": { "type": "object", "additionalProperties": false, "required": ["digest", "snapshot_path"], "properties": { "digest": { "$ref": "#/$defs/digest" }, "snapshot_path": { "type": "string", "pattern": "^/" } } },
+    "sender": { "type": "object", "additionalProperties": false, "required": ["host_id", "thread_id"], "properties": { "host_id": { "$ref": "#/$defs/safeId" }, "thread_id": { "$ref": "#/$defs/safeId" } } },
+    "recipient": { "type": "object", "additionalProperties": false, "required": ["host_id", "lineage_id", "thread_id", "generation", "binding_digest"], "properties": { "host_id": { "$ref": "#/$defs/safeId" }, "lineage_id": { "$ref": "#/$defs/safeId" }, "thread_id": { "$ref": "#/$defs/safeId" }, "generation": { "type": "integer", "minimum": 1 }, "binding_digest": { "$ref": "#/$defs/digest" } } },
+    "executionBinding": { "type": "object", "additionalProperties": false, "required": ["run_id", "runtime_context_digest", "configuration_digest", "repository_digest", "repository_root", "repository_branch", "plan_id", "revision_digest", "namespace", "bound_at"], "properties": { "run_id": { "$ref": "#/$defs/safeId" }, "runtime_context_digest": { "$ref": "#/$defs/digest" }, "configuration_digest": { "$ref": "#/$defs/digest" }, "repository_digest": { "$ref": "#/$defs/digest" }, "repository_root": { "oneOf": [{ "type": "null" }, { "type": "string", "pattern": "^/" }] }, "repository_branch": { "oneOf": [{ "type": "null" }, { "type": "string", "minLength": 1, "maxLength": 256 }] }, "plan_id": { "$ref": "#/$defs/safeId" }, "revision_digest": { "$ref": "#/$defs/digest" }, "namespace": { "$ref": "#/$defs/safeId" }, "bound_at": { "$ref": "#/$defs/timestamp" } } },
+    "acceptance": { "type": "object", "additionalProperties": false, "required": ["report_id", "report_digest", "accepted_by_thread_id", "accepted_at"], "properties": { "report_id": { "$ref": "#/$defs/safeId" }, "report_digest": { "$ref": "#/$defs/digest" }, "accepted_by_thread_id": { "$ref": "#/$defs/safeId" }, "accepted_at": { "$ref": "#/$defs/timestamp" } } }
+  }
+}

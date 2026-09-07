@@ -145,13 +145,15 @@ test("a coordinator delegation binds the active run and exact approved plan back
     },
     approvedPlanPath: resolve(root, ".gitkeep"),
     approvedPlanDigest: sha256("fixture\n"),
+    iterationLabel: "Report route test",
+    purpose: "Coordinator reporting",
     now: TIME,
   });
   assert.equal(result.status, "registered");
   assert.equal(result.route.assignment.kind, "coordinator-delegation");
   assert.equal(result.route.sender.thread_id, context.coordinator.thread_id);
   assert.equal(result.route.recipient.thread_id, director.thread_id);
-  assert.equal((await reportRoute({ stateRoot: legacyStateRoot, routeId: result.route.route_id })).route_id, result.route.route_id);
+  assert.equal((await reportRoute({ stateRoot: result.state_root, routeId: result.route.route_id })).route_id, result.route.route_id);
 
   await assert.rejects(
     () => registerCoordinatorReportRoute({
@@ -166,6 +168,8 @@ test("a coordinator delegation binds the active run and exact approved plan back
       },
       approvedPlanPath: resolve(root, ".gitkeep"),
       approvedPlanDigest: "0".repeat(64),
+      iterationLabel: "Report route test",
+      purpose: "Coordinator reporting",
       now: TIME,
     }),
     /Approved plan digest/,

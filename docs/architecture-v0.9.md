@@ -134,12 +134,28 @@ same-host executor-to-coordinator report route and writes a repository-local,
 sender-keyed locator that pins the immutable reporter and native queue
 configuration. A coordinator separately registers its director route from the
 active run, current coordinator identity, exact approved-plan digest, and a
-pre-bound director generation. The Stop adapter resolves only that exact
+pre-bound director generation. In v0.9.7 that registration creates an
+assignment-lived authority and iteration record outside the removable run
+namespace. The run remains execution evidence, but closing it does not retire
+the coordinator route. The Stop adapter resolves only that exact
 sender locator, delegates capture/deduplication/lifecycle to governance core,
 then makes at most one bounded queue submission. No global task scan or second
-report state machine exists. Task disposition closes its launch route; run
-closure or abandonment closes any remaining routes and fences late `Stop` or
-thread-spawn `SubagentStop` events.
+report state machine exists. Task disposition closes its executor launch route;
+director acceptance closes the assignment route only after its selected report
+and iteration closeout are resolved. Late events from retired assignments stay
+fenced by their old route and source-turn identities.
+
+Workflow tasks may also use `execution_kind: coordinator`. Their start binds
+the real coordinator and Git baseline, and completion executes checks before
+recording a mutation revision or no-change proof. The closure audit joins these
+claims with ordinary child claims, so zero-child and mixed workflows use the
+same accounting contract.
+
+An assignment's iteration registry records members only from authenticated
+assignment and launch commands. Closeout archives eligible children before the
+coordinator through a bounded native adapter and persists each attempt. Active,
+provisional, ambiguous, or not-yet-reclaimed members remain pending rather than
+being reported as closed.
 
 The same first-prompt rule applies to the coordinator handoff: the coordinator
 is dispatched with the complete approved assignment, plan digest or immutable
