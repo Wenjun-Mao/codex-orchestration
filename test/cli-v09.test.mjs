@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { cp, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import test from "node:test";
+import { assignmentAuthority } from "../lib/assignment-authority.mjs";
 import { RUNTIME_DIRECTORY } from "../lib/runtime-context.mjs";
+import { iterationStatus } from "../lib/iteration-registry.mjs";
 import { PACKAGE_VERSION, sha256 } from "../lib/core.mjs";
 import {
   assertSuccess,
@@ -199,4 +201,78 @@ test("v0.9 CLI activates a clean run through current launch-era wiring", async (
     "records",
     `${sha256(coordinatorThreadId)}.json`,
   ));
+
+  const contractRequestPath = resolve(requests, "workflow-contract.json");
+  await writeFile(contractRequestPath, `${JSON.stringify({
+    run_id: runId,
+    plan_id: request.workflow.plan_id,
+    task_id: task.task_id,
+    dependency_authorities: [],
+  })}\n`, "utf8");
+  const contracted = runCli([
+    "workflow", "contract", "--run-id", runId, "--file", contractRequestPath, "--json",
+  ], { cwd: root, env: { CODEX_THREAD_ID: coordinatorThreadId } });
+  assertSuccess(contracted, "workflow task contract");
+  const contract = JSON.parse(contracted.stdout);
+  const baseline = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+  const launchRequestPath = resolve(requests, "task-launch.json");
+  await writeFile(launchRequestPath, `${JSON.stringify({
+    run_id: runId,
+    task_contract: contract,
+    requested_selectors: {
+      project_id: "fixture-project",
+      model: task.model,
+      reasoning_effort: task.reasoning_effort,
+      worktree: {
+        mode: "host-worktree",
+        starting_revision: baseline,
+        starting_branch: "main",
+        executor_branch: "codex/cli-v09-visible",
+        path: null,
+      },
+    },
+  })}\n`, "utf8");
+  const launchPrepared = runCli([
+    "task", "launch", "prepare", "--run-id", runId, "--file", launchRequestPath, "--json",
+  ], { cwd: root, env: { CODEX_THREAD_ID: coordinatorThreadId } });
+  assertSuccess(launchPrepared, "assignment-bound task launch preparation");
+  const launch = JSON.parse(launchPrepared.stdout);
+  const canonicalExecutorTitle = "Executor · CLI v0.9 test · Coordinator reporting";
+  assert.equal(launch.task_title, canonicalExecutorTitle);
+
+  const attemptRequestPath = resolve(requests, "task-launch-attempt.json");
+  await writeFile(attemptRequestPath, `${JSON.stringify({
+    run_id: runId,
+    launch_id: launch.launch_id,
+    host_session_id: "cli-v09-host-session",
+  })}\n`, "utf8");
+  const attempted = runCli([
+    "task", "launch", "attempt", "--run-id", runId, "--file", attemptRequestPath, "--json",
+  ], { cwd: root, env: { CODEX_THREAD_ID: coordinatorThreadId } });
+  assertSuccess(attempted, "assignment-bound task launch attempt");
+  assert.equal(JSON.parse(attempted.stdout).host_request.title, canonicalExecutorTitle);
+
+  const reconcileRequestPath = resolve(requests, "task-launch-reconcile.json");
+  await writeFile(reconcileRequestPath, `${JSON.stringify({
+    run_id: runId,
+    launch_id: launch.launch_id,
+    outcome: "provisional",
+    host_id: "local",
+    provisional_client_thread_id: "client-new-thread:cli-v09-executor",
+  })}\n`, "utf8");
+  const reconciled = runCli([
+    "task", "launch", "reconcile", "--run-id", runId, "--file", reconcileRequestPath, "--json",
+  ], { cwd: root, env: { CODEX_THREAD_ID: coordinatorThreadId } });
+  assertSuccess(reconciled, "assignment-bound task launch reconciliation");
+  const assignment = await assignmentAuthority({
+    stateRoot: reporting.state_root,
+    assignmentId: reporting.route.assignment.assignment_id,
+  });
+  const iteration = await iterationStatus({
+    commonDir: resolve(root, ".git"),
+    iterationId: assignment.iteration_id,
+  });
+  const executor = iteration.members.find((member) => member.role === "executor");
+  assert.equal(executor.requested_title, canonicalExecutorTitle);
+  assert.equal(executor.provisional_id, "client-new-thread:cli-v09-executor");
 });

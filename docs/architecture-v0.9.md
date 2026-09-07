@@ -152,10 +152,15 @@ claims with ordinary child claims, so zero-child and mixed workflows use the
 same accounting contract.
 
 An assignment's iteration registry records members only from authenticated
-assignment and launch commands. Closeout archives eligible children before the
-coordinator through a bounded native adapter and persists each attempt. Active,
-provisional, ambiguous, or not-yet-reclaimed members remain pending rather than
-being reported as closed.
+assignment and launch commands. The assignment-derived executor title is the
+exact title passed to the host and recorded by the registry. Closeout archives
+eligible children before the coordinator through a bounded native adapter,
+persists an ambiguous boundary before each call, and reconciles interruptions
+through exact private archive observation without replay. After host worktree
+reclamation, it consumes the child's callback/disposition/integration authority
+and atomically deletes only the matching local branch. Active, provisional,
+ambiguous, unclean, conflicting, or not-yet-reclaimed members remain pending
+rather than being reported as closed.
 
 The same first-prompt rule applies to the coordinator handoff: the coordinator
 is dispatched with the complete approved assignment, plan digest or immutable

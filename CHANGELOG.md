@@ -11,7 +11,10 @@ decision records remain the detailed release evidence.
 - Add truthful coordinator-local workflow claims with executed verification
   for both mutations and verified no-change results.
 - Add command-managed iteration membership, generated coordinator briefs, and
-  acceptance-triggered, resumable native task archival.
+  acceptance-triggered, resumable native task archival. Executor launches use
+  the same role/iteration/purpose title recorded by the registry; child-first
+  closeout consumes exact Git authority, deletes the authenticated local branch
+  after host worktree reclamation, and never replays an ambiguous archive call.
 
 ## 0.9.6 - 2026-09-06
 

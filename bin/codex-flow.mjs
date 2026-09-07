@@ -64,7 +64,10 @@ import {
   reconcileTaskArchive,
   taskArchiveStatus,
 } from "../lib/archive-lifecycle.mjs";
-import { observeCodexAppArchiveEvidence } from "../lib/adapters/codex-app/private-archive-observer.mjs";
+import {
+  observeCodexAppArchiveEvidence,
+  observeCodexAppPrivateArchive,
+} from "../lib/adapters/codex-app/private-archive-observer.mjs";
 import { codexAppArchiveToNativeObservation } from "../lib/adapters/codex-app/archive-observation.mjs";
 import {
   callbackRecord,
@@ -174,6 +177,7 @@ import {
 } from "../lib/codex-app-report-adapter.mjs";
 import {
   closeoutIteration,
+  iterationTitle,
   iterationStatus,
   registerExecutorIterationMember,
 } from "../lib/iteration-registry.mjs";
@@ -1121,10 +1125,19 @@ async function commandTaskLaunchV09(args, mutationAuthority = null) {
     if (request.task_contract.run_id !== runId) {
       throw new CliError("task contract run_id does not match --run-id", 73);
     }
+    const assignment = mutationAuthority === null ? null : await openAssignmentForSender({
+      stateRoot: assignmentStateRoot(git.commonDir),
+      hostId: mutationAuthority.run.binding.host.host_id,
+      threadId: mutationAuthority.run.binding.lineage.thread_id,
+      runId,
+    });
     result = await prepareTaskLaunch({
       stateRoot: git.stateRoot,
       taskContract: request.task_contract,
       requestedSelectors: request.requested_selectors,
+      taskTitle: assignment === null
+        ? null
+        : iterationTitle("Executor", assignment.iteration_label, assignment.purpose),
       now: Date.now(),
     });
   } else if (subcommand === "attempt") {
@@ -1384,6 +1397,7 @@ async function commandAssignmentV097(args) {
   }
   const threadId = requireText(process.env.CODEX_THREAD_ID, "CODEX_THREAD_ID", { max: 256, safeId: true });
   const archiveThread = ({ threadId: target }) => submitNativeThreadArchive({ configuration: supportedNativeQueue(), threadId: target });
+  const observeArchivedThread = ({ threadId: target }) => observeCodexAppPrivateArchive({ threadId: target });
   if (subcommand === "closeout") {
     requireExactFields(request, { required: ["assignment_id", "phase"] }, "assignment closeout request");
     if (request.assignment_id !== assignmentId || request.phase !== "coordinator") {
@@ -1395,6 +1409,7 @@ async function commandAssignmentV097(args) {
       iterationId: assignment.iteration_id,
       allowCoordinator: false,
       archiveThread,
+      observeArchivedThread,
     }));
     return;
   }
@@ -1407,6 +1422,7 @@ async function commandAssignmentV097(args) {
       reportId: request.report_id,
       directorThreadId: threadId,
       archiveThread,
+      observeArchivedThread,
       retireLocator: ({ routeId, reason, now }) => retireRepositoryReportLocator({ stateRoot, routeId, reason, now }),
     }));
     return;

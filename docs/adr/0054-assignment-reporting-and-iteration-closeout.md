@@ -32,7 +32,10 @@ task identity.
 
 One assignment also owns a command-managed iteration. Dispatch registers exact
 director, coordinator, and executor membership from assignment or launch
-authority. Titles are display data. Coordinator closeout handles accepted
+authority. The coordinator route supplies the role/iteration/purpose title for
+each executor launch, and the registry records that exact host-requested title;
+it must not synthesize a different display claim after dispatch. Titles remain
+display data. Coordinator closeout handles accepted
 children first; director acceptance records review and handles the disposable
 coordinator, route retirement, and locator retirement. Native archive attempts
 are persisted per member. Active, provisional, ambiguous, dirty, unintegrated,

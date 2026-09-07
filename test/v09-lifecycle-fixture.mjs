@@ -55,6 +55,7 @@ function workflowTask(suffix, overrides = {}) {
 
 export async function createActiveTaskLaunch(root, suffix, {
   task = {},
+  taskTitle = null,
   executorBranch = `codex/lifecycle-v09-${suffix}`,
   executorPath = resolve(root, `../${basename(root)}-${suffix}-executor`),
   reconcileCreation = true,
@@ -120,6 +121,7 @@ export async function createActiveTaskLaunch(root, suffix, {
     stateRoot,
     taskContract: contract,
     requestedSelectors,
+    taskTitle,
     now: BASE_TIME,
   });
   const attempted = await recordTaskLaunchAttempt({
