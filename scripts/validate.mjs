@@ -14,7 +14,7 @@ import {
 import { validateReleaseIdentity } from "./release-identity.mjs";
 
 const root = resolve(import.meta.dirname, "..");
-const EXPECTED_PACKAGE_VERSION = "0.9.7-rc.9";
+const EXPECTED_PACKAGE_VERSION = "0.9.7-rc.10";
 
 const ACTIVE_SCHEMA_NAMES = Object.freeze([
   "assignment-authority",

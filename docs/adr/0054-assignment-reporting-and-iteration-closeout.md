@@ -80,13 +80,6 @@ removal before later finals, multiple finals, acceptance ordering, archive
 activity/ambiguity, local mutation/no-change proof, schema parity, and adapter
 idempotence.
 
-RC8 added root-level `package.json` to runtime bundles but omitted that exact
-path from its refresh-export bootstrap allowlist. A finite compatibility capsule
-authenticates the known RC8 bundle and refresh-source hash, patches only that
-allowlist in a temporary copy, and then invokes RC8's own exporter. It never
-mutates stored source state or substitutes target-package workflow semantics;
-any identity or patch-site drift blocks.
-
 Archive dispatch is a single atomic claim persisted before the native host
 boundary. Concurrent callers cannot issue the same archive operation, and an
 ambiguous result requires exact private observation instead of replay. Closeout

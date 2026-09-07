@@ -355,7 +355,7 @@ test("v0.9 refresh replaces an abandoned direct coordinator without inventing cl
 test("assignment-lived reporting binds the exact target before refresh source deletion", async (t) => {
   const root = await createGitFixture("codex-flow-refresh-v097-assignment-");
   const requests = await mkdtemp(resolve(tmpdir(), "codex-flow-refresh-v097-assignment-requests-"));
-  const sourcePackage = await extractTaggedPackage("5ab0a9fa62bcab4de801dd96494bdb2ac4ea72c4");
+  const sourcePackage = await extractTaggedPackage("68251f17077edc9e71ef8758f85a27d25c87ee14");
   const targetPackage = await copyCurrentPackage();
   t.after(async () => {
     await Promise.all([
@@ -415,7 +415,7 @@ test("assignment-lived reporting binds the exact target before refresh source de
   assertSuccess(inspectionCall, "assignment refresh inspection");
   const inspection = JSON.parse(inspectionCall.stdout);
   assert.equal(inspection.route, "refresh-ready", inspection.reason);
-  assert.equal(inspection.authority.source.package_version, "0.9.7-rc.8");
+  assert.equal(inspection.authority.source.package_version, "0.9.7-rc.7");
 
   const replacement = {
     ...source.workflowTask,
@@ -430,7 +430,7 @@ test("assignment-lived reporting binds the exact target before refresh source de
     branchFences: [],
   });
   const preparePath = await jsonFile(requests, "refresh-v097-assignment-prepare", {
-    source_namespace: "v0.9.7-rc.8",
+    source_namespace: "v0.9.7-rc.7",
     source_run_id: source.request.run_id,
     source_resume: source.activated.run.binding,
     decisions: [{
@@ -501,43 +501,8 @@ test("assignment-lived reporting binds the exact target before refresh source de
     threadId: source.request.runtime.lineage.thread_id,
     runId: targetActivation.run_id,
   })).assignment_id, originalAssignment.assignment_id);
-  await assert.rejects(stat(resolve(root, ".git/codex-flow/v0.9.7-rc.8")), /ENOENT/);
+  await assert.rejects(stat(resolve(root, ".git/codex-flow/v0.9.7-rc.7")), /ENOENT/);
   await assert.rejects(stat(resolve(root, ".git/codex-flow/refresh-v1")), /ENOENT/);
-});
-
-test("RC8 refresh bootstrap repair rejects a different source hash", async (t) => {
-  const root = await createGitFixture("codex-flow-refresh-v097-rc8-capsule-");
-  const requests = await mkdtemp(resolve(tmpdir(), "codex-flow-refresh-v097-rc8-capsule-requests-"));
-  const sourcePackage = await extractTaggedPackage("5ab0a9fa62bcab4de801dd96494bdb2ac4ea72c4");
-  const targetPackage = await copyCurrentPackage();
-  t.after(async () => {
-    await Promise.all([
-      removeFixture(root),
-      rm(requests, { recursive: true, force: true }),
-      rm(sourcePackage.root, { recursive: true, force: true }),
-      rm(targetPackage.root, { recursive: true, force: true }),
-    ]);
-  });
-  const refreshSourcePath = resolve(sourcePackage.root, "lib/compat/refresh-source.mjs");
-  await writeFile(
-    refreshSourcePath,
-    `${await readFile(refreshSourcePath, "utf8")}\n// Deliberate source-hash drift for the capsule boundary.\n`,
-    "utf8",
-  );
-  await createAbandonedDirectCoordinatorRun({
-    root,
-    requests,
-    sourcePackage,
-    runId: "refresh-v097-rc8-capsule-source",
-  });
-  const targetSkill = resolve(targetPackage.root, "skills/refresh/SKILL.md");
-  const inspectionCall = invoke(targetPackage.cli, [
-    "refresh", "inspect", "--invoking-skill", targetSkill, "--json",
-  ], root);
-  assertSuccess(inspectionCall, "RC8 capsule hash-drift inspection");
-  const inspection = JSON.parse(inspectionCall.stdout);
-  assert.equal(inspection.route, "blocked");
-  assert.match(inspection.reason, /safe runtime path/);
 });
 
 async function createClosedV09Run({

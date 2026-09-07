@@ -18,7 +18,7 @@ with the automated and live gates recorded below.
 | Explicit read-only native-subagent lifecycle and selector rejection | `subagent-v09.test.mjs` |
 | Same-host final capture, staged reporter upgrade survival, runtime-bundle staging, harmless unregistered stops, resumable route registration, and exact runtime retirement | `cli-v09.test.mjs`, `assignment-lifecycle-v097.test.mjs`, `report-hook-v093.test.mjs`, `report-lifecycle-v093.test.mjs` |
 | Public/private archive evidence | `codex-app-private-archive-v09.test.mjs` |
-| Exact v0.8.3 semantic refresh, hash-bound RC8 exporter bootstrap repair, selected already-terminal evidence, dirty discard, branch/worktree deletion, assignment target binding, target consumption, joined crash-replay boundaries, and exact closed-v0.9.0 no-replacement maintenance refresh | `refresh-v09.test.mjs`, `assignment-lifecycle-v097.test.mjs` |
+| Exact v0.8.3 and live-shaped RC7 semantic refresh, selected already-terminal evidence, dirty discard, branch/worktree deletion, assignment target binding, target consumption, joined crash-replay boundaries, and exact closed-v0.9.0 no-replacement maintenance refresh | `refresh-v09.test.mjs`, `assignment-lifecycle-v097.test.mjs` |
 | Coordinator branch authority remains disjoint from executor cleanup branch fences at admission | `run-lifecycle-v09.test.mjs` |
 | Version-agnostic clean-start unplug | `unplug-v09.test.mjs` |
 | Schema/runtime parity and immutable release identity | `schema-runtime-parity-v09.test.mjs`, `release-identity.test.mjs` |
