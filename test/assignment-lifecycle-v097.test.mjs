@@ -519,6 +519,56 @@ test("iteration closeout observes a manually archived coordinator without replay
   );
 });
 
+test("iteration closeout reconciles manual archival after a definitive blocked coordinator attempt", async (t) => {
+  const {
+    root, coordinatorPath, context, assignment,
+  } = await acceptedChildFixture(t, "coordinator-blocked-then-archived", { disposableCoordinator: true });
+  const calls = [];
+  const archiveThread = async ({ threadId }) => {
+    calls.push(threadId);
+    return threadId === context.coordinator.thread_id
+      ? { outcome: "blocked", reason: "thread-active", archive_attempted: false, diagnostics: { categories: [] } }
+      : { outcome: "accepted", archive_attempted: true, diagnostics: { categories: [] } };
+  };
+  await closeoutIteration({
+    commonDir: context.commonDir,
+    iterationId: assignment.iteration_id,
+    allowCoordinator: true,
+    archiveThread,
+    now: TIME + 22_000,
+  });
+  git(root, ["worktree", "remove", context.executorPath]);
+  const blocked = await closeoutIteration({
+    commonDir: context.commonDir,
+    iterationId: assignment.iteration_id,
+    allowCoordinator: true,
+    archiveThread,
+    now: TIME + 23_000,
+  });
+  assert.equal(blocked.status, "pending");
+  assert.equal(
+    blocked.iteration.members.find((member) => member.role === "coordinator").archive_attempt.state,
+    "blocked",
+  );
+  git(root, ["worktree", "remove", coordinatorPath]);
+  const closed = await closeoutIteration({
+    commonDir: context.commonDir,
+    iterationId: assignment.iteration_id,
+    allowCoordinator: true,
+    archiveThread: async () => { throw new Error("native archive must not replay"); },
+    observeArchivedThread: async ({ threadId }) => ({
+      kind: "private-archive-observation",
+      thread_id: threadId,
+    }),
+    now: TIME + 24_000,
+  });
+  assert.equal(closed.status, "closed");
+  assert.deepEqual(calls, [context.executorThreadId, context.coordinator.thread_id]);
+  const coordinator = closed.iteration.members.find((member) => member.role === "coordinator");
+  assert.equal(coordinator.archive_attempt.state, "accepted");
+  assert.equal(coordinator.archive_attempt.reason, "private-archive-observed");
+});
+
 test("iteration closeout refuses an unmerged coordinator commit before native archival", async (t) => {
   const {
     root, coordinatorPath, context, assignment,

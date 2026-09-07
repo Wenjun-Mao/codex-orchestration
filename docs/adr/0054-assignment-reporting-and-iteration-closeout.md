@@ -86,4 +86,6 @@ unpreserved coordinator work remain protected. This applies to disposable
 coordinators as well as accepted executors. When a user already archived the
 coordinator and its worktree is gone, exact private archive observation plus
 the same source-ancestry proof completes closeout without replaying a native
-archive call.
+archive call. The same observation may replace a definitive blocked/no-archive
+attempt; accepted and ambiguous attempts retain their stricter concurrency and
+no-replay guards.
