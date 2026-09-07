@@ -217,6 +217,39 @@ test("launch attempt emits one full first-turn assignment and no release prompt"
   assert.equal(replay.host_request, null);
 });
 
+test("launch identity includes an assignment-generated display title when supplied", async (t) => {
+  const root = await createGitFixture("codex-flow-v09-launch-title-");
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const context = await launchContext(root, "display-title");
+  const taskTitle = "Executor · v0.9.7 · Assignment reporting";
+  const prepared = await prepareTaskLaunch({
+    stateRoot: context.stateRoot,
+    taskContract: context.contract,
+    requestedSelectors: context.requestedSelectors,
+    taskTitle,
+    now: BASE_TIME + 3_000,
+  });
+  const attempted = await recordTaskLaunchAttempt({
+    stateRoot: context.stateRoot,
+    launchId: prepared.launch_id,
+    hostSessionId: `session-${context.runId}`,
+    timeoutSeconds: 300,
+    now: BASE_TIME + 4_000,
+  });
+
+  assert.equal(prepared.task_title, taskTitle);
+  assert.equal(attempted.host_request.title, taskTitle);
+  assert.equal(prepared.launch_id, taskLaunchIdForContract({
+    taskContract: context.contract,
+    requestedSelectors: context.requestedSelectors,
+    taskTitle,
+  }));
+  assert.notEqual(prepared.launch_id, taskLaunchIdForContract({
+    taskContract: context.contract,
+    requestedSelectors: context.requestedSelectors,
+  }));
+});
+
 test("executor start can establish exact identity before or after the host result", async (t) => {
   for (const order of ["start-first", "result-first"]) {
     const root = await createGitFixture(`codex-flow-v09-${order}-`);

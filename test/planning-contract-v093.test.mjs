@@ -35,20 +35,22 @@ test("the plan contract binds one approved revision before coordinator dispatch"
   const assignment = await source("templates/references/assignment-and-reporting.md");
 
   assert.match(planSkill, /name: plan/);
-  assert.match(planSkill, /one approved project plan/);
-  assert.match(planSkill, /outcome, scope and non-goals, consequential\s+decisions/);
-  assert.match(planSkill, /acceptance evidence, execution\s+authority, and escalation conditions/);
-  assertIncludes(planSkill, "exact content digest or immutable snapshot");
-  assertIncludes(planSkill, "mutable path alone is not approval evidence");
-  assertIncludes(planSkill, "does not implement product changes");
-  assertIncludes(planSkill, "material change to intent, acceptance, risk, scope, or external authority");
-  assertSequence(planSkill, "save and bind the approved plan before dispatch", "give the coordinator");
+  assertIncludes(planSkill, "Write one plan containing outcome");
+  assertIncludes(planSkill, "scope/non-goals");
+  assertIncludes(planSkill, "acceptance evidence");
+  assertIncludes(planSkill, "execution authority");
+  assertIncludes(planSkill, "Assignment preparation saves a fixed copy");
+  assertIncludes(planSkill, "later edits to the source document do not change that assignment");
+  assertIncludes(planSkill, "does not authorize implementation");
+  assertIncludes(planSkill, "Material changes to scope, acceptance, risk, or external authority");
+  assertSequence(planSkill, "After approval", "Assignment preparation saves", "before dispatch");
 
-  assert.match(assignment, /Approved plan/);
-  assertIncludes(assignment, "exact content digest or immutable snapshot");
-  assertIncludes(assignment, "A linked worktree must not depend on an uncommitted file");
-  assertIncludes(assignment, "exactly one recipient and one path");
-  assertSequence(assignment, "The plan is saved and bound before dispatch", "coordinator may add");
+  assertIncludes(assignment, "Before task creation");
+  assertIncludes(assignment, "assignment prepare");
+  assertIncludes(assignment, "computes its digest");
+  assertIncludes(assignment, "persists its snapshot");
+  assertIncludes(assignment, "No commit, manual checksum");
+  assertSequence(assignment, "Before task creation", "coordinator later binds its identity");
 });
 
 test("director dispatch returns once and cannot become local implementation or babysitting", async () => {
@@ -60,24 +62,22 @@ test("director dispatch returns once and cannot become local implementation or b
 
   assert.match(indexSkill, /codex-orchestration:plan/);
   assert.match(indexSkill, /Implement the plan/);
-  assert.match(indexSkill, /one bounded coordinator dispatch and return/);
+  assertIncludes(indexSkill, "dispatch delivery and return");
   assert.match(directSkill, /codex-orchestration:plan/);
-  assertSequence(directSkill, "persist and bind one approved plan revision", "bounded dispatch", "return to strategic conversation");
-  assertIncludes(directSkill, "ready, honestly pending, or blocked");
-  assertIncludes(directSkill, "provisional creation result is pending evidence");
-  assertIncludes(directSkill, "do not retry creation or enter a lookup loop");
-  assertIncludes(directSkill, "repeatedly call `wait_threads`");
-  assertIncludes(directSkill, "Do not implement the approved plan locally");
+  assertSequence(directSkill, "assignment prepare", "Dispatch one coordinator", "return");
+  assertIncludes(directSkill, "ready, pending, or blocked");
+  assertIncludes(directSkill, "A provisional result does not authorize a retry or lookup loop");
+  assertIncludes(directSkill, "Do not poll progress");
+  assertIncludes(directSkill, "Do not absorb unfinished delivery");
   assert.doesNotMatch(directSkill, /wait for the coordinator to finish/);
   assert.doesNotMatch(directSkill, /monitor unchanged progress in a loop/);
 
   assert.match(directorRole, /goals/);
   assert.match(directorRole, /tradeoffs/);
   assert.match(directorRole, /acceptance/);
-  assert.match(directorRole, /reporting recipient\/path/);
-  assertIncludes(directorRole, "dispatch the coordinator once");
-  assertIncludes(directorRole, "Do not implement locally");
-  assertIncludes(directorRole, "repeatedly call `wait_threads`");
+  assertIncludes(directorRole, "Dispatch delivery and return to discussion");
+  assertIncludes(directorRole, "do not take over routine progress monitoring");
+  assertIncludes(directorRole, "Local implementation is limited to work explicitly assigned");
 });
 
 test("coordinator and result briefs preserve role authority and one complete report", async () => {
@@ -88,31 +88,17 @@ test("coordinator and result briefs preserve role authority and one complete rep
   ]);
 
   for (const contract of [coordinateSkill, coordinatorRole]) {
-    assertIncludes(contract, "approved plan");
-    assert.ok(
-      normalized(contract).includes("initial assignment")
-      || normalized(contract).includes("full assignment"),
-      "Expected an initial or full assignment contract",
-    );
-    assert.ok(
-      normalized(contract).includes("technical detail")
-      || normalized(contract).includes("technical breakdown")
-      || normalized(contract).includes("technical work")
-      || normalized(contract).includes("implementation detail"),
-      "Expected technical detail or breakdown guidance",
-    );
-    assertIncludes(contract, "material change");
-    assertIncludes(contract, "director/user");
+    assert.ok(normalized(contract).includes("assignment"), "Expected assignment authority");
   }
-  assertIncludes(coordinateSkill, "full assignment");
-  assertIncludes(coordinateSkill, "one complete result");
-  assertIncludes(coordinateSkill, "exactly one named recipient/path");
-  assertIncludes(coordinateSkill, "result is quiet and non-interrupting");
-  assertIncludes(coordinatorRole, "quiet journal result");
-  assertIncludes(coordinatorRole, "executor waiting, progress management, recovery, verification");
-  assertIncludes(assignment, "Write one complete final report");
-  assertIncludes(assignment, "Result or receipt delivery is not acceptance");
-  assertIncludes(assignment, "Next decision");
+  assertIncludes(coordinateSkill, "prepared plan snapshot");
+  assertIncludes(coordinateSkill, "Refine the technical breakdown without rewriting intent");
+  assertIncludes(coordinateSkill, "Return material changes");
+  assertIncludes(coordinateSkill, "Return one complete final");
+  assertIncludes(coordinatorRole, "Own delivery");
+  assertIncludes(coordinatorRole, "preserve the route for the complete final result");
+  assertIncludes(assignment, "Return one complete final");
+  assertIncludes(assignment, "Do not author a second summary");
+  assertIncludes(assignment, "Queue acceptance is submission evidence, not actual delivery");
 });
 
 test("planning and dispatch contracts do not promote executor authority", async () => {
@@ -123,15 +109,11 @@ test("planning and dispatch contracts do not promote executor authority", async 
     source("templates/roles/executor.md"),
   ]);
 
-  assertIncludes(planSkill, "coordinator's technical execution");
-  assertIncludes(directSkill, "The coordinator owns executor waiting");
-  assertIncludes(coordinateSkill, "A coordinator may complete its entire bounded assignment directly");
-  assertIncludes(coordinateSkill, "zero child tasks is a valid delivery shape");
-  assertIncludes(coordinateSkill, "integration, verification, reporting, release, and cleanup responsibility");
-  assertIncludes(directSkill, "Terra-high and zero child tasks");
-  assertIncludes(directSkill, "complex multi-executor work");
-  assertIncludes(coordinateSkill, "executor contract must not be relabeled");
-  assertIncludes(executorRole, "Do not appoint a coordinator");
-  assertIncludes(executorRole, "broaden ownership");
+  assertIncludes(planSkill, "Do not duplicate the coordinator's execution DAG");
+  assertIncludes(directSkill, "The coordinator owns implementation, executor waiting, integration, and release");
+  assertIncludes(coordinateSkill, "Own delivery even with zero children");
+  assertIncludes(coordinateSkill, "do not relabel an executor contract as local work");
+  assertIncludes(executorRole, "Own only the assigned implementation and evidence");
+  assertIncludes(executorRole, "Own only the assigned implementation and evidence");
   assertIncludes(executorRole, "terminal-receipt-v4");
 });

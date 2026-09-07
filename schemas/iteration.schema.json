@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://private.local/codex-flow/iteration.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "kind", "iteration_id", "assignment_id", "label", "members", "state", "created_at", "updated_at", "record_digest"],
+  "properties": {
+    "schema_version": { "const": 1 }, "kind": { "const": "codex-flow-v097-iteration" },
+    "iteration_id": { "type": "string", "pattern": "^iteration-v1-[0-9a-f]{64}$" },
+    "assignment_id": { "type": "string", "pattern": "^coordinator-assignment-v1-[0-9a-f]{64}$" },
+    "label": { "type": "string", "minLength": 1, "maxLength": 80 },
+    "members": { "type": "array", "minItems": 2, "maxItems": 256, "items": { "$ref": "#/$defs/member" } },
+    "state": { "enum": ["open", "accepted", "closeout-pending", "closed", "cancelled"] },
+    "created_at": { "$ref": "#/$defs/timestamp" }, "updated_at": { "$ref": "#/$defs/timestamp" }, "record_digest": { "$ref": "#/$defs/digest" }
+  },
+  "$defs": {
+    "safeId": { "type": "string", "minLength": 1, "maxLength": 256, "pattern": "^[A-Za-z0-9_.-]+$" },
+    "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" }, "timestamp": { "type": "string", "format": "date-time", "maxLength": 64 },
+    "authority": { "type": "object", "additionalProperties": false, "required": ["kind", "authority_id", "authority_digest", "state_root"], "properties": { "kind": { "enum": ["assignment", "task-launch"] }, "authority_id": { "$ref": "#/$defs/safeId" }, "authority_digest": { "$ref": "#/$defs/digest" }, "state_root": { "type": "string", "pattern": "^/" } } },
+    "archiveAttempt": { "type": "object", "additionalProperties": false, "required": ["attempt_id", "state", "started_at", "completed_at", "result_digest", "reason", "branch_tip"], "properties": { "attempt_id": { "$ref": "#/$defs/safeId" }, "state": { "enum": ["prepared", "accepted", "ambiguous", "blocked"] }, "started_at": { "$ref": "#/$defs/timestamp" }, "completed_at": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/timestamp" }] }, "result_digest": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/digest" }] }, "reason": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/safeId" }] }, "branch_tip": { "oneOf": [{ "type": "null" }, { "type": "string", "pattern": "^[0-9a-f]{40,64}$" }] } } },
+    "member": { "type": "object", "additionalProperties": false, "required": ["member_id", "role", "host_id", "thread_id", "provisional_id", "reporting_parent_thread_id", "retained", "authority", "requested_title", "observed_title", "worktree_path", "branch", "state", "archive_attempt", "registered_at", "updated_at"], "properties": { "member_id": { "$ref": "#/$defs/safeId" }, "role": { "enum": ["director", "coordinator", "executor"] }, "host_id": { "$ref": "#/$defs/safeId" }, "thread_id": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/safeId" }] }, "provisional_id": { "oneOf": [{ "type": "null" }, { "type": "string", "minLength": 1, "maxLength": 256 }] }, "reporting_parent_thread_id": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/safeId" }] }, "retained": { "type": "boolean" }, "authority": { "$ref": "#/$defs/authority" }, "requested_title": { "oneOf": [{ "type": "null" }, { "type": "string", "minLength": 1, "maxLength": 120 }] }, "observed_title": { "oneOf": [{ "type": "null" }, { "type": "string", "minLength": 1, "maxLength": 160 }] }, "worktree_path": { "oneOf": [{ "type": "null" }, { "type": "string", "pattern": "^/" }] }, "branch": { "oneOf": [{ "type": "null" }, { "type": "string", "minLength": 1, "maxLength": 256 }] }, "state": { "enum": ["registered", "accepted", "archive-pending", "archived", "retained"] }, "archive_attempt": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/archiveAttempt" }] }, "registered_at": { "$ref": "#/$defs/timestamp" }, "updated_at": { "$ref": "#/$defs/timestamp" } } }
+  }
+}

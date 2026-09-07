@@ -208,6 +208,12 @@ relabelled as a legacy creation operation and fails closed. The target never
 parses or migrates source journals. Unsupported older state uses the explicit
 unplug path.
 
+Current v0.9 sources also expose coordinator-owned workflow claims. Refresh
+reissues an unfinished coordinator claim with fresh task and selector identity,
+without inventing child archive, worktree, or branch cleanup. A completed
+coordinator claim remains in the authenticated baseline; only a genuinely
+work-free source uses the no-replacement clean-start path.
+
 ## Command surface
 
 Run `codex-flow --help` for the exact inventory. Principal families are:
@@ -215,7 +221,9 @@ Run `codex-flow --help` for the exact inventory. Principal families are:
 ```text
 run activate|status|resume|rebind|audit|close|abandon
 workflow create|revise|status|contract
+workflow local start|complete|status
 task launch prepare|attempt|reconcile|start|status
+assignment brief|status|closeout|accept
 subagent prepare|attempt|reconcile|complete|dispose|status
 callback deliver|observe|status
 urgent persist|attempt|reconcile|observe|consume|expire|status
@@ -228,7 +236,8 @@ refresh inspect|prepare|observe-private|apply|status
 unplug plan|observe-private|apply
 ```
 
-Every run-scoped stateful operation names `run_id`. Complex operations consume
+Every run-scoped stateful operation names `run_id`. Assignment operations use
+their assignment ID because reporting and acceptance can outlive a run. Complex operations consume
 a closed JSON request from `--file`. Native App calls remain external; the CLI
 emits exact host requests only when persisted state authorizes them.
 

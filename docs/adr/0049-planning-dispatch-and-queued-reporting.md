@@ -72,6 +72,24 @@ can resolve its route from the sender worktree without a global task scan or an 
 environment variable. The adapter owns that locator; repository route and
 delivery records remain the sole governance state machines.
 
+The executable reporter has the same lifetime as that locator. Route
+registration stages a complete content-addressed reporter runtime under the
+sender's repository-local locator state and binds its digest into reporter
+authority. Session and subagent start hooks install one immutable v1 launcher
+in writable `PLUGIN_DATA`; completion hooks always enter through that stable
+launcher, which authenticates the sender locator and every staged runtime byte
+before execution. The installed plugin cache is package-discovery authority,
+not an active route's executable store: Codex may remove an old version during
+upgrade while an already-loaded task still has a pending final. Runtime state
+is sender-scoped, is removed with exact locator retirement, and remains covered
+by existing repository unplug ownership. No mutable latest pointer, daemon, or
+global route registry is introduced.
+
+Pinned execution-runtime bundles include the package metadata required to stage
+that reporter runtime. Route registration is locally resumable after partial
+assignment, iteration, or route persistence: replay preserves the original
+iteration timestamps and completes the missing locator transition.
+
 Route lifetime follows assignment lifetime. Completing a task disposition
 closes that launch's route, and closing or abandoning a run closes every
 remaining route owned by the run. A closed route cannot be re-armed, so late
@@ -95,6 +113,11 @@ report path, while `SubagentStop.agent_id` must equal the routed session identit
 - Treat queue acceptance as delivery or acceptance. Transport evidence does
   not prove a recipient reviewed the result or that the work satisfies the
   approved plan.
+- Execute completion directly from `$PLUGIN_ROOT`. Its versioned cache path can
+  disappear during a supported plugin upgrade before an already-loaded task
+  emits the restart-needed final.
+- Fall back to a mutable current package. A newer reporter cannot satisfy the
+  immutable hashes bound by an older active route.
 
 ## Consequences and guardrails
 
@@ -103,7 +126,8 @@ dispatch and acceptance, and `coordinate` for bounded delivery. The reusable
 assignment/result brief keeps the role boundary small and consistent. Focused
 contract tests cover exact approved-plan handoff, dispatch-and-return ordering,
 forbidden director waiting/implementation loops, coordinator-first-turn
-assignments, one complete result report, and terminal route closure. Existing lifecycle, receipt,
+assignments, one complete result report, cache-independent staged execution,
+harmless unregistered completion, and terminal route/runtime closure. Existing lifecycle, receipt,
 disposition, integration, verification, archive, cleanup, and refresh
 authority remain unchanged.
 

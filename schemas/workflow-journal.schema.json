@@ -123,10 +123,10 @@
         "task_id": { "$ref": "#/$defs/safeId" },
         "task_digest": { "$ref": "#/$defs/digest" },
         "contract_id": { "$ref": "#/$defs/digest" },
-        "execution_kind": { "enum": ["task-thread", "subagent"] },
-        "state": { "enum": ["current", "started", "terminal-no-object", "revoked"] },
+        "execution_kind": { "enum": ["coordinator", "task-thread", "subagent"] },
+        "state": { "enum": ["current", "started", "completed", "terminal-no-object", "revoked"] },
         "operation_kind": {
-          "enum": [null, "task-launch", "subagent-operation"]
+          "enum": [null, "coordinator-work", "task-launch", "subagent-operation"]
         },
         "operation_id": {
           "oneOf": [
@@ -147,6 +147,20 @@
       },
       "allOf": [
         {
+          "if": { "properties": { "state": { "const": "completed" } } },
+          "then": {
+            "properties": {
+              "execution_kind": { "const": "coordinator" },
+              "operation_kind": { "const": "coordinator-work" },
+              "operation_id": { "$ref": "#/$defs/hostId" },
+              "started_at": { "$ref": "#/$defs/timestamp" },
+              "terminal_at": { "$ref": "#/$defs/timestamp" },
+              "superseded_by_revision_digest": { "type": "null" },
+              "revoked_at": { "type": "null" }
+            }
+          }
+        },
+        {
           "if": { "properties": { "state": { "const": "current" } } },
           "then": {
             "properties": {
@@ -156,6 +170,16 @@
               "terminal_at": { "type": "null" },
               "superseded_by_revision_digest": { "type": "null" },
               "revoked_at": { "type": "null" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "execution_kind": { "const": "coordinator" } } },
+          "then": {
+            "properties": {
+              "operation_kind": {
+                "enum": [null, "coordinator-work"]
+              }
             }
           }
         },

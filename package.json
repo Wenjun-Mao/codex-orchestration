@@ -1,6 +1,6 @@
 {
   "name": "@wjmao/codex-flow",
-  "version": "0.9.6",
+  "version": "0.9.7-rc.14",
   "description": "Dependency-free repository tooling for coordinated Codex task workflows.",
   "private": true,
   "homepage": "https://github.com/Wenjun-Mao/codex-orchestration#readme",
@@ -18,7 +18,7 @@
   },
   "scripts": {
     "test": "npm run test:v09",
-    "test:v09": "node --test --test-concurrency=1 test/*-v09.test.mjs test/*-v093.test.mjs test/recipient.test.mjs test/release-identity.test.mjs",
+    "test:v09": "node --test --test-concurrency=1 test/*-v09.test.mjs test/*-v093.test.mjs test/*-v097.test.mjs test/recipient.test.mjs test/release-identity.test.mjs",
     "validate": "node scripts/validate.mjs",
     "prepack": "node scripts/release-identity.mjs",
     "pack:check": "npm pack --dry-run"

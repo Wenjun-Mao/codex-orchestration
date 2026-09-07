@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "https://private.local/codex-flow/assignment-preparation.schema.json",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_version", "kind", "preparation_id", "common_dir", "approved_plan", "recipient", "iteration_label", "purpose", "title", "outcome", "scope", "acceptance_criteria", "constraints", "reasons", "created_at"],
+  "properties": {
+    "schema_version": {"enum": [1, 2]}, "kind": {"const": "codex-flow-v097-assignment-preparation"},
+    "preparation_id": {"type": "string", "pattern": "^assignment-preparation-v[12]-[0-9a-f]{64}$"}, "common_dir": {"type": "string", "pattern": "^/"},
+    "approved_plan": {"type": "object", "description": "Command-derived content identity and immutable saved snapshot; callers provide only the source path.", "additionalProperties": false, "required": ["digest", "snapshot_path"], "properties": {"digest": {"type": "string", "description": "SHA-256 derived by assignment preparation.", "pattern": "^[0-9a-f]{64}$"}, "snapshot_path": {"type": "string", "description": "Fixed plan copy validated during coordinator registration.", "pattern": "^/"}}},
+    "recipient": {"type": "object", "additionalProperties": false, "required": ["host_id", "lineage_id", "thread_id", "generation", "binding_digest"], "properties": {"host_id": {"$ref": "#/$defs/id"}, "lineage_id": {"$ref": "#/$defs/id"}, "thread_id": {"$ref": "#/$defs/id"}, "generation": {"type": "integer", "minimum": 1}, "binding_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}},
+    "iteration_label": {"type": "string", "minLength": 1, "maxLength": 80}, "purpose": {"type": "string", "minLength": 1, "maxLength": 120}, "title": {"type": "string", "minLength": 1, "maxLength": 120}, "outcome": {"type": "string", "minLength": 1, "maxLength": 2400},
+    "scope": {"$ref": "#/$defs/list"}, "acceptance_criteria": {"$ref": "#/$defs/list"}, "constraints": {"$ref": "#/$defs/list"}, "reasons": {"$ref": "#/$defs/list"}, "created_at": {"type": "string", "format": "date-time"}
+  },
+  "allOf": [
+    {"if": {"properties": {"schema_version": {"const": 1}}}, "then": {"properties": {"preparation_id": {"pattern": "^assignment-preparation-v1-[0-9a-f]{64}$"}}}},
+    {"if": {"properties": {"schema_version": {"const": 2}}}, "then": {"properties": {"preparation_id": {"pattern": "^assignment-preparation-v2-[0-9a-f]{64}$"}}}}
+  ],
+  "$defs": {"id": {"type": "string", "minLength": 1, "maxLength": 256, "pattern": "^[A-Za-z0-9_.-]+$"}, "list": {"type": "array", "maxItems": 16, "items": {"type": "string", "minLength": 1, "maxLength": 1200}}}
+}

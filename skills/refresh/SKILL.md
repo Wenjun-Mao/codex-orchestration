@@ -23,6 +23,13 @@ preauthorized within the refresh contract, not permission to discard arbitrary
 work. Active native subagents must finish or be disposed through their source
 lifecycle.
 
+An unfinished `execution_kind: coordinator` claim is also refresh-managed. It
+must be discarded and reissued semantically with a fresh task and selector; it
+has no child archive, worktree, or branch cleanup authority. A completed
+coordinator claim remains embodied in the authenticated baseline and is not
+reissued. Only a source with no unfinished refresh-managed work may take the
+no-replacement clean-start path.
+
 Use `refresh prepare`, archive the exact discard targets, and apply only with
 authenticated archive/no-active evidence. Use `refresh observe-private` when
 public indexing is insufficient. `run activate --refresh-id` consumes the

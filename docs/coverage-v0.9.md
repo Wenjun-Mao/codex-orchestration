@@ -16,8 +16,9 @@ with the automated and live gates recorded below.
 | Full launch through callback, disposition, integration/no-change, verification, archive, cleanup, and audit joins, including callback-before-App-result selector enrichment and cross-revision task-disposition dependencies | `lifecycle-v09.test.mjs`, `run-lifecycle-v09.test.mjs` |
 | Quiet completion and separate one-shot urgent interruption | `lifecycle-v09.test.mjs`, `urgent-v09.test.mjs` |
 | Explicit read-only native-subagent lifecycle and selector rejection | `subagent-v09.test.mjs` |
+| Same-host final capture, shared-director recipient preservation across fresh sender fences, staged reporter upgrade survival, runtime-bundle staging, harmless unregistered stops, resumable route registration, and exact runtime retirement | `cli-v09.test.mjs`, `assignment-lifecycle-v097.test.mjs`, `coordinator-recipient-routing-v097.test.mjs`, `report-hook-v093.test.mjs`, `report-lifecycle-v093.test.mjs` |
 | Public/private archive evidence | `codex-app-private-archive-v09.test.mjs` |
-| Exact v0.8.3 semantic refresh, selected already-terminal evidence, dirty discard, branch/worktree deletion, target consumption, joined crash-replay boundaries, and exact closed-v0.9.0 no-replacement maintenance refresh | `refresh-v09.test.mjs` |
+| Exact v0.8.3 and live-shaped RC7 semantic refresh, actual unfinished/completed coordinator-work claims, zero-child reissue, true no-work clean start, selected already-terminal evidence, dirty discard, branch/worktree deletion, assignment target binding, target consumption, joined crash-replay boundaries, and exact closed-v0.9.0 no-replacement maintenance refresh | `refresh-v09.test.mjs`, `assignment-lifecycle-v097.test.mjs` |
 | Coordinator branch authority remains disjoint from executor cleanup branch fences at admission | `run-lifecycle-v09.test.mjs` |
 | Version-agnostic clean-start unplug | `unplug-v09.test.mjs` |
 | Schema/runtime parity and immutable release identity | `schema-runtime-parity-v09.test.mjs`, `release-identity.test.mjs` |

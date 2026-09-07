@@ -73,6 +73,27 @@ test("recipient registry fences rebinding and resolves only recorded lineage gen
     assert.equal(status.current.thread_id, "coordinator-thread-2");
     assert.equal(status.current.fence_token, undefined);
     assert.equal((await recipientStatuses({ stateRoot }))[0].binding_count, 2);
+    const preservedCurrent = await bindRecipient({
+      stateRoot,
+      recipient: {
+        lineage_id: "coordinator-lineage",
+        thread_id: "coordinator-thread-2",
+        generation: 2,
+      },
+    });
+    assert.equal(preservedCurrent.status, "already-bound");
+    assert.equal(preservedCurrent.recipient.fence_token, undefined);
+    await assert.rejects(
+      bindRecipient({
+        stateRoot,
+        recipient: {
+          lineage_id: "new-lineage-at-generation-two",
+          thread_id: "new-thread-at-generation-two",
+          generation: 2,
+        },
+      }),
+      /Initial recipient binding must use generation 1/,
+    );
     const stale = await resolveRecipient({
       stateRoot,
       recipient: {
