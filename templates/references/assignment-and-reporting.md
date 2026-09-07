@@ -1,61 +1,45 @@
 # Assignment and result briefs
 
-Use these small briefs at role boundaries. Reference the relevant Flow skill
-for mechanics rather than repeating its lifecycle.
-
 ## Assignment brief
 
-- **Approved plan:** source path plus the exact content digest or immutable
-  snapshot supplied to the coordinator.
-- **Outcome:** one observable result.
-- **Scope:** owned paths, resources, and work boundary.
-- **Constraints:** prohibited actions and preserved authority.
-- **Acceptance:** checks and evidence the recipient will review.
-- **Reporting:** exactly one recipient and one path.
+Use the generated mechanical fields: assignment identity, approved-plan
+snapshot/digest, runtime references, title, entry commands, and reporting route.
+Add only task-specific outcome, scope, constraints, and acceptance criteria.
+The approved bytes must be readable in the recipient's worktree.
 
-The plan is saved and bound before dispatch. A linked worktree must not depend
-on an uncommitted file in the director checkout. The coordinator may add
-technical detail without changing approved intent; a material change returns to
-the director/user for approval.
+Include reasons only when they affect execution, verification, or escalation.
+Follow-ups carry the delta, not the prior conversation or a staffing essay.
+
+For example, replace “The user and I discussed the cost of this service and
+decided it was worthwhile…” with “Enable private vulnerability reporting for
+this repository only.” Retain a consequential reason such as “Keep old URLs
+working because installed clients still use them.”
 
 ## Result brief
 
-- **Outcome and status:** `complete` or `blocked` against the approved plan and
-  assignment.
-- **Actual results:** changes or findings actually produced.
-- **Evidence:** verification actually run, its outcome, and artifact links.
-- **Concerns:** unresolved gaps or risks, or `none`.
-- **Next decision:** the decision needed from the recipient, or `none`.
-- **Reporting:** the assignment's exact recipient and path.
+Return one complete final: outcome/status, actual results, verification and
+artifact links, concerns, and the next decision if needed. Do not author a
+second summary or copy the report into a separate file for delivery.
 
-Write one complete final report. Do not create a separate narrative summary or
-ask the task to duplicate the report into another file first. Result or receipt
-delivery is not acceptance.
+## Reporting and retirement
 
-## Reporting transition
+Register the exact same-host sender-recipient route before work can finish.
+Use the pinned completion hook to capture complete finals at genuine task idle.
+Waits and commentary are not reporting boundaries. Keep the explicit manual
+path until the hook is installed, trusted, and live-verified for the exact
+sender-recipient mapping; cross-host delivery remains manual.
 
-For supported same-local-host assignments, register and pin the exact upstream
-route before useful work: coordinator-to-director from the active run and
-approved-plan digest, and executor-to-coordinator as part of `task launch
-start`. The native `Stop`/thread-spawn `SubagentStop` completion hook captures
-only the complete final and makes one native
-queue attempt. Queue acceptance is not delivery, review, or Flow acceptance.
-Never remove the explicit manual path until the hook is installed, trusted, and
-live-verified for the exact sender-recipient mapping. Cross-host routes remain manual. Routine
-results must not Steer an active recipient; preserve quiet callbacks and the
-separate rare urgent path.
+Routine reports queue without Steer. Queue acceptance is submission evidence,
+not actual delivery, verification, or director acceptance. Preserve ambiguous
+submissions without replay.
 
-The sender locator is active authority, not permanent configuration. Close the
-exact route at assignment or run termination, prove that every report is
-accepted or absent, persist its authenticated retirement record, and only then
-remove the locator. A pending, ambiguous, conflicting, or manual-required
-report blocks retirement. A later run may reuse the same sender identity only
-after that exact lifecycle completes.
+Coordinator reporting belongs to the assignment, including restart requests
+and cleanup finals, not just an active execution run. Record director acceptance
+against the actual final through the acceptance command. Retire its route only
+after reporting and required closeout resolve. A pending iteration stays
+pending; later assignments cannot inherit its reporting authority.
 
 ## Optional advisor
 
-An advisor receives one bounded question and returns independent analysis with
-evidence and uncertainties. It issues no commands, owns no acceptance, cannot
-appoint or direct a coordinator, and has no coordinator-to-coordinator role.
-The advisory contract does not depend on browser automation, MCP, tunnels,
-installations, or a personal consultation skill.
+An advisor answers a bounded question. It cannot issue assignments, appoint a
+coordinator, or accept work.

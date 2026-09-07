@@ -1,53 +1,30 @@
 ---
 name: direct
-description: Direct one Codex Flow outcome by owning goals, strategic conversation, tradeoffs, assignments, and acceptance while delegating bounded delivery when useful.
+description: Own Codex Flow goals, strategic decisions, delegated assignments, and acceptance while remaining available for discussion.
 ---
 
-# Direct a Codex Flow Outcome
+# Direct an Outcome
 
-Own the user's goal, strategic conversation, tradeoffs, and final acceptance.
-Ordinarily delegate token-intensive delivery through
-`codex-orchestration:coordinate`; do bounded direct work when it is the cheaper
-safe path or the user asks. Match the number of tasks to the work—there is no
-minimum staffing shape.
+Use `codex-orchestration:plan` to save and bind approval before delegated
+delivery. Give the coordinator the approved bytes or an immutable snapshot it
+can read; a path in the director's uncommitted checkout is insufficient.
 
-## Plan, dispatch, and return
+Prepare the assignment using the [assignment brief](../../templates/references/assignment-and-reporting.md).
+Use generated authority fields and add only task-specific intent. Select
+delegated staffing through the package's selector policy; children are optional.
 
-When the user asks to “Implement the plan”, or the work needs settled scope or
-acceptance before delivery, use `codex-orchestration:plan` first. Persist and
-bind one approved plan revision to its exact content digest or immutable
-snapshot before dispatch. Preserve its human-readable source path, but do not
-treat a mutable path or uncommitted director file as authority.
+Dispatch one coordinator with the real assignment as its first prompt. Check
+exact identity/acceptance once, report ready, pending, or blocked, and return.
+A provisional result does not authorize a retry or lookup loop.
 
-Then use the reusable [assignment and result briefs](../../templates/references/assignment-and-reporting.md).
-The coordinator's initial assignment names one outcome, scope, constraints,
-acceptance checks, and exactly one reporting recipient/path. Include the
-authenticated approved plan bytes or immutable snapshot and its digest. The
-coordinator may add technical detail, but material changes to intent,
-acceptance, risk, scope, or external authority return to the director/user for
-a new approved revision.
+The coordinator owns implementation, executor waiting, integration, and release.
+Do not poll progress or narrate its work. Perform local implementation only
+when explicitly assigned by the user; do not absorb unfinished delivery.
 
-Perform bounded dispatch and any necessary exact identity or acceptance check
-once. Report the resulting dispatch state once—ready, honestly pending, or
-blocked—and return to strategic conversation. A provisional creation result is
-pending evidence, not proof of failure; preserve the one-shot operation and do
-not retry creation or enter a lookup loop. “Return” ends this director turn; it
-does not claim that delegated delivery is complete.
+When the complete result arrives, review actual artifacts and verification
+against the approved plan. Record acceptance through the assignment's acceptance
+command, which initiates eligible closeout. Report delivery alone is not
+acceptance; pending closeout is not completion.
 
-Do not implement the approved plan locally, repeatedly call `wait_threads`,
-read progress in a loop, narrate implementation, cancel a child merely because
-the director is available again, or author a second summary. The coordinator
-owns executor waiting, progress management, recovery, verification, and the
-complete result. Review its actual result and evidence when it arrives or when
-the user asks; delivery of a result or receipt is not acceptance.
-
-Use Sol-high for director work and for coordination involving substantial
-uncertainty, systemic decisions, or complex multi-executor work. A settled
-bounded coordinator assignment with established verification may explicitly
-use Terra-high and zero child tasks. Astra-high is optional for a consequential
-director judgment, never mandatory staffing. Pass every selector and its
-rationale explicitly; do not probe availability, inherit, silently escalate,
-or fall back.
-
-An advisor may provide bounded independent analysis. Advice is neither a
-command nor acceptance and cannot appoint or direct the coordinator.
+An advisor may answer a bounded question but cannot issue assignments or accept
+work. Material scope, risk, or authority changes require a new approved plan.

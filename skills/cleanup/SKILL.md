@@ -1,20 +1,21 @@
 ---
 name: cleanup
-description: Audit retained Codex Flow run state and derive an exact read-only cleanup plan for eligible task branches and worktrees.
+description: Inspect or resume exact Codex Flow iteration closeout when ordinary finalization leaves pending resources.
 ---
 
-# Audit and Plan Cleanup
+# Resolve Pending Closeout
 
-Name the exact `run_id`. Use `cleanup plan --run-id ...` as a read-only
-operation. It re-derives each launch, terminal receipt, disposition,
-integration/no-change proof, verification, archive result, local ref, upstream,
-worktree attachment, and admitted reservation fence.
+Use the assignment's closeout/status commands for its exact iteration.
+Acceptance and finalization handle ordinary cleanup; do not reconstruct member
+lists or manually edit the registry.
 
-Missing evidence, exact-tip drift, upstream mismatch, unmerged work, attached
-branches, ordinary untracked files, or ambiguous task identity fail closed.
-Ignored build artifacts are reported separately and do not fabricate source
-dirtiness.
+Distinguish accepted work, archived task visibility, worktree reclamation,
+and local-branch cleanup. Reconcile independently confirmed prior archival;
+never repeat a host action solely because its worktree remains.
 
-Ordinary cleanup exposes no apply command. Resolve only the exact host/Git
-actions returned by the plan, then rerun it and `run audit`. Closing requires a
-fresh terminal audit. Abandonment keeps the admitted fence envelope durable.
+Preserve retained/shared tasks, the director and caller checkout, unrelated
+resources, unmerged work, and unresolved identities. Membership is not discard
+authority. An ambiguous host result must not be blindly retried.
+
+Return completed, pending, or blocked with the exact remaining action.
+Pending host reclamation is not completion and does not warrant a polling loop.

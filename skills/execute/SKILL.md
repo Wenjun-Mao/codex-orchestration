@@ -1,40 +1,29 @@
 ---
 name: execute
-description: Start and execute one generated Codex Flow visible-task contract from its first prompt, then persist one strict terminal result. Use only inside that executor task.
+description: Execute a generated Codex Flow first-turn contract and persist its terminal result. Use only inside the assigned executor task.
 ---
 
-# Execute a First-Turn Assignment
+# Execute the Assigned Contract
 
-The initial user prompt contains the full contract, launch ID, nonce, and exact
-`task launch start` command. Run that command before inspecting or mutating
-source. It authenticates `CODEX_THREAD_ID`, the run-bound runtime, contract,
-nonce, Git common directory, pristine baseline, non-coordinator worktree, and
-reserved branch, then registers and pins the same-host upstream report route.
-If any part cannot complete, stop with its exact blocker. There is no release
-message to wait for.
+Run the exact `task launch start` command from the initial prompt before source
+access. Stop if activation fails; do not wait for a second release message.
+After success, begin useful work in the same first turn.
 
-After start succeeds, begin the assignment in the same first turn. Stay within
-the contract's objective, dependencies, paths, resources, baseline, and
-verification scope. Preserve user and sibling work. Attempt the cheapest safe
-direct action. A supporting instrument returns one checkpoint that enables its
-named follow-up; more supporting instrumentation requires a later authorized
-workflow revision.
+Stay within the contract's paths, resources, dependencies, and verification
+scope. Own implementation and evidence, not sibling coordination or acceptance.
+Use the immutable run-bound runtime throughout; restart does not hot-switch it.
 
-Own only the assigned implementation and evidence. Do not appoint a
-coordinator, direct sibling work, change acceptance, or broaden scope. Use the
-assignment's reporting recipient/path and return actual results and evidence,
-not a separately authored second summary.
+Attempt the cheapest safe direct action. A supporting instrument may return one
+checkpoint for its named follow-up; further instrumentation requires an
+authorized workflow revision.
 
-Use the immutable run-bound runtime for every stateful command. An App restart
-or coordinator refresh does not hot-switch this executor.
+At terminal state, derive Git outcome mechanically: `unchanged`, `clean-commit`,
+or `dirty-blocked`. Deliver exactly one terminal-receipt-v4 with
+`callback deliver`, binding `launch_id`. Copy selector evidence exactly;
+unavailable observation stays null and a null upstream is valid.
 
-For an urgent blocker, approval request, ownership collision, or high-risk
-drift, persist and prepare one identified urgent interrupt, make only that
-native call, and reconcile it. Routine terminal completion never messages or
-Steers the coordinator.
-
-At terminal state, derive Git outcome mechanically as `unchanged`,
-`clean-commit`, or `dirty-blocked`; null upstream is valid. Persist exactly one
-terminal-receipt-v4 with `callback deliver`, binding `launch_id`. Copy selector
-evidence exactly and leave unavailable observation null. Final prose is
-liveness only, not result authority, and receipt delivery is not acceptance.
+Write one complete final through the assignment's reporting path, not a second
+summary. Routine completion never Steers the coordinator. Use the
+[urgent path](../../templates/references/communication-loop.md) only when delay
+would materially endanger the work. A final message does not replace the
+terminal receipt or acceptance.
