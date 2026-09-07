@@ -1,27 +1,20 @@
 # Parallel execution
 
-Represent work as an acyclic dependency graph. Every node has one outcome,
-bounded ownership, exclusive resources, verification, and an execution
-surface. Dependencies authorize start only after their durable terminal
-evidence is accepted.
+Use an acyclic dependency graph with bounded paths, resources, and verification.
+A dependent node starts only after accepted durable results. Serialize shared
+state and integration; parallelize only independent ownership.
 
-## Surfaces
+Choose the surface first:
 
-- **Coordinator task:** bounded delivery ownership, including sequential
-  decisions and shared evolving state. It may have zero child tasks.
-- **Native subagents:** bounded read-only research or review that returns to
-  the current task. They never own task branches, callback journals,
-  integration, archive, or cleanup.
-- **Visible tasks:** independent mutating work that needs a user-visible task,
-  isolated worktree, branch ownership, durable callback, and Git lifecycle.
+- **Coordinator task:** sequential decisions or shared evolving state; no
+  mandatory children.
+- **Native subagents:** bounded read-only support, without branch ownership or
+  independent Git lifecycle.
+- **Visible tasks:** independent work requiring durable task/worktree ownership.
 
-Two nodes may run concurrently only when their path and resource envelopes do
-not overlap and neither depends on the other. Serialize shared configuration,
-generated artifacts, integration, and combined verification.
-
-Choose each model and reasoning effort deliberately after choosing the
-surface. Never inherit selectors or silently replace one surface with another.
-Terra-high may coordinate settled bounded work with established verification;
-Sol-high remains recommended for substantial uncertainty, systemic decisions,
-or complex multi-executor coordination. These are explicit policy
-recommendations, not claims of empirical optimality.
+Obtain delegated selectors from `lib/policy/selector-policy.mjs` in the
+authenticated package: `selectCoordinatorDelivery` for coordinator staffing,
+`routeWork` for other delegated work. Apply a deliberate override only with a
+replacement rationale. Pass explicit model, effort, and supported bounded fork
+history; never inherit, probe availability, silently escalate, or substitute a
+different surface. Ultra is forbidden for native subagents.

@@ -1,47 +1,10 @@
 # Coordinator role
 
-The coordinator owns bounded delivery, delegation, integration, and
-verification for one director assignment. The director retains goals,
-strategic tradeoffs, and acceptance. Delegate only when an independent lane
-improves the outcome enough to justify coordination cost. The coordinator may
-complete the whole bounded assignment directly; zero child tasks is valid and
-does not transfer integration, verification, reporting, release, or cleanup to
-the director.
+Own delivery, optional delegation, integration, verification, reporting, release,
+and closeout for one approved assignment. Zero children is valid.
+Operating instructions are in `skills/coordinate/SKILL.md` in the authenticated
+package.
 
-The director's approved plan is the intent authority. Verify the exact plan
-digest and the authenticated approved bytes or immutable snapshot in the full
-assignment before technical work begins. Do not create a second mandatory
-director/coordinator plan. Add implementation detail only within approved
-intent; return material changes in scope, risk, acceptance, or authority to the
-director/user for a new revision.
-
-## Responsibilities
-
-- Authenticate the loaded package, immutable runtime snapshot, repository,
-  baseline, coordinator identity, and reservation envelope.
-- Choose the execution surface before choosing a model. Keep shared evolving
-  state in the coordinator; use native subagents for bounded read-only support;
-  use visible tasks for independent mutating work.
-- Persist one content-addressed workflow and generate every executor contract
-  from it. Never maintain a second handwritten plan.
-- Send each visible executor its full assignment as the first prompt. Record
-  exactly one native creation attempt and accept identity only through typed
-  host evidence or the executor's authenticated start claim.
-- Treat native waits and final prose as liveness. Routine results enter the
-  quiet journal; only persisted urgent conditions may interrupt the
-  coordinator.
-- Authenticate, disposition, integrate, and verify results serially. Preserve
-  rejected or blocked work until its evidence is resolved.
-- Return one complete result with status, actual outcomes, verification evidence,
-  artifact links, unresolved risks, and the next decision to exactly one named
-  reporting recipient/path. Do not author a separate summary; delivery is not
-  acceptance.
-
-The director's dispatch-and-return boundary ends after the real approved
-assignment is sent and bounded identity/creation state is reported. The
-coordinator owns executor waiting, progress management, recovery, verification,
-and the quiet journal result after that point.
-
-Close only after a fresh passing run audit accounts for every workflow claim,
-launch, result, disposition, integration or no-change proof, verification,
-archive observation, cleanup finding, and reservation fence.
+Refine technical execution within approved intent. Return material scope or
+authority changes to the director, and preserve the route for the complete
+final result.

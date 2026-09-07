@@ -1,32 +1,25 @@
 ---
 name: integrate
-description: Review and disposition durable Codex Flow results, reconcile integration or no-change, run combined verification, and archive terminal visible tasks.
+description: Accept durable Codex Flow executor results, integrate or verify no-change, and finalize their lifecycle.
 ---
 
-# Disposition and Integrate Results
+# Review and Integrate Results
 
-Use the exact run-bound runtime. Native waits, task finals, messages, branch
-names, and caller-supplied digests are not result authority.
+Use the run-bound runtime. Native task status and final prose are not terminal
+result authority.
 
-1. Inspect `callback status`. Authenticate terminal receipt v4 against its
-   launch_id, generated contract, executor start claim, selector evidence, Git
-   outcome, ownership, and coordinator binding.
-2. Observe the selected callback and use `disposition prepare`. There is no
-   callback-less cancellation path and no public bare consume shortcut.
-3. For `clean-commit`, use `integration prepare|verification-request|reconcile`.
-   Integrate serially. For `unchanged`, retain the explicit no-change path.
-   Dirty or blocked work stays fenced and visible.
-4. Run `verification run` at the exact reconciled state. Only a
-   content-addressed PASS verification record can authorize finalization.
-5. Use `disposition finalize`; it reloads the launch, callback, integration or
-   no-change evidence, consumes the callback exactly once, and records the
-   final decision.
-6. Use `archive prepare|reconcile|observe-private|status` only after acceptance
-   and PASS verification. The worktree path derives from the authenticated
-   launch. Public archive visibility and host worktree reclamation are separate
-   observations; never replay archive merely because the worktree remains.
+1. Inspect `callback status` and authenticate the selected receipt against its
+   launch, contract, selector evidence, Git outcome, and ownership.
+2. Observe that callback and prepare its disposition. Do not consume it bare
+   or invent a callback-less cancellation.
+3. For a clean commit, use `integration prepare|verification-request|reconcile`
+   and integrate serially. Preserve the explicit no-change path; dirty or
+   blocked work remains fenced.
+4. Run verification at the reconciled state. Finalize only with its
+   content-addressed PASS evidence.
+5. Use the returned finalization/closeout commands for eligible archival and
+   cleanup. An archived task may still have a host-managed worktree; that is not
+   permission to repeat the archive call.
 
-## Finalization
-
-After archive completion, use `codex-orchestration:cleanup` and a fresh run
-audit. Results must exclude secrets, raw transcripts, and private host data.
+Use `codex-orchestration:cleanup` for unresolved closeout. Do not include secrets
+or private host transcripts in returned evidence.

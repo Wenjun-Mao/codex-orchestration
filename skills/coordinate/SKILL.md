@@ -1,135 +1,52 @@
 ---
 name: coordinate
-description: Deliver one director assignment through a bounded Codex Flow run, directly or with useful child tasks, while owning integration, verification, and one complete non-interrupting result with explicit model routing.
+description: Deliver one approved Codex Flow assignment, with optional child tasks, owning integration, verification, reporting, and release.
 ---
 
-# Coordinate Codex Work
+# Deliver an Assignment
 
-Use the loaded v0.9 package only after the router performs one refresh
-inspection. A `resume-source` route stays on the immutable source runtime; a
-`refresh-ready` route belongs to `codex-orchestration:refresh`.
+Follow `codex-orchestration:refresh` once before actionable coordination.
+Use its authenticated runtime and verify the approved plan bytes/digest.
+Refine the technical breakdown without rewriting intent; return material changes
+to scope, acceptance, risk, or external authority to the director.
 
-Own bounded delivery, optional delegation, integration, and verification for the
-director's assignment. Do not take over the director's goals, strategic
-tradeoffs, or acceptance authority. Confirm that the initial full assignment
-contains the exact approved plan digest and authenticated bytes or immutable
-snapshot. Do not rewrite the approved plan as a second mandatory planning
-layer; add technical breakdown only within its intent.
+Own delivery even with zero children. Delegate only for a concrete independent
+benefit. For delegation, read [parallel execution](../../templates/references/parallel-execution.md)
+and obtain explicit selectors from the package's selector policy.
 
-Return one complete result containing status, actual outcome, verification
-evidence and artifact links, unresolved risks, and the next decision if any to
-the assignment's exactly one named recipient/path. Do not author a second
-narrative summary. Result or receipt delivery is not acceptance. Use the
-reusable [assignment and result briefs](../../templates/references/assignment-and-reporting.md).
+## Admit and execute
 
-If a material change to intent, acceptance, risk, scope, or external authority
-is needed, stop at the boundary and return a decision request to the
-director/user for a new approved plan revision. Routine technical refinements
-remain coordinator-owned.
-A coordinator may complete its entire bounded assignment directly. Delegate
-only when a child has a concrete benefit; zero child tasks is a valid delivery
-shape. An executor contract must not be relabeled to grant coordinator
-authority. Whether or not children exist, the coordinator retains integration,
-verification, reporting, release, and cleanup responsibility.
+Activate the run and persist the workflow through the runtime commands. Use
+their structured output for authority disclosure rather than transcribing IDs,
+digests, or selector evidence into another narrative. Keep requested, accepted,
+configured, observed, and unavailable evidence distinct.
 
-## Activate and plan
+Represent local work and child work with their actual ownership and execution
+kind. A task begins only after its dependencies have accepted durable evidence.
+Use the [stop policy](../../templates/references/stop-policy.md) when work drifts
+or an authority check fails.
 
-Before the first mutation, disclose the package and bundle identity, exact
-Git-common state root, repository baseline, coordinator lineage, workflow DAG,
-reservation envelope, native surface, requested selector, rationale, placement,
-and external host call. Keep configured, requested, accepted, observed, and
-unavailable evidence distinct.
+For visible tasks, follow [host operations](../../templates/references/host-operations.md):
+one prepared attempt, one native creation call, the full first-turn assignment,
+and exact result reconciliation. Never substitute a new task for an ambiguous
+creation. Native subagents remain bounded read-only support.
 
-Use `run activate|status|resume|rebind|audit|close|abandon`. Every stateful
-command names `run_id`. Activation snapshots the exact runtime under the v0.9
-namespace and fails closed on incompatible state or conflicting fences.
+## Results and closeout
 
-The director's dispatch is complete when the coordinator has received the real
-approved assignment in its initial prompt and the bounded creation/identity
-state has been reported. The coordinator owns executor waiting and progress
-management after that point. A routine result is quiet and non-interrupting;
-do not turn it into a director-style monitoring loop.
+Use native waits for executor liveness, not director monitoring. `wait_threads`
+is active work, not an idle reporting boundary. Use
+`codex-orchestration:integrate` for durable executor results.
 
-Use `workflow create|revise|status|contract` for one content-addressed plan.
-Every task names its outcome, nullable causal question, cheapest safe direct
-attempt, instrument role, dependencies, paths, resources, surface, selector,
-rationale, and bounded `fork_turns` where applicable. Only a completed visible
-task disposition or accepted native-subagent operation unblocks dependencies.
+Establish the [reporting route](../../templates/references/assignment-and-reporting.md)
+before work can finish. Routine results use the quiet journal and native queue;
+only a genuinely urgent risk uses the persisted one-shot interrupt described
+in the [communication loop](../../templates/references/communication-loop.md).
 
-Choose surface first, then consult the replaceable selector policy:
+Finalize through the runtime's command-managed closeout. It accounts for local
+and child work, verification, eligible executor archival, and remaining fences
+before normal run closure. Use `codex-orchestration:cleanup` for pending work;
+do not abandon a successful run merely to bypass missing evidence.
 
-- coordinator task for sequential or shared evolving state;
-- native subagent for bounded read-only supporting work;
-- visible task for independent mutating work with durable Git ownership.
-
-The user-selected default is Luna-xhigh for substantive, well-scoped executor
-work; it is a preference, not an empirical optimum. A trivial task may use a
-lower-effort override with a stated rationale. Use Terra-high for bounded
-implementation/review, Terra-xhigh for difficult root-cause work, and Sol-high
-for substantial uncertainty, systemic decisions, or complex multi-executor
-coordination. Terra-high may coordinate settled bounded delivery with
-established verification. Astra-high is optional for a consequential director
-judgment, not mandatory staffing. Higher Sol effort requires an explicit need.
-Ultra is forbidden for native subagents and exceptional for visible tasks.
-Pass selectors, rationales, and bounded fork history explicitly; never inherit,
-probe availability, silently escalate, or fall back. An override replaces the
-selector rationale.
-
-## Launch a visible task once
-
-Read [Host operations](../../templates/references/host-operations.md). The
-native-first lifecycle is:
-
-1. `task launch prepare` authenticates the generated contract and emits the
-   canonical full contract, launch nonce, and exact `task launch start` command
-   as the first-turn prompt.
-2. `task launch attempt` consumes the one-shot creation attempt.
-3. Make one native creation call using that exact prompt and explicit project,
-   model, reasoning, title, placement, starting revision, and worktree surface.
-4. Record the returned ready ID, provisional ID, or bounded opaque result with
-   `task launch reconcile`. Unknown shapes never authorize a retry.
-5. The executor runs `task launch start` before source mutation. That command
-   reads its host task identity, authenticates the nonce/runtime/contract and
-   pristine linked worktree, records branch-binding intent, attaches the
-   reserved branch, and revalidates it. It then performs useful work in the
-   same first turn.
-
-The exact executor start claim can establish the ready task independently of
-the creation return. Any known host ID must agree. Title and project may narrow
-UI discovery but never establish identity. There is no coordinator branch-bind
-wait, second release prompt, ordinary release message, or normal-path history
-scan.
-
-A stalled provisional task that never starts may use the registered read-only
-provisional-to-ready mapping capsule for archival recovery. It cannot activate
-work, create a retry, or replace an exact start claim.
-
-An exact selector rejection before any task/agent identity records
-terminal-no-object. One selector-only child revision may replace it with a new
-contract and operation. Ambiguity, transport failure, any identity, or
-post-creation mismatch remains non-retryable.
-
-## Monitor and close
-
-`wait_threads` is active coordination work, not an idle delivery boundary. Use
-native waits for liveness only. Routine visible-task completion is a quiet
-journal callback; direct messaging or Steer is reserved for a persisted urgent
-blocker, approval request, or high-risk drift. Use `urgent persist`, `urgent
-attempt`, make the returned direct call once, then `urgent reconcile`.
-
-For a new same-local-host director assignment, register the coordinator route
-from the exact active run, approved-plan digest, current coordinator task, and
-pre-bound director recipient before delegated work can finish. New visible-task
-`task launch start` calls register their exact executor-to-coordinator routes
-and pin the installed reporter automatically. The native completion hook
-(`SubagentStop` for task-surface children, `Stop` for root tasks) captures only the
-complete final and makes one native queue attempt; acceptance remains transport
-evidence, not delivery, review, or Flow acceptance. Cross-host and untrusted
-installations retain the explicit manual path.
-
-Hand results to `codex-orchestration:integrate`. Close only after a fresh
-passing `run audit` re-derives every claim, launch, result, disposition,
-integration/no-change proof, verification, archive, cleanup finding, and fence.
-Direct coordinator work uses the same verification, release authorization,
-reporting, and cleanup gates; those responsibilities do not return to the
-director merely because the run has no child task.
+Return one complete final with actual results, verification, artifacts, and
+remaining decisions. Keep assignment reporting usable through restart requests
+and cleanup finals; closing an execution run does not finish the assignment.

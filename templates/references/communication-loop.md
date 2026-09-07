@@ -2,30 +2,18 @@
 
 ## Routine completion
 
-Routine completion is quiet. The executor writes one authenticated terminal
-receipt into the repository journal. Native task finals and waits provide
-liveness only; they are not result authority and must not interrupt a working
-coordinator.
+Executors persist terminal receipts in the quiet journal. Hooks capture the
+complete final at task idle for its registered upstream route. Native waits
+are liveness signals; `wait_threads` is active work, not a reporting boundary.
 
-`wait_threads` is active coordination work, not an idle delivery boundary.
-Never remove a working manual or explicit collection path until a replacement
-is installed and trusted, where applicable, and verified for the exact
-sender-recipient mapping through a live test. A registered same-local-host
-route may queue one complete final through the installed completion hook. Queue
-acceptance proves only transport submission; actual arrival, review, and Flow
-acceptance remain separate. Cross-host, unregistered, rejected, pending, or
-ambiguous delivery retains the explicit manual path and is never blindly
-retried.
-
-At a safe boundary, the coordinator reads callback status, observes the chosen
-receipt, and performs disposition, integration or no-change reconciliation,
-combined verification, archival, and cleanup.
+Queue acceptance proves only transport submission. Actual delivery, review,
+and acceptance remain distinct. Use the
+[reporting contract](assignment-and-reporting.md) for route lifetime and
+unavailable or ambiguous delivery.
 
 ## Urgent interruption
 
-An urgent interruption is reserved for a blocker, approval request, ownership
-collision, or high-risk drift whose delay would materially endanger the work.
-Persist the urgent signal before one bounded direct delivery attempt. Reconcile
-that exact attempt and never retry an ambiguous delivery.
-
-This split protects coordinator continuity without hiding urgent risk.
+Interrupt only when delaying a blocker, approval need, ownership collision,
+or high-risk drift would materially endanger the work. Use `urgent persist`,
+`urgent attempt`, the returned native call once, and `urgent reconcile`.
+Never retry an ambiguous delivery.
