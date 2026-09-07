@@ -113,11 +113,17 @@ worktree reclamation it deletes that tip only when it remains an unattached
 `codex/` task branch. A coordinator additionally requires one exact linked
 worktree that is neither the caller nor primary checkout, and its tip must
 already be an ancestor of the authenticated primary-checkout baseline before
-archive dispatch and branch deletion. Source, caller, dirty, detached, and
-unpreserved coordinator work remain protected. This applies to disposable
-coordinators as well as accepted executors. When a user already archived the
-coordinator and its worktree is gone, exact private archive observation plus
-the same source-ancestry proof completes closeout without replaying a native
-archive call. The same observation may replace a definitive blocked/no-archive
-attempt; accepted and ambiguous attempts retain their stricter concurrency and
-no-replay guards.
+archive dispatch and again after host reclamation. A coordinator registered as
+detached must remain detached and clean at that exact path; closeout captures
+its exact HEAD, proves source-checkout ancestry across the host boundary, and
+archives the task without inventing a branch or branch-deletion authority.
+Changing attachment after registration is drift and fails closed. Source,
+caller, dirty, attachment-drifted, and unpreserved coordinator work remain
+protected. This applies to disposable coordinators as well as accepted
+executors. When a user already archived a named-branch coordinator and its
+worktree is gone, exact private archive observation plus the same
+source-ancestry proof completes closeout without replaying a native archive
+call. A detached coordinator needs a tip captured before archival; closeout
+cannot reconstruct that authority after an unobserved manual removal. The same
+observation may replace a definitive blocked/no-archive attempt; accepted and
+ambiguous attempts retain their stricter concurrency and no-replay guards.

@@ -45,11 +45,13 @@ function git(root, args) {
   return execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
 }
 
-async function fixture(t) {
+async function fixture(t, { detachedCoordinator = false } = {}) {
   const primaryRoot = await createGitFixture("codex-flow-v097-assignment-");
   const coordinatorPath = resolve(primaryRoot, `../${basename(primaryRoot)}-coordinator`);
-  const coordinatorBranch = "codex/coordinator-assignment";
-  git(primaryRoot, ["worktree", "add", "--quiet", "-b", coordinatorBranch, coordinatorPath]);
+  const coordinatorBranch = detachedCoordinator ? "detached" : "codex/coordinator-assignment";
+  git(primaryRoot, detachedCoordinator
+    ? ["worktree", "add", "--quiet", "--detach", coordinatorPath]
+    : ["worktree", "add", "--quiet", "-b", coordinatorBranch, coordinatorPath]);
   const context = await createActiveTaskLaunch(coordinatorPath, "assignment");
   t.after(async () => {
     spawnSync("git", ["worktree", "remove", "--force", context.executorPath], { cwd: primaryRoot, encoding: "utf8" });
@@ -579,6 +581,76 @@ test("iteration closeout removes the exact disposable coordinator branch after i
   assert.equal(git(root, ["branch", "--show-current"]), "main");
 });
 
+test("iteration closeout archives a registered detached coordinator without branch authority", async (t) => {
+  const context = await fixture(t, { detachedCoordinator: true });
+  const assignment = await assignmentAuthority({
+    stateRoot: context.state_root,
+    assignmentId: context.route.assignment.assignment_id,
+  });
+  await writeFile(resolve(context.coordinatorPath, "detached-coordinator.txt"), "preserved detached coordinator\n", "utf8");
+  git(context.coordinatorPath, ["add", "detached-coordinator.txt"]);
+  git(context.coordinatorPath, ["commit", "--quiet", "-m", "detached coordinator result"]);
+  const detachedTip = git(context.coordinatorPath, ["rev-parse", "HEAD"]);
+  git(context.primaryRoot, ["merge", "--quiet", "--no-ff", detachedTip, "-m", "integrate detached coordinator"]);
+  const calls = [];
+  const closed = await closeoutIteration({
+    commonDir: context.commonDir,
+    iterationId: assignment.iteration_id,
+    allowCoordinator: true,
+    archiveThread: async ({ threadId }) => {
+      calls.push(threadId);
+      git(context.primaryRoot, ["worktree", "remove", context.coordinatorPath]);
+      return { outcome: "accepted", archive_attempted: true, diagnostics: { categories: [] } };
+    },
+    now: TIME + 19_500,
+  });
+  assert.equal(closed.status, "closed");
+  assert.deepEqual(calls, [context.route.sender.thread_id]);
+  const coordinator = closed.iteration.members.find((entry) => entry.role === "coordinator");
+  assert.equal(coordinator.state, "archived");
+  assert.equal(coordinator.archive_attempt.branch_tip, detachedTip);
+  assert.equal(coordinator.branch, "detached");
+  assert.equal(git(context.primaryRoot, ["branch", "--list", "codex/coordinator*"]), "");
+});
+
+test("registered detached coordinator closeout rejects attachment drift and unpreserved work", async (t) => {
+  const drift = await fixture(t, { detachedCoordinator: true });
+  const driftAssignment = await assignmentAuthority({
+    stateRoot: drift.state_root,
+    assignmentId: drift.route.assignment.assignment_id,
+  });
+  git(drift.coordinatorPath, ["checkout", "--quiet", "-b", "codex/detached-drift"]);
+  await assert.rejects(
+    () => closeoutIteration({
+      commonDir: drift.commonDir,
+      iterationId: driftAssignment.iteration_id,
+      allowCoordinator: true,
+      archiveThread: async () => ({ outcome: "accepted", archive_attempted: true, diagnostics: { categories: [] } }),
+      now: TIME + 19_600,
+    }),
+    /not an eligible linked task worktree/,
+  );
+
+  const unpreserved = await fixture(t, { detachedCoordinator: true });
+  const unpreservedAssignment = await assignmentAuthority({
+    stateRoot: unpreserved.state_root,
+    assignmentId: unpreserved.route.assignment.assignment_id,
+  });
+  await writeFile(resolve(unpreserved.coordinatorPath, "unpreserved-detached.txt"), "unpreserved\n", "utf8");
+  git(unpreserved.coordinatorPath, ["add", "unpreserved-detached.txt"]);
+  git(unpreserved.coordinatorPath, ["commit", "--quiet", "-m", "unpreserved detached coordinator"]);
+  await assert.rejects(
+    () => closeoutIteration({
+      commonDir: unpreserved.commonDir,
+      iterationId: unpreservedAssignment.iteration_id,
+      allowCoordinator: true,
+      archiveThread: async () => ({ outcome: "accepted", archive_attempted: true, diagnostics: { categories: [] } }),
+      now: TIME + 19_700,
+    }),
+    /not preserved in the source checkout/,
+  );
+});
+
 test("iteration closeout observes a manually archived coordinator without replaying native archival", async (t) => {
   const {
     root, coordinatorPath, coordinatorBranch, context, assignment,
@@ -705,7 +777,7 @@ test("iteration closeout refuses an unmerged coordinator commit before native ar
   assert.deepEqual(calls, [context.executorThreadId]);
 });
 
-test("iteration closeout refuses dirty and detached coordinator worktrees", async (t) => {
+test("iteration closeout refuses dirty and attachment-drifted coordinator worktrees", async (t) => {
   const dirty = await acceptedChildFixture(t, "coordinator-dirty", { disposableCoordinator: true });
   const archiveThread = async () => ({ outcome: "accepted", archive_attempted: true, diagnostics: { categories: [] } });
   await closeoutIteration({

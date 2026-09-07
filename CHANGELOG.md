@@ -29,6 +29,10 @@ decision records remain the detailed release evidence.
   assignments instead of conflating a fresh sender run's execution fence with
   the recipient lineage fence, including exact current recipient generations
   beyond the initial generation.
+- Close out host-created detached coordinator worktrees by preserving their
+  exact commit and archiving the task without fabricating branch-deletion
+  authority; attachment drift, dirt, protected paths, and unpreserved commits
+  still fail closed.
 
 ## 0.9.6 - 2026-09-06
 
