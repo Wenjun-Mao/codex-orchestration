@@ -5,6 +5,10 @@ import { resolve } from "node:path";
 import test from "node:test";
 import { acceptAssignmentResult } from "../lib/assignment-acceptance.mjs";
 import { assignmentAuthority } from "../lib/assignment-authority.mjs";
+import {
+  assignmentPreparation,
+  prepareCoordinatorAssignment,
+} from "../lib/assignment-preparation.mjs";
 import { sha256 } from "../lib/core.mjs";
 import {
   acceptReportSubmission,
@@ -89,6 +93,35 @@ test("assignment reporting survives normal run close and removal of its executio
   assert.equal(accepted.status, "retired");
   assert.equal((await assignmentAuthority({ stateRoot: context.state_root, assignmentId: context.route.assignment.assignment_id })).state, "retired");
   assert.equal((await reportRoute({ stateRoot: context.state_root, routeId: context.route.route_id })).state, "closed");
+});
+
+test("pre-dispatch preparation generates the useful first prompt from bound authority", async (t) => {
+  const root = await createGitFixture("codex-flow-v097-preparation-");
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const commonDir = resolve(root, ".git");
+  const director = { lineage_id: "prepared-director-lineage", thread_id: "prepared-director", generation: 1 };
+  const prepared = await prepareCoordinatorAssignment({
+    commonDir,
+    approvedPlanPath: resolve(root, ".gitkeep"),
+    approvedPlanDigest: sha256("fixture\n"),
+    recipient: { host_id: "local", ...director, binding_digest: recipientBindingDigest(director) },
+    iterationLabel: "v0.9.7",
+    purpose: "Reporting",
+    outcome: "Deliver the approved assignment.",
+    scope: ["Implement the bounded runtime slice."],
+    acceptanceCriteria: ["The exact final reaches the director."],
+    constraints: ["Keep same-host scope."],
+    reasons: ["Preserve v0.9.6 authority until cutover."],
+    now: TIME,
+  });
+  assert.match(prepared.text, /^# Coordinator · v0\.9\.7 · Reporting/m);
+  assert.match(prepared.text, new RegExp(prepared.preparation.preparation_id));
+  assert.match(prepared.text, /codex-orchestration:coordinate/);
+  assert.match(prepared.text, /Preserve v0\.9\.6 authority until cutover/);
+  assert.deepEqual(
+    await assignmentPreparation({ stateRoot: prepared.state_root, preparationId: prepared.preparation.preparation_id }),
+    prepared.preparation,
+  );
 });
 
 test("assignment acceptance is fail-closed for an active coordinator and resumes without duplicate archival", async (t) => {

@@ -418,14 +418,14 @@ if (currentTests.includes("v07-lifecycle-fixture.mjs")) {
 }
 
 const skillContracts = new Map([
-  ["index", ["codex-orchestration:direct", "codex-orchestration:refresh", "first-turn assignment", "Native subagents"]],
-  ["direct", ["goals", "tradeoffs", "acceptance", "codex-orchestration:coordinate", "Astra-high"]],
-  ["coordinate", ["bounded delivery", "zero child tasks", "coordinator retains integration", "task launch prepare", "full contract", "one native creation call"]],
-  ["execute", ["assigned implementation and evidence", "task launch start", "same first turn", "terminal-receipt-v4", "Routine terminal completion"]],
-  ["integrate", ["launch_id", "content-addressed PASS verification", "Finalization"]],
-  ["cleanup", ["cleanup plan --run-id", "launch", "read-only"]],
-  ["refresh", ["authenticated v0.8", "Wait", "Discard", "run activate --refresh-id", "no migration"]],
-  ["unplug", ["unplug plan", "Apply only an approved exact plan", "state paths last"]],
+  ["index", ["codex-orchestration:direct", "codex-orchestration:refresh", "generated first-turn assignment", "iteration closeout"]],
+  ["direct", ["goals", "strategic decisions", "assignment prepare", "assignment accept", "Do not poll progress"]],
+  ["coordinate", ["zero children", "workflow local start", "visible tasks", "assignment closeout", "closing an execution run does not finish"]],
+  ["execute", ["task launch start", "same first turn", "terminal-receipt-v4", "Routine completion never Steers"]],
+  ["integrate", ["launch", "content-addressed PASS evidence", "assignment closeout"]],
+  ["cleanup", ["assignment status", "assignment closeout", "Membership is not discard authority"]],
+  ["refresh", ["refresh inspect", "wait", "discard", "Preserve assignment reporting"]],
+  ["unplug", ["unplug plan", "exact targets and digest", "planned state"]],
 ]);
 for (const [name, markers] of skillContracts) {
   const source = await readRequired(`skills/${name}/SKILL.md`);
@@ -440,13 +440,13 @@ if (Object.keys(selectorPolicy).some((name) => name.endsWith("_VERSION"))) {
 }
 
 for (const [path, markers] of new Map([
-  ["templates/references/assignment-and-reporting.md", ["Assignment brief", "Result brief", "exact sender-recipient mapping", "Optional advisor"]],
+  ["templates/references/assignment-and-reporting.md", ["assignment prepare", "preparation_id", "Result brief", "assignment accept"]],
   ["templates/references/communication-loop.md", ["Routine completion", "quiet", "Queue acceptance proves only transport submission", "Urgent interruption"]],
-  ["templates/references/host-operations.md", ["full contract", "task launch start", "one native creation call", "opaque"]],
+  ["templates/references/host-operations.md", ["full contract", "task launch start", "one native creation call", "accepted archive call"]],
   ["templates/references/parallel-execution.md", ["acyclic dependency graph", "Visible tasks", "Native subagents"]],
   ["templates/references/task-lifecycle.md", ["exact installed package authority", "first prompt", "terminal-receipt-v4", "launch"]],
-  ["templates/roles/director.md", ["goals", "tradeoffs", "acceptance", "reporting recipient/path"]],
-  ["templates/roles/coordinator.md", ["full assignment", "quiet journal", "Close only"]],
+  ["templates/roles/director.md", ["goals", "tradeoffs", "final acceptance", "do not take over"]],
+  ["templates/roles/coordinator.md", ["Own delivery", "Zero children", "preserve the route"]],
   ["templates/roles/executor.md", ["task launch start", "same first turn", "terminal-receipt-v4"]],
 ])) {
   assertMarkers(await readRequired(path), markers, path);
