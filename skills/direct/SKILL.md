@@ -9,9 +9,10 @@ Use `codex-orchestration:plan` to save and bind approval before delegated
 delivery. Give the coordinator the approved bytes or an immutable snapshot it
 can read; a path in the director's uncommitted checkout is insufficient.
 
-Prepare the assignment using the [assignment brief](../../templates/references/assignment-and-reporting.md).
-Use generated authority fields and add only task-specific intent. Select
-delegated staffing through the package's selector policy; children are optional.
+Run `assignment prepare --file request.json --json` using the
+[assignment brief](../../templates/references/assignment-and-reporting.md).
+Use its generated title and full first prompt. Select delegated staffing
+through the package's selector policy; children are optional.
 
 Dispatch one coordinator with the real assignment as its first prompt. Check
 exact identity/acceptance once, report ready, pending, or blocked, and return.
