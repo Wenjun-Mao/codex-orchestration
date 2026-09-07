@@ -161,14 +161,18 @@ assignment and launch commands. The assignment-derived executor title is the
 exact title passed to the host and recorded by the registry. Closeout archives
 eligible children before the coordinator through a bounded native adapter,
 atomically claims an ambiguous boundary before each call, and reconciles
-interruptions through exact private archive observation without replay. After
-host worktree reclamation, it consumes the child's callback/disposition/
-integration authority and deletes only the captured matching tip of an
+interruptions through exact private archive observation without replay. For an
+accepted member whose worktree remains, the same closeout revalidates exact
+canonical path, exclusive membership, clean attachment and captured tip,
+accepted result, and preservation in the authenticated primary baseline before
+non-force Git removal. After verified worktree absence, it consumes the child's
+callback/disposition/integration authority and deletes only the captured
+matching tip of an
 unattached `codex/` task branch for an eligible executor or disposable
 coordinator. A coordinator must be an exact clean linked worktree, distinct
 from the caller and primary checkout, whose tip is already contained by the
 authenticated primary-checkout baseline. Source, caller, detached, unpreserved,
-active, provisional, ambiguous, unclean, conflicting, or not-yet-reclaimed
+active, provisional, ambiguous, unclean, shared, conflicting, or drifted
 members remain pending rather than being reported as closed. A coordinator the
 user already archived is recovered only through exact private observation and
 the same preserved-tip checks, without another native archive attempt.

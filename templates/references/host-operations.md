@@ -20,4 +20,8 @@ recovery, not activation or a replacement creation call.
 Use command-managed closeout for exact eligible members. Task visibility and
 host worktree reclamation are separate facts. An accepted archive call must
 not repeat merely because its worktree remains. Use authenticated private
-archive observation only when public indexing is insufficient.
+archive observation only when public indexing is insufficient. For an accepted
+iteration member, closeout may use that fresh archived/no-active proof to
+revalidate its persisted clean, unshared, integrated Git identity and remove
+the exact worktree without force. A refusal or drift remains pending; it never
+widens deletion authority.

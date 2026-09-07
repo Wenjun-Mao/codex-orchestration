@@ -33,6 +33,11 @@ decision records remain the detailed release evidence.
   exact commit and archiving the task without fabricating branch-deletion
   authority; attachment drift, dirt, protected paths, and unpreserved commits
   still fail closed.
+- Reclaim an exact accepted iteration worktree after fresh archived/no-active
+  evidence when the App leaves it registered. Closeout revalidates canonical
+  path, exclusive membership, attachment, cleanliness, captured result tip, and
+  primary preservation under the iteration lock, uses non-force Git removal,
+  resumes safely after interruption, and never replays accepted archival.
 
 ## 0.9.6 - 2026-09-06
 
