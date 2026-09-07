@@ -48,6 +48,10 @@ worktree absence it may delete only an unchanged, unattached local `codex/`
 branch at the captured tip. Detached membership grants no branch authority.
 Remote refs and unrelated resources are never mutated.
 
+Unrelated Git worktree records marked `prunable` are not live attachments and
+are excluded from moved-owner detection. Closeout neither enters nor removes
+those stale paths; their maintenance remains outside iteration authority.
+
 If interruption occurs after worktree removal, the persisted accepted attempt
 allows the next closeout call to reconcile absence and finish exact branch
 cleanup without replaying archival. Reporting is retired only after the
@@ -76,5 +80,6 @@ non-iteration cleanup retain their original semantics.
 Real-Git regressions cover named executor/coordinator cleanup, detached
 coordinator cleanup without branch deletion, shared-path, caller/source,
 dirty, attachment-drift, captured-tip and preservation rejection, host-already-
-removed state, interruption after removal, and archive no-replay. The accepted
-zero-child and child-first App canaries remain release gates.
+removed state, interruption after removal, unrelated prunable records left
+untouched, and archive no-replay. The accepted zero-child and child-first App
+canaries remain release gates.

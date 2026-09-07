@@ -769,6 +769,49 @@ test("iteration closeout reclaims an exact detached coordinator without deleting
   assert.equal(git(context.primaryRoot, ["branch", "--format=%(refname:short)"]), branchesBefore);
 });
 
+test("iteration reclamation ignores an unrelated prunable worktree record", async (t) => {
+  const context = await fixture(t, { detachedCoordinator: true });
+  const unrelatedPath = resolve(context.primaryRoot, `../${basename(context.primaryRoot)}-prunable`);
+  git(context.primaryRoot, ["worktree", "add", "--quiet", "--detach", unrelatedPath]);
+  const unrelatedRegisteredPath = git(unrelatedPath, ["rev-parse", "--show-toplevel"]);
+  const coordinatorRegisteredPath = git(context.coordinatorPath, ["rev-parse", "--show-toplevel"]);
+  await rm(unrelatedPath, { recursive: true, force: true });
+  const staleInventory = git(context.primaryRoot, ["worktree", "list", "--porcelain"]);
+  assert.equal(staleInventory.includes(`worktree ${unrelatedRegisteredPath}\n`), true);
+  assert.match(staleInventory, /prunable/);
+
+  const assignment = await assignmentAuthority({
+    stateRoot: context.state_root,
+    assignmentId: context.route.assignment.assignment_id,
+  });
+  let archiveCalls = 0;
+  await closeoutIteration({
+    commonDir: context.commonDir,
+    iterationId: assignment.iteration_id,
+    allowCoordinator: true,
+    archiveThread: async () => {
+      archiveCalls += 1;
+      return { outcome: "accepted", archive_attempted: true, diagnostics: { categories: [] } };
+    },
+    now: TIME + 19_550,
+  });
+  const closed = await closeoutIteration({
+    commonDir: context.commonDir,
+    iterationId: assignment.iteration_id,
+    allowCoordinator: true,
+    archiveThread: async () => { throw new Error("accepted archive must not replay"); },
+    observeArchivedThread: async ({ threadId }) => ({ thread_id: threadId, active_session_absent: true }),
+    now: TIME + 19_575,
+  });
+
+  assert.equal(closed.status, "closed");
+  assert.equal(archiveCalls, 1);
+  const inventoryAfterCloseout = git(context.primaryRoot, ["worktree", "list", "--porcelain"]);
+  assert.equal(inventoryAfterCloseout.includes(`worktree ${coordinatorRegisteredPath}\n`), false);
+  assert.equal(inventoryAfterCloseout.includes(`worktree ${unrelatedRegisteredPath}\n`), true);
+  assert.match(inventoryAfterCloseout, /prunable/);
+});
+
 test("iteration reclamation refuses dirty and attachment-drifted accepted worktrees", async (t) => {
   const dirty = await fixture(t);
   const dirtyAssignment = await assignmentAuthority({
