@@ -22,7 +22,8 @@ digests, or selector evidence into another narrative. Keep requested, accepted,
 configured, observed, and unavailable evidence distinct.
 
 Register the [reporting route](../../templates/references/assignment-and-reporting.md)
-before work can finish; retain the returned assignment identity for closeout.
+from the initial prompt's preparation ID before substantive work; retain the
+returned assignment identity for closeout.
 
 Represent local work and child work with their actual ownership and execution
 kind. A task begins only after its dependencies have accepted durable evidence.
