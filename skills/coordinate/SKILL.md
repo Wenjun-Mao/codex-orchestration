@@ -10,8 +10,12 @@ Use its authenticated runtime and verify the approved plan bytes/digest.
 Refine the technical breakdown without rewriting intent; return material changes
 to scope, acceptance, risk, or external authority to the director.
 
-Own delivery even with zero children. Delegate only for a concrete independent
-benefit. For delegation, read [parallel execution](../../templates/references/parallel-execution.md)
+Prefer capable, lower-cost executors for substantial, separable implementation,
+verification, or review. Keep small or tightly coupled work local when
+delegation overhead outweighs the benefit. Reconsider delegation as work
+boundaries become clearer. Own delivery even with zero children.
+
+For delegation, read [parallel execution](../../templates/references/parallel-execution.md)
 and obtain explicit selectors from the package's selector policy.
 
 ## Admit and execute
