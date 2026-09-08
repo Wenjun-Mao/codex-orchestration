@@ -771,6 +771,54 @@ test("owning-host child closeout resumes archive completion before member comple
   assert.equal(git(root, ["branch", "--list", context.executorBranch]), "");
 });
 
+test("owning-host child closeout re-observes archive before resumed worktree removal", async (t) => {
+  const { context, assignment, disposition } = await acceptedChildFixture(
+    t,
+    "owning-host-pre-removal-crash",
+  );
+  const prepared = await closeoutIterationWithOwningHost({
+    commonDir: context.commonDir,
+    iterationId: assignment.iteration_id,
+    taskObservation: activeTaskObservation(context.executorThreadId),
+    now: TIME + 9_460,
+  });
+  await assert.rejects(
+    closeoutIterationWithOwningHost({
+      commonDir: context.commonDir,
+      iterationId: assignment.iteration_id,
+      taskObservation: archivedTaskObservation(context.executorThreadId, TIME + 9_470),
+      hostResult: hostResult(prepared.host_request, "accepted"),
+      removeWorktree: () => { throw new Error("simulated crash before worktree removal"); },
+      now: TIME + 9_470,
+    }),
+    /simulated crash before worktree removal/,
+  );
+  assert.equal((await taskArchiveForDisposition({
+    stateRoot: context.stateRoot,
+    dispositionId: disposition.disposition_id,
+  })).state, "archived-awaiting-worktree-reclamation");
+
+  let observerCalls = 0;
+  let removalAttempts = 0;
+  const resumed = await closeoutIterationWithOwningHost({
+    commonDir: context.commonDir,
+    iterationId: assignment.iteration_id,
+    observeArchivedThread: async () => {
+      observerCalls += 1;
+      return {
+        ...activeTaskObservation(context.executorThreadId),
+        observed_at: new Date(TIME + 9_480).toISOString(),
+      };
+    },
+    removeWorktree: () => { removalAttempts += 1; },
+    now: TIME + 9_480,
+  });
+  assert.equal(resumed.status, "observation-required");
+  assert.equal(observerCalls, 1);
+  assert.equal(removalAttempts, 0);
+  assert.equal(git(context.executorPath, ["rev-parse", "--is-inside-work-tree"]), "true");
+});
+
 test("owning-host child closeout reconciles already archived public and private observations", async (t) => {
   for (const source of ["public", "private"]) {
     const { root, context, assignment, disposition } = await acceptedChildFixture(

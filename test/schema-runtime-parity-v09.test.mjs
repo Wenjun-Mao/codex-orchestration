@@ -259,6 +259,11 @@ test("v0.9 schemas match the launch, receipt-v4, and task-surface runtime bounda
 
   assert(archiveSchema.properties.state.enum.includes("archived-awaiting-worktree-reclamation"));
   assert.equal(archiveSchema.properties.launch_id.$ref, "#/$defs/safeId");
+  assert.equal(archiveSchema.properties.observation.oneOf.length, 2);
+  assert.equal(
+    archiveSchema.properties.observation.oneOf.some((variant) => variant.properties?.source),
+    false,
+  );
 
   const receipt = terminalReceipt();
   assert.throws(
@@ -328,6 +333,34 @@ test("v0.9 schemas match the launch, receipt-v4, and task-surface runtime bounda
 
   const pendingArchive = pendingArchiveRecord();
   assert.deepEqual(validateArchiveOperation(pendingArchive), pendingArchive);
+  const typedActivityTask = {
+    execution_kind: "task-thread",
+    thread_id: pendingArchive.executor_thread_id,
+    source: "typed-host-activity-v1",
+    active_visible: true,
+    archived_visible: false,
+    activity_state: "idle",
+    observed_at: pendingArchive.prepared_at,
+  };
+  const preparedArchive = pendingArchiveRecord({
+    task: typedActivityTask,
+    setter: null,
+    observation: null,
+    state: "prepared",
+    updated_at: pendingArchive.prepared_at,
+  });
+  assert.deepEqual(validateArchiveOperation(preparedArchive), preparedArchive);
+  const typedActivitySchema = archiveSchema.$defs.taskObservation.oneOf.find(
+    (variant) => variant.properties?.source?.const === "typed-host-activity-v1",
+  );
+  assert(typedActivitySchema);
+  assert.deepEqual(
+    [...typedActivitySchema.required].sort(),
+    Object.keys(preparedArchive.task).sort(),
+  );
+  assert.equal(typedActivitySchema.properties.active_visible.const, true);
+  assert.equal(typedActivitySchema.properties.archived_visible.const, false);
+  assert(typedActivitySchema.properties.activity_state.enum.includes(preparedArchive.task.activity_state));
   assert.throws(
     () => validateArchiveOperation(pendingArchiveRecord({
       observation: { ...pendingArchive.observation, worktree_state: "absent" },

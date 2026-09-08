@@ -35,6 +35,10 @@ never reissued merely because observation or reclamation remains pending.
 Run archive completion precedes iteration-member completion. If worktree
 reclamation succeeds and the process stops, resume uses the persisted archived
 observation to complete the same run archive before marking the member archived.
+If the worktree is still present, persisted archive proof is not current
+deletion authority: resume must obtain a fresh archived/no-active observation
+before reclamation. A fresh active observation stops removal and leaves the
+operation pending.
 An exact task already observed archived may seed that operation directly with
 no invented active evidence and no setter call.
 
@@ -64,7 +68,8 @@ insufficient.
 The owning role, not the CLI, performs the one external archive mutation. Flow
 continues to derive identity, eligibility, order, and cleanup authority. Host
 diagnostics remain bounded and non-sensitive. Regressions cover idle/activity
-gating, interruption at the worktree/archive boundary, exact attempt matching,
-ambiguity without replay, public/private already-archived reconciliation,
-run-level archive completion, child-first cleanup, dirty-state rejection, and a real
-cherry-pick-to-reclamation path.
+gating, interruption before and after worktree removal, re-observation before a
+resumed deletion, exact attempt matching, ambiguity without replay,
+public/private already-archived reconciliation, schema/runtime observation
+parity, run-level archive completion, child-first cleanup, dirty-state
+rejection, and a real cherry-pick-to-reclamation path.

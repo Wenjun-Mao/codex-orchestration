@@ -106,23 +106,6 @@
             "worktree_state": { "enum": ["not-applicable", "present", "absent"] },
             "observed_at": { "$ref": "#/$defs/timestamp" }
           }
-        },
-        {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "execution_kind", "thread_id", "source", "active_visible", "archived_visible",
-            "activity_state", "observed_at"
-          ],
-          "properties": {
-            "execution_kind": { "const": "task-thread" },
-            "thread_id": { "$ref": "#/$defs/threadId" },
-            "source": { "const": "typed-host-activity-v1" },
-            "active_visible": { "const": true },
-            "archived_visible": { "const": false },
-            "activity_state": { "enum": ["idle", "active", "unknown"] },
-            "observed_at": { "$ref": "#/$defs/timestamp" }
-          }
         }
       ]
     },
@@ -193,6 +176,23 @@
             "active_visible": { "const": false },
             "archived_visible": { "const": true },
             "host_evidence_digest": { "$ref": "#/$defs/digest" },
+            "observed_at": { "$ref": "#/$defs/timestamp" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "execution_kind", "thread_id", "source", "active_visible", "archived_visible",
+            "activity_state", "observed_at"
+          ],
+          "properties": {
+            "execution_kind": { "const": "task-thread" },
+            "thread_id": { "$ref": "#/$defs/threadId" },
+            "source": { "const": "typed-host-activity-v1" },
+            "active_visible": { "const": true },
+            "archived_visible": { "const": false },
+            "activity_state": { "enum": ["idle", "active", "unknown"] },
             "observed_at": { "$ref": "#/$defs/timestamp" }
           }
         }
