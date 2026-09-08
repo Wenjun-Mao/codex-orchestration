@@ -57,7 +57,10 @@ in the [communication loop](../../templates/references/communication-loop.md).
 
 After verified local and child results, run `assignment closeout --assignment-id
 ID --file request.json` with phase `coordinator` for child-first cleanup before
-normal run closure. Use `codex-orchestration:cleanup` for pending resources;
+normal run closure. Perform any returned host archive action through the owning
+Codex App tool and reconcile its exact bounded result as described in
+[host operations](../../templates/references/host-operations.md). Use
+`codex-orchestration:cleanup` for pending resources;
 do not abandon a successful run to bypass missing evidence. Director acceptance
 handles the coordinator's remaining closeout after reviewing its final.
 

@@ -54,13 +54,20 @@ and cleanup finals, not just an active execution run. Run-independent commands
 use the authenticated package and exact assignment:
 
 - Coordinator: `assignment closeout --assignment-id ID --file request.json`,
-  with `{ "assignment_id": "ID", "phase": "coordinator" }`, handles eligible
-  children before run closure without retiring coordinator reporting.
+  with `{ "assignment_id": "ID", "phase": "coordinator" }`, identifies the
+  next eligible child before run closure without retiring coordinator reporting.
 - Director: after reviewing the actual final and evidence, `assignment accept
   --assignment-id ID --file request.json`, with `{ "assignment_id": "ID",
-  "report_id": "REPORT_ID" }`, records acceptance and attempts remaining closeout.
+  "report_id": "REPORT_ID" }`, records acceptance and identifies remaining
+  coordinator closeout.
 - Recovery: `assignment status --assignment-id ID` exposes pending work. Resume
   the owning phase with the same identity and, for acceptance, the same report.
+
+Follow the [owning-host archive sequence](host-operations.md) when either command
+requests active observation, one exact App action, a host result, or archived
+observation. Add only the requested `task_observation` or `host_result` to the
+same request. The command determines child-first membership and never asks the
+caller to reconstruct a task list.
 
 Accepted members whose exact worktree remains may be reclaimed by these same
 commands after fresh archived/no-active evidence. The command revalidates the

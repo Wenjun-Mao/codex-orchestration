@@ -66,7 +66,6 @@ import {
 } from "../lib/archive-lifecycle.mjs";
 import {
   observeCodexAppArchiveEvidence,
-  observeCodexAppPrivateArchive,
 } from "../lib/adapters/codex-app/private-archive-observer.mjs";
 import { codexAppArchiveToNativeObservation } from "../lib/adapters/codex-app/archive-observation.mjs";
 import {
@@ -173,10 +172,9 @@ import {
 import {
   CODEX_APP_BINARY_PATH,
   CODEX_APP_CLI_VERSION,
-  submitNativeThreadArchive,
 } from "../lib/codex-app-report-adapter.mjs";
 import {
-  closeoutIteration,
+  closeoutIterationWithOwningHost,
   iterationTitle,
   iterationStatus,
   registerExecutorIterationMember,
@@ -1393,32 +1391,41 @@ async function commandAssignmentV097(args) {
     return;
   }
   const threadId = requireText(process.env.CODEX_THREAD_ID, "CODEX_THREAD_ID", { max: 256, safeId: true });
-  const archiveThread = ({ threadId: target }) => submitNativeThreadArchive({ configuration: supportedNativeQueue(), threadId: target });
-  const observeArchivedThread = ({ threadId: target }) => observeCodexAppPrivateArchive({ threadId: target });
+  const observeArchivedThread = async ({ threadId: target }) => codexAppArchiveToNativeObservation(
+    await observeCodexAppArchiveEvidence({ threadId: target }),
+  );
   if (subcommand === "closeout") {
-    requireExactFields(request, { required: ["assignment_id", "phase"] }, "assignment closeout request");
+    requireExactFields(request, {
+      required: ["assignment_id", "phase"],
+      optional: ["task_observation", "host_result"],
+    }, "assignment closeout request");
     if (request.assignment_id !== assignmentId || request.phase !== "coordinator") {
       throw new CliError("assignment closeout requires the exact assignment and coordinator phase", 73);
     }
     if (assignment.sender.thread_id !== threadId) throw new CliError("Coordinator closeout must run in the assigned coordinator task", 73);
-    v09Output(await closeoutIteration({
+    v09Output(await closeoutIterationWithOwningHost({
       commonDir: git.commonDir,
       iterationId: assignment.iteration_id,
       allowCoordinator: false,
-      archiveThread,
+      taskObservation: request.task_observation ?? null,
+      hostResult: request.host_result ?? null,
       observeArchivedThread,
     }));
     return;
   }
   if (subcommand === "accept") {
-    requireExactFields(request, { required: ["assignment_id", "report_id"] }, "assignment accept request");
+    requireExactFields(request, {
+      required: ["assignment_id", "report_id"],
+      optional: ["task_observation", "host_result"],
+    }, "assignment accept request");
     if (request.assignment_id !== assignmentId) throw new CliError("assignment accept request does not match --assignment-id", 73);
     v09Output(await acceptAssignmentResult({
       stateRoot,
       assignmentId,
       reportId: request.report_id,
       directorThreadId: threadId,
-      archiveThread,
+      taskObservation: request.task_observation ?? null,
+      hostResult: request.host_result ?? null,
       observeArchivedThread,
       retireLocator: ({ routeId, reason, now }) => retireRepositoryReportLocator({ stateRoot, routeId, reason, now }),
     }));

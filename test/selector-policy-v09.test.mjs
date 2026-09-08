@@ -49,12 +49,14 @@ test("routing policy maps each bounded work lane to an explicit selector", () =>
   });
 });
 
-test("settled coordinators may deliver solo while complex work receives justified staffing", () => {
+test("delivery-owner selectors follow the hardest expected judgment independently of staffing", () => {
   assert.deepEqual(selectCoordinatorDelivery({
     settledScope: true,
     establishedVerification: true,
+    boundedDemandingWork: false,
     substantialUncertainty: false,
     systemicDecision: false,
+    difficultIntegrationDecision: false,
     complexMultiExecutorCoordination: false,
     childHasConcreteBenefit: false,
   }), {
@@ -68,11 +70,29 @@ test("settled coordinators may deliver solo while complex work receives justifie
     },
     coordinator_retains: ["delivery", "integration", "verification", "reporting", "release", "cleanup"],
   });
+  const demanding = selectCoordinatorDelivery({
+    settledScope: true,
+    establishedVerification: true,
+    boundedDemandingWork: true,
+    substantialUncertainty: false,
+    systemicDecision: false,
+    difficultIntegrationDecision: false,
+    complexMultiExecutorCoordination: false,
+    childHasConcreteBenefit: false,
+  });
+  assert.deepEqual(demanding.selector, {
+    lane: "integration",
+    model: "gpt-5.6-terra",
+    reasoning_effort: "xhigh",
+    selector_rationale: "Difficult root-cause analysis or integration work.",
+  });
   const complex = selectCoordinatorDelivery({
     settledScope: false,
     establishedVerification: false,
+    boundedDemandingWork: true,
     substantialUncertainty: true,
     systemicDecision: true,
+    difficultIntegrationDecision: true,
     complexMultiExecutorCoordination: true,
     childHasConcreteBenefit: true,
   });
@@ -82,6 +102,17 @@ test("settled coordinators may deliver solo while complex work receives justifie
   assert.deepEqual(complex.coordinator_retains, [
     "delivery", "integration", "verification", "reporting", "release", "cleanup",
   ]);
+  const sameJudgmentWithoutChild = selectCoordinatorDelivery({
+    settledScope: false,
+    establishedVerification: false,
+    boundedDemandingWork: true,
+    substantialUncertainty: true,
+    systemicDecision: true,
+    difficultIntegrationDecision: true,
+    complexMultiExecutorCoordination: true,
+    childHasConcreteBenefit: false,
+  });
+  assert.deepEqual(sameJudgmentWithoutChild.selector, complex.selector);
 });
 
 test("v0.9 chooses the execution surface before model selectors", () => {

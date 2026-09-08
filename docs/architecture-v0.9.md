@@ -158,14 +158,19 @@ same accounting contract.
 
 An assignment's iteration registry records members only from authenticated
 assignment and launch commands. The assignment-derived executor title is the
-exact title passed to the host and recorded by the registry. Closeout archives
-eligible children before the coordinator through a bounded native adapter,
-atomically claims an ambiguous boundary before each call, and reconciles
-interruptions through exact private archive observation without replay. For an
+exact title passed to the host and recorded by the registry. Closeout prepares
+eligible children before the coordinator as one exact owning-host App action,
+persists the attempt before returning it, and reconciles the owning role's
+bounded result and exact private archive observation without replay. Executor
+closeout completes the existing run-level archive operation rather than adding
+an iteration-only substitute. For an
 accepted member whose worktree remains, the same closeout revalidates exact
 canonical path, exclusive membership, clean attachment and captured tip,
 accepted result, and preservation in the authenticated primary baseline before
-non-force Git removal. After verified worktree absence, it consumes the child's
+non-force Git removal. Patch-equivalent preservation is accepted only from the
+same reconciled integration when its executor tip matches and the current
+primary descends from its verified primary tip. After verified worktree absence,
+it consumes the child's
 callback/disposition/integration authority and deletes only the captured
 matching tip of an
 unattached `codex/` task branch for an eligible executor or disposable

@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { basename, resolve } from "node:path";
 import test from "node:test";
 import { acceptAssignmentResult } from "../lib/assignment-acceptance.mjs";
+import { taskArchiveForDisposition } from "../lib/archive-lifecycle.mjs";
 import { observeCodexAppPrivateArchive } from "../lib/adapters/codex-app/private-archive-observer.mjs";
 import {
   assignmentAuthority,
@@ -21,9 +22,15 @@ import { deliverCallback, observeCallback } from "../lib/callbacks.mjs";
 import { finalizeTaskDisposition, prepareTaskDisposition } from "../lib/dispositions.mjs";
 import {
   closeoutIteration,
+  closeoutIterationWithOwningHost,
   iterationStatus,
   registerExecutorIterationMember,
 } from "../lib/iteration-registry.mjs";
+import {
+  integrationVerificationRequest,
+  prepareSerialIntegration,
+  reconcileSerialIntegration,
+} from "../lib/integration.mjs";
 import {
   acceptReportSubmission,
   beginReportSubmission,
@@ -79,8 +86,31 @@ async function fixture(t, { detachedCoordinator = false } = {}) {
   return { ...context, primaryRoot, coordinatorPath, coordinatorBranch, director, ...registered };
 }
 
-function reclaimCoordinator(context) {
-  git(context.primaryRoot, ["worktree", "remove", context.coordinatorPath]);
+function activeTaskObservation(threadId) {
+  return {
+    execution_kind: "task-thread",
+    thread_id: threadId,
+    source: "host-observed",
+    active_visible: true,
+    archived_visible: false,
+  };
+}
+
+function archivedTaskObservation(threadId) {
+  return {
+    ...activeTaskObservation(threadId),
+    active_visible: false,
+    archived_visible: true,
+  };
+}
+
+function hostResult(hostRequest, outcome, reason = undefined) {
+  return {
+    attempt_id: hostRequest.attempt_id,
+    thread_id: hostRequest.thread_id,
+    outcome,
+    ...(reason === undefined ? {} : { reason }),
+  };
 }
 
 async function acceptedFinal(context, turnId, text, offset) {
@@ -105,7 +135,11 @@ async function acceptedFinal(context, turnId, text, offset) {
   })).report;
 }
 
-async function acceptedChildFixture(t, suffix, { disposableCoordinator = false } = {}) {
+async function acceptedChildFixture(
+  t,
+  suffix,
+  { disposableCoordinator = false, patchEquivalentIntegration = false } = {},
+) {
   const primaryRoot = await createGitFixture(`codex-flow-v097-child-closeout-${suffix}-`);
   const coordinatorBranch = disposableCoordinator ? `codex/coordinator-${suffix}` : "main";
   const coordinatorPath = disposableCoordinator
@@ -165,7 +199,21 @@ async function acceptedChildFixture(t, suffix, { disposableCoordinator = false }
     senderHostId: "local",
     recipientHostId: "local",
   });
-  const receipt = terminalReceiptV4(context, {
+  let executorCommit = null;
+  if (patchEquivalentIntegration) {
+    await writeFile(resolve(context.executorPath, "patch-equivalent.txt"), `${suffix}\n`, "utf8");
+    git(context.executorPath, ["add", "patch-equivalent.txt"]);
+    git(context.executorPath, ["commit", "--quiet", "-m", `executor ${suffix}`]);
+    executorCommit = git(context.executorPath, ["rev-parse", "HEAD"]);
+  }
+  const receipt = terminalReceiptV4(context, patchEquivalentIntegration ? {
+    kind: "clean-commit",
+    baseline_revision: context.baseline,
+    commit: executorCommit,
+    branch: context.executorBranch,
+    upstream: null,
+    cleanliness: "clean",
+  } : {
     kind: "unchanged",
     baseline_revision: context.baseline,
     final_revision: context.baseline,
@@ -190,15 +238,51 @@ async function acceptedChildFixture(t, suffix, { disposableCoordinator = false }
   const disposition = await prepareTaskDisposition({
     stateRoot: context.stateRoot,
     callbackId: delivered.callback_id,
-    decision: "accepted-no-change",
-    reason: "The child returned verified no-change work.",
+    decision: patchEquivalentIntegration ? "accepted-for-integration" : "accepted-no-change",
+    reason: patchEquivalentIntegration
+      ? "The child returned one clean commit for serial integration."
+      : "The child returned verified no-change work.",
   });
-  const verification = await runCombinedVerification({
-    stateRoot: context.stateRoot,
-    repositoryPath: context.executorPath,
-    receipt,
-    checks: [{ check_id: "exact-child", argv: [process.execPath, "-e", "process.exit(0)"] }],
-  });
+  let integration = null;
+  let verification;
+  if (patchEquivalentIntegration) {
+    integration = await prepareSerialIntegration({
+      stateRoot: context.stateRoot,
+      repositoryPath: primaryRoot,
+      dispositionId: disposition.disposition_id,
+      mainBranch: "main",
+    });
+    // Ensure cherry-pick preservation is exercised even when Git timestamps
+    // would otherwise reproduce the executor commit byte-for-byte.
+    git(primaryRoot, ["commit", "--allow-empty", "--quiet", "-m", "independent primary work"]);
+    git(primaryRoot, ["cherry-pick", "--quiet", executorCommit]);
+    const request = await integrationVerificationRequest({
+      stateRoot: context.stateRoot,
+      repositoryPath: primaryRoot,
+      integrationId: integration.integration_id,
+    });
+    verification = await runCombinedVerification({
+      stateRoot: context.stateRoot,
+      repositoryPath: primaryRoot,
+      receipt: request.receipt,
+      integrationScope: request.integration_scope,
+      checks: [{ check_id: "exact-child", argv: [process.execPath, "-e", "process.exit(0)"] }],
+    });
+    integration = await reconcileSerialIntegration({
+      stateRoot: context.stateRoot,
+      repositoryPath: primaryRoot,
+      integrationId: integration.integration_id,
+      verificationId: verification.verification_id,
+    });
+    assert.equal(integration.outcome, "patch-equivalent");
+  } else {
+    verification = await runCombinedVerification({
+      stateRoot: context.stateRoot,
+      repositoryPath: context.executorPath,
+      receipt,
+      checks: [{ check_id: "exact-child", argv: [process.execPath, "-e", "process.exit(0)"] }],
+    });
+  }
   await finalizeTaskDisposition({
     stateRoot: context.stateRoot,
     dispositionId: disposition.disposition_id,
@@ -208,9 +292,18 @@ async function acceptedChildFixture(t, suffix, { disposableCoordinator = false }
       generation: context.coordinator.generation,
     },
     executorThreadId: context.executorThreadId,
+    integrationId: integration?.integration_id ?? null,
     verificationId: verification.verification_id,
   });
-  return { root: primaryRoot, coordinatorPath, coordinatorBranch, context, assignment };
+  return {
+    root: primaryRoot,
+    coordinatorPath,
+    coordinatorBranch,
+    context,
+    assignment,
+    disposition,
+    integration,
+  };
 }
 
 test("assignment reporting survives normal run close and removal of its execution namespace", async (t) => {
@@ -223,17 +316,26 @@ test("assignment reporting survives normal run close and removal of its executio
   const complete = await acceptedFinal(context, "complete-turn", "Implementation and validation are complete.", 3_000);
   assert.notEqual(restart.report_id, complete.report_id);
   assert.equal((await reportRoute({ stateRoot: context.state_root, routeId: context.route.route_id })).state, "active");
+  const prepared = await acceptAssignmentResult({
+    stateRoot: context.state_root,
+    assignmentId: context.route.assignment.assignment_id,
+    reportId: complete.report_id,
+    directorThreadId: context.director.thread_id,
+    taskObservation: activeTaskObservation(context.coordinator.thread_id),
+    retireLocator: async () => ({ status: "retired" }),
+    now: TIME + 4_000,
+  });
+  assert.equal(prepared.status, "closeout-pending");
+  assert.equal(prepared.closeout.status, "host-action-required");
   const accepted = await acceptAssignmentResult({
     stateRoot: context.state_root,
     assignmentId: context.route.assignment.assignment_id,
     reportId: complete.report_id,
     directorThreadId: context.director.thread_id,
-    archiveThread: async () => {
-      reclaimCoordinator(context);
-      return { outcome: "accepted", archive_attempted: true, diagnostics: { categories: [] } };
-    },
+    taskObservation: archivedTaskObservation(context.coordinator.thread_id),
+    hostResult: hostResult(prepared.closeout.host_request, "accepted"),
     retireLocator: async () => ({ status: "retired" }),
-    now: TIME + 4_000,
+    now: TIME + 4_100,
   });
   assert.equal(accepted.status, "retired");
   assert.equal((await assignmentAuthority({ stateRoot: context.state_root, assignmentId: context.route.assignment.assignment_id })).state, "retired");
@@ -407,43 +509,55 @@ test("pre-dispatch preparation generates the useful first prompt from bound auth
 test("assignment acceptance is fail-closed for an active coordinator and resumes without duplicate archival", async (t) => {
   const context = await fixture(t);
   const report = await acceptedFinal(context, "complete", "Complete.", 1_000);
-  let calls = 0;
-  const first = await acceptAssignmentResult({
+  const prepared = await acceptAssignmentResult({
     stateRoot: context.state_root,
     assignmentId: context.route.assignment.assignment_id,
     reportId: report.report_id,
     directorThreadId: context.director.thread_id,
-    archiveThread: async () => { calls += 1; return { outcome: "blocked", reason: "thread-active", archive_attempted: false, diagnostics: { categories: [] } }; },
+    taskObservation: activeTaskObservation(context.coordinator.thread_id),
     retireLocator: async () => ({ status: "retired" }),
     now: TIME + 2_000,
   });
-  assert.equal(first.status, "closeout-pending");
-  assert.equal(calls, 1);
+  assert.equal(prepared.closeout.status, "host-action-required");
+  const rejected = await acceptAssignmentResult({
+    stateRoot: context.state_root,
+    assignmentId: context.route.assignment.assignment_id,
+    reportId: report.report_id,
+    directorThreadId: context.director.thread_id,
+    hostResult: hostResult(prepared.closeout.host_request, "rejected-before-send", "thread-active"),
+    retireLocator: async () => ({ status: "retired" }),
+    now: TIME + 3_000,
+  });
+  assert.equal(rejected.status, "closeout-pending");
+  const retried = await acceptAssignmentResult({
+    stateRoot: context.state_root,
+    assignmentId: context.route.assignment.assignment_id,
+    reportId: report.report_id,
+    directorThreadId: context.director.thread_id,
+    taskObservation: activeTaskObservation(context.coordinator.thread_id),
+    retireLocator: async () => ({ status: "retired" }),
+    now: TIME + 3_100,
+  });
+  assert.equal(retried.closeout.status, "host-action-required");
   const second = await acceptAssignmentResult({
     stateRoot: context.state_root,
     assignmentId: context.route.assignment.assignment_id,
     reportId: report.report_id,
     directorThreadId: context.director.thread_id,
-    archiveThread: async () => {
-      calls += 1;
-      reclaimCoordinator(context);
-      return { outcome: "accepted", archive_attempted: true, diagnostics: { categories: [] } };
-    },
+    taskObservation: archivedTaskObservation(context.coordinator.thread_id),
+    hostResult: hostResult(retried.closeout.host_request, "accepted"),
     retireLocator: async () => ({ status: "retired" }),
-    now: TIME + 3_000,
+    now: TIME + 3_200,
   });
   assert.equal(second.status, "retired");
-  assert.equal(calls, 2);
   const replay = await acceptAssignmentResult({
     stateRoot: context.state_root,
     assignmentId: context.route.assignment.assignment_id,
     reportId: report.report_id,
     directorThreadId: context.director.thread_id,
-    archiveThread: async () => { calls += 1; return { outcome: "accepted" }; },
     retireLocator: async () => ({ status: "retired" }),
   });
   assert.equal(replay.status, "already-retired");
-  assert.equal(calls, 2);
 });
 
 test("assignment acceptance reclaims an exact archived coordinator before retiring reporting", async (t) => {
@@ -467,27 +581,23 @@ test("assignment acceptance reclaims an exact archived coordinator before retiri
     "utf8",
   );
   t.after(() => rm(codexHome, { recursive: true, force: true }));
-  const observeArchivedThread = ({ threadId }) => observeCodexAppPrivateArchive({
-    threadId,
-    codexHome,
-    now: TIME + 4_650,
-  });
-  let archiveCalls = 0;
+  const observeArchivedThread = async ({ threadId }) => {
+    await observeCodexAppPrivateArchive({ threadId, codexHome, now: TIME + 4_650 });
+    return archivedTaskObservation(threadId);
+  };
   let retirementCalls = 0;
   const first = await acceptAssignmentResult({
     stateRoot: context.state_root,
     assignmentId: context.route.assignment.assignment_id,
     reportId: report.report_id,
     directorThreadId: context.director.thread_id,
-    archiveThread: async () => {
-      archiveCalls += 1;
-      return { outcome: "accepted", archive_attempted: true, diagnostics: { categories: [] } };
-    },
+    taskObservation: activeTaskObservation(context.coordinator.thread_id),
     observeArchivedThread,
     retireLocator: async () => { retirementCalls += 1; return { status: "retired" }; },
     now: TIME + 4_600,
   });
   assert.equal(first.status, "closeout-pending");
+  assert.equal(first.closeout.status, "host-action-required");
   assert.equal(retirementCalls, 0);
 
   const retired = await acceptAssignmentResult({
@@ -495,14 +605,130 @@ test("assignment acceptance reclaims an exact archived coordinator before retiri
     assignmentId: context.route.assignment.assignment_id,
     reportId: report.report_id,
     directorThreadId: context.director.thread_id,
-    archiveThread: async () => { throw new Error("accepted archive must not replay"); },
+    hostResult: hostResult(first.closeout.host_request, "accepted"),
     observeArchivedThread,
     retireLocator: async () => { retirementCalls += 1; return { status: "retired" }; },
     now: TIME + 4_700,
   });
   assert.equal(retired.status, "retired");
-  assert.equal(archiveCalls, 1);
   assert.equal(retirementCalls, 1);
+  assert.equal(git(context.primaryRoot, ["branch", "--list", context.coordinatorBranch]), "");
+});
+
+test("owning-host child closeout prepares one exact App action and completes the run archive", async (t) => {
+  const { root, context, assignment, disposition } = await acceptedChildFixture(
+    t,
+    "owning-host-archive",
+  );
+  const prepared = await closeoutIterationWithOwningHost({
+    commonDir: context.commonDir,
+    iterationId: assignment.iteration_id,
+    taskObservation: activeTaskObservation(context.executorThreadId),
+    now: TIME + 9_000,
+  });
+  assert.equal(prepared.status, "host-action-required");
+  assert.equal(prepared.call_required, true);
+  assert.deepEqual(prepared.host_request, {
+    action: "set-thread-archived",
+    attempt_id: prepared.host_request.attempt_id,
+    thread_id: context.executorThreadId,
+    host_id: "local",
+    archived: true,
+  });
+
+  const interrupted = await closeoutIterationWithOwningHost({
+    commonDir: context.commonDir,
+    iterationId: assignment.iteration_id,
+    now: TIME + 9_100,
+  });
+  assert.equal(interrupted.status, "host-result-required");
+  assert.equal(interrupted.call_required, false);
+  assert.deepEqual(interrupted.host_request, prepared.host_request);
+  await assert.rejects(
+    closeoutIterationWithOwningHost({
+      commonDir: context.commonDir,
+      iterationId: assignment.iteration_id,
+      hostResult: {
+        ...hostResult(prepared.host_request, "accepted"),
+        attempt_id: "archive-attempt-v1-wrong",
+      },
+      now: TIME + 9_150,
+    }),
+    /does not match the prepared iteration archive action/,
+  );
+
+  const ambiguous = await closeoutIterationWithOwningHost({
+    commonDir: context.commonDir,
+    iterationId: assignment.iteration_id,
+    hostResult: hostResult(prepared.host_request, "ambiguous", "response-lost"),
+    now: TIME + 9_200,
+  });
+  assert.equal(ambiguous.status, "observation-required");
+  await assert.rejects(
+    closeoutIterationWithOwningHost({
+      commonDir: context.commonDir,
+      iterationId: assignment.iteration_id,
+      hostResult: hostResult(prepared.host_request, "accepted"),
+      now: TIME + 9_250,
+    }),
+    /already reconciled|must not replay/,
+  );
+
+  const closed = await closeoutIterationWithOwningHost({
+    commonDir: context.commonDir,
+    iterationId: assignment.iteration_id,
+    taskObservation: archivedTaskObservation(context.executorThreadId),
+    now: TIME + 9_300,
+  });
+  assert.equal(closed.status, "phase-complete");
+  const archive = await taskArchiveForDisposition({
+    stateRoot: context.stateRoot,
+    dispositionId: disposition.disposition_id,
+  });
+  assert.equal(archive.state, "completed");
+  assert.equal(git(root, ["branch", "--list", context.executorBranch]), "");
+});
+
+test("authenticated patch-equivalent integration preserves exact executor reclamation", async (t) => {
+  const { root, context, assignment, integration } = await acceptedChildFixture(
+    t,
+    "patch-equivalent-reclamation",
+    { patchEquivalentIntegration: true },
+  );
+  assert.equal(integration.outcome, "patch-equivalent");
+  git(root, ["commit", "--allow-empty", "--quiet", "-m", "later primary work"]);
+
+  const prepared = await closeoutIterationWithOwningHost({
+    commonDir: context.commonDir,
+    iterationId: assignment.iteration_id,
+    taskObservation: activeTaskObservation(context.executorThreadId),
+    now: TIME + 9_500,
+  });
+  const closed = await closeoutIterationWithOwningHost({
+    commonDir: context.commonDir,
+    iterationId: assignment.iteration_id,
+    taskObservation: archivedTaskObservation(context.executorThreadId),
+    hostResult: hostResult(prepared.host_request, "accepted"),
+    now: TIME + 9_600,
+  });
+  assert.equal(closed.status, "phase-complete");
+  assert.equal(git(root, ["branch", "--list", context.executorBranch]), "");
+});
+
+test("owning-host closeout reconciles an already archived coordinator with a remaining worktree", async (t) => {
+  const context = await fixture(t);
+  const assignment = await assignmentAuthority({
+    stateRoot: context.state_root,
+    assignmentId: context.route.assignment.assignment_id,
+  });
+  const closed = await closeoutIterationWithOwningHost({
+    commonDir: context.commonDir,
+    iterationId: assignment.iteration_id,
+    allowCoordinator: true,
+    taskObservation: archivedTaskObservation(context.coordinator.thread_id),
+    now: TIME + 9_700,
+  });
+  assert.equal(closed.status, "closed");
   assert.equal(git(context.primaryRoot, ["branch", "--list", context.coordinatorBranch]), "");
 });
 

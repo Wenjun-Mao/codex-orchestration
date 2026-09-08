@@ -10,14 +10,14 @@ with the automated and live gates recorded below.
 | Contract | Primary coverage |
 | --- | --- |
 | Workflow DAG, ownership, goal-proximate fields, selectors, and generated contracts | `workflow-plan-v09.test.mjs`, `v09-lifecycle-fixture.mjs` |
-| Replaceable selector policy and deliberate overrides | `selector-policy-v09.test.mjs` |
+| Replaceable selector policy, three delivery-owner judgment bands independent of staffing, and deliberate overrides | `selector-policy-v09.test.mjs` |
 | Typed Codex App evidence, ready/provisional/opaque shapes, duplicate discovery, and contradictions | `codex-app-adapter-v09.test.mjs` |
 | First-turn launch, exact executor claim, linked-worktree activation, one-shot creation, crash recovery, and negative identity/Git cases | `task-launch-v09.test.mjs` |
 | Full launch through callback, disposition, integration/no-change, verification, archive, cleanup, and audit joins, including callback-before-App-result selector enrichment and cross-revision task-disposition dependencies | `lifecycle-v09.test.mjs`, `run-lifecycle-v09.test.mjs` |
 | Quiet completion and separate one-shot urgent interruption | `lifecycle-v09.test.mjs`, `urgent-v09.test.mjs` |
 | Explicit read-only native-subagent lifecycle and selector rejection | `subagent-v09.test.mjs` |
 | Same-host final capture, shared-director recipient preservation across fresh sender fences, staged reporter upgrade survival, runtime-bundle staging, harmless unregistered stops, resumable route registration, and exact runtime retirement | `cli-v09.test.mjs`, `assignment-lifecycle-v097.test.mjs`, `coordinator-recipient-routing-v097.test.mjs`, `report-hook-v093.test.mjs`, `report-lifecycle-v093.test.mjs` |
-| Assignment-owned exact worktree reclamation after archived/no-active proof, including named and detached cleanup, shared/dirty/drift/protected/preservation rejection, interruption, and archive no-replay | `assignment-lifecycle-v097.test.mjs` |
+| Assignment-owned exact worktree reclamation after archived/no-active proof, including owning-host action/result reconciliation, run-archive convergence, authenticated patch-equivalent preservation, named and detached cleanup, shared/dirty/drift/protected/preservation rejection, interruption, and archive no-replay | `assignment-lifecycle-v097.test.mjs` |
 | Public/private archive evidence | `codex-app-private-archive-v09.test.mjs` |
 | Exact v0.8.3 and live-shaped RC7 semantic refresh, actual unfinished/completed coordinator-work claims, zero-child reissue, true no-work clean start, selected already-terminal evidence, dirty discard, branch/worktree deletion, assignment target binding, target consumption, joined crash-replay boundaries, and exact closed-v0.9.0 no-replacement maintenance refresh | `refresh-v09.test.mjs`, `assignment-lifecycle-v097.test.mjs` |
 | Coordinator branch authority remains disjoint from executor cleanup branch fences at admission | `run-lifecycle-v09.test.mjs` |

@@ -25,7 +25,9 @@ when explicitly assigned by the user; do not absorb unfinished delivery.
 When the complete result arrives, review actual artifacts and verification
 against the approved plan. If accepted, run `assignment accept --assignment-id
 ID --file request.json` for that report; it records review and initiates remaining
-closeout. Use the [reporting contract](../../templates/references/assignment-and-reporting.md)
+closeout. Perform any returned host archive action through the owning Codex App
+tool and reconcile its exact bounded result. Use the
+[reporting contract](../../templates/references/assignment-and-reporting.md)
 for request fields and recovery. Report delivery alone is not acceptance;
 pending closeout is not completion.
 

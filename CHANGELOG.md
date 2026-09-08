@@ -38,6 +38,15 @@ decision records remain the detailed release evidence.
   path, exclusive membership, attachment, cleanliness, captured result tip, and
   primary preservation under the iteration lock, uses non-force Git removal,
   resumes safely after interruption, and never replays accepted archival.
+- Prepare assignment closeout as an exact owning-host Codex App archive action,
+  reconcile its bounded result without opening a competing App server, and
+  complete the executor's existing run archive after reclamation. Exact
+  verified patch-equivalent integration now preserves eligible executor cleanup
+  without weakening the normal ancestry rule.
+- Route delivery owners by the hardest expected judgment: Terra-high for
+  settled routine delivery, Terra-xhigh for bounded demanding work, and Sol-high
+  for unsettled architecture or difficult authority/integration decisions,
+  independently of child count.
 - Allow an authenticated executor start to register its report route before
   the one-shot App creation result is reconciled, or when that result carries
   opaque host information, while still rejecting known conflicting host

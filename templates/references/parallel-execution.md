@@ -18,3 +18,6 @@ authenticated package: `selectCoordinatorDelivery` for coordinator staffing,
 replacement rationale. Pass explicit model, effort, and supported bounded fork
 history; never inherit, probe availability, silently escalate, or substitute a
 different surface. Ultra is forbidden for native subagents.
+
+For the delivery owner, choose the selector by the hardest expected judgment;
+the presence or absence of child tasks affects staffing, not that selector.

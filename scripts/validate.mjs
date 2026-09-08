@@ -458,7 +458,7 @@ if (Object.keys(selectorPolicy).some((name) => name.endsWith("_VERSION"))) {
 for (const [path, markers] of new Map([
   ["templates/references/assignment-and-reporting.md", ["assignment prepare", "preparation_id", "Result brief", "assignment accept"]],
   ["templates/references/communication-loop.md", ["Routine completion", "quiet", "Queue acceptance proves only transport submission", "Urgent interruption"]],
-  ["templates/references/host-operations.md", ["full contract", "task launch start", "one native creation call", "accepted archive call"]],
+  ["templates/references/host-operations.md", ["full contract", "task launch start", "one native creation call", "Codex App archive tool", "call_required: false"]],
   ["templates/references/parallel-execution.md", ["acyclic dependency graph", "Visible tasks", "Native subagents"]],
   ["templates/references/task-lifecycle.md", ["exact installed package authority", "first prompt", "terminal-receipt-v4", "launch"]],
   ["templates/roles/director.md", ["goals", "tradeoffs", "final acceptance", "do not take over"]],
@@ -491,6 +491,16 @@ assertMarkers(await readRequired("docs/adr/0053-consolidated-release-candidates.
   "Retain necessary release candidates",
   "never moved, overwritten, or reused",
 ], "ADR 0053");
+assertMarkers(await readRequired("docs/adr/0056-owning-host-iteration-archive.md"), [
+  "owning role",
+  "call_required: false",
+  "patch-equivalent",
+], "ADR 0056");
+assertMarkers(await readRequired("docs/adr/0057-delivery-owner-selector-starting-points.md"), [
+  "hardest expected judgment",
+  "Terra-xhigh",
+  "child count",
+], "ADR 0057");
 
 assertMarkers(await readRequired("README.md"), [
   "Native-first visible-task launch",

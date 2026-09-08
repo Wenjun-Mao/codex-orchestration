@@ -143,8 +143,9 @@ The current explicit recommendation is:
 | Substantive, well-scoped executor work | Luna, xhigh |
 | Bounded nontrivial implementation or review | Terra, high |
 | Difficult root-cause analysis or integration | Terra, xhigh |
-| Settled bounded coordinator delivery with established verification | Terra, high |
-| Systemic decisions or complex multi-executor coordination | Sol, high |
+| Settled routine delivery with established checks | Terra, high |
+| Bounded demanding implementation or diagnosis | Terra, xhigh |
+| Unsettled architecture, interacting authority, or difficult integration decisions | Sol, high |
 | Optional consequential director judgment | Astra, high |
 
 Luna-xhigh is a user-selected preference, not an empirical optimum. Trivial
@@ -153,7 +154,9 @@ requires an explicit need. Ultra is forbidden for native subagents and
 exceptional for visible tasks. Every native call passes selectors and
 rationales explicitly. There is no inherited selector, availability probe,
 automatic fallback, model registry, or silent escalation. A deliberate
-override replaces the rationale.
+override replaces the rationale. Delivery owners choose by the hardest expected
+judgment in the assignment, independent of their title or whether they use a
+child task.
 
 ## Quiet completion and urgent interruption
 
