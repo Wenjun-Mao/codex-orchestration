@@ -3,7 +3,7 @@
 This file records concise user-facing changes. Immutable tags and the linked
 decision records remain the detailed release evidence.
 
-## 0.9.7 - 2026-09-06
+## 0.9.7 - 2026-09-07
 
 - Keep coordinator reporting valid for its assignment after execution-run
   closure or namespace removal, while preserving per-turn deduplication and
