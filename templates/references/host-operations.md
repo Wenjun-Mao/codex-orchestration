@@ -17,8 +17,10 @@ recovery, not activation or a replacement creation call.
 
 ## Archival
 
-Use command-managed closeout for exact eligible members. Give the command the
-requested active-task observation. When it returns `host-action-required`, call
+Use command-managed closeout for exact eligible members. Give the command fresh
+typed host activity evidence with the exact task, `activity_state: "idle"`, and
+`observed_at`; visible `active` or `unknown` activity is not archive authority.
+When it returns `host-action-required`, call
 the Codex App archive tool once with the exact `host_request`, then return only
 the matching `attempt_id`, `thread_id`, outcome (`accepted`,
 `rejected-before-send`, or `ambiguous`), and an optional bounded safe reason or
@@ -33,3 +35,9 @@ integrated Git identity, removes the worktree without force, and completes the
 run archive. A refusal or drift remains pending; it never widens deletion
 authority. Patch-equivalent cleanup requires the exact accepted integration
 evidence, not a new similarity calculation.
+
+If the exact task is already archived, return the current public observation or
+typed private archive evidence. Closeout creates no host action, reconciles the
+existing postcondition into the run archive, and reclaims only after the usual
+Git checks. Run archive completion precedes iteration-member completion so an
+interruption cannot hide pending archive state.

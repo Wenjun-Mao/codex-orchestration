@@ -159,11 +159,13 @@ same accounting contract.
 An assignment's iteration registry records members only from authenticated
 assignment and launch commands. The assignment-derived executor title is the
 exact title passed to the host and recorded by the registry. Closeout prepares
-eligible children before the coordinator as one exact owning-host App action,
+eligible idle children before the coordinator as one exact owning-host App action,
 persists the attempt before returning it, and reconciles the owning role's
 bounded result and exact private archive observation without replay. Executor
 closeout completes the existing run-level archive operation rather than adding
-an iteration-only substitute. For an
+an iteration-only substitute, and it completes that archive before marking the
+iteration member archived. Exact already-archived public or private evidence
+seeds the same operation without inventing active visibility. For an
 accepted member whose worktree remains, the same closeout revalidates exact
 canonical path, exclusive membership, clean attachment and captured tip,
 accepted result, and preservation in the authenticated primary baseline before

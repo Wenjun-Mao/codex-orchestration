@@ -20,8 +20,10 @@ alone. Correctly accepted work could therefore remain unreclaimable.
 
 ## Decision
 
-Assignment closeout never opens a second App server to archive a task. It
-prepares exactly one child-first action, persists its attempt before the host
+Assignment closeout never opens a second App server to archive a task. Fresh
+typed host evidence must prove the exact visible task is idle; active, stale,
+or unknown activity remains visible. Closeout then prepares exactly one
+child-first action, persists its attempt before the host
 boundary, and returns `set-thread-archived` to the owning role. That role calls
 the Codex App archive tool and returns a bounded result containing the exact
 attempt, thread, outcome, and optional safe reason/error code. Flow reconciles
@@ -29,6 +31,12 @@ the result, obtains exact archived/no-active observation, reclaims the worktree
 without force, and completes the same run-level archive operation. A prepared
 action replay reports `call_required: false`; accepted or ambiguous delivery is
 never reissued merely because observation or reclamation remains pending.
+
+Run archive completion precedes iteration-member completion. If worktree
+reclamation succeeds and the process stops, resume uses the persisted archived
+observation to complete the same run archive before marking the member archived.
+An exact task already observed archived may seed that operation directly with
+no invented active evidence and no setter call.
 
 Executor closeout reuses the existing disposition-bound archive lifecycle.
 Disposable coordinator closeout uses the iteration's existing archive attempt,
@@ -55,7 +63,8 @@ insufficient.
 
 The owning role, not the CLI, performs the one external archive mutation. Flow
 continues to derive identity, eligibility, order, and cleanup authority. Host
-diagnostics remain bounded and non-sensitive. Regressions cover interruption,
-exact attempt matching, ambiguity without replay, archived reconciliation,
-run-level archive completion, child-first cleanup, and a real
+diagnostics remain bounded and non-sensitive. Regressions cover idle/activity
+gating, interruption at the worktree/archive boundary, exact attempt matching,
+ambiguity without replay, public/private already-archived reconciliation,
+run-level archive completion, child-first cleanup, dirty-state rejection, and a real
 cherry-pick-to-reclamation path.

@@ -39,8 +39,10 @@ decision records remain the detailed release evidence.
   primary preservation under the iteration lock, uses non-force Git removal,
   resumes safely after interruption, and never replays accepted archival.
 - Prepare assignment closeout as an exact owning-host Codex App archive action,
-  reconcile its bounded result without opening a competing App server, and
-  complete the executor's existing run archive after reclamation. Exact
+  require fresh typed idle evidence, reconcile its bounded result without
+  opening a competing App server, and complete the executor's existing run
+  archive before member completion after reclamation. Already-archived tasks
+  reconcile without an invented active state or setter replay. Exact
   verified patch-equivalent integration now preserves eligible executor cleanup
   without weakening the normal ancestry rule.
 - Route delivery owners by the hardest expected judgment: Terra-high for

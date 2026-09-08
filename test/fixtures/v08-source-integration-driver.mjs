@@ -126,9 +126,11 @@ const archive = await prepareTaskArchive({
   taskObservation: {
     execution_kind: "task-thread",
     thread_id: executor.ready_thread_id,
-    source: "host-observed",
+    source: "typed-host-activity-v1",
     active_visible: true,
     archived_visible: false,
+    activity_state: "idle",
+    observed_at: new Date().toISOString(),
   },
 });
 await reconcileTaskArchive({

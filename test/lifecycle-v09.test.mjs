@@ -117,9 +117,11 @@ test("v0.9 completes launch through quiet callback, no-change proof, archive, cl
     const activeObservation = {
       execution_kind: "task-thread",
       thread_id: context.executorThreadId,
-      source: "host-observed",
+      source: "typed-host-activity-v1",
       active_visible: true,
       archived_visible: false,
+      activity_state: "idle",
+      observed_at: new Date().toISOString(),
     };
     const archive = await prepareTaskArchive({
       stateRoot: context.stateRoot,
@@ -142,7 +144,9 @@ test("v0.9 completes launch through quiet callback, no-change proof, archive, cl
       attemptId: archive.host_intent.attempt_id,
       outcome: "accepted",
       observation: {
-        ...activeObservation,
+        execution_kind: "task-thread",
+        thread_id: context.executorThreadId,
+        source: "host-observed",
         active_visible: false,
         archived_visible: true,
       },
@@ -409,9 +413,11 @@ test("v0.9 admits only launch-bound evidence and completes clean-commit integrat
     const activeObservation = {
       execution_kind: "task-thread",
       thread_id: context.executorThreadId,
-      source: "host-observed",
+      source: "typed-host-activity-v1",
       active_visible: true,
       archived_visible: false,
+      activity_state: "idle",
+      observed_at: new Date().toISOString(),
     };
     const archive = await prepareTaskArchive({
       stateRoot: context.stateRoot,
@@ -432,7 +438,9 @@ test("v0.9 admits only launch-bound evidence and completes clean-commit integrat
       attemptId: archive.host_intent.attempt_id,
       outcome: "accepted",
       observation: {
-        ...activeObservation,
+        execution_kind: "task-thread",
+        thread_id: context.executorThreadId,
+        source: "host-observed",
         active_visible: false,
         archived_visible: true,
       },
