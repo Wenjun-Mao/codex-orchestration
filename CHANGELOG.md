@@ -3,6 +3,15 @@
 This file records concise user-facing changes. Immutable tags and the linked
 decision records remain the detailed release evidence.
 
+## 0.9.8 - 2026-09-08
+
+- Read private archived JSONL evidence incrementally rather than retaining an
+  entire task transcript, while preserving exact full-stream SHA-256 evidence
+  and one canonical `session_meta` record.
+- Bound archive observation by explicit byte, record-count, and record-size
+  ceilings; descriptor and pathname identity checks now reject replacement,
+  truncation, append, and swap-and-restore races during observation.
+
 ## 0.9.7 - 2026-09-07
 
 - Keep coordinator reporting valid for its assignment after execution-run
