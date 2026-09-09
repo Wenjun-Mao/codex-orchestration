@@ -13,6 +13,9 @@ decision records remain the detailed release evidence.
   representative real-Git coverage and lighter coordinator-reporting fixtures.
 - Revalidate precisely reconciled settled predecessors under the repository-wide
   admission lock, so a fresh installed run cannot contradict refresh inspection.
+- Preserve accepted executor results through their exact launch source or
+  reconciled integration target during owning-host closeout, while retaining
+  primary preservation for coordinator cleanup.
 
 
 ## 0.9.9 - 2026-09-08

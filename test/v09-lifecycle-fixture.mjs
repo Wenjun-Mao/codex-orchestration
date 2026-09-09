@@ -58,6 +58,7 @@ export async function createActiveTaskLaunch(root, suffix, {
   taskTitle = null,
   executorBranch = `codex/lifecycle-v09-${suffix}`,
   executorPath = resolve(root, `../${basename(root)}-${suffix}-executor`),
+  startingBranch = git(root, ["branch", "--show-current"]),
   reconcileCreation = true,
 } = {}) {
   const commonDir = await realpath(git(root, ["rev-parse", "--path-format=absolute", "--git-common-dir"]));
@@ -112,7 +113,7 @@ export async function createActiveTaskLaunch(root, suffix, {
     worktree: {
       mode: "host-worktree",
       starting_revision: baseline,
-      starting_branch: "main",
+      starting_branch: startingBranch,
       executor_branch: executorBranch,
       path: null,
     },

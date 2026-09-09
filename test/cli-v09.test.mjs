@@ -66,7 +66,9 @@ test("v0.9 help exposes launch authority and no retired bootstrap or release com
 
 test("installed CLI admits the updater's bounded manifest cachebuster through refresh inspection", async (t) => {
   const installedRoot = await mkdtemp(resolve(tmpdir(), "codex-flow-installed-identity-"));
+  const root = await createGitFixture("codex-flow-installed-identity-");
   t.after(() => rm(installedRoot, { recursive: true, force: true }));
+  t.after(() => removeFixture(root));
   await Promise.all([
     cp(resolve(packageRoot, ".codex-plugin"), resolve(installedRoot, ".codex-plugin"), { recursive: true }),
     cp(resolve(packageRoot, "bin"), resolve(installedRoot, "bin"), { recursive: true }),
@@ -86,7 +88,7 @@ test("installed CLI admits the updater's bounded manifest cachebuster through re
     "refresh", "inspect",
     "--invoking-skill", resolve(installedRoot, "skills", "refresh", "SKILL.md"),
     "--json",
-  ], { cwd: packageRoot, encoding: "utf8" });
+  ], { cwd: root, encoding: "utf8" });
   assert.equal(result.status, 0, result.stderr);
   const inspection = JSON.parse(result.stdout);
   assert.equal(inspection.route, "fresh", inspection.reason);

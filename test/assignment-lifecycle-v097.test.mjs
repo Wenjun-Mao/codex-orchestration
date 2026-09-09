@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { basename, resolve } from "node:path";
 import test from "node:test";
 import { acceptAssignmentResult } from "../lib/assignment-acceptance.mjs";
-import { taskArchiveForDisposition } from "../lib/archive-lifecycle.mjs";
+import { reconcileTaskArchive, taskArchiveForDisposition } from "../lib/archive-lifecycle.mjs";
 import { observeCodexAppPrivateArchive } from "../lib/adapters/codex-app/private-archive-observer.mjs";
 import {
   assignmentAuthority,
@@ -196,15 +196,31 @@ async function acceptedFinal(context, turnId, text, offset) {
 async function acceptedChildFixture(
   t,
   suffix,
-  { disposableCoordinator = false, patchEquivalentIntegration = false } = {},
+  {
+    disposableCoordinator = false,
+    deliveryBranch = false,
+    integrationOutcome = null,
+    integrationTargetExecutor = false,
+    patchEquivalentIntegration = false,
+  } = {},
 ) {
+  const selectedIntegrationOutcome = patchEquivalentIntegration
+    ? "patch-equivalent"
+    : integrationOutcome;
+  if (![null, "ancestor", "patch-equivalent"].includes(selectedIntegrationOutcome)) {
+    throw new Error("Fixture integration outcome is unsupported");
+  }
   const primaryRoot = await createGitFixture(`codex-flow-v097-child-closeout-${suffix}-`);
-  const coordinatorBranch = disposableCoordinator ? `codex/coordinator-${suffix}` : "main";
-  const coordinatorPath = disposableCoordinator
+  const coordinatorWorktree = disposableCoordinator || deliveryBranch;
+  const coordinatorBranch = coordinatorWorktree ? `codex/coordinator-${suffix}` : "main";
+  const coordinatorPath = coordinatorWorktree
     ? resolve(primaryRoot, `../${basename(primaryRoot)}-${suffix}-coordinator`)
     : primaryRoot;
-  if (disposableCoordinator) {
+  if (coordinatorWorktree) {
     git(primaryRoot, ["worktree", "add", "--quiet", "-b", coordinatorBranch, coordinatorPath]);
+    if (deliveryBranch) {
+      git(coordinatorPath, ["commit", "--allow-empty", "--quiet", "-m", "delivery branch baseline"]);
+    }
   }
   const taskTitle = "Executor · v0.9.7 · Assignment reporting";
   const context = await createActiveTaskLaunch(coordinatorPath, suffix, { taskTitle });
@@ -213,7 +229,7 @@ async function acceptedChildFixture(
       cwd: primaryRoot,
       encoding: "utf8",
     });
-    if (disposableCoordinator) {
+    if (coordinatorWorktree) {
       spawnSync("git", ["worktree", "remove", "--force", coordinatorPath], {
         cwd: primaryRoot,
         encoding: "utf8",
@@ -237,8 +253,8 @@ async function acceptedChildFixture(
     approvedPlanDigest: sha256("fixture\n"),
     iterationLabel: "v0.9.7",
     purpose: "Assignment reporting",
-    repositoryRoot: disposableCoordinator ? coordinatorPath : null,
-    repositoryBranch: disposableCoordinator ? coordinatorBranch : null,
+    repositoryRoot: coordinatorWorktree ? coordinatorPath : null,
+    repositoryBranch: coordinatorWorktree ? coordinatorBranch : null,
     now: TIME,
   });
   const assignment = await assignmentAuthority({
@@ -258,13 +274,13 @@ async function acceptedChildFixture(
     recipientHostId: "local",
   });
   let executorCommit = null;
-  if (patchEquivalentIntegration) {
-    await writeFile(resolve(context.executorPath, "patch-equivalent.txt"), `${suffix}\n`, "utf8");
-    git(context.executorPath, ["add", "patch-equivalent.txt"]);
+  if (selectedIntegrationOutcome !== null) {
+    await writeFile(resolve(context.executorPath, "integration-result.txt"), `${suffix}\n`, "utf8");
+    git(context.executorPath, ["add", "integration-result.txt"]);
     git(context.executorPath, ["commit", "--quiet", "-m", `executor ${suffix}`]);
     executorCommit = git(context.executorPath, ["rev-parse", "HEAD"]);
   }
-  const receipt = terminalReceiptV4(context, patchEquivalentIntegration ? {
+  const receipt = terminalReceiptV4(context, selectedIntegrationOutcome !== null ? {
     kind: "clean-commit",
     baseline_revision: context.baseline,
     commit: executorCommit,
@@ -296,43 +312,53 @@ async function acceptedChildFixture(
   const disposition = await prepareTaskDisposition({
     stateRoot: context.stateRoot,
     callbackId: delivered.callback_id,
-    decision: patchEquivalentIntegration ? "accepted-for-integration" : "accepted-no-change",
-    reason: patchEquivalentIntegration
+    decision: selectedIntegrationOutcome !== null ? "accepted-for-integration" : "accepted-no-change",
+    reason: selectedIntegrationOutcome !== null
       ? "The child returned one clean commit for serial integration."
       : "The child returned verified no-change work.",
   });
   let integration = null;
   let verification;
-  if (patchEquivalentIntegration) {
+  if (selectedIntegrationOutcome !== null) {
+    const integrationPath = integrationTargetExecutor
+      ? context.executorPath
+      : coordinatorWorktree ? coordinatorPath : primaryRoot;
+    const integrationBranch = integrationTargetExecutor
+      ? context.executorBranch
+      : coordinatorWorktree ? coordinatorBranch : "main";
     integration = await prepareSerialIntegration({
       stateRoot: context.stateRoot,
-      repositoryPath: primaryRoot,
+      repositoryPath: integrationPath,
       dispositionId: disposition.disposition_id,
-      mainBranch: "main",
+      mainBranch: integrationBranch,
     });
-    // Ensure cherry-pick preservation is exercised even when Git timestamps
-    // would otherwise reproduce the executor commit byte-for-byte.
-    git(primaryRoot, ["commit", "--allow-empty", "--quiet", "-m", "independent primary work"]);
-    git(primaryRoot, ["cherry-pick", "--quiet", executorCommit]);
+    if (selectedIntegrationOutcome === "ancestor") {
+      git(integrationPath, ["merge", "--ff-only", "--quiet", executorCommit]);
+    } else {
+      // Ensure cherry-pick preservation is exercised even when Git timestamps
+      // would otherwise reproduce the executor commit byte-for-byte.
+      git(integrationPath, ["commit", "--allow-empty", "--quiet", "-m", "independent target work"]);
+      git(integrationPath, ["cherry-pick", "--quiet", executorCommit]);
+    }
     const request = await integrationVerificationRequest({
       stateRoot: context.stateRoot,
-      repositoryPath: primaryRoot,
+      repositoryPath: integrationPath,
       integrationId: integration.integration_id,
     });
     verification = await runCombinedVerification({
       stateRoot: context.stateRoot,
-      repositoryPath: primaryRoot,
+      repositoryPath: integrationPath,
       receipt: request.receipt,
       integrationScope: request.integration_scope,
       checks: [{ check_id: "exact-child", argv: [process.execPath, "-e", "process.exit(0)"] }],
     });
     integration = await reconcileSerialIntegration({
       stateRoot: context.stateRoot,
-      repositoryPath: primaryRoot,
+      repositoryPath: integrationPath,
       integrationId: integration.integration_id,
       verificationId: verification.verification_id,
     });
-    assert.equal(integration.outcome, "patch-equivalent");
+    assert.equal(integration.outcome, selectedIntegrationOutcome);
   } else {
     verification = await runCombinedVerification({
       stateRoot: context.stateRoot,
@@ -362,6 +388,24 @@ async function acceptedChildFixture(
     disposition,
     integration,
   };
+}
+
+async function closeoutAcceptedExecutor(child, { now = TIME + 12_000 } = {}) {
+  const prepared = await closeoutIterationWithOwningHost({
+    commonDir: child.context.commonDir,
+    iterationId: child.assignment.iteration_id,
+    taskObservation: activeTaskObservation(child.context.executorThreadId),
+    now,
+  });
+  assert.equal(prepared.status, "host-action-required");
+  const closed = await closeoutIterationWithOwningHost({
+    commonDir: child.context.commonDir,
+    iterationId: child.assignment.iteration_id,
+    taskObservation: archivedTaskObservation(child.context.executorThreadId, now + 100),
+    hostResult: hostResult(prepared.host_request, "accepted"),
+    now: now + 100,
+  });
+  return { prepared, closed };
 }
 
 test("assignment reporting survives normal run close and removal of its execution namespace", async (t) => {
@@ -930,6 +974,113 @@ test("authenticated patch-equivalent integration preserves exact executor reclam
   });
   assert.equal(closed.status, "phase-complete");
   assert.equal(git(root, ["branch", "--list", context.executorBranch]), "");
+});
+
+for (const [label, integrationOutcome] of [
+  ["no-change", null],
+  ["ancestor integration", "ancestor"],
+  ["patch-equivalent integration", "patch-equivalent"],
+]) {
+  test(`owning-host closeout preserves ${label} on its named delivery branch ahead of primary`, async (t) => {
+    const child = await acceptedChildFixture(t, `delivery-owner-${label.replaceAll(" ", "-")}`, {
+      deliveryBranch: true,
+      integrationOutcome,
+    });
+    assert.notEqual(
+      spawnSync("git", ["merge-base", "--is-ancestor", child.context.baseline, "main"], {
+        cwd: child.root,
+        encoding: "utf8",
+      }).status,
+      0,
+    );
+
+    const { closed } = await closeoutAcceptedExecutor(child, { now: TIME + 12_000 });
+    assert.equal(closed.status, "phase-complete");
+    assert.equal(Object.hasOwn(closed, "host_request"), false);
+    assert.equal(git(child.root, ["branch", "--list", child.context.executorBranch]), "");
+  });
+}
+
+for (const [label, mutateOwner] of [
+  ["is absent", (child) => {
+    git(child.root, ["worktree", "remove", "--force", child.coordinatorPath]);
+    git(child.root, ["branch", "-D", child.coordinatorBranch]);
+  }],
+  ["rewinds away from the recorded delivery tip", (child) => {
+    git(child.root, ["worktree", "remove", "--force", child.coordinatorPath]);
+    git(child.root, ["branch", "-f", child.coordinatorBranch, "main"]);
+  }],
+]) {
+  test(`owning-host closeout retains an executor branch when its no-change source ${label}`, async (t) => {
+    const child = await acceptedChildFixture(t, `missing-owner-${label.replaceAll(" ", "-")}`, {
+      deliveryBranch: true,
+    });
+    const prepared = await closeoutIterationWithOwningHost({
+      commonDir: child.context.commonDir,
+      iterationId: child.assignment.iteration_id,
+      taskObservation: activeTaskObservation(child.context.executorThreadId),
+      now: TIME + 13_000,
+    });
+    mutateOwner(child);
+
+    await assert.rejects(
+      closeoutIterationWithOwningHost({
+        commonDir: child.context.commonDir,
+        iterationId: child.assignment.iteration_id,
+        taskObservation: archivedTaskObservation(child.context.executorThreadId, TIME + 13_100),
+        hostResult: hostResult(prepared.host_request, "accepted"),
+        now: TIME + 13_100,
+      }),
+      /No-change launch source preservation branch/,
+    );
+    assert.notEqual(git(child.root, ["branch", "--list", child.context.executorBranch]), "");
+  });
+}
+
+test("serial integration rejects its disposable executor branch as the target owner", async (t) => {
+  await assert.rejects(
+    acceptedChildFixture(t, "executor-owner", {
+      deliveryBranch: true,
+      integrationOutcome: "ancestor",
+      integrationTargetExecutor: true,
+    }),
+    /Integration target branch must differ from the disposable executor branch/,
+  );
+});
+
+test("run-independent closeout completes an RC2-shaped archived absent-worktree executor without replaying archive", async (t) => {
+  const child = await acceptedChildFixture(t, "rc2-shaped-recovery", { deliveryBranch: true });
+  const prepared = await closeoutIterationWithOwningHost({
+    commonDir: child.context.commonDir,
+    iterationId: child.assignment.iteration_id,
+    taskObservation: activeTaskObservation(child.context.executorThreadId),
+    now: TIME + 14_000,
+  });
+  const archive = await taskArchiveForDisposition({
+    stateRoot: child.context.stateRoot,
+    dispositionId: child.disposition.disposition_id,
+  });
+  git(child.root, ["worktree", "remove", "--force", child.context.executorPath]);
+  const completedArchive = await reconcileTaskArchive({
+    stateRoot: child.context.stateRoot,
+    archiveId: archive.archive_id,
+    attemptId: archive.host_intent.attempt_id,
+    outcome: "accepted",
+    observation: archivedTaskObservation(child.context.executorThreadId, TIME + 14_100),
+    now: TIME + 14_100,
+  });
+  assert.equal(completedArchive.state, "completed");
+  assert.equal(git(child.root, ["branch", "--list", child.context.executorBranch]) !== "", true);
+
+  const recovered = await closeoutIterationWithOwningHost({
+    commonDir: child.context.commonDir,
+    iterationId: child.assignment.iteration_id,
+    taskObservation: archivedTaskObservation(child.context.executorThreadId, TIME + 14_200),
+    now: TIME + 14_200,
+  });
+  assert.equal(recovered.status, "phase-complete");
+  assert.equal(Object.hasOwn(recovered, "host_request"), false);
+  assert.equal(git(child.root, ["branch", "--list", child.context.executorBranch]), "");
 });
 
 test("owning-host closeout reconciles an already archived coordinator with a remaining worktree", async (t) => {
