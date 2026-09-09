@@ -11,6 +11,9 @@ decision records remain the detailed release evidence.
 - Remove the unused direct closeout driver. CLI and assignment acceptance share
   the owning-host prepare/result/observation/reclamation transition, with
   representative real-Git coverage and lighter coordinator-reporting fixtures.
+- Revalidate precisely reconciled settled predecessors under the repository-wide
+  admission lock, so a fresh installed run cannot contradict refresh inspection.
+
 
 ## 0.9.9 - 2026-09-08
 

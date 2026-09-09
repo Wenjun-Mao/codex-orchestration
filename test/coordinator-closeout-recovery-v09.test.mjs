@@ -119,6 +119,46 @@ function recoveryPlan(prefix) {
   });
 }
 
+function freshActivationRequest({ runId, coordinator }) {
+  return {
+    run_id: runId,
+    activated_at: new Date(TIME + 6_000).toISOString(),
+    runtime: {
+      config: { config_id: `${runId}-config`, snapshot: { project_id: "recovery-fixture" } },
+      policy: { policy_id: `${runId}-policy`, snapshot: { routine_callbacks: "journal" } },
+      host: { host_id: "fixture-host", session_id: `${runId}-session` },
+      lineage: coordinator,
+    },
+    workflow: {
+      schema_version: 1,
+      plan_id: `${runId}-plan`,
+      revision: 1,
+      parent_revision_digest: null,
+      tasks: [{
+        task_id: `${runId}-work`,
+        title: "Start one fresh settled-predecessor regression run",
+        execution_kind: "coordinator",
+        mode: "read",
+        model: "gpt-5.6-terra",
+        reasoning_effort: "high",
+        selector_rationale: "The regression needs one bounded coordinator authority after exact predecessor reconciliation.",
+        fork_turns: null,
+        dependencies: [],
+        read_paths: ["lib"],
+        write_paths: [],
+        shared_resources: [],
+        primary_outcome: "Admit one fresh run without altering the settled predecessor.",
+        causal_question: "Does fresh activation revalidate the exact settled predecessor under its admission lock?",
+        cheapest_safe_direct_attempt: "Activate one empty-fence coordinator run after refresh inspection.",
+        instrument_role: "none",
+        supporting_follow_up: null,
+        supporting_authorization: null,
+      }],
+    },
+    fences: { path_fences: [], resource_fences: [], branch_fences: [] },
+  };
+}
+
 async function currentRecoveryFixture(t, { wrongInitialBinding = false } = {}) {
   const primary = await createGitFixture("codex-flow-v099-current-recovery-");
   const coordinatorPath = resolve(primary, `../${basename(primary)}-coordinator`);
@@ -339,6 +379,10 @@ async function settledV097Fixture(t) {
     repositoryBranch: coordinatorBranch,
     now: TIME + 1_000,
   });
+  // Registration has already snapshotted this fixture-only source plan. Remove
+  // the untracked original so the successor CLI journey tests its real clean
+  // activation precondition instead of inheriting fixture residue.
+  await rm(planPath);
   const report = await captureReport({
     stateRoot: registration.state_root,
     routeId: registration.route.route_id,
@@ -398,6 +442,7 @@ async function settledV097Fixture(t) {
     commonDir,
     coordinatorPath,
     sourcePackage,
+    requests,
     reportPath: resolve(
       assignmentStateRoot(commonDir),
       "reports", "deliveries", "records", `${acceptedReport.report.report_id}.json`,
@@ -422,45 +467,35 @@ test("settled v0.9.7 coordinator reconciliation requires accepted closeout evide
   });
   assert.equal(inspection.route, "fresh", inspection.reason);
   assert.equal(inspection.authority.settled_predecessors[0].run_id, "v097-closeout-recovery-run");
+  const predecessorLifecyclePath = resolve(
+    fixture.commonDir,
+    "codex-flow",
+    "v0.9.7",
+    "runs",
+    "lifecycle.json",
+  );
+  const predecessorLifecycleBytes = await readFile(predecessorLifecyclePath, "utf8");
+  const predecessorReportBytes = await readFile(fixture.reportPath, "utf8");
 
   const nextCoordinator = {
     lineage_id: "v099-next-assignment-lineage",
     thread_id: "v099-next-assignment-coordinator",
     generation: 1,
   };
-  const nextPlan = createWorkflowPlanRevision({
-    schema_version: 1,
-    plan_id: "v099-next-assignment-plan",
-    revision: 1,
-    parent_revision_digest: null,
-    tasks: [{
-      task_id: "v099-next-assignment-work",
-      title: "Start the next assignment",
-      execution_kind: "coordinator",
-      mode: "read",
-      model: "gpt-5.6-terra",
-      reasoning_effort: "high",
-      selector_rationale: "The next-assignment regression is a settled bounded lane.",
-      fork_turns: null,
-      dependencies: [],
-      read_paths: ["lib"],
-      write_paths: [],
-      shared_resources: [],
-      primary_outcome: "Start a fresh assignment after closeout.",
-      causal_question: null,
-      cheapest_safe_direct_attempt: "Register the next coordinator assignment.",
-      instrument_role: "none",
-      supporting_follow_up: null,
-      supporting_authorization: null,
-    }],
-  });
-  const next = await activateFixtureRun({
-    root: fixture.primary,
+  const nextRequest = freshActivationRequest({
     runId: "v099-next-assignment-run",
-    plan: nextPlan,
-    lineage: nextCoordinator,
-    now: TIME + 6_000,
+    coordinator: nextCoordinator,
   });
+  const nextRequestPath = resolve(fixture.requests, "fresh-activation.json");
+  await writeFile(nextRequestPath, `${JSON.stringify(nextRequest)}\n`, "utf8");
+  const nextActivation = invoke(resolve(packageRoot, "bin", "codex-flow.mjs"), [
+    "run", "activate", "--run-id", nextRequest.run_id, "--file", nextRequestPath, "--json",
+  ], fixture.primary, { CODEX_THREAD_ID: nextCoordinator.thread_id });
+  assert.equal(nextActivation.status, 0, nextActivation.stderr || nextActivation.stdout);
+  const next = JSON.parse(nextActivation.stdout);
+  assert.equal(next.run.run_id, nextRequest.run_id);
+  assert.equal(await readFile(predecessorLifecyclePath, "utf8"), predecessorLifecycleBytes);
+  assert.equal(await readFile(fixture.reportPath, "utf8"), predecessorReportBytes);
   const nextDirector = {
     lineage_id: "v099-next-assignment-director",
     thread_id: "v099-next-assignment-director-thread",
@@ -506,6 +541,22 @@ test("settled v0.9.7 reconciliation fails closed on missing accepted-report evid
   assert.equal(missingReport.status, "blocked");
   assert.match(missingReport.reason, /accepted report record/i);
   assert.match(missingReport.reason, /Do not recreate, remove, or rebind/);
+  const blockedCoordinator = {
+    lineage_id: "v097-missing-report-fresh-lineage",
+    thread_id: "v097-missing-report-fresh-coordinator",
+    generation: 1,
+  };
+  const blockedRequest = freshActivationRequest({
+    runId: "v097-missing-report-fresh-run",
+    coordinator: blockedCoordinator,
+  });
+  const blockedRequestPath = resolve(fixture.requests, "missing-report-fresh-activation.json");
+  await writeFile(blockedRequestPath, `${JSON.stringify(blockedRequest)}\n`, "utf8");
+  const blockedActivation = invoke(resolve(packageRoot, "bin", "codex-flow.mjs"), [
+    "run", "activate", "--run-id", blockedRequest.run_id, "--file", blockedRequestPath, "--json",
+  ], fixture.primary, { CODEX_THREAD_ID: blockedCoordinator.thread_id });
+  assert.notEqual(blockedActivation.status, 0);
+  assert.match(`${blockedActivation.stderr}\n${blockedActivation.stdout}`, /accepted report record/i);
   await assert.rejects(
     loadRefreshSourceAuthority({
       commonDir: fixture.commonDir,

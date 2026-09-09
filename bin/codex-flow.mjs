@@ -15,6 +15,7 @@ import {
   requireText,
   sha256,
   stableStringify,
+  withProcessLock,
 } from "../lib/core.mjs";
 import { assertInstalledDistributionIdentity } from "../lib/distribution-identity.mjs";
 import { cleanupPlan } from "../lib/cleanup.mjs";
@@ -35,10 +36,6 @@ import {
   startCoordinatorWork,
 } from "../lib/coordinator-work.mjs";
 import { discoverGit, gitSnapshot } from "../lib/git.mjs";
-import {
-  assertNoForeignActiveRunCollision,
-  assertNoIncompatibleFlowNamespace,
-} from "../lib/foreign-active-run-sentinel.mjs";
 import {
   assertNoUnplugInProgress,
   observePrivateUnplug,
@@ -89,7 +86,6 @@ import {
 } from "../lib/integration.mjs";
 import {
   abandonRun,
-  admitRun,
   admitRunWithRepositoryLockHeld,
   assertWorkflowReservationCovered,
   buildFencePlan,
@@ -103,6 +99,7 @@ import {
 import {
   applyRefresh,
   authenticateRefreshSkill,
+  assertFreshStartPredecessors,
   consumeRefreshActivation,
   inspectRefresh,
   observeRefreshPrivateArchives,
@@ -621,16 +618,6 @@ async function commandRunV09(args) {
       throw new CliError("run activate requires a clean authenticated Git worktree", 73);
     }
     await assertNoUnplugInProgress({ gitCommonDirectory: git.commonDir });
-    if (refreshId === null) {
-      await assertNoForeignActiveRunCollision({
-        gitCommonDirectory: git.commonDir,
-        currentNamespace: RUNTIME_DIRECTORY,
-      });
-      await assertNoIncompatibleFlowNamespace({
-        gitCommonDirectory: git.commonDir,
-        currentNamespace: RUNTIME_DIRECTORY,
-      });
-    }
     const workflow = createWorkflowPlanRevision(request.workflow);
     const fences = activationFences(request.fences);
     assertWorkflowReservationCovered(fences, workflow);
@@ -748,11 +735,27 @@ async function commandRunV09(args) {
           repositoryLockToken,
         }),
       });
-    const preparedTarget = refresh === null
-      ? await prepareTargetState()
-      : refresh.prepared;
+    const freshActivation = refresh === null
+      ? await withProcessLock({
+        path: resolve(git.commonDir, "codex-flow", "foreign-active-run.lock"),
+        guardRoot: git.commonDir,
+        label: "Codex Flow fresh-start admission",
+      }, async (repositoryLockToken) => {
+        await assertFreshStartPredecessors({
+          commonDir: git.commonDir,
+          currentNamespace: RUNTIME_DIRECTORY,
+        });
+        const prepared = await prepareTargetState();
+        const admitted = await admitRunWithRepositoryLockHeld({
+          ...admissionRequest,
+          repositoryLockToken,
+        });
+        return { prepared, admitted };
+      })
+      : null;
+    const preparedTarget = freshActivation === null ? refresh.prepared : freshActivation.prepared;
     const { acquired, journal } = preparedTarget;
-    const admitted = refresh === null ? await admitRun(admissionRequest) : refresh.admitted;
+    const admitted = freshActivation === null ? refresh.admitted : freshActivation.admitted;
     const coordinatorRecipient = await bindRunCoordinatorRecipient({
       git,
       run: admitted.run,
