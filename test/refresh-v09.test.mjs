@@ -883,6 +883,7 @@ async function createClosedV09Run({
   sourcePackage,
   runId = "refresh-v09-closed-source",
   selectorReplan = false,
+  blockedAuditFirst = false,
 }) {
   const prompt = "Inspect the bounded refresh fixture and return its terminal result.";
   const workflowTask = task(`${runId}-subagent`, {
@@ -1024,6 +1025,13 @@ async function createClosedV09Run({
       "subagent", "reconcile", "--run-id", runId, "--file", replacementReconcilePath, "--json",
     ], root), "v0.9 source replacement subagent reconciliation");
   }
+  let blockedAudit = null;
+  if (blockedAuditFirst) {
+    const blockedAuditCall = invoke(runtimeCli, ["run", "audit", "--run-id", runId, "--json"], root);
+    assertSuccess(blockedAuditCall, "v0.9 source blocked closure audit");
+    blockedAudit = JSON.parse(blockedAuditCall.stdout).audit;
+    assert.equal(blockedAudit.terminal_ready, false);
+  }
   const completePath = await jsonFile(requests, `${runId}-subagent-complete`, {
     run_id: runId,
     operation_id: activeOperation.operation_id,
@@ -1060,6 +1068,7 @@ async function createClosedV09Run({
     activated,
     closed: JSON.parse(closeCall.stdout),
     audit,
+    blockedAudit,
     request,
     runtimeCli,
   };
@@ -1719,7 +1728,10 @@ test("v0.9 refresh recognizes a reclaimed closed predecessor only through its au
     requests,
     sourcePackage,
     runId: "refresh-v090-reclaimed-closed",
+    blockedAuditFirst: true,
   });
+  assert.equal(reclaimed.blockedAudit.terminal_ready, false);
+  assert.notEqual(reclaimed.blockedAudit.audit_id, reclaimed.audit.audit_id);
   execFileSync("git", ["worktree", "remove", "--force", reclaimedRoot], { cwd: root });
   await assert.rejects(stat(reclaimedRoot), /ENOENT/);
 

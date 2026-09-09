@@ -40,6 +40,12 @@ revision. A lawful selector replan may advance the journal's current revision,
 so settlement binds the audit's current revision to the journal's current
 revision rather than requiring either value to equal the activation revision.
 
+Closure audits are append-only evidence. Earlier blocked audits do not compete
+with a later terminal-ready audit; settlement selects exactly one audit that
+matches the current lawful authority. Multiple matching terminal-ready audits
+remain ambiguous and fail closed. Selection never relies on timestamp order or
+deletes historical audit records.
+
 ## Consequences and guardrails
 
 Both inspection and source-namespace removal use the same classifier. The
@@ -50,5 +56,6 @@ non-unique, mismatched, or tampered audit evidence fails closed.
 Focused regressions cover a reclaimed closed task run through both consumers,
 a reclaimed closed coordinator-local-work run, audit tampering, and an
 abandoned run retaining a live Git fence, plus a reclaimed selector-replan
-run. The repair is source-only; release, installation, and historical
-namespace retirement remain separate decisions.
+run and an earlier blocked audit followed by successful close. The repair is
+source-only; release, installation, and historical namespace retirement remain
+separate decisions.
