@@ -57,5 +57,8 @@ from mismatched identities, branches, repositories, or reporting state.
 Real-Git lifecycle regressions cover the original cancelled-to-successor
 journey, repeated cancellation chains, wrong task and branch bindings, a
 different worktree, active and reporting-unsettled predecessors, a competing
-post-admission executor, and concurrent registration. Existing executor and
-coordinator closeout tests continue to exercise the same reclamation boundary.
+post-admission executor, and concurrent registration. A public CLI journey also
+starts from the exact frozen v0.9.11-rc.1 candidate, consumes refresh into
+v0.9.11-rc.2, and completes successor admission plus reclamation. Existing
+executor and coordinator closeout tests continue to exercise the same
+reclamation boundary.

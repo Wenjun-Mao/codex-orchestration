@@ -19,7 +19,7 @@ import {
   prepareCoordinatorAssignment,
   validateAssignmentPreparation,
 } from "../lib/assignment-preparation.mjs";
-import { sha256, stableStringify } from "../lib/core.mjs";
+import { PACKAGE_VERSION, sha256, stableStringify } from "../lib/core.mjs";
 import { deliverCallback, observeCallback } from "../lib/callbacks.mjs";
 import { finalizeTaskDisposition, prepareTaskDisposition } from "../lib/dispositions.mjs";
 import {
@@ -63,9 +63,68 @@ import { coordinatorBindingDigest, createWorkflowPlanRevision } from "../lib/wor
 import { persistWorkflowTaskContract } from "../lib/workflow-journal.mjs";
 
 const TIME = Date.parse("2026-09-06T15:00:00.000Z");
+const FROZEN_RC1_COMMIT = "ac301363976d4433885323530e7ccedbc5fcc5e5";
 
 function git(root, args) {
   return execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
+}
+
+async function frozenRc1Package(t) {
+  const root = await mkdtemp(resolve(tmpdir(), "codex-flow-v0911-rc1-package-"));
+  const archive = resolve(root, "source.tar");
+  execFileSync("git", [
+    "archive", "--format=tar", `--output=${archive}`, FROZEN_RC1_COMMIT,
+  ], { cwd: packageRoot });
+  execFileSync("tar", ["-xf", archive, "-C", root]);
+  await rm(archive);
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const metadata = JSON.parse(await readFile(resolve(root, "package.json"), "utf8"));
+  assert.equal(metadata.version, "0.9.11-rc.1");
+  return { root, cli: resolve(root, "bin", "codex-flow.mjs") };
+}
+
+function invokePackage(cli, args, cwd, env = {}) {
+  return spawnSync(process.execPath, [cli, ...args], {
+    cwd,
+    env: { ...process.env, ...env },
+    encoding: "utf8",
+  });
+}
+
+function assertPackageSuccess(result, label) {
+  assert.equal(result.status, 0, `${label}: ${result.stderr || result.stdout}`);
+  return JSON.parse(result.stdout);
+}
+
+async function jsonRequest(directory, name, value) {
+  const path = resolve(directory, `${name}.json`);
+  await writeFile(path, `${JSON.stringify(value)}\n`, "utf8");
+  return path;
+}
+
+function activationRequest({ runId, plan, lineage, branchFences, now }) {
+  return {
+    run_id: runId,
+    activated_at: new Date(now).toISOString(),
+    runtime: {
+      config: { config_id: `${runId}-config`, snapshot: {} },
+      policy: { policy_id: `${runId}-policy`, snapshot: {} },
+      host: { host_id: "fixture-host", session_id: `${runId}-session` },
+      lineage,
+    },
+    workflow: {
+      schema_version: plan.schema_version,
+      plan_id: plan.plan_id,
+      revision: plan.revision,
+      parent_revision_digest: plan.parent_revision_digest,
+      tasks: plan.tasks,
+    },
+    fences: {
+      path_fences: [...new Set(plan.tasks.flatMap((task) => task.write_paths))],
+      resource_fences: [...new Set(plan.tasks.flatMap((task) => task.shared_resources))],
+      branch_fences: branchFences,
+    },
+  };
 }
 
 async function fixture(t, { detachedCoordinator = false } = {}) {
@@ -1441,6 +1500,244 @@ test("a cancelled coordinator can be rebound to a successor assignment and recla
     now: TIME + 16_100,
   });
   assert.equal(retired.status, "retired");
+});
+
+test("frozen RC1 cancellation admits and reclaims an exact RC2 successor", async (t) => {
+  assert.equal(PACKAGE_VERSION, "0.9.11-rc.2");
+  const source = await frozenRc1Package(t);
+  const requests = await mkdtemp(resolve(tmpdir(), "codex-flow-v0911-cross-version-requests-"));
+  t.after(() => rm(requests, { recursive: true, force: true }));
+  const primaryRoot = await createGitFixture("codex-flow-v0911-cross-version-");
+  const coordinatorPath = resolve(primaryRoot, `../${basename(primaryRoot)}-coordinator`);
+  const coordinatorBranch = "codex/v0911-cross-version-coordinator";
+  git(primaryRoot, ["worktree", "add", "--quiet", "-b", coordinatorBranch, coordinatorPath]);
+  const commonDir = resolve(git(coordinatorPath, [
+    "rev-parse", "--path-format=absolute", "--git-common-dir",
+  ]));
+  const coordinatorGitDir = resolve(git(coordinatorPath, [
+    "rev-parse", "--path-format=absolute", "--git-dir",
+  ]));
+  t.after(async () => {
+    spawnSync("git", ["worktree", "remove", "--force", coordinatorPath], {
+      cwd: primaryRoot,
+      encoding: "utf8",
+    });
+    await rm(primaryRoot, { recursive: true, force: true });
+  });
+
+  const coordinator = {
+    lineage_id: "v0911-cross-version-coordinator-lineage",
+    thread_id: "v0911-cross-version-coordinator-thread",
+    generation: 1,
+  };
+  await writeFile(resolve(coordinatorGitDir, "codex-thread.json"), `${JSON.stringify({
+    version: 1,
+    ownerThreadId: coordinator.thread_id,
+  })}\n`, "utf8");
+  const director = {
+    lineage_id: "v0911-cross-version-director-lineage",
+    thread_id: "v0911-cross-version-director-thread",
+    generation: 1,
+  };
+  const predecessorPlan = successorAssignmentPlan("frozen-rc1");
+  const predecessorRunId = "v0911-cross-version-rc1-run";
+  const predecessorActivationPath = await jsonRequest(
+    requests,
+    "rc1-activation",
+    activationRequest({
+      runId: predecessorRunId,
+      plan: predecessorPlan,
+      lineage: coordinator,
+      branchFences: [],
+      now: TIME + 16_120,
+    }),
+  );
+  const predecessorActivation = assertPackageSuccess(invokePackage(source.cli, [
+    "run", "activate", "--run-id", predecessorRunId,
+    "--file", predecessorActivationPath, "--json",
+  ], coordinatorPath, { CODEX_THREAD_ID: coordinator.thread_id }), "frozen RC1 activation");
+  assert.equal(predecessorActivation.package_authority.package_version, "0.9.11-rc.1");
+  const predecessorRuntimeCli = resolve(
+    predecessorActivation.runtime_authority.bundle_root,
+    "bin",
+    "codex-flow.mjs",
+  );
+  const predecessorPreparationPath = await jsonRequest(requests, "rc1-preparation", {
+    approved_plan_path: resolve(coordinatorPath, ".gitkeep"),
+    recipient: { host_id: "fixture-host", ...director },
+    iteration_label: "v0.9.11 RC1 predecessor",
+    purpose: "Cross-version cancelled predecessor",
+    outcome: "Preserve one cancelled RC1 coordinator assignment.",
+    scope: ["Create and cancel the exact RC1 predecessor."],
+    acceptance_criteria: ["RC1 cancellation and locator retirement settle."],
+    constraints: [],
+    reasons: [],
+  });
+  const predecessorPreparation = assertPackageSuccess(invokePackage(source.cli, [
+    "assignment", "prepare", "--file", predecessorPreparationPath, "--json",
+  ], coordinatorPath, { CODEX_THREAD_ID: director.thread_id }), "frozen RC1 assignment preparation");
+  const predecessorRoutePath = await jsonRequest(requests, "rc1-route", {
+    run_id: predecessorRunId,
+    sender_thread_id: coordinator.thread_id,
+    preparation_id: predecessorPreparation.preparation.preparation_id,
+  });
+  const predecessor = assertPackageSuccess(invokePackage(predecessorRuntimeCli, [
+    "report", "route", "coordinator", "--run-id", predecessorRunId,
+    "--file", predecessorRoutePath, "--json",
+  ], coordinatorPath, { CODEX_THREAD_ID: coordinator.thread_id }), "frozen RC1 route registration");
+  const predecessorLocalStartPath = await jsonRequest(requests, "rc1-local-start", {
+    run_id: predecessorRunId,
+    plan_id: predecessorPlan.plan_id,
+    task_id: predecessorPlan.tasks[0].task_id,
+    dependency_authorities: [],
+  });
+  const predecessorLocalWork = assertPackageSuccess(invokePackage(predecessorRuntimeCli, [
+    "workflow", "local", "start", "--run-id", predecessorRunId,
+    "--file", predecessorLocalStartPath, "--json",
+  ], coordinatorPath, { CODEX_THREAD_ID: coordinator.thread_id }), "frozen RC1 local work start");
+  const predecessorLocalCompletePath = await jsonRequest(requests, "rc1-local-complete", {
+    run_id: predecessorRunId,
+    local_work_id: predecessorLocalWork.local_work_id,
+    checks: [{
+      check_id: "frozen-rc1-no-change",
+      argv: [process.execPath, "-e", "process.exit(0)"],
+    }],
+  });
+  const completedLocalWork = assertPackageSuccess(invokePackage(predecessorRuntimeCli, [
+    "workflow", "local", "complete", "--run-id", predecessorRunId,
+    "--file", predecessorLocalCompletePath, "--json",
+  ], coordinatorPath, { CODEX_THREAD_ID: coordinator.thread_id }), "frozen RC1 local work completion");
+  assert.equal(completedLocalWork.state, "completed");
+  const reason = "Exercise the exact frozen RC1 cancellation before RC2 successor admission.";
+  const predecessorAbandonPath = await jsonRequest(requests, "rc1-abandon", {
+    run_id: predecessorRunId,
+    resume: predecessorActivation.run.binding,
+    reason,
+  });
+  assertPackageSuccess(invokePackage(predecessorRuntimeCli, [
+    "run", "abandon", "--run-id", predecessorRunId,
+    "--file", predecessorAbandonPath, "--json",
+  ], coordinatorPath), "frozen RC1 abandonment");
+  const predecessorCancelPath = await jsonRequest(requests, "rc1-cancel", {
+    assignment_id: predecessor.route.assignment.assignment_id,
+    reason,
+  });
+  const cancelled = assertPackageSuccess(invokePackage(predecessorRuntimeCli, [
+    "assignment", "cancel", "--assignment-id", predecessor.route.assignment.assignment_id,
+    "--file", predecessorCancelPath, "--json",
+  ], coordinatorPath, { CODEX_THREAD_ID: director.thread_id }), "frozen RC1 cancellation");
+  assert.equal(cancelled.status, "cancelled");
+  assert.equal(cancelled.assignment.execution_bindings[0].namespace, "v0.9.11-rc.1");
+
+  const successorCli = resolve(packageRoot, "bin", "codex-flow.mjs");
+  const refreshSkill = resolve(packageRoot, "skills", "refresh", "SKILL.md");
+  const refreshPreparePath = await jsonRequest(requests, "rc1-to-rc2-refresh-prepare", {
+    source_namespace: "v0.9.11-rc.1",
+    source_run_id: predecessorRunId,
+    source_resume: predecessorActivation.run.binding,
+    decisions: [],
+    replacements: [],
+    target_workflow: null,
+    target_fences: { path_fences: [], resource_fences: [], branch_fences: [] },
+    target_coordinator_thread_id: coordinator.thread_id,
+  });
+  const refresh = assertPackageSuccess(invokePackage(successorCli, [
+    "refresh", "prepare", "--invoking-skill", refreshSkill,
+    "--file", refreshPreparePath, "--json",
+  ], coordinatorPath), "RC1 to RC2 refresh preparation");
+  const refreshApplyPath = await jsonRequest(requests, "rc1-to-rc2-refresh-apply", {
+    refresh_id: refresh.handoff.refresh_id,
+    expected_handoff_digest: refresh.handoff.handoff_digest,
+    archive_evidence: [],
+  });
+  const applied = assertPackageSuccess(invokePackage(successorCli, [
+    "refresh", "apply", "--invoking-skill", refreshSkill,
+    "--file", refreshApplyPath, "--json",
+  ], coordinatorPath), "RC1 to RC2 refresh consumption");
+  assert.equal(applied.status, "consumed-clean-start");
+
+  const successorPlan = successorAssignmentPlan("rc2-cross-version");
+  const successorRunId = "v0911-cross-version-rc2-run";
+  const successorActivationPath = await jsonRequest(
+    requests,
+    "rc2-activation",
+    activationRequest({
+      runId: successorRunId,
+      plan: successorPlan,
+      lineage: coordinator,
+      branchFences: [],
+      now: TIME + 16_200,
+    }),
+  );
+  const successorActivation = assertPackageSuccess(invokePackage(successorCli, [
+    "run", "activate", "--run-id", successorRunId,
+    "--file", successorActivationPath, "--json",
+  ], coordinatorPath, { CODEX_THREAD_ID: coordinator.thread_id }), "RC2 successor activation");
+  assert.equal(successorActivation.package_authority.package_version, "0.9.11-rc.2");
+  const successorRuntimeCli = resolve(
+    successorActivation.runtime_authority.bundle_root,
+    "bin",
+    "codex-flow.mjs",
+  );
+  const successorPreparationPath = await jsonRequest(requests, "rc2-preparation", {
+    approved_plan_path: resolve(coordinatorPath, ".gitkeep"),
+    recipient: { host_id: "fixture-host", ...director },
+    iteration_label: "v0.9.11 RC2 successor",
+    purpose: "Cross-version successor reclamation",
+    outcome: "Admit and reclaim the RC2 successor.",
+    scope: ["Use the exact cancelled RC1 predecessor authority."],
+    acceptance_criteria: ["RC2 successor reclamation completes."],
+    constraints: [],
+    reasons: [],
+  });
+  const successorPreparation = assertPackageSuccess(invokePackage(successorCli, [
+    "assignment", "prepare", "--file", successorPreparationPath, "--json",
+  ], coordinatorPath, { CODEX_THREAD_ID: director.thread_id }), "RC2 assignment preparation");
+  const successorRoutePath = await jsonRequest(requests, "rc2-route", {
+    run_id: successorRunId,
+    sender_thread_id: coordinator.thread_id,
+    preparation_id: successorPreparation.preparation.preparation_id,
+  });
+  const successor = assertPackageSuccess(invokePackage(successorRuntimeCli, [
+    "report", "route", "coordinator", "--run-id", successorRunId,
+    "--file", successorRoutePath, "--json",
+  ], coordinatorPath, { CODEX_THREAD_ID: coordinator.thread_id }), "RC2 successor admission");
+  const successorAssignment = await assignmentAuthority({
+    stateRoot: successor.state_root,
+    assignmentId: successor.route.assignment.assignment_id,
+  });
+  assert.equal(successorAssignment.execution_bindings[0].namespace, "v0.9.11-rc.2");
+  const report = await acceptedFinal(
+    successor,
+    "v0911-cross-version-successor-final",
+    "RC2 successor complete.",
+    16_240,
+  );
+  const activeObservationAt = Date.now();
+  const pendingPath = await jsonRequest(requests, "rc2-accept-pending", {
+    assignment_id: successorAssignment.assignment_id,
+    report_id: report.report_id,
+    task_observation: activeTaskObservation(coordinator.thread_id, activeObservationAt),
+  });
+  const pending = assertPackageSuccess(invokePackage(successorRuntimeCli, [
+    "assignment", "accept", "--assignment-id", successorAssignment.assignment_id,
+    "--file", pendingPath, "--json",
+  ], primaryRoot, { CODEX_THREAD_ID: director.thread_id }), "RC2 pending closeout");
+  assert.equal(pending.status, "closeout-pending");
+  const retiredPath = await jsonRequest(requests, "rc2-accept-retired", {
+    assignment_id: successorAssignment.assignment_id,
+    report_id: report.report_id,
+    task_observation: archivedTaskObservation(coordinator.thread_id, activeObservationAt + 1),
+    host_result: hostResult(pending.closeout.host_request, "accepted"),
+  });
+  const retired = assertPackageSuccess(invokePackage(successorRuntimeCli, [
+    "assignment", "accept", "--assignment-id", successorAssignment.assignment_id,
+    "--file", retiredPath, "--json",
+  ], primaryRoot, { CODEX_THREAD_ID: director.thread_id }), "RC2 successor reclamation");
+  assert.equal(retired.status, "retired");
+  assert.doesNotMatch(git(primaryRoot, ["worktree", "list", "--porcelain"]), new RegExp(
+    coordinatorPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+  ));
 });
 
 for (const [label, successorOptions] of [

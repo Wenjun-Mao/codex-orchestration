@@ -5,6 +5,9 @@ decision records remain the detailed release evidence.
 
 ## 0.9.11 - 2026-09-09
 
+- Rebind one cancelled coordinator's disposable worktree to an exact settled
+  successor at both admission and reclamation, with repository-global mutation
+  locking and authenticated report-locator retirement.
 - Admit completed, passing coordinator work as a first-class dependency
   authority only when its exact result is contained in the dependent task's
   authoritative baseline.
