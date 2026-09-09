@@ -55,26 +55,30 @@ function workflowTask(suffix, overrides = {}) {
 
 export async function createActiveTaskLaunch(root, suffix, {
   task = {},
+  predecessorTask = null,
+  beforeTaskContract = null,
   taskTitle = null,
   executorBranch = `codex/lifecycle-v09-${suffix}`,
   executorPath = resolve(root, `../${basename(root)}-${suffix}-executor`),
   startingBranch = git(root, ["branch", "--show-current"]),
   reconcileCreation = true,
+  baseTime = BASE_TIME,
 } = {}) {
   const commonDir = await realpath(git(root, ["rev-parse", "--path-format=absolute", "--git-common-dir"]));
   const stateRoot = resolve(commonDir, "codex-flow", RUNTIME_DIRECTORY);
-  const baseline = git(root, ["rev-parse", "HEAD"]);
+  let baseline = git(root, ["rev-parse", "HEAD"]);
   const coordinator = {
     lineage_id: `lifecycle-lineage-${suffix}`,
     thread_id: `lifecycle-coordinator-${suffix}`,
     generation: 1,
   };
+  const visibleTask = workflowTask(suffix, task);
   const plan = createWorkflowPlanRevision({
     schema_version: 1,
     plan_id: `lifecycle-plan-${suffix}`,
     revision: 1,
     parent_revision_digest: null,
-    tasks: [workflowTask(suffix, task)],
+    tasks: predecessorTask === null ? [visibleTask] : [predecessorTask, visibleTask],
   });
   const runId = `lifecycle-run-${suffix}`;
   const activated = await activateFixtureRun({
@@ -83,7 +87,7 @@ export async function createActiveTaskLaunch(root, suffix, {
     plan,
     branchFences: [executorBranch],
     lineage: coordinator,
-    now: BASE_TIME - 3_000,
+    now: baseTime - 3_000,
   });
   await bindRecipient({
     stateRoot,
@@ -95,16 +99,29 @@ export async function createActiveTaskLaunch(root, suffix, {
     runId,
     planId: plan.plan_id,
     planRevision: plan,
-    now: BASE_TIME - 2_000,
+    now: baseTime - 2_000,
   });
+  let dependencyAuthorities = [];
+  if (beforeTaskContract !== null) {
+    dependencyAuthorities = await beforeTaskContract({
+      root,
+      stateRoot,
+      runId,
+      plan,
+      coordinator,
+      baseline,
+      baseTime,
+    });
+    baseline = git(root, ["rev-parse", "HEAD"]);
+  }
   const contract = await persistWorkflowTaskContract({
     stateRoot,
     runId,
     planId: plan.plan_id,
-    taskId: plan.tasks[0].task_id,
+    taskId: visibleTask.task_id,
     currentBaseline: { revision: baseline },
-    dependencyAuthorities: [],
-    now: BASE_TIME - 1_000,
+    dependencyAuthorities,
+    now: baseTime - 1_000,
   });
   const requestedSelectors = {
     project_id: `lifecycle-project-${suffix}`,
@@ -123,14 +140,14 @@ export async function createActiveTaskLaunch(root, suffix, {
     taskContract: contract,
     requestedSelectors,
     taskTitle,
-    now: BASE_TIME,
+    now: baseTime,
   });
   const attempted = await recordTaskLaunchAttempt({
     stateRoot,
     launchId: prepared.launch_id,
     hostSessionId: `lifecycle-session-${suffix}`,
     timeoutSeconds: 300,
-    now: BASE_TIME + 1_000,
+    now: baseTime + 1_000,
   });
   git(root, ["worktree", "add", "--quiet", "--detach", executorPath, baseline]);
   const executorThreadId = `lifecycle-executor-${suffix}`;
@@ -140,7 +157,7 @@ export async function createActiveTaskLaunch(root, suffix, {
     launchNonce: prepared.launch_nonce,
     executorThreadId,
     repositoryPath: executorPath,
-    now: BASE_TIME + 2_000,
+    now: baseTime + 2_000,
   });
   const launch = reconcileCreation
     ? await reconcileTaskLaunch({
@@ -154,12 +171,12 @@ export async function createActiveTaskLaunch(root, suffix, {
           project_id: requestedSelectors.project_id,
           model: requestedSelectors.model,
           reasoning_effort: requestedSelectors.reasoning_effort,
-          observed_at: new Date(BASE_TIME + 2_500).toISOString(),
+          observed_at: new Date(baseTime + 2_500).toISOString(),
         },
         observed: null,
       },
-      observedAt: new Date(BASE_TIME + 2_500).toISOString(),
-      now: BASE_TIME + 2_500,
+      observedAt: new Date(baseTime + 2_500).toISOString(),
+      now: baseTime + 2_500,
     })
     : started;
   return {

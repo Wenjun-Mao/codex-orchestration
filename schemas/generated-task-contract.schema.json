@@ -34,7 +34,7 @@
         "required": ["task_id", "authority_kind", "authority_id", "authority_digest", "result_digest"],
         "properties": {
           "task_id": { "$ref": "#/$defs/safeId" },
-          "authority_kind": { "enum": ["task-disposition", "subagent-operation"] },
+          "authority_kind": { "enum": ["coordinator-work", "task-disposition", "subagent-operation"] },
           "authority_id": { "$ref": "#/$defs/safeId" },
           "authority_digest": { "$ref": "#/$defs/digest" },
           "result_digest": { "$ref": "#/$defs/digest" }

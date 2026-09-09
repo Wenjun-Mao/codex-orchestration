@@ -220,7 +220,7 @@ test("generated contracts bind run, runtime, repository, coordinator, and durabl
       dependency_records: [{ task_id: "research", disposition: "accepted", result_digest: "4".repeat(64) }],
       authority: authority(),
     }),
-    /durable task disposition or subagent operation/,
+    /durable completed workflow authority/,
   );
   assert.throws(
     () => contractFor(plan, "implementation", [{ ...acceptedDisposition(plan), state: "finalized" }]),

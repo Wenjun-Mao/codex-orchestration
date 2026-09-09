@@ -3,6 +3,21 @@
 This file records concise user-facing changes. Immutable tags and the linked
 decision records remain the detailed release evidence.
 
+## 0.9.11 - 2026-09-09
+
+- Admit completed, passing coordinator work as a first-class dependency
+  authority only when its exact result is contained in the dependent task's
+  authoritative baseline.
+- Reconcile interrupted coordinator start and completion writes without
+  replacing timestamps or rerunning completed checks, while rejecting branch,
+  baseline, repository, and result-inclusion conflicts.
+- Choose assignment acceptance and cancellation atomically under assignment
+  authority so concurrent terminal transitions cannot split reporting,
+  iteration, or cleanup state.
+- Audit the unique lawful maximal terminal Git fact across local and integrated
+  work, rejecting stale rollback matches, divergent maxima, and unverified
+  checkout advances.
+
 ## 0.9.10 - 2026-09-08
 
 - Accept the updater's bounded manifest-only Codex cachebuster at installed

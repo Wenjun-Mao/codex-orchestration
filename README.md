@@ -275,6 +275,7 @@ same-coordinator App canary described in
 - [ADR 0043: native-first modular architecture](docs/adr/0043-native-first-modular-architecture.md)
 - [ADR 0052: MIT source license](docs/adr/0052-mit-source-license.md)
 - [ADR 0053: consolidated release candidates](docs/adr/0053-consolidated-release-candidates.md)
+- [ADR 0066: lifecycle transition authority and replay](docs/adr/0066-lifecycle-transition-authority-and-replay.md)
 
 Historical tags and ADRs remain evidence. Historical executable compatibility
 is not part of the current package unless listed in the finite compatibility

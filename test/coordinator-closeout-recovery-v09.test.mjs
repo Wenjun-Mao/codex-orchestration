@@ -31,6 +31,7 @@ import { registerCoordinatorReportRoute } from "../lib/report-routes.mjs";
 import { bindRecipient } from "../lib/recipients.mjs";
 import { recipientBindingDigest } from "../lib/task-results.mjs";
 import { RUNTIME_DIRECTORY } from "../lib/runtime-context.mjs";
+import { auditRunClosure } from "../lib/run-audit.mjs";
 import { closeRun } from "../lib/run-lifecycle.mjs";
 import { createWorkflowPlanRevision } from "../lib/workflow-plan.mjs";
 import {
@@ -159,7 +160,36 @@ function freshActivationRequest({ runId, coordinator }) {
   };
 }
 
-async function currentRecoveryFixture(t, { wrongInitialBinding = false } = {}) {
+async function captureAcceptedCoordinatorReport(fixture, {
+  turnId = "current-recovery-final",
+  now = TIME + 2_000,
+} = {}) {
+  const report = await captureReport({
+    stateRoot: fixture.registration.state_root,
+    routeId: fixture.registration.route.route_id,
+    source: {
+      host_id: "fixture-host",
+      thread_id: fixture.coordinator.thread_id,
+      turn_id: turnId,
+      output_kind: "final-assistant-output",
+    },
+    finalText: "The current coordinator result is ready for director acceptance.",
+    now,
+  });
+  await beginReportSubmission({
+    stateRoot: fixture.registration.state_root,
+    reportId: report.report.report_id,
+    now: now + 1,
+  });
+  return (await acceptReportSubmission({
+    stateRoot: fixture.registration.state_root,
+    reportId: report.report.report_id,
+    clientMessageId: `current-recovery-queue-${turnId}`,
+    now: now + 2,
+  })).report;
+}
+
+async function currentRecoveryFixture(t, { wrongInitialBinding = false, captureReportNow = true } = {}) {
   const primary = await createGitFixture("codex-flow-v099-current-recovery-");
   const coordinatorPath = resolve(primary, `../${basename(primary)}-coordinator`);
   const coordinatorBranch = "codex/v099-current-recovery";
@@ -206,35 +236,12 @@ async function currentRecoveryFixture(t, { wrongInitialBinding = false } = {}) {
     repositoryBranch: wrongInitialBinding ? "main" : coordinatorBranch,
     now: TIME + 1_000,
   });
-  const report = await captureReport({
-    stateRoot: registration.state_root,
-    routeId: registration.route.route_id,
-    source: {
-      host_id: "fixture-host",
-      thread_id: coordinator.thread_id,
-      turn_id: "current-recovery-final",
-      output_kind: "final-assistant-output",
-    },
-    finalText: "The current coordinator result is ready for director acceptance.",
-    now: TIME + 2_000,
-  });
-  await beginReportSubmission({
-    stateRoot: registration.state_root,
-    reportId: report.report.report_id,
-    now: TIME + 2_001,
-  });
-  const acceptedReport = await acceptReportSubmission({
-    stateRoot: registration.state_root,
-    reportId: report.report.report_id,
-    clientMessageId: "current-recovery-queue",
-    now: TIME + 2_002,
-  });
   const gitDir = git(coordinatorPath, ["rev-parse", "--path-format=absolute", "--git-dir"]);
   await writeFile(resolve(gitDir, "codex-thread.json"), `${JSON.stringify({
     version: 1,
     ownerThreadId: coordinator.thread_id,
   })}\n`, "utf8");
-  return {
+  const fixture = {
     primary,
     commonDir,
     coordinatorPath,
@@ -244,8 +251,11 @@ async function currentRecoveryFixture(t, { wrongInitialBinding = false } = {}) {
     plan,
     activation,
     registration,
-    report: acceptedReport.report,
     requests,
+  };
+  return {
+    ...fixture,
+    report: captureReportNow ? await captureAcceptedCoordinatorReport(fixture) : null,
   };
 }
 
@@ -293,6 +303,97 @@ async function completeExactCoordinatorWork(fixture) {
     else process.env.CODEX_THREAD_ID = previousThread;
   }
 }
+
+test("local-only coordinator delivery closes and admits the next assignment", async (t) => {
+  const fixture = await currentRecoveryFixture(t, { captureReportNow: false });
+  const stateRoot = resolve(fixture.commonDir, "codex-flow", RUNTIME_DIRECTORY);
+  await bindRecipient({
+    stateRoot,
+    recipient: fixture.coordinator,
+    fenceToken: fixture.activation.run.binding.fence_token,
+  });
+  const completed = await completeExactCoordinatorWork(fixture);
+  const audit = await auditRunClosure({
+    stateRoot,
+    runId: fixture.activation.run.run_id,
+  });
+  assert.equal(audit.audit.terminal_ready, true, JSON.stringify(audit.audit.blockers));
+  await closeRun({
+    gitCommonDirectory: fixture.commonDir,
+    runId: fixture.activation.run.run_id,
+    resume: fixture.activation.run.binding,
+    closedAt: new Date(TIME + 3_000).toISOString(),
+  });
+  const report = await captureAcceptedCoordinatorReport(fixture, {
+    turnId: "local-only-complete",
+    now: TIME + 3_100,
+  });
+  const pending = await acceptAssignmentResult({
+    stateRoot: fixture.registration.state_root,
+    assignmentId: fixture.registration.route.assignment.assignment_id,
+    reportId: report.report_id,
+    directorThreadId: fixture.director.thread_id,
+    taskObservation: activeObservation(fixture.coordinator.thread_id, TIME + 3_200),
+    retireLocator: async () => ({ status: "retired" }),
+    now: TIME + 3_200,
+  });
+  assert.equal(pending.status, "closeout-pending");
+  const retired = await acceptAssignmentResult({
+    stateRoot: fixture.registration.state_root,
+    assignmentId: fixture.registration.route.assignment.assignment_id,
+    reportId: report.report_id,
+    directorThreadId: fixture.director.thread_id,
+    taskObservation: archivedObservation(fixture.coordinator.thread_id, TIME + 3_300),
+    hostResult: {
+      attempt_id: pending.closeout.host_request.attempt_id,
+      thread_id: fixture.coordinator.thread_id,
+      outcome: "accepted",
+    },
+    retireLocator: async () => ({ status: "retired" }),
+    now: TIME + 3_300,
+  });
+  assert.equal(retired.status, "retired");
+  assert.equal(retired.assignment.acceptance.report_id, report.report_id);
+  assert.equal(git(fixture.primary, ["rev-parse", "HEAD"]), completed.result.final_revision);
+  assert.equal(git(fixture.primary, ["branch", "--list", fixture.coordinatorBranch]), "");
+
+  await rm(resolve(fixture.primary, "current-recovery-plan.md"));
+  const successor = {
+    lineage_id: "local-only-successor-lineage",
+    thread_id: "local-only-successor-thread",
+    generation: 1,
+  };
+  const successorPlan = recoveryPlan("local-only-successor");
+  const activated = await activateFixtureRun({
+    root: fixture.primary,
+    runId: "local-only-successor-run",
+    plan: successorPlan,
+    lineage: successor,
+    now: TIME + 4_000,
+  });
+  await bindRecipient({ stateRoot, recipient: fixture.director });
+  const successorPlanPath = resolve(fixture.primary, "local-only-successor-plan.md");
+  await writeFile(successorPlanPath, "# local-only successor\n", "utf8");
+  const registration = await registerCoordinatorReportRoute({
+    stateRoot,
+    runId: activated.run.run_id,
+    senderThreadId: successor.thread_id,
+    senderHostId: "fixture-host",
+    recipient: {
+      host_id: "fixture-host",
+      ...fixture.director,
+      binding_digest: recipientBindingDigest(fixture.director),
+    },
+    approvedPlanPath: successorPlanPath,
+    approvedPlanDigest: sha256(await readFile(successorPlanPath)),
+    iterationLabel: "local-only successor",
+    purpose: "Prove successor admission after local-only closeout.",
+    repositoryRoot: fixture.primary,
+    repositoryBranch: "main",
+    now: TIME + 4_100,
+  });
+  assert.equal(registration.route.assignment.run_id, activated.run.run_id);
+});
 
 async function settledV097Fixture(t) {
   const primary = await createGitFixture("codex-flow-v099-closeout-recovery-");

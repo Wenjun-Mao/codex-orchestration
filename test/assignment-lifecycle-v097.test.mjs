@@ -5,6 +5,7 @@ import { homedir, tmpdir } from "node:os";
 import { basename, resolve } from "node:path";
 import test from "node:test";
 import { acceptAssignmentResult, cancelAssignmentResult } from "../lib/assignment-acceptance.mjs";
+import { completeCoordinatorWork, startCoordinatorWork } from "../lib/coordinator-work.mjs";
 import { reconcileTaskArchive, taskArchiveForDisposition } from "../lib/archive-lifecycle.mjs";
 import { observeCodexAppPrivateArchive } from "../lib/adapters/codex-app/private-archive-observer.mjs";
 import {
@@ -51,6 +52,7 @@ import {
   reportRoute,
 } from "../lib/report-routes.mjs";
 import { bindRecipient } from "../lib/recipients.mjs";
+import { auditRunClosure } from "../lib/run-audit.mjs";
 import { abandonRun, closeRun, readRun } from "../lib/run-lifecycle.mjs";
 import { RUNTIME_DIRECTORY } from "../lib/runtime-context.mjs";
 import { recipientBindingDigest } from "../lib/task-results.mjs";
@@ -58,6 +60,7 @@ import { runCombinedVerification } from "../lib/verifications.mjs";
 import { activateFixtureRun, createGitFixture, packageRoot } from "./helpers.mjs";
 import { createActiveTaskLaunch, terminalReceiptV4 } from "./v09-lifecycle-fixture.mjs";
 import { coordinatorBindingDigest, createWorkflowPlanRevision } from "../lib/workflow-plan.mjs";
+import { persistWorkflowTaskContract } from "../lib/workflow-journal.mjs";
 
 const TIME = Date.parse("2026-09-06T15:00:00.000Z");
 
@@ -188,6 +191,35 @@ function nativeQueue() {
   };
 }
 
+function arrivalBarrier(participants) {
+  let arrived = 0;
+  let release;
+  const ready = new Promise((resolveReady) => {
+    release = resolveReady;
+  });
+  return async () => {
+    arrived += 1;
+    if (arrived === participants) release();
+    await ready;
+  };
+}
+
+function orderedAssignmentInterleave() {
+  const bothArrived = arrivalBarrier(2);
+  let releaseSecond;
+  const secondMayProceed = new Promise((resolveSecond) => {
+    releaseSecond = resolveSecond;
+  });
+  return {
+    first: bothArrived,
+    async second() {
+      await bothArrived();
+      await secondMayProceed;
+    },
+    releaseSecond,
+  };
+}
+
 
 async function acceptedFinal(context, turnId, text, offset) {
   const captured = await captureReport({
@@ -221,6 +253,7 @@ async function acceptedChildFixture(
     integrationTargetExecutor = false,
     patchEquivalentIntegration = false,
     stateNamespace = RUNTIME_DIRECTORY,
+    localPredecessor = false,
   } = {},
 ) {
   const selectedIntegrationOutcome = patchEquivalentIntegration
@@ -242,7 +275,76 @@ async function acceptedChildFixture(
     }
   }
   const taskTitle = "Executor · v0.9.7 · Assignment reporting";
-  const context = await createActiveTaskLaunch(coordinatorPath, suffix, { taskTitle });
+  const predecessorTask = localPredecessor ? {
+    task_id: `local-predecessor-${suffix}`,
+    title: `Complete local predecessor ${suffix}`,
+    execution_kind: "coordinator",
+    mode: "write",
+    model: "gpt-5.6-terra",
+    reasoning_effort: "high",
+    selector_rationale: "Terra-high is sufficient for the bounded local predecessor.",
+    fork_turns: null,
+    dependencies: [],
+    read_paths: [],
+    write_paths: [`local-predecessor/${suffix}.txt`],
+    shared_resources: [],
+    primary_outcome: "Produce the exact local input for the visible executor.",
+    causal_question: null,
+    cheapest_safe_direct_attempt: "Commit and verify the local predecessor once.",
+    instrument_role: "none",
+    supporting_follow_up: null,
+    supporting_authorization: null,
+  } : null;
+  let localWork = null;
+  const context = await createActiveTaskLaunch(coordinatorPath, suffix, {
+    taskTitle,
+    task: localPredecessor ? { dependencies: [predecessorTask.task_id] } : {},
+    predecessorTask,
+    baseTime: localPredecessor ? TIME - 5_000 : undefined,
+    beforeTaskContract: localPredecessor ? async ({
+      stateRoot,
+      runId,
+      plan,
+      coordinator,
+      baseline,
+      baseTime,
+    }) => {
+      const contract = await persistWorkflowTaskContract({
+        stateRoot,
+        runId,
+        planId: plan.plan_id,
+        taskId: predecessorTask.task_id,
+        currentBaseline: { revision: baseline },
+        dependencyAuthorities: [],
+        now: baseTime - 1_500,
+      });
+      const previousThread = process.env.CODEX_THREAD_ID;
+      process.env.CODEX_THREAD_ID = coordinator.thread_id;
+      try {
+        const started = await startCoordinatorWork({
+          stateRoot,
+          taskContract: contract,
+          repositoryPath: coordinatorPath,
+          now: baseTime - 1_250,
+        });
+        await mkdir(resolve(coordinatorPath, "local-predecessor"), { recursive: true });
+        await writeFile(resolve(coordinatorPath, `local-predecessor/${suffix}.txt`), "local input\n", "utf8");
+        git(coordinatorPath, ["add", `local-predecessor/${suffix}.txt`]);
+        git(coordinatorPath, ["commit", "--quiet", "-m", `local predecessor ${suffix}`]);
+        localWork = await completeCoordinatorWork({
+          stateRoot,
+          localWorkId: started.local_work_id,
+          repositoryPath: coordinatorPath,
+          checks: [{ check_id: "local-input", argv: [process.execPath, "-e", "process.exit(0)"] }],
+          now: baseTime - 1_000,
+        });
+      } finally {
+        if (previousThread === undefined) delete process.env.CODEX_THREAD_ID;
+        else process.env.CODEX_THREAD_ID = previousThread;
+      }
+      return [{ authority_kind: "coordinator-work", authority_id: localWork.local_work_id }];
+    } : null,
+  });
   const currentStateRoot = context.stateRoot;
   const legacyStateRoot = resolve(context.commonDir, "codex-flow", stateNamespace);
   const usesLegacyState = stateNamespace !== RUNTIME_DIRECTORY;
@@ -421,6 +523,8 @@ async function acceptedChildFixture(
     assignment,
     disposition,
     integration,
+    localWork,
+    reporting: registered,
   };
 }
 
@@ -428,7 +532,7 @@ async function closeoutAcceptedExecutor(child, { now = TIME + 12_000 } = {}) {
   const prepared = await closeoutIterationWithOwningHost({
     commonDir: child.context.commonDir,
     iterationId: child.assignment.iteration_id,
-    taskObservation: activeTaskObservation(child.context.executorThreadId),
+    taskObservation: activeTaskObservation(child.context.executorThreadId, now),
     now,
   });
   assert.equal(prepared.status, "host-action-required");
@@ -441,6 +545,154 @@ async function closeoutAcceptedExecutor(child, { now = TIME + 12_000 } = {}) {
   });
   return { prepared, closed };
 }
+
+test("mixed local and visible delivery preserves its owner through closeout and successor admission", async (t) => {
+  const child = await acceptedChildFixture(t, "mixed-connected-journey", {
+    deliveryBranch: true,
+    integrationOutcome: "ancestor",
+    localPredecessor: true,
+  });
+  assert.equal(child.localWork.state, "completed");
+  assert.equal(child.context.contract.accepted_dependencies[0].authority_kind, "coordinator-work");
+  assert.notEqual(
+    git(child.root, ["rev-parse", "main"]),
+    git(child.root, ["rev-parse", child.coordinatorBranch]),
+  );
+  const now = Date.now();
+  const executorCloseout = await closeoutAcceptedExecutor(child, { now });
+  assert.equal(executorCloseout.closed.status, "phase-complete");
+  const audit = await auditRunClosure({
+    stateRoot: child.context.stateRoot,
+    runId: child.context.launch.run_id,
+  });
+  assert.equal(audit.audit.terminal_ready, true, JSON.stringify(audit.audit.blockers));
+  const { run } = await readRun({
+    gitCommonDirectory: child.context.commonDir,
+    runId: child.context.launch.run_id,
+  });
+  await closeRun({
+    gitCommonDirectory: child.context.commonDir,
+    runId: run.run_id,
+    resume: run.binding,
+    closedAt: new Date(now + 1_000).toISOString(),
+  });
+  const report = await acceptedFinal(
+    child.reporting,
+    "mixed-connected-final",
+    "Mixed local and visible delivery complete.",
+    now + 2_000 - TIME,
+  );
+  git(child.root, ["merge", "--ff-only", "--quiet", child.coordinatorBranch]);
+  const preservedTip = git(child.root, ["rev-parse", child.coordinatorBranch]);
+  assert.equal(git(child.root, ["rev-parse", "main"]), preservedTip);
+  const pending = await acceptAssignmentResult({
+    stateRoot: child.reporting.state_root,
+    assignmentId: child.assignment.assignment_id,
+    reportId: report.report_id,
+    directorThreadId: child.assignment.recipient.thread_id,
+    taskObservation: activeTaskObservation(child.context.coordinator.thread_id, now + 3_000),
+    retireLocator: async () => ({ status: "retired" }),
+    now: now + 3_000,
+  });
+  assert.equal(pending.status, "closeout-pending");
+  const retired = await acceptAssignmentResult({
+    stateRoot: child.reporting.state_root,
+    assignmentId: child.assignment.assignment_id,
+    reportId: report.report_id,
+    directorThreadId: child.assignment.recipient.thread_id,
+    taskObservation: archivedTaskObservation(child.context.coordinator.thread_id, now + 3_100),
+    hostResult: hostResult(pending.closeout.host_request, "accepted"),
+    retireLocator: async () => ({ status: "retired" }),
+    now: now + 3_100,
+  });
+  assert.equal(retired.status, "retired");
+  assert.equal(git(child.root, ["rev-parse", "main"]), preservedTip);
+  assert.equal(git(child.root, ["branch", "--list", child.coordinatorBranch]), "");
+
+  const successorCoordinator = {
+    lineage_id: "mixed-successor-lineage",
+    thread_id: "mixed-successor-thread",
+    generation: 1,
+  };
+  const successorPlan = createWorkflowPlanRevision({
+    schema_version: 1,
+    plan_id: "mixed-successor-plan",
+    revision: 1,
+    parent_revision_digest: null,
+    tasks: [{
+      task_id: "mixed-successor-local",
+      title: "Admit the mixed-journey successor",
+      execution_kind: "coordinator",
+      mode: "read",
+      model: "gpt-5.6-terra",
+      reasoning_effort: "high",
+      selector_rationale: "The successor is one bounded coordinator admission check.",
+      fork_turns: null,
+      dependencies: [],
+      read_paths: ["lib"],
+      write_paths: [],
+      shared_resources: [],
+      primary_outcome: "Admit the successor after mixed closeout.",
+      causal_question: null,
+      cheapest_safe_direct_attempt: "Activate and register one successor assignment.",
+      instrument_role: "none",
+      supporting_follow_up: null,
+      supporting_authorization: null,
+    }],
+  });
+  const successor = await activateFixtureRun({
+    root: child.root,
+    runId: "mixed-successor-run",
+    plan: successorPlan,
+    lineage: successorCoordinator,
+    now: now + 4_000,
+  });
+  const successorStateRoot = resolve(child.context.commonDir, "codex-flow", RUNTIME_DIRECTORY);
+  await bindRecipient({
+    stateRoot: successorStateRoot,
+    recipient: {
+      lineage_id: child.assignment.recipient.lineage_id,
+      thread_id: child.assignment.recipient.thread_id,
+      generation: child.assignment.recipient.generation,
+    },
+  });
+  const successorPlanPath = resolve(child.root, "mixed-successor-plan.md");
+  await writeFile(successorPlanPath, "# mixed successor\n", "utf8");
+  const registration = await registerCoordinatorReportRoute({
+    stateRoot: successorStateRoot,
+    runId: successor.run.run_id,
+    senderThreadId: successorCoordinator.thread_id,
+    senderHostId: "fixture-host",
+    recipient: child.assignment.recipient,
+    approvedPlanPath: successorPlanPath,
+    approvedPlanDigest: sha256(await readFile(successorPlanPath)),
+    iterationLabel: "mixed successor",
+    purpose: "Prove successor admission after mixed closeout.",
+    repositoryRoot: child.root,
+    repositoryBranch: "main",
+    now: now + 4_100,
+  });
+  assert.equal(registration.route.assignment.run_id, successor.run.run_id);
+});
+
+test("run audit rejects rollback to an older local fact after a later integrated result", async (t) => {
+  const child = await acceptedChildFixture(t, "mixed-stale-terminal-fact", {
+    deliveryBranch: true,
+    integrationOutcome: "ancestor",
+    localPredecessor: true,
+  });
+  const integratedTip = git(child.coordinatorPath, ["rev-parse", "HEAD"]);
+  assert.notEqual(integratedTip, child.localWork.result.final_revision);
+  await closeoutAcceptedExecutor(child, { now: Date.now() });
+  git(child.coordinatorPath, ["reset", "--hard", child.localWork.result.final_revision]);
+  const audit = await auditRunClosure({
+    stateRoot: child.context.stateRoot,
+    runId: child.context.launch.run_id,
+  });
+  assert.equal(audit.audit.terminal_ready, false);
+  assert.equal(audit.audit.blockers.some((blocker) => blocker.code === "repository-drift"), true);
+  assert.equal(audit.audit.repository.expected_head_revision, integratedTip);
+});
 
 test("assignment reporting survives normal run close and removal of its execution namespace", async (t) => {
   const context = await fixture(t);
@@ -694,6 +946,144 @@ test("assignment acceptance is fail-closed for an active coordinator and resumes
     retireLocator: async () => ({ status: "retired" }),
   });
   assert.equal(replay.status, "already-retired");
+});
+
+test("concurrent assignment acceptance selects one report inside the lock", async (t) => {
+  const context = await fixture(t);
+  const firstReport = await acceptedFinal(context, "concurrent-first", "First complete result.", 1_000);
+  const secondReport = await acceptedFinal(context, "concurrent-second", "Second complete result.", 1_100);
+  const interleave = orderedAssignmentInterleave();
+  const request = (report, now, beforeAcceptanceUpdate) => acceptAssignmentResult({
+    stateRoot: context.state_root,
+    assignmentId: context.route.assignment.assignment_id,
+    reportId: report.report_id,
+    directorThreadId: context.director.thread_id,
+    taskObservation: activeTaskObservation(context.coordinator.thread_id),
+    retireLocator: async () => ({ status: "retired" }),
+    beforeAcceptanceUpdate,
+    now,
+  });
+  const first = request(firstReport, TIME + 2_000, interleave.first);
+  const second = request(secondReport, TIME + 3_000, interleave.second);
+  const accepted = await first;
+  assert.equal(accepted.status, "closeout-pending");
+  interleave.releaseSecond();
+  await assert.rejects(second, /different report/);
+  const assignment = await assignmentAuthority({
+    stateRoot: context.state_root,
+    assignmentId: context.route.assignment.assignment_id,
+  });
+  const acceptedAt = assignment.acceptance.accepted_at;
+  const replay = await acceptAssignmentResult({
+    stateRoot: context.state_root,
+    assignmentId: context.route.assignment.assignment_id,
+    reportId: firstReport.report_id,
+    directorThreadId: context.director.thread_id,
+    taskObservation: activeTaskObservation(context.coordinator.thread_id, TIME + 4_000),
+    retireLocator: async () => ({ status: "retired" }),
+    now: TIME + 4_000,
+  });
+  assert.equal(replay.status, "closeout-pending");
+  assert.equal(replay.assignment.acceptance.accepted_at, acceptedAt);
+});
+
+test("concurrent acceptance and cancellation cannot split assignment and reporting state", async (t) => {
+  const context = await fixture(t);
+  const report = await acceptedFinal(context, "accept-cancel-race", "Terminal result.", 1_000);
+  const { run } = await readRun({
+    gitCommonDirectory: context.commonDir,
+    runId: context.launch.run_id,
+  });
+  await abandonRun({
+    gitCommonDirectory: context.commonDir,
+    runId: run.run_id,
+    resume: run.binding,
+    reason: "Exercise the terminal acceptance and cancellation race.",
+    abandonedAt: new Date(TIME + 1_500).toISOString(),
+  });
+  const interleave = orderedAssignmentInterleave();
+  const acceptance = acceptAssignmentResult({
+      stateRoot: context.state_root,
+      assignmentId: context.route.assignment.assignment_id,
+      reportId: report.report_id,
+      directorThreadId: context.director.thread_id,
+      taskObservation: activeTaskObservation(context.coordinator.thread_id),
+      retireLocator: async () => ({ status: "retired" }),
+      beforeAcceptanceUpdate: interleave.second,
+      now: TIME + 2_000,
+    });
+  const cancellation = cancelAssignmentResult({
+      stateRoot: context.state_root,
+      assignmentId: context.route.assignment.assignment_id,
+      directorThreadId: context.director.thread_id,
+      reason: "Exercise the terminal acceptance and cancellation race.",
+      retireLocator: async () => ({ status: "retired" }),
+      beforeCancellationUpdate: interleave.first,
+      now: TIME + 3_000,
+    });
+  const cancelled = await cancellation;
+  assert.equal(cancelled.status, "cancelled");
+  interleave.releaseSecond();
+  await assert.rejects(acceptance, /Cancelled assignment cannot be accepted/);
+  const assignment = await assignmentAuthority({
+    stateRoot: context.state_root,
+    assignmentId: context.route.assignment.assignment_id,
+  });
+  const route = await reportRoute({ stateRoot: context.state_root, routeId: context.route.route_id });
+  const iteration = await iterationStatus({
+    commonDir: context.commonDir,
+    iterationId: assignment.iteration_id,
+  });
+  assert.equal(assignment.state, "cancelled");
+  assert.equal(route.state, "closed");
+  assert.equal(iteration.state, "cancelled");
+});
+
+test("accepted assignment wins the inverse cancellation interleave without cleanup", async (t) => {
+  const context = await fixture(t);
+  const report = await acceptedFinal(context, "accept-cancel-inverse", "Terminal result.", 1_000);
+  const { run } = await readRun({
+    gitCommonDirectory: context.commonDir,
+    runId: context.launch.run_id,
+  });
+  await abandonRun({
+    gitCommonDirectory: context.commonDir,
+    runId: run.run_id,
+    resume: run.binding,
+    reason: "Exercise the inverse terminal acceptance and cancellation race.",
+    abandonedAt: new Date(TIME + 1_500).toISOString(),
+  });
+  const interleave = orderedAssignmentInterleave();
+  const acceptance = acceptAssignmentResult({
+    stateRoot: context.state_root,
+    assignmentId: context.route.assignment.assignment_id,
+    reportId: report.report_id,
+    directorThreadId: context.director.thread_id,
+    taskObservation: activeTaskObservation(context.coordinator.thread_id),
+    retireLocator: async () => ({ status: "retired" }),
+    beforeAcceptanceUpdate: interleave.first,
+    now: TIME + 2_000,
+  });
+  const cancellation = cancelAssignmentResult({
+    stateRoot: context.state_root,
+    assignmentId: context.route.assignment.assignment_id,
+    directorThreadId: context.director.thread_id,
+    reason: "Exercise the inverse terminal acceptance and cancellation race.",
+    retireLocator: async () => ({ status: "retired" }),
+    beforeCancellationUpdate: interleave.second,
+    now: TIME + 3_000,
+  });
+  const accepted = await acceptance;
+  assert.equal(accepted.status, "closeout-pending");
+  interleave.releaseSecond();
+  await assert.rejects(cancellation, /Assignment terminal state changed during cancellation/);
+  const assignment = await assignmentAuthority({
+    stateRoot: context.state_root,
+    assignmentId: context.route.assignment.assignment_id,
+  });
+  const route = await reportRoute({ stateRoot: context.state_root, routeId: context.route.route_id });
+  assert.equal(assignment.state, "accepted");
+  assert.equal(route.state, "active");
 });
 
 test("assignment cancellation proves terminal ownership, retires reporting, and preserves coordinator resources", async (t) => {
