@@ -9,9 +9,11 @@ import { completeCoordinatorWork, startCoordinatorWork } from "../lib/coordinato
 import { reconcileTaskArchive, taskArchiveForDisposition } from "../lib/archive-lifecycle.mjs";
 import { observeCodexAppPrivateArchive } from "../lib/adapters/codex-app/private-archive-observer.mjs";
 import {
+  assignmentIdFor,
   assignmentAuthority,
   assignmentStateRoot,
   bindAssignmentRefreshExecution,
+  createAssignmentAuthority,
   openAssignmentForSender,
 } from "../lib/assignment-authority.mjs";
 import {
@@ -1381,6 +1383,16 @@ test("a cancelled coordinator can be rebound to a successor assignment and recla
   assert.equal(cancelled.status, "cancelled");
   assert.equal(cancelled.iteration.iteration.state, "cancelled");
 
+  await writeFile(
+    resolve(predecessor.coordinatorPath, "successor-baseline.txt"),
+    "lawful retained coordinator advance\n",
+    "utf8",
+  );
+  git(predecessor.coordinatorPath, ["add", "successor-baseline.txt"]);
+  git(predecessor.coordinatorPath, [
+    "commit", "-m", "Advance retained coordinator before successor",
+  ]);
+
   const successorPlan = createWorkflowPlanRevision({
     schema_version: 1,
     plan_id: "successor-assignment-plan",
@@ -1408,7 +1420,7 @@ test("a cancelled coordinator can be rebound to a successor assignment and recla
     }],
   });
   const successorRunId = "successor-assignment-run";
-  await activateFixtureRun({
+  const successorActivation = await activateFixtureRun({
     root: predecessor.coordinatorPath,
     runId: successorRunId,
     plan: successorPlan,
@@ -1420,6 +1432,84 @@ test("a cancelled coordinator can be rebound to a successor assignment and recla
     },
     now: TIME + 15_700,
   });
+  const successorPlanDigest = sha256("fixture\n");
+  const successorSender = {
+    host_id: "fixture-host",
+    thread_id: predecessor.coordinator.thread_id,
+  };
+  const successorRecipient = {
+    host_id: "fixture-host",
+    ...predecessor.director,
+    binding_digest: recipientBindingDigest(predecessor.director),
+  };
+  const successorExecutionBinding = {
+    run_id: successorRunId,
+    runtime_context_digest: successorActivation.authority.runtime_context_digest,
+    configuration_digest: successorActivation.authority.configuration_digest,
+    repository_digest: successorActivation.authority.repository_id,
+    repository_root: predecessor.coordinatorPath,
+    repository_branch: predecessor.coordinatorBranch,
+    plan_id: successorPlan.plan_id,
+    revision_digest: successorPlan.revision_digest,
+    namespace: basename(resolve(predecessor.stateRoot)),
+    bound_at: new Date(TIME + 15_800).toISOString(),
+  };
+  const successorAssignmentSeed = {
+    common_dir: predecessor.commonDir,
+    repository_digest: successorActivation.authority.repository_id,
+    approved_plan: {
+      digest: successorPlanDigest,
+      snapshot_path: resolve(
+        assignmentStateRoot(predecessor.commonDir),
+        "plans",
+        `${successorPlanDigest}.md`,
+      ),
+    },
+    sender: successorSender,
+    recipient: successorRecipient,
+    execution_bindings: [successorExecutionBinding],
+  };
+  const expectedSuccessorAssignmentId = assignmentIdFor(successorAssignmentSeed);
+  const successorAssignmentDraft = {
+    kind: "coordinator-delegation",
+    assignment_id: expectedSuccessorAssignmentId,
+    run_id: successorRunId,
+    runtime_context_digest: successorActivation.authority.runtime_context_digest,
+    configuration_digest: successorActivation.authority.configuration_digest,
+    repository_digest: successorActivation.authority.repository_id,
+    common_dir: predecessor.commonDir,
+    plan_id: successorPlan.plan_id,
+    revision_digest: successorPlan.revision_digest,
+    approved_plan_path: successorAssignmentSeed.approved_plan.snapshot_path,
+    approved_plan_digest: successorPlanDigest,
+  };
+  const expectedSuccessorRouteId = `report-route-v1-${sha256(stableStringify({
+    assignment: successorAssignmentDraft,
+    sender: successorSender,
+    recipient: successorRecipient,
+  }))}`;
+  const partialSuccessor = await createAssignmentAuthority({
+    commonDir: predecessor.commonDir,
+    routeId: expectedSuccessorRouteId,
+    repositoryDigest: successorActivation.authority.repository_id,
+    approvedPlanPath: resolve(predecessor.coordinatorPath, ".gitkeep"),
+    approvedPlanDigest: successorPlanDigest,
+    sender: successorSender,
+    recipient: successorRecipient,
+    executionBinding: successorExecutionBinding,
+    iterationLabel: "v0.9.7-successor",
+    purpose: "Successor assignment reporting",
+    expectedAssignmentId: expectedSuccessorAssignmentId,
+    now: TIME + 15_800,
+  });
+  assert.equal(partialSuccessor.status, "created");
+  await assert.rejects(
+    iterationStatus({
+      commonDir: predecessor.commonDir,
+      iterationId: partialSuccessor.assignment.iteration_id,
+    }),
+    /ENOENT/,
+  );
   const successor = await registerCoordinatorReportRoute({
     stateRoot: predecessor.stateRoot,
     runId: successorRunId,
@@ -1436,12 +1526,24 @@ test("a cancelled coordinator can be rebound to a successor assignment and recla
     purpose: "Successor assignment reporting",
     repositoryRoot: predecessor.coordinatorPath,
     repositoryBranch: predecessor.coordinatorBranch,
-    now: TIME + 15_800,
+    now: TIME + 15_900,
   });
+  assert.equal(successor.status, "registered");
+  assert.equal(successor.route.assignment.assignment_id, expectedSuccessorAssignmentId);
   const successorAssignment = await assignmentAuthority({
     stateRoot: successor.state_root,
     assignmentId: successor.route.assignment.assignment_id,
   });
+  assert.equal(
+    successorAssignment.created_at,
+    new Date(TIME + 15_800).toISOString(),
+    "route replay must preserve the assignment-only record's original creation time",
+  );
+  assert.notEqual(
+    successorAssignment.repository_digest,
+    cancelled.assignment.repository_digest,
+    "the successor must exercise a different revision-bearing repository digest",
+  );
   await assert.rejects(
     registerExecutorIterationMember({
       assignment: successorAssignment,
@@ -1473,6 +1575,7 @@ test("a cancelled coordinator can be rebound to a successor assignment and recla
     packageRoot,
     nativeQueue: nativeQueue(),
   });
+  git(predecessor.primaryRoot, ["merge", "--ff-only", predecessor.coordinatorBranch]);
   const retireSuccessorLocator = ({ routeId, reason, now }) => retireRepositoryReportLocator({
     stateRoot: successor.state_root,
     routeId,
@@ -1595,6 +1698,13 @@ test("frozen RC1 cancellation admits and reclaims an exact RC2 successor", async
     "workflow", "local", "start", "--run-id", predecessorRunId,
     "--file", predecessorLocalStartPath, "--json",
   ], coordinatorPath, { CODEX_THREAD_ID: coordinator.thread_id }), "frozen RC1 local work start");
+  await writeFile(
+    resolve(coordinatorPath, "cross-version-baseline.txt"),
+    "completed RC1 coordinator result\n",
+    "utf8",
+  );
+  git(coordinatorPath, ["add", "cross-version-baseline.txt"]);
+  git(coordinatorPath, ["commit", "-m", "Complete RC1 coordinator result"]);
   const predecessorLocalCompletePath = await jsonRequest(requests, "rc1-local-complete", {
     run_id: predecessorRunId,
     local_work_id: predecessorLocalWork.local_work_id,
@@ -1707,12 +1817,18 @@ test("frozen RC1 cancellation admits and reclaims an exact RC2 successor", async
     assignmentId: successor.route.assignment.assignment_id,
   });
   assert.equal(successorAssignment.execution_bindings[0].namespace, "v0.9.11-rc.2");
+  assert.notEqual(
+    successorAssignment.repository_digest,
+    cancelled.assignment.repository_digest,
+    "the RC2 successor must admit after the completed RC1 baseline advanced",
+  );
   const report = await acceptedFinal(
     successor,
     "v0911-cross-version-successor-final",
     "RC2 successor complete.",
     16_240,
   );
+  git(primaryRoot, ["merge", "--ff-only", coordinatorBranch]);
   const activeObservationAt = Date.now();
   const pendingPath = await jsonRequest(requests, "rc2-accept-pending", {
     assignment_id: successorAssignment.assignment_id,

@@ -15,6 +15,12 @@ reclamation nevertheless treated every historical same-path membership as a
 simultaneous owner, so an accepted successor could be admitted but could not
 reclaim its coordinator worktree.
 
+The run binding's `repository_digest` is not a stable repository identifier:
+it hashes the full repository snapshot, including the Git revision. A retained
+coordinator may lawfully advance its branch before the successor activates, so
+requiring that digest to remain equal rejects the exact recovery this decision
+is intended to authorize.
+
 Ignoring all cancelled iterations would remove the symptom by allowing an
 unrelated task or branch to inherit deletion authority over preserved
 resources. Recording a new transfer schema is unnecessary because the existing
@@ -28,10 +34,11 @@ and reclamation. The authenticated source checkout is protected infrastructure
 outside this exclusive set: sequential coordinator routes may use it, but
 reclamation may never delete it. A same-path historical member is a settled
 predecessor only when it is a non-retained coordinator for the exact same host,
-task, reporting parent, branch, Git common directory, repository digest, sender,
-and recipient; its iteration and assignment are both cancelled in temporal
-order; and its exact report route has authentic terminal locator-retirement
-evidence.
+task, reporting parent, worktree, branch, canonical Git common directory,
+sender, and recipient. The revision-bearing repository digest remains exact
+run evidence but is not cross-assignment repository identity. The predecessor's
+iteration and assignment must both be cancelled in temporal order, and its
+exact report route must have authentic terminal locator-retirement evidence.
 
 During successor admission, no sender locator may remain active. During
 successor reclamation, the only permitted active sender locator is the exact
@@ -55,7 +62,8 @@ Historical cancelled records remain intact and continue to protect resources
 from mismatched identities, branches, repositories, or reporting state.
 
 Real-Git lifecycle regressions cover the original cancelled-to-successor
-journey, repeated cancellation chains, wrong task and branch bindings, a
+journey with a lawful retained-branch advance between assignments, repeated
+cancellation chains, wrong task and branch bindings, a
 different worktree, active and reporting-unsettled predecessors, a competing
 post-admission executor, and concurrent registration. A public CLI journey also
 starts from the exact frozen v0.9.11-rc.1 candidate, consumes refresh into
