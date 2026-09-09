@@ -151,6 +151,115 @@ async function fixture(t, { detachedCoordinator = false } = {}) {
   return { ...context, primaryRoot, coordinatorPath, coordinatorBranch, director, ...registered };
 }
 
+function successorAssignmentPlan(suffix) {
+  return createWorkflowPlanRevision({
+    schema_version: 1,
+    plan_id: `successor-assignment-plan-${suffix}`,
+    revision: 1,
+    parent_revision_digest: null,
+    tasks: [{
+      task_id: `successor-assignment-task-${suffix}`,
+      title: "Coordinate the successor assignment",
+      execution_kind: "coordinator",
+      mode: "write",
+      model: "gpt-5.6-terra",
+      reasoning_effort: "high",
+      selector_rationale: "The fixture needs one successor on the retained coordinator checkout.",
+      fork_turns: null,
+      dependencies: [],
+      read_paths: ["lib"],
+      write_paths: [`audit-sentinel/successor-assignment-${suffix}.txt`],
+      shared_resources: [],
+      primary_outcome: "Exercise successor coordinator ownership.",
+      causal_question: null,
+      cheapest_safe_direct_attempt: "Register and accept one successor assignment.",
+      instrument_role: "none",
+      supporting_follow_up: null,
+      supporting_authorization: null,
+    }],
+  });
+}
+
+async function registerSuccessorAssignment(
+  predecessor,
+  {
+    suffix,
+    senderThreadId = predecessor.coordinator.thread_id,
+    repositoryRoot = predecessor.coordinatorPath,
+    repositoryBranch = predecessor.coordinatorBranch,
+    now,
+  },
+) {
+  const plan = successorAssignmentPlan(suffix);
+  const runId = `successor-assignment-run-${suffix}`;
+  await activateFixtureRun({
+    root: repositoryRoot,
+    runId,
+    plan,
+    branchFences: [],
+    lineage: {
+      lineage_id: `successor-lineage-${suffix}`,
+      thread_id: senderThreadId,
+      generation: 1,
+    },
+    now,
+  });
+  return registerCoordinatorReportRoute({
+    stateRoot: predecessor.stateRoot,
+    runId,
+    senderThreadId,
+    senderHostId: "fixture-host",
+    recipient: {
+      host_id: "fixture-host",
+      ...predecessor.director,
+      binding_digest: recipientBindingDigest(predecessor.director),
+    },
+    approvedPlanPath: resolve(repositoryRoot, ".gitkeep"),
+    approvedPlanDigest: sha256("fixture\n"),
+    iterationLabel: `v0.9.7-successor-${suffix}`,
+    purpose: "Successor assignment reporting",
+    repositoryRoot,
+    repositoryBranch,
+    now: now + 100,
+  });
+}
+
+async function abandonAndCancelPredecessor(predecessor, now) {
+  const { run } = await readRun({
+    gitCommonDirectory: predecessor.commonDir,
+    runId: predecessor.launch.run_id,
+  });
+  const reason = "Exercise an unsuccessful predecessor before a lawful successor assignment.";
+  await abandonRun({
+    gitCommonDirectory: predecessor.commonDir,
+    runId: run.run_id,
+    resume: run.binding,
+    reason,
+    abandonedAt: new Date(now).toISOString(),
+  });
+  await installRepositoryReportLocator({
+    stateRoot: predecessor.state_root,
+    route: predecessor.route,
+    packageRoot,
+    nativeQueue: nativeQueue(),
+  });
+  return cancelAssignmentResult({
+    stateRoot: predecessor.state_root,
+    assignmentId: predecessor.route.assignment.assignment_id,
+    directorThreadId: predecessor.director.thread_id,
+    reason,
+    retireLocator: ({ routeId, reason: retirementReason, now: retirementNow }) => (
+      retireRepositoryReportLocator({
+        stateRoot: predecessor.state_root,
+        routeId,
+        reason: retirementReason,
+        now: retirementNow,
+      })
+    ),
+    now: now + 100,
+  });
+}
+
 function activeTaskObservation(threadId, observedAt = TIME) {
   return {
     execution_kind: "task-thread",
@@ -1175,6 +1284,381 @@ test("assignment cancellation proves terminal ownership, retires reporting, and 
   await assert.rejects(
     () => cancel(child.assignment.recipient.thread_id, "A different cancellation reason must not rewrite the durable exit."),
     /does not match this exact cancellation request/,
+  );
+});
+
+test("a cancelled coordinator can be rebound to a successor assignment and reclaimed", async (t) => {
+  const predecessor = await fixture(t);
+  const { run: predecessorRun } = await readRun({
+    gitCommonDirectory: predecessor.commonDir,
+    runId: predecessor.launch.run_id,
+  });
+  await abandonRun({
+    gitCommonDirectory: predecessor.commonDir,
+    runId: predecessorRun.run_id,
+    resume: predecessorRun.binding,
+    reason: "Exercise an unsuccessful predecessor before a lawful successor assignment.",
+    abandonedAt: new Date(TIME + 15_500).toISOString(),
+  });
+  await installRepositoryReportLocator({
+    stateRoot: predecessor.state_root,
+    route: predecessor.route,
+    packageRoot,
+    nativeQueue: nativeQueue(),
+  });
+  const cancelled = await cancelAssignmentResult({
+    stateRoot: predecessor.state_root,
+    assignmentId: predecessor.route.assignment.assignment_id,
+    directorThreadId: predecessor.director.thread_id,
+    reason: "Exercise an unsuccessful predecessor before a lawful successor assignment.",
+    retireLocator: ({ routeId, reason, now }) => retireRepositoryReportLocator({
+      stateRoot: predecessor.state_root,
+      routeId,
+      reason,
+      now,
+    }),
+    now: TIME + 15_600,
+  });
+  assert.equal(cancelled.status, "cancelled");
+  assert.equal(cancelled.iteration.iteration.state, "cancelled");
+
+  const successorPlan = createWorkflowPlanRevision({
+    schema_version: 1,
+    plan_id: "successor-assignment-plan",
+    revision: 1,
+    parent_revision_digest: null,
+    tasks: [{
+      task_id: "successor-assignment-task",
+      title: "Coordinate the successor assignment",
+      execution_kind: "coordinator",
+      mode: "write",
+      model: "gpt-5.6-terra",
+      reasoning_effort: "high",
+      selector_rationale: "The fixture needs one successor on the retained coordinator checkout.",
+      fork_turns: null,
+      dependencies: [],
+      read_paths: ["lib"],
+      write_paths: ["audit-sentinel/successor-assignment.txt"],
+      shared_resources: [],
+      primary_outcome: "Exercise successor coordinator ownership.",
+      causal_question: null,
+      cheapest_safe_direct_attempt: "Register and accept one successor assignment.",
+      instrument_role: "none",
+      supporting_follow_up: null,
+      supporting_authorization: null,
+    }],
+  });
+  const successorRunId = "successor-assignment-run";
+  await activateFixtureRun({
+    root: predecessor.coordinatorPath,
+    runId: successorRunId,
+    plan: successorPlan,
+    branchFences: [],
+    lineage: {
+      lineage_id: predecessor.coordinator.lineage_id,
+      thread_id: predecessor.coordinator.thread_id,
+      generation: predecessor.coordinator.generation,
+    },
+    now: TIME + 15_700,
+  });
+  const successor = await registerCoordinatorReportRoute({
+    stateRoot: predecessor.stateRoot,
+    runId: successorRunId,
+    senderThreadId: predecessor.coordinator.thread_id,
+    senderHostId: "fixture-host",
+    recipient: {
+      host_id: "fixture-host",
+      ...predecessor.director,
+      binding_digest: recipientBindingDigest(predecessor.director),
+    },
+    approvedPlanPath: resolve(predecessor.coordinatorPath, ".gitkeep"),
+    approvedPlanDigest: sha256("fixture\n"),
+    iterationLabel: "v0.9.7-successor",
+    purpose: "Successor assignment reporting",
+    repositoryRoot: predecessor.coordinatorPath,
+    repositoryBranch: predecessor.coordinatorBranch,
+    now: TIME + 15_800,
+  });
+  const successorAssignment = await assignmentAuthority({
+    stateRoot: successor.state_root,
+    assignmentId: successor.route.assignment.assignment_id,
+  });
+  await assert.rejects(
+    registerExecutorIterationMember({
+      assignment: successorAssignment,
+      launch: {
+        launch_id: "task-launch-v1-competing-successor-owner",
+        task_title: "Executor · v0.9.7-successor · Successor assignment reporting",
+        coordinator_binding: { thread_id: predecessor.coordinator.thread_id },
+        start_claim: { executor_thread_id: "competing-successor-executor" },
+        creation_evidence: { host_id: "fixture-host" },
+        git_activation: {
+          worktree_path: predecessor.coordinatorPath,
+          executor_branch: predecessor.coordinatorBranch,
+        },
+      },
+      stateRoot: predecessor.stateRoot,
+      now: TIME + 15_850,
+    }),
+    /shared by another persisted member/,
+  );
+  const report = await acceptedFinal(
+    successor,
+    "successor-assignment-final",
+    "Successor assignment complete.",
+    15_900,
+  );
+  await installRepositoryReportLocator({
+    stateRoot: successor.state_root,
+    route: successor.route,
+    packageRoot,
+    nativeQueue: nativeQueue(),
+  });
+  const retireSuccessorLocator = ({ routeId, reason, now }) => retireRepositoryReportLocator({
+    stateRoot: successor.state_root,
+    routeId,
+    reason,
+    now,
+  });
+  const pending = await acceptAssignmentResult({
+    stateRoot: successor.state_root,
+    assignmentId: successor.route.assignment.assignment_id,
+    reportId: report.report_id,
+    directorThreadId: predecessor.director.thread_id,
+    taskObservation: activeTaskObservation(predecessor.coordinator.thread_id, TIME + 16_000),
+    retireLocator: retireSuccessorLocator,
+    now: TIME + 16_000,
+  });
+  assert.equal(pending.status, "closeout-pending");
+  const retired = await acceptAssignmentResult({
+    stateRoot: successor.state_root,
+    assignmentId: successor.route.assignment.assignment_id,
+    reportId: report.report_id,
+    directorThreadId: predecessor.director.thread_id,
+    taskObservation: archivedTaskObservation(predecessor.coordinator.thread_id, TIME + 16_100),
+    hostResult: hostResult(pending.closeout.host_request, "accepted"),
+    retireLocator: retireSuccessorLocator,
+    now: TIME + 16_100,
+  });
+  assert.equal(retired.status, "retired");
+});
+
+for (const [label, successorOptions] of [
+  ["another coordinator task", { senderThreadId: "different-coordinator-thread" }],
+  ["another branch binding", { repositoryBranch: "codex/different-coordinator-branch" }],
+]) {
+  test(`successor admission rejects a cancelled checkout claimed by ${label}`, async (t) => {
+    const predecessor = await fixture(t);
+    const cancelled = await abandonAndCancelPredecessor(predecessor, TIME + 16_200);
+    assert.equal(cancelled.status, "cancelled");
+    await assert.rejects(
+      registerSuccessorAssignment(predecessor, {
+        suffix: label.replaceAll(" ", "-"),
+        now: TIME + 16_400,
+        ...successorOptions,
+      }),
+      /shared by another persisted member/,
+    );
+  });
+}
+
+test("successor admission rejects a still-active same-worktree membership", async (t) => {
+  const predecessor = await fixture(t);
+  const { run } = await readRun({
+    gitCommonDirectory: predecessor.commonDir,
+    runId: predecessor.launch.run_id,
+  });
+  await abandonRun({
+    gitCommonDirectory: predecessor.commonDir,
+    runId: run.run_id,
+    resume: run.binding,
+    reason: "Keep the predecessor assignment active while checking successor admission.",
+    abandonedAt: new Date(TIME + 16_600).toISOString(),
+  });
+  await assert.rejects(
+    registerSuccessorAssignment(predecessor, {
+      suffix: "active-predecessor",
+      now: TIME + 16_700,
+    }),
+    /shared by another persisted member/,
+  );
+});
+
+test("successor admission does not collide with a cancelled coordinator on another worktree", async (t) => {
+  const predecessor = await fixture(t);
+  const cancelled = await abandonAndCancelPredecessor(predecessor, TIME + 16_900);
+  assert.equal(cancelled.status, "cancelled");
+  const alternatePath = resolve(
+    predecessor.primaryRoot,
+    `../${basename(predecessor.primaryRoot)}-alternate-successor`,
+  );
+  const alternateBranch = "codex/alternate-successor";
+  git(predecessor.primaryRoot, [
+    "worktree", "add", "--quiet", "-b", alternateBranch, alternatePath,
+  ]);
+  try {
+    const successor = await registerSuccessorAssignment(predecessor, {
+      suffix: "alternate-worktree",
+      repositoryRoot: alternatePath,
+      repositoryBranch: alternateBranch,
+      now: TIME + 17_100,
+    });
+    assert.equal(successor.status, "registered");
+  } finally {
+    spawnSync("git", ["worktree", "remove", "--force", alternatePath], {
+      cwd: predecessor.primaryRoot,
+      encoding: "utf8",
+    });
+  }
+});
+
+test("concurrent member registration persists at most one owner for a worktree", async (t) => {
+  const context = await fixture(t);
+  const assignment = await assignmentAuthority({
+    stateRoot: context.state_root,
+    assignmentId: context.route.assignment.assignment_id,
+  });
+  const executorPath = resolve(
+    context.primaryRoot,
+    `../${basename(context.primaryRoot)}-concurrent-executor`,
+  );
+  const executorBranch = "codex/concurrent-executor-owner";
+  git(context.primaryRoot, ["worktree", "add", "--quiet", "-b", executorBranch, executorPath]);
+  const launch = (suffix) => ({
+    launch_id: `task-launch-v1-concurrent-owner-${suffix}`,
+    task_title: "Executor · v0.9.7 · Assignment reporting",
+    coordinator_binding: { thread_id: context.coordinator.thread_id },
+    start_claim: { executor_thread_id: `concurrent-owner-${suffix}` },
+    creation_evidence: { host_id: "fixture-host" },
+    git_activation: { worktree_path: executorPath, executor_branch: executorBranch },
+  });
+  try {
+    const outcomes = await Promise.allSettled([
+      registerExecutorIterationMember({
+        assignment,
+        launch: launch("first"),
+        stateRoot: context.stateRoot,
+        now: TIME + 17_300,
+      }),
+      registerExecutorIterationMember({
+        assignment,
+        launch: launch("second"),
+        stateRoot: context.stateRoot,
+        now: TIME + 17_301,
+      }),
+    ]);
+    assert.equal(outcomes.filter((entry) => entry.status === "fulfilled").length, 1);
+    assert.equal(outcomes.filter((entry) => entry.status === "rejected").length, 1);
+    const persisted = await iterationStatus({
+      commonDir: context.commonDir,
+      iterationId: assignment.iteration_id,
+    });
+    assert.equal(
+      persisted.members.filter((entry) => entry.worktree_path === executorPath).length,
+      1,
+    );
+  } finally {
+    spawnSync("git", ["worktree", "remove", "--force", executorPath], {
+      cwd: context.primaryRoot,
+      encoding: "utf8",
+    });
+  }
+});
+
+test("repeated cancelled assignments leave one reclaimable same-owner successor", async (t) => {
+  const first = await fixture(t);
+  assert.equal((await abandonAndCancelPredecessor(first, TIME + 17_500)).status, "cancelled");
+  const second = await registerSuccessorAssignment(first, {
+    suffix: "repeated-second",
+    now: TIME + 17_700,
+  });
+  const secondContext = {
+    ...first,
+    state_root: second.state_root,
+    route: second.route,
+    launch: { run_id: second.route.assignment.run_id },
+  };
+  assert.equal((await abandonAndCancelPredecessor(secondContext, TIME + 17_900)).status, "cancelled");
+
+  const third = await registerSuccessorAssignment(first, {
+    suffix: "repeated-third",
+    now: TIME + 18_100,
+  });
+  const report = await acceptedFinal(
+    third,
+    "repeated-third-final",
+    "The third same-owner assignment completed.",
+    18_300,
+  );
+  await installRepositoryReportLocator({
+    stateRoot: third.state_root,
+    route: third.route,
+    packageRoot,
+    nativeQueue: nativeQueue(),
+  });
+  const retireLocator = ({ routeId, reason, now }) => retireRepositoryReportLocator({
+    stateRoot: third.state_root,
+    routeId,
+    reason,
+    now,
+  });
+  const pending = await acceptAssignmentResult({
+    stateRoot: third.state_root,
+    assignmentId: third.route.assignment.assignment_id,
+    reportId: report.report_id,
+    directorThreadId: first.director.thread_id,
+    taskObservation: activeTaskObservation(first.coordinator.thread_id, TIME + 18_400),
+    retireLocator,
+    now: TIME + 18_400,
+  });
+  assert.equal(pending.status, "closeout-pending");
+  const retired = await acceptAssignmentResult({
+    stateRoot: third.state_root,
+    assignmentId: third.route.assignment.assignment_id,
+    reportId: report.report_id,
+    directorThreadId: first.director.thread_id,
+    taskObservation: archivedTaskObservation(first.coordinator.thread_id, TIME + 18_500),
+    hostResult: hostResult(pending.closeout.host_request, "accepted"),
+    retireLocator,
+    now: TIME + 18_500,
+  });
+  assert.equal(retired.status, "retired");
+});
+
+test("successor admission rejects an iteration cancelled before its reporting assignment settled", async (t) => {
+  const predecessor = await fixture(t);
+  const { run } = await readRun({
+    gitCommonDirectory: predecessor.commonDir,
+    runId: predecessor.launch.run_id,
+  });
+  await abandonRun({
+    gitCommonDirectory: predecessor.commonDir,
+    runId: run.run_id,
+    resume: run.binding,
+    reason: "Leave reporting unsettled while exercising the iteration guard.",
+    abandonedAt: new Date(TIME + 16_600).toISOString(),
+  });
+  await installRepositoryReportLocator({
+    stateRoot: predecessor.state_root,
+    route: predecessor.route,
+    packageRoot,
+    nativeQueue: nativeQueue(),
+  });
+  const prematurelyCancelled = await cancelAssignmentResult({
+    stateRoot: predecessor.state_root,
+    assignmentId: predecessor.route.assignment.assignment_id,
+    directorThreadId: predecessor.director.thread_id,
+    reason: "Leave reporting unsettled while exercising the iteration guard.",
+    retireLocator: async () => ({ status: "retired" }),
+    now: TIME + 16_700,
+  });
+  assert.equal(prematurelyCancelled.status, "cancelled");
+  await assert.rejects(
+    registerSuccessorAssignment(predecessor, {
+      suffix: "unsettled-reporting",
+      now: TIME + 16_800,
+    }),
+    /shared by another persisted member/,
   );
 });
 
