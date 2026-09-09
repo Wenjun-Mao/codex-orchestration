@@ -87,7 +87,10 @@ The adapter translates current host behavior into discriminated evidence:
 - executor start identity claim;
 - linked-worktree and selector evidence;
 - bounded provisional-to-ready mapping evidence; and
-- public or private archive observations.
+- public or private archive observations; and
+- the private Codex worktree-owner record that binds a coordinator's current
+  task identity to the checkout before route registration persists cleanup
+  authority.
 
 Unknown future creation shapes become bounded opaque records. They do not
 authorize retries. An executor's exact `task launch start` claim may establish

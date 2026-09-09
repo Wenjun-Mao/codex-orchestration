@@ -13,6 +13,7 @@
     "assignment-brief.mjs": "governance-core",
     "assignment-preparation.mjs": "governance-core",
     "adapters/codex-app/archive-observation.mjs": "codex-app-adapter",
+    "adapters/codex-app/coordinator-worktree.mjs": "codex-app-adapter",
     "adapters/codex-app/host-evidence.mjs": "codex-app-adapter",
     "adapters/codex-app/private-archive-observer.mjs": "codex-app-adapter",
     "adapters/codex-app/provisional-mapping.mjs": "codex-app-adapter",

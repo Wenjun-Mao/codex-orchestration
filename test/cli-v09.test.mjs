@@ -145,7 +145,6 @@ test("v0.9 CLI activates a clean run through current launch-era wiring", async (
     result.runtime_authority.bundle_root,
     new RegExp(`${RUNTIME_DIRECTORY.replaceAll(".", "\\.")}/runtimes/`),
   );
-  const runtimeCli = resolve(result.runtime_authority.bundle_root, "bin", "codex-flow.mjs");
   await stat(resolve(result.runtime_authority.bundle_root, "package.json"));
 
   await stat(resolve(root, ".git", "codex-flow", RUNTIME_DIRECTORY, "runs", "lifecycle.json"));
@@ -187,6 +186,10 @@ test("v0.9 CLI activates a clean run through current launch-era wiring", async (
   };
   const reportRequestPath = resolve(requests, "report-route.json");
   await writeFile(reportRequestPath, `${JSON.stringify(reportRequest)}\n`, "utf8");
+  await writeFile(resolve(root, ".git", "codex-thread.json"), `${JSON.stringify({
+    version: 1,
+    ownerThreadId: coordinatorThreadId,
+  })}\n`, "utf8");
   await writeFile(preparation.approved_plan.snapshot_path, "corrupt snapshot\n", "utf8");
   const corrupted = runCli([
     "report", "route", "coordinator", "--run-id", runId, "--file", reportRequestPath, "--json",
@@ -197,13 +200,11 @@ test("v0.9 CLI activates a clean run through current launch-era wiring", async (
   assert.notEqual(corrupted.status, 0);
   assert.match(`${corrupted.stdout}\n${corrupted.stderr}`, /plan was tampered/);
   await writeFile(preparation.approved_plan.snapshot_path, savedPlan, "utf8");
-  const registered = spawnSync(process.execPath, [
-    runtimeCli,
+  const registered = runCli([
     "report", "route", "coordinator", "--run-id", runId, "--file", reportRequestPath, "--json",
   ], {
     cwd: root,
-    env: { ...process.env, CODEX_THREAD_ID: coordinatorThreadId },
-    encoding: "utf8",
+    env: { CODEX_THREAD_ID: coordinatorThreadId },
   });
   assertSuccess(registered, "coordinator report route");
   const reporting = JSON.parse(registered.stdout);

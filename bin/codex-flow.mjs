@@ -67,6 +67,7 @@ import {
 import {
   observeCodexAppArchiveEvidence,
 } from "../lib/adapters/codex-app/private-archive-observer.mjs";
+import { assertCodexAppCoordinatorWorktree } from "../lib/adapters/codex-app/coordinator-worktree.mjs";
 import { codexAppArchiveToNativeObservation } from "../lib/adapters/codex-app/archive-observation.mjs";
 import {
   callbackRecord,
@@ -177,6 +178,7 @@ import {
   closeoutIterationWithOwningHost,
   iterationTitle,
   iterationStatus,
+  reconcileCoordinatorWorktreeBinding,
   registerExecutorIterationMember,
 } from "../lib/iteration-registry.mjs";
 
@@ -201,7 +203,7 @@ Usage:
   codex-flow report route close --run-id ID --file request.json [--json]
   codex-flow assignment prepare --file request.json [--json]
   codex-flow assignment status --assignment-id ID [--json]
-  codex-flow assignment brief|accept|closeout --assignment-id ID --file request.json [--json]
+  codex-flow assignment brief|reconcile-binding|accept|closeout --assignment-id ID --file request.json [--json]
   codex-flow subagent prepare|attempt|reconcile|complete|dispose --run-id ID --file request.json [--json]
   codex-flow subagent status --run-id ID --operation-id ID [--json]
   codex-flow callback deliver|observe --run-id ID --file request.json [--json]
@@ -1255,6 +1257,11 @@ async function commandReportV09(args, mutationAuthority = null) {
       label: "Coordinator report route registration",
     });
     assertCurrentCoordinatorTask(mutationAuthority.run.binding.lineage, "report route coordinator");
+    const coordinatorWorktree = await assertCodexAppCoordinatorWorktree({
+      repositoryPath: git.root,
+      commonDir: git.commonDir,
+      coordinatorThreadId: mutationAuthority.run.binding.lineage.thread_id,
+    });
     const preparation = await assignmentPreparation({
       stateRoot: assignmentStateRoot(git.commonDir),
       preparationId: request.preparation_id,
@@ -1297,8 +1304,8 @@ async function commandReportV09(args, mutationAuthority = null) {
         approvedPlanDigest: preparation.approved_plan.digest,
         iterationLabel: preparation.iteration_label,
         purpose: preparation.purpose,
-        repositoryRoot: git.root,
-        repositoryBranch: gitSnapshot(git.root).branch,
+        repositoryRoot: coordinatorWorktree.worktree_path,
+        repositoryBranch: coordinatorWorktree.branch,
       });
       await installRepositoryReportLocator({
         stateRoot: registered.state_root,
@@ -1391,6 +1398,29 @@ async function commandAssignmentV097(args) {
     return;
   }
   const threadId = requireText(process.env.CODEX_THREAD_ID, "CODEX_THREAD_ID", { max: 256, safeId: true });
+  if (subcommand === "reconcile-binding") {
+    requireExactFields(request, {
+      required: ["assignment_id"],
+    }, "assignment binding reconciliation request");
+    if (request.assignment_id !== assignmentId) {
+      throw new CliError("assignment binding reconciliation request does not match --assignment-id", 73);
+    }
+    if (assignment.sender.thread_id !== threadId) {
+      throw new CliError("Coordinator binding reconciliation must run in the assigned coordinator task", 73);
+    }
+    const coordinatorWorktree = await assertCodexAppCoordinatorWorktree({
+      repositoryPath: git.root,
+      commonDir: git.commonDir,
+      coordinatorThreadId: assignment.sender.thread_id,
+    });
+    v09Output(await reconcileCoordinatorWorktreeBinding({
+      commonDir: git.commonDir,
+      iterationId: assignment.iteration_id,
+      coordinatorThreadId: assignment.sender.thread_id,
+      ownershipEvidence: coordinatorWorktree,
+    }));
+    return;
+  }
   const observeArchivedThread = async ({ threadId: target }) => codexAppArchiveToNativeObservation(
     await observeCodexAppArchiveEvidence({ threadId: target }),
   );
@@ -1416,7 +1446,7 @@ async function commandAssignmentV097(args) {
   if (subcommand === "accept") {
     requireExactFields(request, {
       required: ["assignment_id", "report_id"],
-      optional: ["task_observation", "host_result"],
+      optional: ["task_observation", "host_result", "coordinator_recovery"],
     }, "assignment accept request");
     if (request.assignment_id !== assignmentId) throw new CliError("assignment accept request does not match --assignment-id", 73);
     v09Output(await acceptAssignmentResult({
@@ -1426,12 +1456,13 @@ async function commandAssignmentV097(args) {
       directorThreadId: threadId,
       taskObservation: request.task_observation ?? null,
       hostResult: request.host_result ?? null,
+      coordinatorRecovery: request.coordinator_recovery ?? null,
       observeArchivedThread,
       retireLocator: ({ routeId, reason, now }) => retireRepositoryReportLocator({ stateRoot, routeId, reason, now }),
     }));
     return;
   }
-  throw new CliError("assignment requires prepare, status, brief, closeout, or accept");
+  throw new CliError("assignment requires prepare, status, brief, reconcile-binding, closeout, or accept");
 }
 
 async function commandSubagentV09(args) {

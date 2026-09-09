@@ -3,6 +3,29 @@
 This file records concise user-facing changes. Immutable tags and the linked
 decision records remain the detailed release evidence.
 
+## 0.9.9 - 2026-09-08
+
+- Authenticate the Codex App worktree owner before coordinator route
+  registration persists cleanup authority; a matching process thread ID alone
+  cannot bind an arbitrary checkout.
+- Provide an explicit coordinator-only correction for an already-recorded
+  wrong checkout binding while retaining the original authority for audit.
+- Let the director retry accepted coordinator closeout after both registered
+  resources disappeared, but only by repeating the exact result tip captured
+  before archival or the final revision from one uniquely assignment-bound,
+  passing completed coordinator-work record, with the exact accepted report and
+  proof that the worktree and disposable branch are absent. If neither source
+  exists, it requests a new director disposition rather than accepting a chosen
+  ancestor. The retry emits the existing native archive action rather than
+  fabricating evidence.
+- Recognize one fully settled v0.9.7 coordinator predecessor without reviving
+  its deleted worktree. Reconciliation requires the exact retired assignment,
+  accepted report, closed archived iteration, deleted disposable branch, and a
+  non-host ref preserving the captured tip; incomplete or ambiguous evidence
+  remains blocked.
+- Surface the underlying Git spawn failure when a historical source checkout
+  has disappeared, replacing the unactionable `undefined` diagnostic.
+
 ## 0.9.8 - 2026-09-08
 
 - Read private archived JSONL evidence incrementally rather than retaining an

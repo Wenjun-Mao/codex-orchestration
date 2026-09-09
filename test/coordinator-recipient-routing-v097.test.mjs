@@ -289,6 +289,10 @@ test("fresh coordinator fences preserve one shared director binding and recover 
     sender_thread_id: third.lineage.thread_id,
     preparation_id: thirdPreparation.preparation.preparation_id,
   })}\n`, "utf8");
+  await writeFile(resolve(root, ".git", "codex-thread.json"), `${JSON.stringify({
+    version: 1,
+    ownerThreadId: third.lineage.thread_id,
+  })}\n`, "utf8");
   const cliRegistration = runCli([
     "report", "route", "coordinator",
     "--run-id", third.run.run_id,
