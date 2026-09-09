@@ -41,6 +41,10 @@ import {
   deleteRefreshExecutorBranch,
   removeRefreshExecutorWorktree,
 } from "../lib/compat/refresh-discard-git.mjs";
+import {
+  assertRefreshNamespaceRemovalSafe,
+  loadRefreshSourceAuthority,
+} from "../lib/compat/refresh-source.mjs";
 import { RUNTIME_DIRECTORY } from "../lib/runtime-context.mjs";
 import { createGitFixture, packageRoot, removeFixture } from "./helpers.mjs";
 
@@ -221,6 +225,7 @@ async function createAbandonedDirectCoordinatorRun({
   sourcePackage,
   runId = "refresh-v097-direct-coordinator",
   beforeAbandon = null,
+  terminalKind = "abandoned",
 }) {
   const workflowTask = task(`${runId}-delivery`, {
     execution_kind: "coordinator",
@@ -258,18 +263,41 @@ async function createAbandonedDirectCoordinatorRun({
   const beforeAbandonResult = beforeAbandon === null
     ? null
     : await beforeAbandon({ activated, request, runtimeCli, workflowTask, localWork });
-  const abandonPath = await jsonFile(requests, `${runId}-abandon`, {
-    run_id: runId,
-    resume: activated.run.binding,
-    reason: "The terminal direct coordinator delivery must be reissued under the corrected release.",
-  });
-  const abandonedCall = invoke(runtimeCli, [
-    "run", "abandon", "--run-id", runId, "--file", abandonPath, "--json",
-  ], root);
-  assertSuccess(abandonedCall, "v0.9.7 direct coordinator source abandonment");
+  let audit = null;
+  let terminal;
+  if (terminalKind === "closed") {
+    const auditCall = invoke(runtimeCli, ["run", "audit", "--run-id", runId, "--json"], root);
+    assertSuccess(auditCall, "v0.9 direct coordinator source closure audit");
+    audit = JSON.parse(auditCall.stdout).audit;
+    assert.equal(audit.terminal_ready, true);
+    const closePath = await jsonFile(requests, `${runId}-close`, {
+      run_id: runId,
+      resume: activated.run.binding,
+      audit_id: audit.audit_id,
+    });
+    const closeCall = invoke(runtimeCli, [
+      "run", "close", "--run-id", runId, "--file", closePath, "--json",
+    ], root);
+    assertSuccess(closeCall, "v0.9 direct coordinator source closure");
+    terminal = { closed: JSON.parse(closeCall.stdout) };
+  } else if (terminalKind === "abandoned") {
+    const abandonPath = await jsonFile(requests, `${runId}-abandon`, {
+      run_id: runId,
+      resume: activated.run.binding,
+      reason: "The terminal direct coordinator delivery must be reissued under the corrected release.",
+    });
+    const abandonedCall = invoke(runtimeCli, [
+      "run", "abandon", "--run-id", runId, "--file", abandonPath, "--json",
+    ], root);
+    assertSuccess(abandonedCall, "v0.9.7 direct coordinator source abandonment");
+    terminal = { abandoned: JSON.parse(abandonedCall.stdout) };
+  } else {
+    throw new Error(`Unsupported direct coordinator terminal fixture: ${terminalKind}`);
+  }
   return {
     activated,
-    abandoned: JSON.parse(abandonedCall.stdout),
+    ...terminal,
+    audit,
     request,
     runtimeCli,
     workflowTask,
@@ -854,6 +882,8 @@ async function createClosedV09Run({
   requests,
   sourcePackage,
   runId = "refresh-v09-closed-source",
+  selectorReplan = false,
+  blockedAuditFirst = false,
 }) {
   const prompt = "Inspect the bounded refresh fixture and return its terminal result.";
   const workflowTask = task(`${runId}-subagent`, {
@@ -922,15 +952,89 @@ async function createClosedV09Run({
   const reconcilePath = await jsonFile(requests, `${runId}-subagent-reconcile`, {
     run_id: runId,
     operation_id: operation.operation_id,
-    outcome: "accepted",
-    agent_id: `${runId}-agent`,
+    outcome: selectorReplan ? "selector-rejected-before-agent-identity" : "accepted",
+    ...(selectorReplan ? {} : { agent_id: `${runId}-agent` }),
   });
   assertSuccess(invoke(runtimeCli, [
     "subagent", "reconcile", "--run-id", runId, "--file", reconcilePath, "--json",
   ], root), "v0.9.0 source subagent reconciliation");
+  let activeOperation = operation;
+  if (selectorReplan) {
+    const replacementTask = {
+      ...workflowTask,
+      model: "gpt-5.6-terra",
+      reasoning_effort: "high",
+      selector_rationale: "Terra-high replaces the rejected Luna selector under the single replan authority.",
+    };
+    const revisePath = await jsonFile(requests, `${runId}-selector-replan`, {
+      run_id: runId,
+      plan_id: request.workflow.plan_id,
+      draft: {
+        schema_version: 1,
+        plan_id: request.workflow.plan_id,
+        revision: 2,
+        parent_revision_digest: contract.revision_digest,
+        tasks: [replacementTask],
+      },
+    });
+    assertSuccess(invoke(runtimeCli, [
+      "workflow", "revise", "--run-id", runId, "--file", revisePath, "--json",
+    ], root), "v0.9 source selector replan");
+    const replacementContractPath = await jsonFile(requests, `${runId}-replacement-contract`, {
+      run_id: runId,
+      plan_id: request.workflow.plan_id,
+      task_id: replacementTask.task_id,
+      dependency_authorities: [],
+    });
+    const replacementContractCall = invoke(runtimeCli, [
+      "workflow", "contract", "--run-id", runId, "--file", replacementContractPath, "--json",
+    ], root);
+    assertSuccess(replacementContractCall, "v0.9 source replacement contract");
+    const replacementContract = JSON.parse(replacementContractCall.stdout);
+    const replacementPreparePath = await jsonFile(requests, `${runId}-replacement-prepare`, {
+      run_id: runId,
+      task_contract: replacementContract,
+      model: replacementTask.model,
+      reasoning_effort: replacementTask.reasoning_effort,
+      fork_turns: replacementTask.fork_turns,
+      mode: replacementTask.mode,
+      prompt_digest: sha256(prompt),
+      worktree_path: root,
+    });
+    const replacementPreparedCall = invoke(runtimeCli, [
+      "subagent", "prepare", "--run-id", runId, "--file", replacementPreparePath, "--json",
+    ], root);
+    assertSuccess(replacementPreparedCall, "v0.9 source replacement subagent preparation");
+    activeOperation = JSON.parse(replacementPreparedCall.stdout);
+    const replacementAttemptPath = await jsonFile(requests, `${runId}-replacement-attempt`, {
+      run_id: runId,
+      operation_id: activeOperation.operation_id,
+      prompt,
+      timeout_seconds: 300,
+    });
+    assertSuccess(invoke(runtimeCli, [
+      "subagent", "attempt", "--run-id", runId, "--file", replacementAttemptPath, "--json",
+    ], root), "v0.9 source replacement subagent attempt");
+    const replacementReconcilePath = await jsonFile(requests, `${runId}-replacement-reconcile`, {
+      run_id: runId,
+      operation_id: activeOperation.operation_id,
+      outcome: "accepted",
+      agent_id: `${runId}-replacement-agent`,
+    });
+    assertSuccess(invoke(runtimeCli, [
+      "subagent", "reconcile", "--run-id", runId, "--file", replacementReconcilePath, "--json",
+    ], root), "v0.9 source replacement subagent reconciliation");
+  }
+  let blockedAudit = null;
+  if (blockedAuditFirst) {
+    const blockedAuditCall = invoke(runtimeCli, ["run", "audit", "--run-id", runId, "--json"], root);
+    assertSuccess(blockedAuditCall, "v0.9 source blocked closure audit");
+    blockedAudit = JSON.parse(blockedAuditCall.stdout).audit;
+    assert.equal(blockedAudit.terminal_ready, false);
+  }
   const completePath = await jsonFile(requests, `${runId}-subagent-complete`, {
     run_id: runId,
-    operation_id: operation.operation_id,
+    operation_id: activeOperation.operation_id,
     classification: "PASS",
     summary: "The bounded source fixture is complete.",
     evidence_digests: [sha256("v0.9.0 closed refresh fixture")],
@@ -940,7 +1044,7 @@ async function createClosedV09Run({
   ], root), "v0.9.0 source subagent completion");
   const disposePath = await jsonFile(requests, `${runId}-subagent-dispose`, {
     run_id: runId,
-    operation_id: operation.operation_id,
+    operation_id: activeOperation.operation_id,
     disposition: "accepted",
   });
   assertSuccess(invoke(runtimeCli, [
@@ -963,6 +1067,8 @@ async function createClosedV09Run({
   return {
     activated,
     closed: JSON.parse(closeCall.stdout),
+    audit,
+    blockedAudit,
     request,
     runtimeCli,
   };
@@ -1595,7 +1701,188 @@ test("v0.9 refresh rejects an abandoned predecessor that retains a live Git fenc
   assertSuccess(inspectionCall, "v0.9 blocked refresh inspection");
   const inspection = JSON.parse(inspectionCall.stdout);
   assert.equal(inspection.route, "blocked");
-  assert.match(inspection.reason, /Earlier source run is not cleanup-complete/);
+  assert.match(inspection.reason, /Earlier source run retains unresolved fences/);
+});
+
+test("v0.9 refresh recognizes a reclaimed closed predecessor only through its authenticated terminal audit", async (t) => {
+  const root = await createGitFixture("codex-flow-refresh-v09-reclaimed-closed-");
+  const requests = await mkdtemp(resolve(tmpdir(), "codex-flow-refresh-v09-reclaimed-closed-requests-"));
+  const worktreeParent = await mkdtemp(resolve(tmpdir(), "codex-flow-refresh-v09-reclaimed-closed-worktree-"));
+  const reclaimedRoot = resolve(worktreeParent, "reclaimed-source");
+  const sourcePackage = await extractTaggedPackage("v0.9.9");
+  const targetPackage = await copyCurrentPackage();
+  t.after(async () => {
+    spawnSync("git", ["worktree", "remove", "--force", reclaimedRoot], { cwd: root, stdio: "ignore" });
+    await Promise.all([
+      removeFixture(root),
+      rm(requests, { recursive: true, force: true }),
+      rm(worktreeParent, { recursive: true, force: true }),
+      rm(sourcePackage.root, { recursive: true, force: true }),
+      rm(targetPackage.root, { recursive: true, force: true }),
+    ]);
+  });
+
+  execFileSync("git", ["worktree", "add", "--quiet", "--detach", reclaimedRoot, "HEAD"], { cwd: root });
+  const reclaimed = await createClosedV09Run({
+    root: reclaimedRoot,
+    requests,
+    sourcePackage,
+    runId: "refresh-v090-reclaimed-closed",
+    blockedAuditFirst: true,
+  });
+  assert.equal(reclaimed.blockedAudit.terminal_ready, false);
+  assert.notEqual(reclaimed.blockedAudit.audit_id, reclaimed.audit.audit_id);
+  execFileSync("git", ["worktree", "remove", "--force", reclaimedRoot], { cwd: root });
+  await assert.rejects(stat(reclaimedRoot), /ENOENT/);
+
+  const selected = await createClosedV09Run({
+    root,
+    requests,
+    sourcePackage,
+    runId: "refresh-v090-selected-closed",
+  });
+  const targetSkill = resolve(targetPackage.root, "skills/refresh/SKILL.md");
+  const inspectionCall = invoke(targetPackage.cli, [
+    "refresh", "inspect", "--invoking-skill", targetSkill, "--json",
+  ], root);
+  assertSuccess(inspectionCall, "reclaimed closed predecessor refresh inspection");
+  const inspection = JSON.parse(inspectionCall.stdout);
+  assert.equal(inspection.route, "refresh-ready", inspection.reason);
+
+  const commonDir = await realpath(resolve(root, ".git"));
+  const selectedSource = await loadRefreshSourceAuthority({
+    commonDir,
+    namespace: "v0.9.9",
+    runId: selected.request.run_id,
+  });
+  await assert.doesNotReject(assertRefreshNamespaceRemovalSafe({
+    source: selectedSource,
+    handoff: { cleanup: [] },
+  }));
+  const auditPath = resolve(
+    commonDir,
+    "codex-flow",
+    "v0.9.9",
+    "run-closure-audits",
+    "records",
+    `${reclaimed.audit.audit_id}.json`,
+  );
+  const tampered = JSON.parse(await readFile(auditPath, "utf8"));
+  tampered.record_digest = "0".repeat(64);
+  await writeFile(auditPath, `${JSON.stringify(tampered)}\n`, "utf8");
+  const tamperedCall = invoke(targetPackage.cli, [
+    "refresh", "inspect", "--invoking-skill", targetSkill, "--json",
+  ], root);
+  assertSuccess(tamperedCall, "tampered reclaimed predecessor refresh inspection");
+  const tamperedInspection = JSON.parse(tamperedCall.stdout);
+  assert.equal(tamperedInspection.route, "blocked");
+  assert.match(tamperedInspection.reason, /Run-closure audit record digest is invalid/);
+});
+
+test("v0.9 refresh recognizes reclaimed closed coordinator work from terminal audit evidence", async (t) => {
+  const root = await createGitFixture("codex-flow-refresh-v09-reclaimed-coordinator-");
+  const requests = await mkdtemp(resolve(tmpdir(), "codex-flow-refresh-v09-reclaimed-coordinator-requests-"));
+  const worktreeParent = await mkdtemp(resolve(tmpdir(), "codex-flow-refresh-v09-reclaimed-coordinator-worktree-"));
+  const reclaimedRoot = resolve(worktreeParent, "reclaimed-source");
+  const sourcePackage = await extractTaggedPackage("v0.9.9");
+  const targetPackage = await copyCurrentPackage();
+  t.after(async () => {
+    spawnSync("git", ["worktree", "remove", "--force", reclaimedRoot], { cwd: root, stdio: "ignore" });
+    await Promise.all([
+      removeFixture(root),
+      rm(requests, { recursive: true, force: true }),
+      rm(worktreeParent, { recursive: true, force: true }),
+      rm(sourcePackage.root, { recursive: true, force: true }),
+      rm(targetPackage.root, { recursive: true, force: true }),
+    ]);
+  });
+
+  execFileSync("git", ["worktree", "add", "--quiet", "--detach", reclaimedRoot, "HEAD"], { cwd: root });
+  const reclaimed = await createAbandonedDirectCoordinatorRun({
+    root: reclaimedRoot,
+    requests,
+    sourcePackage,
+    runId: "refresh-v099-reclaimed-coordinator",
+    terminalKind: "closed",
+    beforeAbandon: async ({ request, runtimeCli, localWork }) => {
+      const completePath = await jsonFile(requests, "reclaimed-coordinator-complete", {
+        run_id: request.run_id,
+        local_work_id: localWork.local_work_id,
+        checks: [{
+          check_id: "completed-reclaimed-coordinator",
+          argv: [process.execPath, "-e", "process.exit(0)"],
+        }],
+      });
+      const completedCall = invoke(runtimeCli, [
+        "workflow", "local", "complete", "--run-id", request.run_id,
+        "--file", completePath, "--json",
+      ], reclaimedRoot, { CODEX_THREAD_ID: request.runtime.lineage.thread_id });
+      assertSuccess(completedCall, "reclaimed coordinator work completion");
+    },
+  });
+  assert.equal(reclaimed.audit.counts.coordinator_work, 1);
+  execFileSync("git", ["worktree", "remove", "--force", reclaimedRoot], { cwd: root });
+
+  await createClosedV09Run({
+    root,
+    requests,
+    sourcePackage,
+    runId: "refresh-v099-selected-closed",
+  });
+  const targetSkill = resolve(targetPackage.root, "skills/refresh/SKILL.md");
+  const inspectionCall = invoke(targetPackage.cli, [
+    "refresh", "inspect", "--invoking-skill", targetSkill, "--json",
+  ], root);
+  assertSuccess(inspectionCall, "reclaimed coordinator predecessor refresh inspection");
+  const inspection = JSON.parse(inspectionCall.stdout);
+  assert.equal(inspection.route, "refresh-ready", inspection.reason);
+});
+
+test("v0.9 refresh recognizes a reclaimed closed selector-replan run", async (t) => {
+  const root = await createGitFixture("codex-flow-refresh-v09-reclaimed-replan-");
+  const requests = await mkdtemp(resolve(tmpdir(), "codex-flow-refresh-v09-reclaimed-replan-requests-"));
+  const worktreeParent = await mkdtemp(resolve(tmpdir(), "codex-flow-refresh-v09-reclaimed-replan-worktree-"));
+  const reclaimedRoot = resolve(worktreeParent, "reclaimed-source");
+  const sourcePackage = await extractTaggedPackage("v0.9.9");
+  const targetPackage = await copyCurrentPackage();
+  t.after(async () => {
+    spawnSync("git", ["worktree", "remove", "--force", reclaimedRoot], { cwd: root, stdio: "ignore" });
+    await Promise.all([
+      removeFixture(root),
+      rm(requests, { recursive: true, force: true }),
+      rm(worktreeParent, { recursive: true, force: true }),
+      rm(sourcePackage.root, { recursive: true, force: true }),
+      rm(targetPackage.root, { recursive: true, force: true }),
+    ]);
+  });
+
+  execFileSync("git", ["worktree", "add", "--quiet", "--detach", reclaimedRoot, "HEAD"], { cwd: root });
+  const reclaimed = await createClosedV09Run({
+    root: reclaimedRoot,
+    requests,
+    sourcePackage,
+    runId: "refresh-v099-reclaimed-selector-replan",
+    selectorReplan: true,
+  });
+  assert.notEqual(
+    reclaimed.audit.authority.activated_revision_digest,
+    reclaimed.audit.authority.current_revision_digest,
+  );
+  execFileSync("git", ["worktree", "remove", "--force", reclaimedRoot], { cwd: root });
+
+  await createClosedV09Run({
+    root,
+    requests,
+    sourcePackage,
+    runId: "refresh-v099-selected-after-replan",
+  });
+  const targetSkill = resolve(targetPackage.root, "skills/refresh/SKILL.md");
+  const inspectionCall = invoke(targetPackage.cli, [
+    "refresh", "inspect", "--invoking-skill", targetSkill, "--json",
+  ], root);
+  assertSuccess(inspectionCall, "reclaimed selector-replan refresh inspection");
+  const inspection = JSON.parse(inspectionCall.stdout);
+  assert.equal(inspection.route, "refresh-ready", inspection.reason);
 });
 
 test("v0.9 refresh recognizes a selected source already abandoned before preparation", async (t) => {

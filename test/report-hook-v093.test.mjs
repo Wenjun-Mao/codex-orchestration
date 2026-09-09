@@ -525,7 +525,9 @@ test("queue text labels the exact final as untrusted data", async (t) => {
 
 test("reporter authority reflects the packaged release identity", async () => {
   const authority = await reporterAuthorityFor({ packageRoot });
-  assert.equal(authority.package_version, "0.9.10-rc.5");
+  const manifest = JSON.parse(await readFile(resolve(packageRoot, "package.json"), "utf8"));
+  assert.match(manifest.version, /^\d+\.\d+\.\d+(?:-(?:dev|rc)\.\d+)?$/);
+  assert.equal(authority.package_version, manifest.version);
   assert.match(authority.routes_sha256, /^[0-9a-f]{64}$/);
   assert.match(authority.records_sha256, /^[0-9a-f]{64}$/);
 });
