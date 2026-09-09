@@ -24,7 +24,7 @@ import {
   assignmentStateRoot,
   openAssignmentForSender,
 } from "../lib/assignment-authority.mjs";
-import { acceptAssignmentResult } from "../lib/assignment-acceptance.mjs";
+import { acceptAssignmentResult, cancelAssignmentResult } from "../lib/assignment-acceptance.mjs";
 import { generateCoordinatorBrief } from "../lib/assignment-brief.mjs";
 import {
   assignmentPreparation,
@@ -201,7 +201,7 @@ Usage:
   codex-flow report route close --run-id ID --file request.json [--json]
   codex-flow assignment prepare --file request.json [--json]
   codex-flow assignment status --assignment-id ID [--json]
-  codex-flow assignment brief|reconcile-binding|accept|closeout --assignment-id ID --file request.json [--json]
+  codex-flow assignment brief|reconcile-binding|accept|cancel|closeout --assignment-id ID --file request.json [--json]
   codex-flow subagent prepare|attempt|reconcile|complete|dispose --run-id ID --file request.json [--json]
   codex-flow subagent status --run-id ID --operation-id ID [--json]
   codex-flow callback deliver|observe --run-id ID --file request.json [--json]
@@ -1472,7 +1472,21 @@ async function commandAssignmentV097(args) {
     }));
     return;
   }
-  throw new CliError("assignment requires prepare, status, brief, reconcile-binding, closeout, or accept");
+  if (subcommand === "cancel") {
+    requireExactFields(request, {
+      required: ["assignment_id", "reason"],
+    }, "assignment cancel request");
+    if (request.assignment_id !== assignmentId) throw new CliError("assignment cancel request does not match --assignment-id", 73);
+    v09Output(await cancelAssignmentResult({
+      stateRoot,
+      assignmentId,
+      directorThreadId: threadId,
+      reason: request.reason,
+      retireLocator: ({ routeId, reason, now }) => retireRepositoryReportLocator({ stateRoot, routeId, reason, now }),
+    }));
+    return;
+  }
+  throw new CliError("assignment requires prepare, status, brief, reconcile-binding, closeout, accept, or cancel");
 }
 
 async function commandSubagentV09(args) {

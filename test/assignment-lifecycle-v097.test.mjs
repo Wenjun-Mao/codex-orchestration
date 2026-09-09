@@ -1,14 +1,15 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
 import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { basename, resolve } from "node:path";
 import test from "node:test";
-import { acceptAssignmentResult } from "../lib/assignment-acceptance.mjs";
+import { acceptAssignmentResult, cancelAssignmentResult } from "../lib/assignment-acceptance.mjs";
 import { reconcileTaskArchive, taskArchiveForDisposition } from "../lib/archive-lifecycle.mjs";
 import { observeCodexAppPrivateArchive } from "../lib/adapters/codex-app/private-archive-observer.mjs";
 import {
   assignmentAuthority,
+  assignmentStateRoot,
   bindAssignmentRefreshExecution,
   openAssignmentForSender,
 } from "../lib/assignment-authority.mjs";
@@ -31,6 +32,14 @@ import {
   reconcileSerialIntegration,
 } from "../lib/integration.mjs";
 import {
+  CODEX_APP_BINARY_PATH,
+  CODEX_APP_CLI_VERSION,
+} from "../lib/codex-app-report-adapter.mjs";
+import {
+  installRepositoryReportLocator,
+  retireRepositoryReportLocator,
+} from "../lib/report-hook.mjs";
+import {
   acceptReportSubmission,
   beginReportSubmission,
   captureReport,
@@ -38,14 +47,15 @@ import {
 import {
   registerCoordinatorReportRoute,
   registerReportRoute,
+  closeReportRoute,
   reportRoute,
 } from "../lib/report-routes.mjs";
 import { bindRecipient } from "../lib/recipients.mjs";
-import { closeRun, readRun } from "../lib/run-lifecycle.mjs";
+import { abandonRun, closeRun, readRun } from "../lib/run-lifecycle.mjs";
 import { RUNTIME_DIRECTORY } from "../lib/runtime-context.mjs";
 import { recipientBindingDigest } from "../lib/task-results.mjs";
 import { runCombinedVerification } from "../lib/verifications.mjs";
-import { activateFixtureRun, createGitFixture } from "./helpers.mjs";
+import { activateFixtureRun, createGitFixture, packageRoot } from "./helpers.mjs";
 import { createActiveTaskLaunch, terminalReceiptV4 } from "./v09-lifecycle-fixture.mjs";
 import { coordinatorBindingDigest, createWorkflowPlanRevision } from "../lib/workflow-plan.mjs";
 
@@ -167,6 +177,14 @@ function hostResult(hostRequest, outcome, reason = undefined) {
     thread_id: hostRequest.thread_id,
     outcome,
     ...(reason === undefined ? {} : { reason }),
+  };
+}
+
+function nativeQueue() {
+  return {
+    binary_path: CODEX_APP_BINARY_PATH,
+    expected_version: CODEX_APP_CLI_VERSION,
+    sqlite_home: resolve(homedir(), ".codex"),
   };
 }
 
@@ -676,6 +694,130 @@ test("assignment acceptance is fail-closed for an active coordinator and resumes
     retireLocator: async () => ({ status: "retired" }),
   });
   assert.equal(replay.status, "already-retired");
+});
+
+test("assignment cancellation proves terminal ownership, retires reporting, and preserves coordinator resources", async (t) => {
+  const child = await acceptedChildFixture(t, "failed-assignment-cancellation", { deliveryBranch: true });
+  const stateRoot = assignmentStateRoot(child.context.commonDir);
+  const route = await reportRoute({ stateRoot, routeId: child.assignment.route_id });
+  const cancel = (directorThreadId, reason = "The bounded run was abandoned after an unrecoverable baseline drift.") => (
+    cancelAssignmentResult({
+      stateRoot,
+      assignmentId: child.assignment.assignment_id,
+      directorThreadId,
+      reason,
+      retireLocator: ({ routeId, reason: retirementReason, now }) => retireRepositoryReportLocator({
+        stateRoot,
+        routeId,
+        reason: retirementReason,
+        now,
+      }),
+      now: TIME + 15_000,
+    })
+  );
+
+  await assert.rejects(
+    () => cancel("wrong-director"),
+    /Only the assigned director can cancel/,
+  );
+  await assert.rejects(
+    () => cancel(child.assignment.recipient.thread_id),
+    /requires terminal execution evidence/,
+  );
+
+  const executorCloseout = await closeoutAcceptedExecutor(child, { now: TIME + 15_100 });
+  assert.equal(executorCloseout.closed.status, "phase-complete");
+  const { run } = await readRun({
+    gitCommonDirectory: child.context.commonDir,
+    runId: child.context.launch.run_id,
+  });
+  await abandonRun({
+    gitCommonDirectory: child.context.commonDir,
+    runId: run.run_id,
+    resume: run.binding,
+    reason: "The isolated fixture records an honest failed-assignment exit.",
+    abandonedAt: new Date(TIME + 15_200).toISOString(),
+  });
+  await installRepositoryReportLocator({
+    stateRoot,
+    route,
+    packageRoot,
+    nativeQueue: nativeQueue(),
+  });
+
+  const cancelled = await cancel(child.assignment.recipient.thread_id);
+  assert.equal(cancelled.status, "cancelled");
+  assert.equal(cancelled.assignment.state, "cancelled");
+  assert.equal(cancelled.assignment.acceptance, null);
+  assert.equal(cancelled.assignment.cancellation.execution_evidence[0].terminal_status, "abandoned");
+  assert.equal(cancelled.iteration.iteration.state, "cancelled");
+  const executor = cancelled.iteration.iteration.members.find((member) => member.role === "executor");
+  const coordinator = cancelled.iteration.iteration.members.find((member) => member.role === "coordinator");
+  assert.equal(executor.state, "archived");
+  assert.equal(coordinator.state, "registered");
+  assert.notEqual(git(child.root, ["branch", "--list", child.coordinatorBranch]), "");
+  assert.equal((await reportRoute({ stateRoot, routeId: route.route_id })).state, "closed");
+  await assert.rejects(
+    () => captureReport({
+      stateRoot,
+      routeId: route.route_id,
+      source: {
+        host_id: route.sender.host_id,
+        thread_id: route.sender.thread_id,
+        turn_id: "late-cancelled-final",
+        output_kind: "final-assistant-output",
+      },
+      finalText: "This late final must not be accepted after cancellation.",
+      now: TIME + 15_300,
+    }),
+    /reporting assignment is not open|active report route|not active/i,
+  );
+  const closeout = await closeoutIterationWithOwningHost({
+    commonDir: child.context.commonDir,
+    iterationId: child.assignment.iteration_id,
+    allowCoordinator: true,
+    now: TIME + 15_400,
+  });
+  assert.equal(closeout.status, "cancelled");
+  assert.equal(git(child.root, ["branch", "--list", child.coordinatorBranch]) !== "", true);
+  const replay = await cancel(child.assignment.recipient.thread_id);
+  assert.equal(replay.status, "already-cancelled");
+  await assert.rejects(
+    () => cancel(child.assignment.recipient.thread_id, "A different cancellation reason must not rewrite the durable exit."),
+    /does not match this exact cancellation request/,
+  );
+});
+
+test("assignment cancellation resumes safely after its route was closed before locator retirement", async (t) => {
+  const child = await acceptedChildFixture(t, "failed-assignment-cancellation-retry", { deliveryBranch: true });
+  const stateRoot = assignmentStateRoot(child.context.commonDir);
+  const route = await reportRoute({ stateRoot, routeId: child.assignment.route_id });
+  await closeoutAcceptedExecutor(child, { now: TIME + 15_500 });
+  const { run } = await readRun({
+    gitCommonDirectory: child.context.commonDir,
+    runId: child.context.launch.run_id,
+  });
+  await abandonRun({
+    gitCommonDirectory: child.context.commonDir,
+    runId: run.run_id,
+    resume: run.binding,
+    reason: "The isolated fixture records an interrupted cancellation.",
+    abandonedAt: new Date(TIME + 15_600).toISOString(),
+  });
+  await installRepositoryReportLocator({ stateRoot, route, packageRoot, nativeQueue: nativeQueue() });
+  await closeReportRoute({ stateRoot, routeId: route.route_id, reason: "terminal", now: TIME + 15_700 });
+
+  const resumed = await cancelAssignmentResult({
+    stateRoot,
+    assignmentId: child.assignment.assignment_id,
+    directorThreadId: child.assignment.recipient.thread_id,
+    reason: "The isolated fixture records an interrupted cancellation.",
+    retireLocator: ({ routeId, reason, now }) => retireRepositoryReportLocator({ stateRoot, routeId, reason, now }),
+    now: TIME + 15_800,
+  });
+  assert.equal(resumed.status, "cancelled");
+  assert.equal(resumed.assignment.state, "cancelled");
+  assert.equal(resumed.iteration.iteration.state, "cancelled");
 });
 
 test("assignment acceptance reclaims an exact archived coordinator before retiring reporting", async (t) => {

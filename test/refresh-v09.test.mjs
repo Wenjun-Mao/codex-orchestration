@@ -32,8 +32,10 @@ import {
   assignmentAuthority,
   openAssignmentForSender,
 } from "../lib/assignment-authority.mjs";
+import { installRepositoryReportLocator } from "../lib/report-hook.mjs";
+import { closeoutIterationWithOwningHost, iterationStatus } from "../lib/iteration-registry.mjs";
 import { bindRecipient } from "../lib/recipients.mjs";
-import { registerCoordinatorReportRoute } from "../lib/report-routes.mjs";
+import { registerCoordinatorReportRoute, reportRoute } from "../lib/report-routes.mjs";
 import {
   captureRefreshGitAuthority,
   deleteRefreshExecutorBranch,
@@ -618,6 +620,233 @@ test("assignment-lived reporting binds the exact target before refresh source de
   })).assignment_id, originalAssignment.assignment_id);
   await assert.rejects(stat(resolve(root, ".git/codex-flow/v0.9.7-rc.7")), /ENOENT/);
   await assert.rejects(stat(resolve(root, ".git/codex-flow/refresh-v1")), /ENOENT/);
+});
+
+test("RC2 snapshot abandonment cancellation permits same-coordinator fresh assignment admission", async (t) => {
+  const root = await createGitFixture("codex-flow-refresh-rc2-failed-assignment-");
+  const commonDir = resolve(root, ".git");
+  const requests = await mkdtemp(resolve(tmpdir(), "codex-flow-refresh-rc2-failed-assignment-requests-"));
+  const sourcePackage = await extractTaggedPackage("1d5595621f1b6d5afaf3daa3f38cb359fa3f8759");
+  const targetPackage = await copyCurrentPackage();
+  t.after(async () => {
+    await Promise.all([
+      removeFixture(root),
+      rm(requests, { recursive: true, force: true }),
+      rm(sourcePackage.root, { recursive: true, force: true }),
+      rm(targetPackage.root, { recursive: true, force: true }),
+    ]);
+  });
+
+  const coordinatorThreadId = "rc2-failed-assignment-source-coordinator";
+  const director = {
+    lineage_id: "rc2-failed-assignment-director-lineage",
+    thread_id: "rc2-failed-assignment-director",
+    generation: 1,
+  };
+  const sourcePlan = resolve(requests, "rc2-failed-assignment-plan.md");
+  await writeFile(sourcePlan, "# Failed assignment exit fixture\n", "utf8");
+  const source = await createAbandonedDirectCoordinatorRun({
+    root,
+    requests,
+    sourcePackage,
+    runId: "rc2-failed-assignment-source",
+    beforeAbandon: async ({ activated, request, runtimeCli, localWork }) => {
+      await bindRecipient({ stateRoot: activated.state_authority.state_root, recipient: director });
+      const registration = await registerCoordinatorReportRoute({
+        stateRoot: activated.state_authority.state_root,
+        runId: request.run_id,
+        senderThreadId: coordinatorThreadId,
+        senderHostId: "local",
+        recipient: {
+          host_id: "local",
+          ...director,
+          binding_digest: recipientBindingDigest(director),
+        },
+        approvedPlanPath: sourcePlan,
+        approvedPlanDigest: sha256("# Failed assignment exit fixture\n"),
+        iterationLabel: "v0.9.10 failed assignment",
+        purpose: "Cross-namespace cancellation proof",
+        repositoryRoot: root,
+        repositoryBranch: "main",
+      });
+      await installRepositoryReportLocator({
+        stateRoot: registration.state_root,
+        route: registration.route,
+        packageRoot: targetPackage.root,
+        nativeQueue: {
+          binary_path: CODEX_APP_BINARY_PATH,
+          expected_version: CODEX_APP_CLI_VERSION,
+          sqlite_home: resolve(homedir(), ".codex"),
+        },
+      });
+      const assignmentPath = resolve(
+        registration.state_root,
+        "records",
+        `${registration.route.assignment.assignment_id}.json`,
+      );
+      const legacyAssignment = JSON.parse(await readFile(assignmentPath, "utf8"));
+      delete legacyAssignment.cancellation;
+      await writeFile(assignmentPath, `${JSON.stringify(legacyAssignment)}\n`, "utf8");
+
+      const cancellationRequest = await jsonFile(requests, "rc2-active-cancellation", {
+        assignment_id: registration.route.assignment.assignment_id,
+        reason: "The original snapshot fixture is intentionally failed after its coordinator work completed.",
+      });
+      const wrongDirector = invoke(targetPackage.cli, [
+        "assignment", "cancel", "--assignment-id", registration.route.assignment.assignment_id,
+        "--file", cancellationRequest, "--json",
+      ], root, { CODEX_THREAD_ID: "wrong-director" });
+      assert.notEqual(wrongDirector.status, 0);
+      assert.match(wrongDirector.stderr, /Only the assigned director can cancel/);
+      const active = invoke(targetPackage.cli, [
+        "assignment", "cancel", "--assignment-id", registration.route.assignment.assignment_id,
+        "--file", cancellationRequest, "--json",
+      ], root, { CODEX_THREAD_ID: director.thread_id });
+      assert.notEqual(active.status, 0);
+      assert.match(active.stderr, /requires terminal execution evidence/);
+
+      const completePath = await jsonFile(requests, "rc2-source-coordinator-complete", {
+        run_id: request.run_id,
+        local_work_id: localWork.local_work_id,
+        checks: [{
+          check_id: "rc2-source-completed-no-change",
+          argv: [process.execPath, "-e", "process.exit(0)"],
+        }],
+      });
+      const complete = invoke(runtimeCli, [
+        "workflow", "local", "complete", "--run-id", request.run_id,
+        "--file", completePath, "--json",
+      ], root, { CODEX_THREAD_ID: coordinatorThreadId });
+      assertSuccess(complete, "RC2 source coordinator completion");
+      return registration;
+    },
+  });
+  assert.equal(source.activated.package_authority.package_version, "0.9.10-rc.2");
+  const registration = source.beforeAbandonResult;
+  const cancellationPath = await jsonFile(requests, "rc2-terminal-cancellation", {
+    assignment_id: registration.route.assignment.assignment_id,
+    reason: "The original snapshot fixture is intentionally failed after its coordinator work completed.",
+  });
+  const cancellationCall = invoke(targetPackage.cli, [
+    "assignment", "cancel", "--assignment-id", registration.route.assignment.assignment_id,
+    "--file", cancellationPath, "--json",
+  ], root, { CODEX_THREAD_ID: director.thread_id });
+  assertSuccess(cancellationCall, "RC2 assignment cancellation through the newer candidate");
+  const cancelled = JSON.parse(cancellationCall.stdout);
+  assert.equal(cancelled.assignment.state, "cancelled");
+  assert.equal(cancelled.assignment.acceptance, null);
+  assert.equal(cancelled.assignment.cancellation.execution_evidence[0].namespace, "v0.9.10-rc.2");
+  assert.equal(cancelled.assignment.cancellation.execution_evidence[0].terminal_status, "abandoned");
+  assert.equal(cancelled.iteration.iteration.state, "cancelled");
+  assert.equal((await reportRoute({ stateRoot: registration.state_root, routeId: registration.route.route_id })).state, "closed");
+  await assert.rejects(stat(resolve(
+    commonDir,
+    "codex-flow",
+    "report-locators",
+    "records",
+    `${sha256(coordinatorThreadId)}.json`,
+  )), /ENOENT/);
+  const cancelledIteration = await iterationStatus({
+    commonDir,
+    iterationId: cancelled.assignment.iteration_id,
+  });
+  assert.equal(cancelledIteration.members.find((member) => member.role === "coordinator").worktree_path, root);
+  assert.equal((await closeoutIterationWithOwningHost({
+    commonDir,
+    iterationId: cancelled.assignment.iteration_id,
+    allowCoordinator: true,
+  })).status, "cancelled");
+
+  const targetSkill = resolve(targetPackage.root, "skills/refresh/SKILL.md");
+  const refreshPrepare = await jsonFile(requests, "rc2-cancelled-refresh-prepare", {
+    source_namespace: "v0.9.10-rc.2",
+    source_run_id: source.request.run_id,
+    source_resume: source.activated.run.binding,
+    decisions: [],
+    replacements: [],
+    target_workflow: null,
+    target_fences: { path_fences: [], resource_fences: [], branch_fences: [] },
+    target_coordinator_thread_id: coordinatorThreadId,
+  });
+  const preparedCall = invoke(targetPackage.cli, [
+    "refresh", "prepare", "--invoking-skill", targetSkill,
+    "--file", refreshPrepare, "--json",
+  ], root);
+  assertSuccess(preparedCall, "RC2 cancelled-source refresh preparation");
+  const handoff = JSON.parse(preparedCall.stdout).handoff;
+  assert.equal(handoff.intent.source.package_version, "0.9.10-rc.2");
+  assert.equal(handoff.intent.target.package_version, JSON.parse(await readFile(resolve(targetPackage.root, "package.json"), "utf8")).version);
+  const refreshApply = await jsonFile(requests, "rc2-cancelled-refresh-apply", {
+    refresh_id: handoff.refresh_id,
+    expected_handoff_digest: handoff.handoff_digest,
+    archive_evidence: [],
+  });
+  const appliedCall = invoke(targetPackage.cli, [
+    "refresh", "apply", "--invoking-skill", targetSkill,
+    "--file", refreshApply, "--json",
+  ], root);
+  assertSuccess(appliedCall, "RC2 cancelled-source refresh consumption");
+  assert.equal(JSON.parse(appliedCall.stdout).status, "consumed-clean-start");
+  await assert.rejects(stat(resolve(commonDir, "codex-flow", "v0.9.10-rc.2")), /ENOENT/);
+
+  const freshTask = task("rc2-failed-assignment-fresh-canary", {
+    execution_kind: "coordinator",
+    mode: "read",
+    write_paths: [],
+    shared_resources: [],
+  });
+  const freshActivation = activation({
+    runId: "rc2-failed-assignment-fresh-target",
+    workflowTask: freshTask,
+    lineageId: "rc2-failed-assignment-fresh-lineage",
+    threadId: coordinatorThreadId,
+    branch: "main",
+    branchFences: [],
+  });
+  const freshActivationPath = await jsonFile(requests, "rc2-failed-assignment-fresh-activation", freshActivation);
+  const freshCall = invoke(targetPackage.cli, [
+    "run", "activate", "--run-id", freshActivation.run_id,
+    "--file", freshActivationPath, "--json",
+  ], root, { CODEX_THREAD_ID: coordinatorThreadId });
+  assertSuccess(freshCall, "fresh candidate run admission after cancelled RC2");
+  const fresh = JSON.parse(freshCall.stdout);
+  assert.equal(fresh.run.status, "active");
+
+  const targetStateRoot = resolve(commonDir, "codex-flow", RUNTIME_DIRECTORY);
+  await bindRecipient({ stateRoot: targetStateRoot, recipient: director });
+  const freshRegistration = await registerCoordinatorReportRoute({
+    stateRoot: targetStateRoot,
+    runId: freshActivation.run_id,
+    senderThreadId: coordinatorThreadId,
+    senderHostId: "local",
+    recipient: {
+      host_id: "local",
+      ...director,
+      binding_digest: recipientBindingDigest(director),
+    },
+    approvedPlanPath: sourcePlan,
+    approvedPlanDigest: sha256("# Failed assignment exit fixture\n"),
+    iterationLabel: "v0.9.10 fresh canary",
+    purpose: "Fresh assignment after failed exit",
+    repositoryRoot: root,
+    repositoryBranch: "main",
+  });
+  const freshAssignment = await assignmentAuthority({
+    stateRoot: freshRegistration.state_root,
+    assignmentId: freshRegistration.route.assignment.assignment_id,
+  });
+  assert.equal(freshAssignment.state, "open");
+  assert.equal((await openAssignmentForSender({
+    stateRoot: freshRegistration.state_root,
+    hostId: "local",
+    threadId: coordinatorThreadId,
+  })).assignment_id, freshAssignment.assignment_id);
+  const freshIteration = await iterationStatus({
+    commonDir,
+    iterationId: freshAssignment.iteration_id,
+  });
+  assert.equal(freshIteration.members.find((member) => member.role === "coordinator").worktree_path, root);
+  assert.equal(cancelledIteration.state, "cancelled");
 });
 
 async function createClosedV09Run({

@@ -157,6 +157,25 @@ implies that separation, but cleanup must not rely on guidance. Treating the
 executor's own branch as an integration target must be rejected before it can
 become its own alleged preservation owner.
 
+## Post-audit failure-exit finding
+
+**P0 / observed in RC2 recovery planning / corrected candidate required — an
+abandoned run had no assignment-terminal transition.** The original runtime's
+`run abandon` correctly retains fences and ends its active run, but the shared
+assignment, route, locator, and iteration remain open. A no-replacement
+refresh can remove the old namespace, yet it cannot retire that shared state;
+the next coordinator route then conflicts with the old sender authority. This
+is an assignment-lifetime gap, not evidence that the archived executor needs
+another host action or that the coordinator delivery branch may be deleted.
+
+The bounded remedy is director-authorized assignment cancellation: authenticate
+the exact recorded executions as terminal, require existing archived executor
+evidence, retire the exact route and locator, and mark the assignment and
+iteration `cancelled` while retaining coordinator resources. The isolated
+RC2-snapshot-to-newer-namespace proof must complete cancellation, existing
+refresh consumption, and same-coordinator fresh assignment admission before
+this is applied to live RC2. See ADR 0064.
+
 ## Ranked findings
 
 1. **P0 / observed for no-change; statically established for integration /
