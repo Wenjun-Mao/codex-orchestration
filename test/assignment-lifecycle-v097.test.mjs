@@ -1108,6 +1108,137 @@ test("owning-host child closeout reconciles already archived public and private 
   }
 });
 
+test("owning-host closeout uses a post-observer clock for automatic executor reconciliation", async (t) => {
+  const { root, context, assignment, disposition } = await acceptedChildFixture(
+    t,
+    "automatic-executor-clock-boundary",
+  );
+  const prepared = await closeoutIterationWithOwningHost({
+    commonDir: context.commonDir,
+    iterationId: assignment.iteration_id,
+    taskObservation: activeTaskObservation(context.executorThreadId, TIME + 9_550),
+    now: TIME + 9_550,
+  });
+  let observerCalls = 0;
+  let clockCalls = 0;
+  const completed = await closeoutIterationWithOwningHost({
+    commonDir: context.commonDir,
+    iterationId: assignment.iteration_id,
+    hostResult: hostResult(prepared.host_request, "accepted"),
+    observeArchivedThread: async ({ threadId }) => {
+      observerCalls += 1;
+      return archivedTaskObservation(threadId, TIME + 9_650);
+    },
+    clock: () => {
+      clockCalls += 1;
+      return TIME + 9_700;
+    },
+    now: TIME + 9_600,
+  });
+  assert.equal(completed.status, "phase-complete");
+  assert.equal(observerCalls, 1);
+  assert.equal(clockCalls, 1);
+  const archive = await taskArchiveForDisposition({
+    stateRoot: context.stateRoot,
+    dispositionId: disposition.disposition_id,
+  });
+  assert.equal(archive.state, "completed");
+  assert.equal(archive.updated_at, new Date(TIME + 9_700).toISOString());
+  assert.equal(git(root, ["branch", "--list", context.executorBranch]), "");
+});
+
+test("owning-host closeout uses a post-observer clock for automatic coordinator completion", async (t) => {
+  const context = await fixture(t);
+  const assignment = await assignmentAuthority({
+    stateRoot: context.state_root,
+    assignmentId: context.route.assignment.assignment_id,
+  });
+  const prepared = await closeoutIterationWithOwningHost({
+    commonDir: context.commonDir,
+    iterationId: assignment.iteration_id,
+    allowCoordinator: true,
+    taskObservation: activeTaskObservation(context.coordinator.thread_id, TIME + 9_750),
+    now: TIME + 9_750,
+  });
+  let observerCalls = 0;
+  let clockCalls = 0;
+  const completed = await closeoutIterationWithOwningHost({
+    commonDir: context.commonDir,
+    iterationId: assignment.iteration_id,
+    allowCoordinator: true,
+    hostResult: hostResult(prepared.host_request, "accepted"),
+    observeArchivedThread: async ({ threadId }) => {
+      observerCalls += 1;
+      return archivedTaskObservation(threadId, TIME + 9_850);
+    },
+    clock: () => {
+      clockCalls += 1;
+      return TIME + 9_900;
+    },
+    now: TIME + 9_800,
+  });
+  assert.equal(completed.status, "closed");
+  assert.equal(observerCalls, 1);
+  assert.equal(clockCalls, 1);
+  const member = completed.iteration.members.find((entry) => entry.role === "coordinator");
+  assert.equal(member.updated_at, new Date(TIME + 9_900).toISOString());
+  assert.equal(completed.iteration.updated_at, new Date(TIME + 9_900).toISOString());
+});
+
+test("owning-host closeout keeps supplied evidence on its command-entry boundary", async (t) => {
+  const { context, assignment, disposition } = await acceptedChildFixture(
+    t,
+    "supplied-executor-clock-boundary",
+  );
+  const prepared = await closeoutIterationWithOwningHost({
+    commonDir: context.commonDir,
+    iterationId: assignment.iteration_id,
+    taskObservation: activeTaskObservation(context.executorThreadId, TIME + 9_950),
+    now: TIME + 9_950,
+  });
+  const completed = await closeoutIterationWithOwningHost({
+    commonDir: context.commonDir,
+    iterationId: assignment.iteration_id,
+    taskObservation: archivedTaskObservation(context.executorThreadId, TIME + 10_000),
+    hostResult: hostResult(prepared.host_request, "accepted"),
+    clock: () => { throw new Error("supplied evidence must not re-read the closeout clock"); },
+    now: TIME + 10_050,
+  });
+  assert.equal(completed.status, "phase-complete");
+  const archive = await taskArchiveForDisposition({
+    stateRoot: context.stateRoot,
+    dispositionId: disposition.disposition_id,
+  });
+  assert.equal(archive.updated_at, new Date(TIME + 10_050).toISOString());
+});
+
+test("owning-host closeout rejects an automatic observation stale at the post-observer boundary", async (t) => {
+  const { context, assignment, disposition } = await acceptedChildFixture(
+    t,
+    "automatic-observer-stale-boundary",
+  );
+  const prepared = await closeoutIterationWithOwningHost({
+    commonDir: context.commonDir,
+    iterationId: assignment.iteration_id,
+    taskObservation: activeTaskObservation(context.executorThreadId, TIME + 10_100),
+    now: TIME + 10_100,
+  });
+  const pending = await closeoutIterationWithOwningHost({
+    commonDir: context.commonDir,
+    iterationId: assignment.iteration_id,
+    hostResult: hostResult(prepared.host_request, "accepted"),
+    observeArchivedThread: async ({ threadId }) => archivedTaskObservation(threadId, TIME + 13_000),
+    clock: () => TIME + 44_000,
+    now: TIME + 10_200,
+  });
+  assert.equal(pending.status, "observation-required");
+  const archive = await taskArchiveForDisposition({
+    stateRoot: context.stateRoot,
+    dispositionId: disposition.disposition_id,
+  });
+  assert.equal(archive.state, "accepted-awaiting-observation");
+});
+
 test("authenticated patch-equivalent integration preserves exact executor reclamation", async (t) => {
   const { root, context, assignment, integration } = await acceptedChildFixture(
     t,

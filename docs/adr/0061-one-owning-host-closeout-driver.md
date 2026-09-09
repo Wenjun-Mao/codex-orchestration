@@ -40,3 +40,14 @@ This one implementation measurement is evidence of less repeated fixture work,
 not a release performance guarantee. Real Git remains in every ownership,
 integration, and reclamation test; no global cache, timeout change, or
 concurrency increase was introduced.
+
+## Addendum: automatic archive evidence establishes its own completion boundary
+
+The same driver must not reuse entry-time state as the completion time after an
+asynchronous archived observation. Automatic observation is validated and
+reconciled against one clock sample taken after the observer resolves; this
+keeps the record lifecycle ordered without treating an observed timestamp as a
+clock source. Caller-supplied evidence retains the command-entry boundary.
+Existing stale/future rejection, exact archive identity, no-replay and
+reclamation authority remain unchanged. Deterministic executor and coordinator
+regressions cover the shared path.
