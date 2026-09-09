@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, resolve } from "node:path";
 import test from "node:test";
@@ -138,7 +138,7 @@ async function fixture(t, { detachedCoordinator = false } = {}) {
   return { ...context, primaryRoot, coordinatorPath, coordinatorBranch, director, ...registered };
 }
 
-function activeTaskObservation(threadId) {
+function activeTaskObservation(threadId, observedAt = TIME) {
   return {
     execution_kind: "task-thread",
     thread_id: threadId,
@@ -146,7 +146,7 @@ function activeTaskObservation(threadId) {
     active_visible: true,
     archived_visible: false,
     activity_state: "idle",
-    observed_at: new Date(TIME).toISOString(),
+    observed_at: new Date(observedAt).toISOString(),
   };
 }
 
@@ -202,6 +202,7 @@ async function acceptedChildFixture(
     integrationOutcome = null,
     integrationTargetExecutor = false,
     patchEquivalentIntegration = false,
+    stateNamespace = RUNTIME_DIRECTORY,
   } = {},
 ) {
   const selectedIntegrationOutcome = patchEquivalentIntegration
@@ -224,6 +225,13 @@ async function acceptedChildFixture(
   }
   const taskTitle = "Executor · v0.9.7 · Assignment reporting";
   const context = await createActiveTaskLaunch(coordinatorPath, suffix, { taskTitle });
+  const currentStateRoot = context.stateRoot;
+  const legacyStateRoot = resolve(context.commonDir, "codex-flow", stateNamespace);
+  const usesLegacyState = stateNamespace !== RUNTIME_DIRECTORY;
+  if (usesLegacyState) {
+    await rename(currentStateRoot, legacyStateRoot);
+    context.stateRoot = legacyStateRoot;
+  }
   t.after(async () => {
     spawnSync("git", ["worktree", "remove", "--force", context.executorPath], {
       cwd: primaryRoot,
@@ -267,12 +275,20 @@ async function acceptedChildFixture(
     stateRoot: context.stateRoot,
     now: TIME + 100,
   });
+  if (usesLegacyState) {
+    await rename(legacyStateRoot, currentStateRoot);
+    context.stateRoot = currentStateRoot;
+  }
   await registerReportRoute({
     stateRoot: context.stateRoot,
     launchId: context.launch.launch_id,
     senderHostId: "local",
     recipientHostId: "local",
   });
+  if (usesLegacyState) {
+    await rename(currentStateRoot, legacyStateRoot);
+    context.stateRoot = legacyStateRoot;
+  }
   let executorCommit = null;
   if (selectedIntegrationOutcome !== null) {
     await writeFile(resolve(context.executorPath, "integration-result.txt"), `${suffix}\n`, "utf8");
@@ -1080,6 +1096,57 @@ test("run-independent closeout completes an RC2-shaped archived absent-worktree 
   });
   assert.equal(recovered.status, "phase-complete");
   assert.equal(Object.hasOwn(recovered, "host_request"), false);
+  assert.equal(git(child.root, ["branch", "--list", child.context.executorBranch]), "");
+});
+
+test("RC3 CLI closes an archived RC2 namespace through its persisted assignment authority", async (t) => {
+  const child = await acceptedChildFixture(t, "rc2-cross-version-cli", {
+    deliveryBranch: true,
+    stateNamespace: "v0.9.10-rc.2",
+  });
+  assert.equal(child.assignment.execution_bindings[0].namespace, "v0.9.10-rc.2");
+  const recoveryNow = Date.now();
+  const prepared = await closeoutIterationWithOwningHost({
+    commonDir: child.context.commonDir,
+    iterationId: child.assignment.iteration_id,
+    taskObservation: activeTaskObservation(child.context.executorThreadId, recoveryNow - 200),
+    now: recoveryNow - 200,
+  });
+  const archive = await taskArchiveForDisposition({
+    stateRoot: child.context.stateRoot,
+    dispositionId: child.disposition.disposition_id,
+  });
+  git(child.root, ["worktree", "remove", "--force", child.context.executorPath]);
+  await reconcileTaskArchive({
+    stateRoot: child.context.stateRoot,
+    archiveId: archive.archive_id,
+    attemptId: archive.host_intent.attempt_id,
+    outcome: "accepted",
+    observation: archivedTaskObservation(child.context.executorThreadId, recoveryNow - 100),
+    now: recoveryNow - 100,
+  });
+
+  const requestPath = resolve(child.coordinatorPath, "rc3-closeout-request.json");
+  await writeFile(requestPath, `${JSON.stringify({
+    assignment_id: child.assignment.assignment_id,
+    phase: "coordinator",
+    task_observation: archivedTaskObservation(child.context.executorThreadId, recoveryNow),
+  })}\n`, "utf8");
+  const result = spawnSync(process.execPath, [
+    resolve(import.meta.dirname, "..", "bin", "codex-flow.mjs"),
+    "assignment", "closeout",
+    "--assignment-id", child.assignment.assignment_id,
+    "--file", requestPath,
+    "--json",
+  ], {
+    cwd: child.coordinatorPath,
+    env: { ...process.env, CODEX_THREAD_ID: child.context.coordinator.thread_id },
+    encoding: "utf8",
+  });
+  assert.equal(result.status, 0, result.stderr);
+  const closed = JSON.parse(result.stdout);
+  assert.equal(closed.status, "phase-complete");
+  assert.equal(Object.hasOwn(closed, "host_request"), false);
   assert.equal(git(child.root, ["branch", "--list", child.context.executorBranch]), "");
 });
 
