@@ -64,19 +64,21 @@ test("v0.9 help exposes launch authority and no retired bootstrap or release com
   assert.doesNotMatch(retiredExecution.stderr, /node:internal|at main/);
 });
 
-test("installed CLI rejects a plugin manifest cachebuster that diverges from package identity", async (t) => {
+test("installed CLI admits the updater's bounded manifest cachebuster through refresh inspection", async (t) => {
   const installedRoot = await mkdtemp(resolve(tmpdir(), "codex-flow-installed-identity-"));
   t.after(() => rm(installedRoot, { recursive: true, force: true }));
   await Promise.all([
     cp(resolve(packageRoot, ".codex-plugin"), resolve(installedRoot, ".codex-plugin"), { recursive: true }),
     cp(resolve(packageRoot, "bin"), resolve(installedRoot, "bin"), { recursive: true }),
     cp(resolve(packageRoot, "lib"), resolve(installedRoot, "lib"), { recursive: true }),
+    cp(resolve(packageRoot, "schemas"), resolve(installedRoot, "schemas"), { recursive: true }),
     cp(resolve(packageRoot, "skills"), resolve(installedRoot, "skills"), { recursive: true }),
+    cp(resolve(packageRoot, "templates"), resolve(installedRoot, "templates"), { recursive: true }),
     cp(resolve(packageRoot, "package.json"), resolve(installedRoot, "package.json")),
   ]);
   const manifestPath = resolve(installedRoot, ".codex-plugin", "plugin.json");
   const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
-  manifest.version = `${manifest.version}+codex.fixture`;
+  manifest.version = `${manifest.version}+codex.20260909011550`;
   await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
 
   const result = spawnSync(process.execPath, [
@@ -85,8 +87,51 @@ test("installed CLI rejects a plugin manifest cachebuster that diverges from pac
     "--invoking-skill", resolve(installedRoot, "skills", "refresh", "SKILL.md"),
     "--json",
   ], { cwd: packageRoot, encoding: "utf8" });
-  assert.notEqual(result.status, 0);
-  assert.ok(result.stderr.includes(`package metadata must exactly match version ${PACKAGE_VERSION}`));
+  assert.equal(result.status, 0, result.stderr);
+  const inspection = JSON.parse(result.stdout);
+  assert.equal(inspection.route, "fresh", inspection.reason);
+});
+
+test("installed CLI rejects unrecognized distribution metadata and a non-loaded refresh skill", async (t) => {
+  const installedRoot = await mkdtemp(resolve(tmpdir(), "codex-flow-installed-identity-"));
+  t.after(() => rm(installedRoot, { recursive: true, force: true }));
+  await Promise.all([
+    cp(resolve(packageRoot, ".codex-plugin"), resolve(installedRoot, ".codex-plugin"), { recursive: true }),
+    cp(resolve(packageRoot, "bin"), resolve(installedRoot, "bin"), { recursive: true }),
+    cp(resolve(packageRoot, "lib"), resolve(installedRoot, "lib"), { recursive: true }),
+    cp(resolve(packageRoot, "schemas"), resolve(installedRoot, "schemas"), { recursive: true }),
+    cp(resolve(packageRoot, "skills"), resolve(installedRoot, "skills"), { recursive: true }),
+    cp(resolve(packageRoot, "templates"), resolve(installedRoot, "templates"), { recursive: true }),
+    cp(resolve(packageRoot, "package.json"), resolve(installedRoot, "package.json")),
+  ]);
+  const manifestPath = resolve(installedRoot, ".codex-plugin", "plugin.json");
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+  for (const invalidVersion of [
+    "0.9.9+codex.20260909011550",
+    `${PACKAGE_VERSION}+codex.fixture`,
+  ]) {
+    manifest.version = invalidVersion;
+    await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
+    const result = spawnSync(process.execPath, [
+      resolve(installedRoot, "bin", "codex-flow.mjs"), "refresh", "inspect",
+      "--invoking-skill", resolve(installedRoot, "skills", "refresh", "SKILL.md"), "--json",
+    ], { cwd: packageRoot, encoding: "utf8" });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /Installed codex-orchestration Installed plugin metadata/);
+  }
+
+  manifest.version = PACKAGE_VERSION;
+  await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
+  const wrongSkill = resolve(installedRoot, "wrong-refresh-skill.md");
+  await writeFile(wrongSkill, await readFile(resolve(installedRoot, "skills", "refresh", "SKILL.md")));
+  const result = spawnSync(process.execPath, [
+    resolve(installedRoot, "bin", "codex-flow.mjs"), "refresh", "inspect",
+    "--invoking-skill", wrongSkill, "--json",
+  ], { cwd: packageRoot, encoding: "utf8" });
+  assert.equal(result.status, 0, result.stderr);
+  const inspection = JSON.parse(result.stdout);
+  assert.equal(inspection.route, "blocked");
+  assert.match(inspection.reason, /Loaded skill and CLI package disagree/);
 });
 
 test("v0.9 CLI activates a clean run through current launch-era wiring", async (t) => {

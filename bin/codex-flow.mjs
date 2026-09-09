@@ -16,6 +16,7 @@ import {
   sha256,
   stableStringify,
 } from "../lib/core.mjs";
+import { assertInstalledDistributionIdentity } from "../lib/distribution-identity.mjs";
 import { cleanupPlan } from "../lib/cleanup.mjs";
 import {
   assignmentAuthority,
@@ -266,16 +267,22 @@ function requireCanonicalSource() {
   if (
     packageMetadata.name !== "@wjmao/codex-flow"
     || packageMetadata.private !== true
-    || packageMetadata.version !== PACKAGE_VERSION
     || !Array.isArray(packageMetadata.files)
     || !packageMetadata.files.includes("skills/")
     || pluginMetadata.name !== "codex-orchestration"
-    || pluginMetadata.version !== PACKAGE_VERSION
     || pluginMetadata.skills !== "./skills/"
-  ) {
-    throw new CliError(
-      `Installed codex-orchestration package metadata must exactly match version ${PACKAGE_VERSION}`,
-    );
+  ) throw new CliError("Installed codex-orchestration package metadata is not canonical");
+  try {
+    assertInstalledDistributionIdentity({
+      packageVersion: packageMetadata.version,
+      pluginVersion: pluginMetadata.version,
+      expectedVersion: PACKAGE_VERSION,
+    });
+  } catch (error) {
+    if (error instanceof CliError) {
+      throw new CliError(`Installed codex-orchestration ${error.message}`);
+    }
+    throw error;
   }
 }
 

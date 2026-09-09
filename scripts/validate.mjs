@@ -4,6 +4,7 @@ import { spawnSync } from "node:child_process";
 import { access, readdir, readFile } from "node:fs/promises";
 import { basename, dirname, relative, resolve, sep } from "node:path";
 import { PACKAGE_VERSION } from "../lib/core.mjs";
+import { assertExactSourceReleaseIdentity } from "../lib/distribution-identity.mjs";
 import { CODEX_FLOW_STATE_NAMESPACE } from "../lib/git.mjs";
 import * as selectorPolicy from "../lib/policy/selector-policy.mjs";
 import { RUNTIME_DIRECTORY } from "../lib/runtime-context.mjs";
@@ -14,7 +15,7 @@ import {
 import { validateReleaseIdentity } from "./release-identity.mjs";
 
 const root = resolve(import.meta.dirname, "..");
-const EXPECTED_PACKAGE_VERSION = "0.9.9";
+const EXPECTED_PACKAGE_VERSION = "0.9.10-rc.1";
 
 const ACTIVE_SCHEMA_NAMES = Object.freeze([
   "assignment-authority",
@@ -241,9 +242,11 @@ const plugin = JSON.parse(await readRequired(".codex-plugin/plugin.json"));
 if (PACKAGE_VERSION !== EXPECTED_PACKAGE_VERSION) {
   throw new Error(`v0.9 source must identify as ${EXPECTED_PACKAGE_VERSION}`);
 }
-if (packageJson.version !== PACKAGE_VERSION || plugin.version !== PACKAGE_VERSION) {
-  throw new Error("Package, plugin, and runtime versions must match");
-}
+assertExactSourceReleaseIdentity({
+  packageVersion: packageJson.version,
+  pluginVersion: plugin.version,
+  expectedVersion: PACKAGE_VERSION,
+});
 const expectedNamespace = `v${PACKAGE_VERSION}`;
 if (CODEX_FLOW_STATE_NAMESPACE !== expectedNamespace || RUNTIME_DIRECTORY !== expectedNamespace) {
   throw new Error(`Runtime state must use exact package namespace ${expectedNamespace}`);
@@ -524,6 +527,7 @@ assertMarkers(await readRequired("SECURITY.md"), [
   "does not promise a response SLA",
 ], "SECURITY.md");
 assertMarkers(await readRequired("CHANGELOG.md"), [
+  "0.9.10 - 2026-09-08",
   "0.9.9 - 2026-09-08",
   "0.9.8 - 2026-09-08",
   "0.9.7 - 2026-09-07",

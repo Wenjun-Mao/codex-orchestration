@@ -4,6 +4,10 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import test from "node:test";
+import {
+  assertExactSourceReleaseIdentity,
+  assertInstalledDistributionIdentity,
+} from "../lib/distribution-identity.mjs";
 import { validateReleaseIdentity } from "../scripts/release-identity.mjs";
 
 const packageMetadata = {
@@ -12,6 +16,43 @@ const packageMetadata = {
   main: "./entry/main.mjs",
   bin: { "release-identity-fixture": "./entry/bin.mjs" },
 };
+
+test("release identity separates strict source metadata from the bounded plugin cachebuster", () => {
+  assert.deepEqual(assertExactSourceReleaseIdentity({
+    packageVersion: "1.2.3-dev.0",
+    pluginVersion: "1.2.3-dev.0",
+    expectedVersion: "1.2.3-dev.0",
+  }), {
+    package_version: "1.2.3-dev.0",
+    plugin_version: "1.2.3-dev.0",
+  });
+  assert.throws(() => assertExactSourceReleaseIdentity({
+    packageVersion: "1.2.3-dev.0",
+    pluginVersion: "1.2.3-dev.0+codex.20260909011550",
+    expectedVersion: "1.2.3-dev.0",
+  }), /exactly match/);
+
+  assert.deepEqual(assertInstalledDistributionIdentity({
+    packageVersion: "1.2.3-dev.0",
+    pluginVersion: "1.2.3-dev.0+codex.20260909011550",
+    expectedVersion: "1.2.3-dev.0",
+  }), {
+    package_version: "1.2.3-dev.0",
+    plugin_version: "1.2.3-dev.0+codex.20260909011550",
+    cachebuster: "20260909011550",
+  });
+  for (const pluginVersion of [
+    "1.2.2+codex.20260909011550",
+    "1.2.3-dev.0+codex.fixture",
+    "1.2.3-dev.0+other.20260909011550",
+  ]) {
+    assert.throws(() => assertInstalledDistributionIdentity({
+      packageVersion: "1.2.3-dev.0",
+      pluginVersion,
+      expectedVersion: "1.2.3-dev.0",
+    }), /Installed plugin metadata/);
+  }
+});
 
 async function createReleasedFixture({ prepack } = {}) {
   const root = await mkdtemp(resolve(tmpdir(), "codex-flow-release-identity-"));

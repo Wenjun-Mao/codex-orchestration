@@ -29,6 +29,7 @@
     "content-safety.mjs": "governance-core",
     "core.mjs": "governance-core",
     "core/task-launch.mjs": "governance-core",
+    "distribution-identity.mjs": "governance-core",
     "dispositions.mjs": "governance-core",
     "foreign-active-run-sentinel.mjs": "governance-core",
     "git.mjs": "governance-core",

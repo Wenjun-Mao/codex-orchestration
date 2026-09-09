@@ -3,6 +3,15 @@
 This file records concise user-facing changes. Immutable tags and the linked
 decision records remain the detailed release evidence.
 
+## 0.9.10 - 2026-09-08
+
+- Accept the updater's bounded manifest-only Codex cachebuster at installed
+  distribution boundaries while retaining exact source and runtime release
+  identity.
+- Remove the unused direct closeout driver. CLI and assignment acceptance share
+  the owning-host prepare/result/observation/reclamation transition, with
+  representative real-Git coverage and lighter coordinator-reporting fixtures.
+
 ## 0.9.9 - 2026-09-08
 
 - Authenticate the Codex App worktree owner before coordinator route
