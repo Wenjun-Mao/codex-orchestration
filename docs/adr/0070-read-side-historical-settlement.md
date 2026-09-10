@@ -57,6 +57,14 @@ compatibility readers retain their narrower rules. A reclaimed modern run with
 no exact retired assignment blocks; a legitimately standalone run remains usable
 through its live-source path while its checkout exists.
 
+Sibling safety during a live semantic refresh is intentionally narrower than
+fresh admission. A reclaimed closed sibling may be accepted when the same ready,
+open assignment contains both its exact execution binding and released runtime
+retirement and the selected live run is that assignment's latest binding. This
+proves the earlier execution is safe to leave behind without falsely requiring
+the still-live outer assignment, report, route, locator, or iteration to be
+retired. Once no live source remains, the full outer-settlement contract applies.
+
 Inspection is advisory. Ordinary activation repeats the classification while
 holding the existing repository admission lock and before target runtime or
 workflow preparation. An existing refresh handoff takes precedence: unrelated

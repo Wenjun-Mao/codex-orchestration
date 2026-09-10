@@ -31,6 +31,7 @@ import {
 import {
   assignmentAuthority,
   assignmentRegistration,
+  bindAssignmentRefreshExecution,
   markAssignmentRegistrationStage,
   openAssignmentForSender,
   publishAssignmentReadiness,
@@ -41,7 +42,7 @@ import {
   closeoutIterationWithOwningHost,
   iterationStatus,
 } from "../lib/iteration-registry.mjs";
-import { bindRecipient } from "../lib/recipients.mjs";
+import { bindRecipient, recipientPaths } from "../lib/recipients.mjs";
 import { registerCoordinatorReportRoute, reportRoute } from "../lib/report-routes.mjs";
 import {
   acceptReportSubmission,
@@ -58,11 +59,7 @@ import {
   loadRefreshSourceAuthority,
   refreshNamespaceTreeDigest,
 } from "../lib/compat/refresh-source.mjs";
-import {
-  assertRuntimeRepositoryCurrent,
-  RUNTIME_DIRECTORY,
-} from "../lib/runtime-context.mjs";
-import { gitSnapshot } from "../lib/git.mjs";
+import { RUNTIME_DIRECTORY } from "../lib/runtime-context.mjs";
 import { createGitFixture, packageRoot, removeFixture } from "./helpers.mjs";
 import { createActiveTaskLaunch } from "./v09-lifecycle-fixture.mjs";
 
@@ -480,6 +477,8 @@ async function createAbandonedDirectCoordinatorRun({
   beforeAbandon = null,
   terminalKind = "abandoned",
   workflowTaskOverrides = {},
+  coordinatorThreadId = `${runId}-coordinator`,
+  coordinatorLineageId = `${runId}-lineage`,
 }) {
   const workflowTask = task(`${runId}-delivery`, {
     execution_kind: "coordinator",
@@ -491,8 +490,8 @@ async function createAbandonedDirectCoordinatorRun({
   const request = activation({
     runId,
     workflowTask,
-    lineageId: `${runId}-lineage`,
-    threadId: `${runId}-coordinator`,
+    lineageId: coordinatorLineageId,
+    threadId: coordinatorThreadId,
     branch: `codex/${runId}`,
     branchFences: [],
   });
@@ -526,7 +525,7 @@ async function createAbandonedDirectCoordinatorRun({
     const auditCall = invoke(runtimeCli, ["run", "audit", "--run-id", runId, "--json"], root);
     assertSuccess(auditCall, "v0.9 direct coordinator source closure audit");
     audit = JSON.parse(auditCall.stdout).audit;
-    assert.equal(audit.terminal_ready, true);
+    assert.equal(audit.terminal_ready, true, JSON.stringify(audit.blockers));
     const closePath = await jsonFile(requests, `${runId}-close`, {
       run_id: runId,
       resume: activated.run.binding,
@@ -815,6 +814,160 @@ test("v0.9 refresh keeps completed coordinator work on the true no-work clean-st
   await assert.rejects(stat(resolve(root, ".git/codex-flow/v0.9.7-rc.7")), /ENOENT/);
 });
 
+test("live semantic refresh accepts a reclaimed closed sibling owned by its open assignment", async (t) => {
+  const primary = await createGitFixture("codex-flow-refresh-open-assignment-sibling-");
+  const requests = await mkdtemp(resolve(tmpdir(), "codex-flow-refresh-open-assignment-sibling-requests-"));
+  const sourcePackage = await copyCurrentPackage({ version: "0.9.12-rc.1" });
+  const targetPackage = await copyCurrentPackage({ version: "0.9.12" });
+  const oldRoot = resolve(primary, `../${basename(primary)}-open-assignment-old`);
+  const oldBranch = "codex/open-assignment-old";
+  t.after(async () => {
+    spawnSync("git", ["worktree", "remove", "--force", oldRoot], { cwd: primary, stdio: "ignore" });
+    spawnSync("git", ["branch", "-D", oldBranch], { cwd: primary, stdio: "ignore" });
+    await Promise.all([
+      removeFixture(primary),
+      rm(requests, { recursive: true, force: true }),
+      rm(sourcePackage.root, { recursive: true, force: true }),
+      rm(targetPackage.root, { recursive: true, force: true }),
+    ]);
+  });
+  execFileSync("git", ["worktree", "add", "--quiet", "-b", oldBranch, oldRoot], { cwd: primary });
+  const coordinatorThreadId = "open-assignment-sibling-coordinator";
+  const coordinatorLineageId = "open-assignment-sibling-lineage";
+  const director = {
+    lineage_id: "open-assignment-sibling-director-lineage",
+    thread_id: "open-assignment-sibling-director",
+    generation: 1,
+  };
+  const planPath = resolve(requests, "open-assignment-sibling-plan.md");
+  await writeFile(planPath, "# Open assignment sibling fixture\n", "utf8");
+  const earlier = await createAbandonedDirectCoordinatorRun({
+    root: oldRoot,
+    requests,
+    sourcePackage,
+    runId: "open-assignment-old",
+    terminalKind: "closed",
+    coordinatorThreadId,
+    coordinatorLineageId,
+    beforeAbandon: async ({ activated, request, runtimeCli, localWork }) => {
+      await bindRecipient({ stateRoot: activated.state_authority.state_root, recipient: director });
+      const registration = await registerCoordinatorReportRoute({
+        stateRoot: activated.state_authority.state_root,
+        runId: request.run_id,
+        senderThreadId: coordinatorThreadId,
+        senderHostId: request.runtime.host.host_id,
+        recipient: {
+          host_id: request.runtime.host.host_id,
+          ...director,
+          binding_digest: recipientBindingDigest(director),
+        },
+        approvedPlanPath: planPath,
+        approvedPlanDigest: sha256("# Open assignment sibling fixture\n"),
+        iterationLabel: "open assignment sibling",
+        purpose: "Prove operation-specific sibling settlement",
+        repositoryRoot: oldRoot,
+        repositoryBranch: oldBranch,
+      });
+      await installRepositoryReportLocator({
+        stateRoot: registration.state_root,
+        route: registration.route,
+        packageRoot: sourcePackage.root,
+        nativeQueue: {
+          binary_path: CODEX_APP_BINARY_PATH,
+          expected_version: CODEX_APP_CLI_VERSION,
+          sqlite_home: resolve(homedir(), ".codex"),
+        },
+      });
+      await markAssignmentRegistrationStage({
+        stateRoot: registration.state_root,
+        assignmentId: registration.route.assignment.assignment_id,
+        stage: "locator",
+      });
+      await publishAssignmentReadiness({
+        stateRoot: registration.state_root,
+        assignmentId: registration.route.assignment.assignment_id,
+      });
+      const completionPath = await jsonFile(requests, "open-assignment-old-complete", {
+        run_id: request.run_id,
+        local_work_id: localWork.local_work_id,
+        checks: [{
+          check_id: "open-assignment-old-complete",
+          argv: [process.execPath, "-e", "process.exit(0)"],
+        }],
+      });
+      const completionCall = invoke(runtimeCli, [
+        "workflow", "local", "complete", "--run-id", request.run_id,
+        "--file", completionPath, "--json",
+      ], oldRoot, { CODEX_THREAD_ID: coordinatorThreadId });
+      assertSuccess(completionCall, "open-assignment earlier execution completion");
+      return registration;
+    },
+  });
+  const registration = earlier.beforeAbandonResult;
+  const recipientLocation = recipientPaths(
+    earlier.activated.state_authority.state_root,
+    coordinatorLineageId,
+  );
+  await rm(recipientLocation.registry);
+  const current = await createAbandonedDirectCoordinatorRun({
+    root: primary,
+    requests,
+    sourcePackage,
+    runId: "open-assignment-current",
+    terminalKind: "active",
+    coordinatorThreadId,
+    coordinatorLineageId,
+  });
+  await bindAssignmentRefreshExecution({
+    commonDir: await realpath(resolve(primary, ".git")),
+    sender: registration.route.sender,
+    source: {
+      run_id: earlier.request.run_id,
+      runtime_context_digest: earlier.activated.run.runtime_context_hash,
+      plan_id: earlier.activated.run.workflow_plan_id,
+      namespace: "v0.9.12-rc.1",
+    },
+    targetExecutionBinding: {
+      run_id: current.request.run_id,
+      runtime_context_digest: current.activated.run.runtime_context_hash,
+      configuration_digest: current.activated.run.binding.config_hash,
+      repository_digest: current.activated.run.binding.repository_hash,
+      repository_root: primary,
+      repository_branch: "main",
+      plan_id: current.activated.run.workflow_plan_id,
+      revision_digest: current.activated.run.workflow_revision_digest,
+      namespace: "v0.9.12-rc.1",
+      bound_at: current.activated.run.admitted_at,
+    },
+  });
+  execFileSync("git", ["worktree", "remove", oldRoot], { cwd: primary });
+  execFileSync("git", ["branch", "-d", oldBranch], { cwd: primary });
+  const assignment = await assignmentAuthority({
+    stateRoot: registration.state_root,
+    assignmentId: registration.route.assignment.assignment_id,
+  });
+  assert.equal(assignment.state, "open");
+  assert.equal(assignment.execution_retirements.find(
+    (entry) => entry.run_id === earlier.request.run_id,
+  ).resource_disposition, "released");
+  const skill = resolve(sourcePackage.root, "skills", "refresh", "SKILL.md");
+  const inspectionCall = invoke(sourcePackage.cli, [
+    "refresh", "inspect", "--invoking-skill", skill, "--json",
+  ], primary);
+  assertSuccess(inspectionCall, "open-assignment sibling refresh inspection");
+  const inspection = JSON.parse(inspectionCall.stdout);
+  assert.equal(inspection.route, "resume-source", inspection.reason);
+  assert.equal(inspection.authority.source.run_id, current.request.run_id);
+  const targetSkill = resolve(targetPackage.root, "skills", "refresh", "SKILL.md");
+  const targetInspectionCall = invoke(targetPackage.cli, [
+    "refresh", "inspect", "--invoking-skill", targetSkill, "--json",
+  ], primary);
+  assertSuccess(targetInspectionCall, "open-assignment sibling target inspection");
+  const targetInspection = JSON.parse(targetInspectionCall.stdout);
+  assert.equal(targetInspection.route, "refresh-ready", targetInspection.reason);
+  assert.equal(targetInspection.authority.source.run_id, current.request.run_id);
+});
+
 test("assignment-lived reporting binds the exact target before refresh source deletion", async (t) => {
   const root = await createGitFixture("codex-flow-refresh-v097-assignment-");
   const requests = await mkdtemp(resolve(tmpdir(), "codex-flow-refresh-v097-assignment-requests-"));
@@ -1015,8 +1168,8 @@ test("assignment-lived reporting binds the exact target before refresh source de
     root,
     activationRequest: targetActivation,
     refreshId: handoff.refresh_id,
-    crashAfter: "afterAssignmentBinding",
-  }), /afterAssignmentBinding/);
+    crashAfter: "afterAssignmentBindingPersisted",
+  }), /afterAssignmentBindingPersisted/);
   const interrupted = await assignmentAuthority({
     stateRoot: registered.state_root,
     assignmentId: originalAssignment.assignment_id,
@@ -1024,6 +1177,17 @@ test("assignment-lived reporting binds the exact target before refresh source de
   assert.equal(interrupted.execution_bindings.length, 2);
   assert.deepEqual(interrupted.execution_bindings[0], originalAssignment.execution_bindings[0]);
   assert.equal(interrupted.execution_bindings[1].run_id, targetActivation.run_id);
+  await assert.rejects(stat(resolve(flowRoot, "v0.9.12")), /ENOENT/);
+  const interruptedCancellation = invoke(targetPackage.cli, [
+    "assignment", "cancel", "--assignment-id", originalAssignment.assignment_id,
+    "--file", preAdmissionCancellationPath, "--json",
+  ], root, { CODEX_THREAD_ID: recipient.thread_id });
+  assert.notEqual(interruptedCancellation.status, 0);
+  assert.equal((await assignmentAuthority({
+    stateRoot: registered.state_root,
+    assignmentId: originalAssignment.assignment_id,
+  })).state, "open");
+  assert.equal(await readFile(handoffPath, "utf8"), handoffBytes);
   const interruptedStatusCall = invoke(targetPackage.cli, [
     "refresh", "status", "--invoking-skill", targetSkill,
     "--refresh-id", handoff.refresh_id, "--json",
@@ -2376,20 +2540,53 @@ test("v0.9 refresh rejects an abandoned predecessor that retains a live Git fenc
   assert.match(inspection.reason, /Earlier source run retains unresolved fences/);
 });
 
-test("run activation preparation rejects clean target Git drift from its initial authority", async (t) => {
+test("public run activation rejects clean target Git drift before preparation", async (t) => {
   const root = await createGitFixture("codex-flow-refresh-target-drift-");
-  t.after(() => removeFixture(root));
-  const initial = gitSnapshot(root);
-  await writeFile(resolve(root, "target-drift.txt"), "drifted after initial snapshot\n", "utf8");
-  execFileSync("git", ["add", "target-drift.txt"], { cwd: root });
-  execFileSync("git", ["commit", "--quiet", "-m", "target drift"], { cwd: root });
-  assert.throws(() => assertRuntimeRepositoryCurrent({
-    common_dir: initial.commonDir,
-    root: initial.root,
-    branch: initial.branch,
-    revision: initial.revision,
-  }), /Target repository drifted before run activation preparation/);
-  await assert.rejects(stat(resolve(initial.commonDir, "codex-flow", RUNTIME_DIRECTORY)), /ENOENT/);
+  const requests = await mkdtemp(resolve(tmpdir(), "codex-flow-refresh-target-drift-requests-"));
+  const targetPackage = await copyCurrentPackage({ version: "0.9.12-rc.1" });
+  t.after(async () => Promise.all([
+    removeFixture(root),
+    rm(requests, { recursive: true, force: true }),
+    rm(targetPackage.root, { recursive: true, force: true }),
+  ]));
+  const cliSource = await readFile(targetPackage.cli, "utf8");
+  const injectionPoint = "    const bundleSource = await loadRuntimeBundleSource({ packageRoot });";
+  assert.equal(cliSource.includes(injectionPoint), true);
+  await writeFile(targetPackage.cli, cliSource.replace(injectionPoint, `
+    if (process.env.CODEX_FLOW_TEST_TARGET_DRIFT === "1") {
+      const { writeFileSync } = await import("node:fs");
+      const { spawnSync } = await import("node:child_process");
+      writeFileSync(resolve(git.root, "target-drift.txt"), "drifted after initial snapshot\\n", "utf8");
+      const added = spawnSync("git", ["add", "target-drift.txt"], { cwd: git.root });
+      const committed = spawnSync("git", ["commit", "--quiet", "-m", "target drift"], { cwd: git.root });
+      if (added.status !== 0 || committed.status !== 0) throw new Error("target drift injection failed");
+    }
+${injectionPoint}`), "utf8");
+  const request = activation({
+    runId: "public-target-drift",
+    workflowTask: task("public-target-drift-work", {
+      execution_kind: "coordinator",
+      mode: "read",
+      write_paths: [],
+      shared_resources: [],
+    }),
+    lineageId: "public-target-drift-lineage",
+    threadId: "public-target-drift-thread",
+    branch: "main",
+    branchFences: [],
+  });
+  const requestPath = await jsonFile(requests, "public-target-drift", request);
+  const activated = invoke(targetPackage.cli, [
+    "run", "activate", "--run-id", request.run_id,
+    "--file", requestPath, "--json",
+  ], root, {
+    CODEX_THREAD_ID: request.runtime.lineage.thread_id,
+    CODEX_FLOW_TEST_TARGET_DRIFT: "1",
+  });
+  assert.notEqual(activated.status, 0);
+  assert.match(`${activated.stderr}\n${activated.stdout}`, /Target repository drifted before run activation preparation/);
+  const commonDir = await realpath(resolve(root, ".git"));
+  await assert.rejects(stat(resolve(commonDir, "codex-flow", RUNTIME_DIRECTORY)), /ENOENT/);
 });
 
 test("settled v0.9.11 assignments admit candidate work and a later stable consumer across two namespaces", async (t) => {

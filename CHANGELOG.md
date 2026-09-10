@@ -18,6 +18,9 @@ decision records remain the detailed release evidence.
 - Serialize assignment-backed refresh admission with cancellation, revalidate
   unrelated retained history on first refresh-ID admission, and reject target
   Git drift before runtime or workflow preparation.
+- Keep live semantic refresh available when a reclaimed closed sibling has exact
+  released execution evidence in the same open assignment, without weakening
+  the fully retired outer contract required for fresh admission.
 
 ## 0.9.11 - 2026-09-09
 
