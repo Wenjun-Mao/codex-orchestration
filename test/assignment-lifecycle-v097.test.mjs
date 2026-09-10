@@ -14,7 +14,9 @@ import {
   assignmentStateRoot,
   bindAssignmentRefreshExecution,
   createAssignmentAuthority,
+  markAssignmentRegistrationStage,
   openAssignmentForSender,
+  publishAssignmentReadiness,
 } from "../lib/assignment-authority.mjs";
 import {
   assignmentPreparation,
@@ -66,6 +68,7 @@ import { persistWorkflowTaskContract } from "../lib/workflow-journal.mjs";
 
 const TIME = Date.parse("2026-09-06T15:00:00.000Z");
 const FROZEN_RC1_COMMIT = "ac301363976d4433885323530e7ccedbc5fcc5e5";
+const cli = resolve(packageRoot, "bin", "codex-flow.mjs");
 
 function git(root, args) {
   return execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
@@ -129,7 +132,7 @@ function activationRequest({ runId, plan, lineage, branchFences, now }) {
   };
 }
 
-async function fixture(t, { detachedCoordinator = false } = {}) {
+async function fixture(t, { detachedCoordinator = false, publishRegistration = true } = {}) {
   const primaryRoot = await createGitFixture("codex-flow-v097-assignment-");
   const coordinatorPath = resolve(primaryRoot, `../${basename(primaryRoot)}-coordinator`);
   const coordinatorBranch = detachedCoordinator ? "detached" : "codex/coordinator-assignment";
@@ -181,6 +184,7 @@ async function fixture(t, { detachedCoordinator = false } = {}) {
   });
   const context = {
     ...activated,
+    plan,
     commonDir,
     stateRoot: resolve(commonDir, "codex-flow", RUNTIME_DIRECTORY),
     launch: { run_id: runId },
@@ -209,7 +213,35 @@ async function fixture(t, { detachedCoordinator = false } = {}) {
     repositoryBranch: coordinatorBranch,
     now: TIME,
   });
-  return { ...context, primaryRoot, coordinatorPath, coordinatorBranch, director, ...registered };
+  let assignment = registered.assignment;
+  if (publishRegistration) {
+    await installRepositoryReportLocator({
+      stateRoot: registered.state_root,
+      route: registered.route,
+      packageRoot,
+      nativeQueue: nativeQueue(),
+    });
+    await markAssignmentRegistrationStage({
+      stateRoot: registered.state_root,
+      assignmentId: registered.route.assignment.assignment_id,
+      stage: "locator",
+      now: TIME,
+    });
+    assignment = await publishAssignmentReadiness({
+      stateRoot: registered.state_root,
+      assignmentId: registered.route.assignment.assignment_id,
+      now: TIME,
+    });
+  }
+  return {
+    ...context,
+    primaryRoot,
+    coordinatorPath,
+    coordinatorBranch,
+    director,
+    ...registered,
+    assignment,
+  };
 }
 
 function successorAssignmentPlan(suffix) {
@@ -253,7 +285,7 @@ async function registerSuccessorAssignment(
 ) {
   const plan = successorAssignmentPlan(suffix);
   const runId = `successor-assignment-run-${suffix}`;
-  await activateFixtureRun({
+  const activation = await activateFixtureRun({
     root: repositoryRoot,
     runId,
     plan,
@@ -265,7 +297,7 @@ async function registerSuccessorAssignment(
     },
     now,
   });
-  return registerCoordinatorReportRoute({
+  const registered = await registerCoordinatorReportRoute({
     stateRoot: predecessor.stateRoot,
     runId,
     senderThreadId,
@@ -283,6 +315,24 @@ async function registerSuccessorAssignment(
     repositoryBranch,
     now: now + 100,
   });
+  await installRepositoryReportLocator({
+    stateRoot: registered.state_root,
+    route: registered.route,
+    packageRoot,
+    nativeQueue: nativeQueue(),
+  });
+  await markAssignmentRegistrationStage({
+    stateRoot: registered.state_root,
+    assignmentId: registered.route.assignment.assignment_id,
+    stage: "locator",
+    now: now + 100,
+  });
+  const assignment = await publishAssignmentReadiness({
+    stateRoot: registered.state_root,
+    assignmentId: registered.route.assignment.assignment_id,
+    now: now + 100,
+  });
+  return { ...registered, assignment, activation };
 }
 
 async function abandonAndCancelPredecessor(predecessor, now) {
@@ -553,6 +603,23 @@ async function acceptedChildFixture(
     purpose: "Assignment reporting",
     repositoryRoot: coordinatorWorktree ? coordinatorPath : null,
     repositoryBranch: coordinatorWorktree ? coordinatorBranch : null,
+    now: TIME,
+  });
+  await installRepositoryReportLocator({
+    stateRoot: registered.state_root,
+    route: registered.route,
+    packageRoot,
+    nativeQueue: nativeQueue(),
+  });
+  await markAssignmentRegistrationStage({
+    stateRoot: registered.state_root,
+    assignmentId: registered.route.assignment.assignment_id,
+    stage: "locator",
+    now: TIME,
+  });
+  await publishAssignmentReadiness({
+    stateRoot: registered.state_root,
+    assignmentId: registered.route.assignment.assignment_id,
     now: TIME,
   });
   const assignment = await assignmentAuthority({
@@ -932,6 +999,85 @@ test("coordinator route registration is idempotent after assignment iteration pe
   assert.equal(iteration.created_at, new Date(TIME).toISOString());
 });
 
+test("interrupted coordinator registration exposes status and a lawful public abort", async (t) => {
+  const context = await fixture(t, { publishRegistration: false });
+  const assignmentId = context.route.assignment.assignment_id;
+  const before = assertPackageSuccess(invokePackage(cli, [
+    "assignment", "status", "--assignment-id", assignmentId, "--json",
+  ], context.coordinatorPath), "partial assignment status");
+  assert.equal(before.assignment.state, "registering");
+  assert.equal(before.registration.route, "ready");
+  assert.equal(before.registration.locator, "pending");
+  assert.equal(before.iteration.state, "open");
+  assert.equal(before.route.state, "active");
+  assert.equal(before.locator.status, "absent");
+  assert.match(before.registration.next_action, /locator/);
+  await closeReportRoute({
+    stateRoot: context.state_root,
+    routeId: context.route.route_id,
+    reason: "terminal",
+    now: TIME + 500,
+  });
+  const closedWhileActive = assertPackageSuccess(invokePackage(cli, [
+    "assignment", "status", "--assignment-id", assignmentId, "--json",
+  ], context.coordinatorPath), "closed-route active-registration status");
+  assert.match(closedWhileActive.registration.next_action, /terminalize every bound execution/);
+
+  const requests = await mkdtemp(resolve(tmpdir(), "codex-flow-registration-abort-"));
+  t.after(() => rm(requests, { recursive: true, force: true }));
+  const { run } = await readRun({
+    gitCommonDirectory: context.commonDir,
+    runId: context.launch.run_id,
+  });
+  const reason = "Abort one interrupted registration while retaining unresolved reservations.";
+  const abandonRequest = await jsonRequest(requests, "abandon", {
+    run_id: run.run_id,
+    resume: run.binding,
+    reason,
+    abandoned_at: new Date(TIME + 1_000).toISOString(),
+  });
+  const abandoned = assertPackageSuccess(invokePackage(cli, [
+    "run", "abandon", "--run-id", run.run_id, "--file", abandonRequest, "--json",
+  ], context.coordinatorPath, { CODEX_THREAD_ID: context.coordinator.thread_id }), "partial registration run abandonment");
+  assert.equal(abandoned.run.status, "abandoned");
+  assert.deepEqual(abandoned.locator_retirements, []);
+  const terminalStatus = assertPackageSuccess(invokePackage(cli, [
+    "assignment", "status", "--assignment-id", assignmentId, "--json",
+  ], context.coordinatorPath), "terminal partial assignment status");
+  assert.equal(terminalStatus.route.state, "closed");
+  assert.match(terminalStatus.registration.next_action, /cancel the assignment/);
+
+  const cancelRequest = await jsonRequest(requests, "cancel", {
+    assignment_id: assignmentId,
+    reason,
+  });
+  const cancelled = assertPackageSuccess(invokePackage(cli, [
+    "assignment", "cancel", "--assignment-id", assignmentId, "--file", cancelRequest, "--json",
+  ], context.coordinatorPath, { CODEX_THREAD_ID: context.director.thread_id }), "partial assignment cancellation");
+  assert.equal(cancelled.status, "cancelled");
+  assert.equal(cancelled.assignment.registration.status, "aborted");
+  assert.equal(cancelled.iteration.iteration.state, "cancelled");
+  assert.equal(cancelled.locator_retirement.status, "not-installed");
+  assert.equal(cancelled.obligations[0].resource_disposition, "retained");
+  assert.equal(cancelled.obligations[0].owner_thread_id, context.coordinator.thread_id);
+  assert.match(cancelled.obligations[0].next_action, /retained fences/);
+
+  await assert.rejects(
+    activateFixtureRun({
+      root: context.coordinatorPath,
+      runId: "conflicting-post-abort-run",
+      plan: context.plan,
+      lineage: {
+        lineage_id: "conflicting-post-abort-lineage",
+        thread_id: context.coordinator.thread_id,
+        generation: 1,
+      },
+      now: TIME + 2_000,
+    }),
+    /retained fences/,
+  );
+});
+
 test("assignment refresh binding appends once and rejects conflicting or stale transitions", async (t) => {
   const context = await fixture(t);
   const beforeRoute = await reportRoute({
@@ -1067,7 +1213,7 @@ test("pre-dispatch preparation generates the useful first prompt from bound auth
 test("assignment acceptance is fail-closed for an active coordinator and resumes without duplicate archival", async (t) => {
   const context = await fixture(t);
   const report = await acceptedFinal(context, "complete", "Complete.", 1_000);
-  const prepared = await acceptAssignmentResult({
+  const premature = await acceptAssignmentResult({
     stateRoot: context.state_root,
     assignmentId: context.route.assignment.assignment_id,
     reportId: report.report_id,
@@ -1075,6 +1221,36 @@ test("assignment acceptance is fail-closed for an active coordinator and resumes
     taskObservation: activeTaskObservation(context.coordinator.thread_id),
     retireLocator: async () => ({ status: "retired" }),
     now: TIME + 2_000,
+  });
+  assert.equal(premature.status, "closeout-pending");
+  assert.equal(premature.reason, "execution-terminal-required");
+  assert.equal(premature.active_executions[0].run_id, context.launch.run_id);
+  assert.equal(Object.hasOwn(premature, "closeout"), false);
+  const { run } = await readRun({
+    gitCommonDirectory: context.commonDir,
+    runId: context.launch.run_id,
+  });
+  await closeRun({
+    gitCommonDirectory: context.commonDir,
+    runId: run.run_id,
+    resume: run.binding,
+    closedAt: new Date(TIME + 2_500).toISOString(),
+  });
+  const afterClose = await assignmentAuthority({
+    stateRoot: context.state_root,
+    assignmentId: context.route.assignment.assignment_id,
+  });
+  assert.equal(afterClose.execution_retirements[0].run_id, run.run_id);
+  assert.equal(afterClose.execution_retirements[0].resource_disposition, "released");
+  await rm(context.stateRoot, { recursive: true, force: true });
+  const prepared = await acceptAssignmentResult({
+    stateRoot: context.state_root,
+    assignmentId: context.route.assignment.assignment_id,
+    reportId: report.report_id,
+    directorThreadId: context.director.thread_id,
+    taskObservation: activeTaskObservation(context.coordinator.thread_id, TIME + 3_000),
+    retireLocator: async () => ({ status: "retired" }),
+    now: TIME + 3_000,
   });
   assert.equal(prepared.closeout.status, "host-action-required");
   const rejected = await acceptAssignmentResult({
@@ -1209,7 +1385,7 @@ test("concurrent acceptance and cancellation cannot split assignment and reporti
   assert.equal(iteration.state, "cancelled");
 });
 
-test("accepted assignment wins the inverse cancellation interleave without cleanup", async (t) => {
+test("an accepted decision can still cancel retained execution obligations without cleanup", async (t) => {
   const context = await fixture(t);
   const report = await acceptedFinal(context, "accept-cancel-inverse", "Terminal result.", 1_000);
   const { run } = await readRun({
@@ -1245,15 +1421,18 @@ test("accepted assignment wins the inverse cancellation interleave without clean
   });
   const accepted = await acceptance;
   assert.equal(accepted.status, "closeout-pending");
+  assert.equal(accepted.reason, "execution-obligations-retained");
   interleave.releaseSecond();
-  await assert.rejects(cancellation, /Assignment terminal state changed during cancellation/);
+  const cancelled = await cancellation;
+  assert.equal(cancelled.status, "cancelled");
   const assignment = await assignmentAuthority({
     stateRoot: context.state_root,
     assignmentId: context.route.assignment.assignment_id,
   });
   const route = await reportRoute({ stateRoot: context.state_root, routeId: context.route.route_id });
-  assert.equal(assignment.state, "accepted");
-  assert.equal(route.state, "active");
+  assert.equal(assignment.state, "cancelled");
+  assert.equal(assignment.acceptance.report_id, report.report_id);
+  assert.equal(route.state, "closed");
 });
 
 test("assignment cancellation proves terminal ownership, retires reporting, and preserves coordinator resources", async (t) => {
@@ -1503,6 +1682,14 @@ test("a cancelled coordinator can be rebound to a successor assignment and recla
     now: TIME + 15_800,
   });
   assert.equal(partialSuccessor.status, "created");
+  const partialStatus = assertPackageSuccess(invokePackage(cli, [
+    "assignment", "status", "--assignment-id", expectedSuccessorAssignmentId, "--json",
+  ], predecessor.coordinatorPath), "assignment-only public status");
+  assert.equal(partialStatus.assignment.state, "registering");
+  assert.equal(partialStatus.iteration, null);
+  assert.equal(partialStatus.route, null);
+  assert.equal(partialStatus.locator.status, "absent");
+  assert.match(partialStatus.registration.next_action, /iteration/);
   await assert.rejects(
     iterationStatus({
       commonDir: predecessor.commonDir,
@@ -1563,17 +1750,38 @@ test("a cancelled coordinator can be rebound to a successor assignment and recla
     }),
     /shared by another persisted member/,
   );
+  await installRepositoryReportLocator({
+    stateRoot: successor.state_root,
+    route: successor.route,
+    packageRoot,
+    nativeQueue: nativeQueue(),
+  });
+  await markAssignmentRegistrationStage({
+    stateRoot: successor.state_root,
+    assignmentId: successor.route.assignment.assignment_id,
+    stage: "locator",
+    now: TIME + 15_900,
+  });
+  await publishAssignmentReadiness({
+    stateRoot: successor.state_root,
+    assignmentId: successor.route.assignment.assignment_id,
+    now: TIME + 15_900,
+  });
   const report = await acceptedFinal(
     successor,
     "successor-assignment-final",
     "Successor assignment complete.",
     15_900,
   );
-  await installRepositoryReportLocator({
-    stateRoot: successor.state_root,
-    route: successor.route,
-    packageRoot,
-    nativeQueue: nativeQueue(),
+  const { run: successorTerminalRun } = await readRun({
+    gitCommonDirectory: predecessor.commonDir,
+    runId: successorRunId,
+  });
+  await closeRun({
+    gitCommonDirectory: predecessor.commonDir,
+    runId: successorRunId,
+    resume: successorTerminalRun.binding,
+    closedAt: new Date(TIME + 15_950).toISOString(),
   });
   git(predecessor.primaryRoot, ["merge", "--ff-only", predecessor.coordinatorBranch]);
   const retireSuccessorLocator = ({ routeId, reason, now }) => retireRepositoryReportLocator({
@@ -1822,6 +2030,41 @@ test("frozen RC1 cancellation admits and reclaims an exact RC2 successor", async
     cancelled.assignment.repository_digest,
     "the RC2 successor must admit after the completed RC1 baseline advanced",
   );
+  const successorLocalStartPath = await jsonRequest(requests, "rc2-successor-local-start", {
+    run_id: successorRunId,
+    plan_id: successorPlan.plan_id,
+    task_id: successorPlan.tasks[0].task_id,
+    dependency_authorities: [],
+  });
+  const successorLocalWork = assertPackageSuccess(invokePackage(successorRuntimeCli, [
+    "workflow", "local", "start", "--run-id", successorRunId,
+    "--file", successorLocalStartPath, "--json",
+  ], coordinatorPath, { CODEX_THREAD_ID: coordinator.thread_id }), "RC2 successor useful work start");
+  const successorLocalCompletePath = await jsonRequest(requests, "rc2-successor-local-complete", {
+    run_id: successorRunId,
+    local_work_id: successorLocalWork.local_work_id,
+    checks: [{
+      check_id: "rc2-successor-complete",
+      argv: [process.execPath, "-e", "process.exit(0)"],
+    }],
+  });
+  assertPackageSuccess(invokePackage(successorRuntimeCli, [
+    "workflow", "local", "complete", "--run-id", successorRunId,
+    "--file", successorLocalCompletePath, "--json",
+  ], coordinatorPath, { CODEX_THREAD_ID: coordinator.thread_id }), "RC2 successor useful work completion");
+  const successorAudit = assertPackageSuccess(invokePackage(successorRuntimeCli, [
+    "run", "audit", "--run-id", successorRunId, "--json",
+  ], coordinatorPath), "RC2 successor run audit").audit;
+  assert.equal(successorAudit.terminal_ready, true);
+  const successorClosePath = await jsonRequest(requests, "rc2-successor-close", {
+    run_id: successorRunId,
+    resume: successorActivation.run.binding,
+    audit_id: successorAudit.audit_id,
+  });
+  assertPackageSuccess(invokePackage(successorRuntimeCli, [
+    "run", "close", "--run-id", successorRunId,
+    "--file", successorClosePath, "--json",
+  ], coordinatorPath), "RC2 successor run close");
   const report = await acceptedFinal(
     successor,
     "v0911-cross-version-successor-final",
@@ -2003,6 +2246,12 @@ test("repeated cancelled assignments leave one reclaimable same-owner successor"
     "The third same-owner assignment completed.",
     18_300,
   );
+  await closeRun({
+    gitCommonDirectory: first.commonDir,
+    runId: third.activation.run.run_id,
+    resume: third.activation.run.binding,
+    closedAt: new Date(TIME + 18_350).toISOString(),
+  });
   await installRepositoryReportLocator({
     stateRoot: third.state_root,
     route: third.route,
@@ -2110,6 +2359,12 @@ test("assignment cancellation resumes safely after its route was closed before l
 test("assignment acceptance reclaims an exact archived coordinator before retiring reporting", async (t) => {
   const context = await fixture(t);
   const report = await acceptedFinal(context, "flow-owned-cleanup", "Complete.", 4_500);
+  await closeRun({
+    gitCommonDirectory: context.commonDir,
+    runId: context.run.run_id,
+    resume: context.run.binding,
+    closedAt: new Date(TIME + 4_550).toISOString(),
+  });
   const codexHome = await mkdtemp(resolve(tmpdir(), "codex-flow-assignment-private-archive-"));
   await mkdir(resolve(codexHome, "sessions"), { recursive: true });
   await mkdir(resolve(codexHome, "archived_sessions"), { recursive: true });

@@ -30,7 +30,9 @@ import {
 } from "../lib/codex-app-report-adapter.mjs";
 import {
   assignmentAuthority,
+  markAssignmentRegistrationStage,
   openAssignmentForSender,
+  publishAssignmentReadiness,
 } from "../lib/assignment-authority.mjs";
 import { installRepositoryReportLocator } from "../lib/report-hook.mjs";
 import { closeoutIterationWithOwningHost, iterationStatus } from "../lib/iteration-registry.mjs";
@@ -166,12 +168,31 @@ async function extractTaggedPackage(tag) {
   return { root, cli: resolve(root, "bin", "codex-flow.mjs") };
 }
 
-async function copyCurrentPackage() {
+async function copyCurrentPackage({ version = null } = {}) {
   const root = await mkdtemp(resolve(tmpdir(), "codex-flow-v09-target-package-"));
   for (const path of ["bin", "lib", "schemas", "skills", "templates", ".codex-plugin"]) {
     await cp(resolve(packageRoot, path), resolve(root, path), { recursive: true });
   }
   await cp(resolve(packageRoot, "package.json"), resolve(root, "package.json"));
+  if (version !== null) {
+    const packageMetadata = JSON.parse(await readFile(resolve(root, "package.json"), "utf8"));
+    packageMetadata.version = version;
+    await writeFile(resolve(root, "package.json"), `${JSON.stringify(packageMetadata, null, 2)}\n`, "utf8");
+    const pluginPath = resolve(root, ".codex-plugin", "plugin.json");
+    const pluginMetadata = JSON.parse(await readFile(pluginPath, "utf8"));
+    pluginMetadata.version = version;
+    await writeFile(pluginPath, `${JSON.stringify(pluginMetadata, null, 2)}\n`, "utf8");
+    const corePath = resolve(root, "lib", "core.mjs");
+    const coreSource = await readFile(corePath, "utf8");
+    await writeFile(
+      corePath,
+      coreSource.replace(
+        /export const PACKAGE_VERSION = "[^"]+";/,
+        `export const PACKAGE_VERSION = ${JSON.stringify(version)};`,
+      ),
+      "utf8",
+    );
+  }
   return { root, cli: resolve(root, "bin", "codex-flow.mjs") };
 }
 
@@ -226,12 +247,14 @@ async function createAbandonedDirectCoordinatorRun({
   runId = "refresh-v097-direct-coordinator",
   beforeAbandon = null,
   terminalKind = "abandoned",
+  workflowTaskOverrides = {},
 }) {
   const workflowTask = task(`${runId}-delivery`, {
     execution_kind: "coordinator",
     mode: "read",
     write_paths: [],
     shared_resources: [],
+    ...workflowTaskOverrides,
   });
   const request = activation({
     runId,
@@ -320,7 +343,16 @@ test("v0.9 refresh reissues unfinished coordinator work without inventing child 
     ]);
   });
 
-  const source = await createAbandonedDirectCoordinatorRun({ root, requests, sourcePackage });
+  const source = await createAbandonedDirectCoordinatorRun({
+    root,
+    requests,
+    sourcePackage,
+    workflowTaskOverrides: {
+      mode: "write",
+      write_paths: ["audit-sentinel/refresh-v096-replacement.txt"],
+      shared_resources: ["refresh-v096-replacement-resource"],
+    },
+  });
   const targetSkill = resolve(targetPackage.root, "skills/refresh/SKILL.md");
   const inspectionCall = invoke(targetPackage.cli, [
     "refresh", "inspect", "--invoking-skill", targetSkill, "--json",
@@ -365,6 +397,30 @@ test("v0.9 refresh reissues unfinished coordinator work without inventing child 
   ], root);
   assert.notEqual(invalidWait.status, 0);
   assert.match(invalidWait.stderr, /Unfinished coordinator work must be discarded and reissued/);
+
+  const partialFencePath = await jsonFile(requests, "refresh-v096-direct-coordinator-partial-fences", {
+    source_namespace: "v0.9.7-rc.7",
+    source_run_id: source.request.run_id,
+    source_resume: source.activated.run.binding,
+    decisions: [{
+      source_task_id: source.workflowTask.task_id,
+      disposition: "discard",
+      rationale: "The terminal direct delivery has no executor resources and will be reissued.",
+    }],
+    replacements: [{
+      source_task_id: source.workflowTask.task_id,
+      target_task_id: replacement.task_id,
+    }],
+    target_workflow: targetActivation.workflow,
+    target_fences: { path_fences: [], resource_fences: [], branch_fences: [] },
+    target_coordinator_thread_id: source.request.runtime.lineage.thread_id,
+  });
+  const partialFenceCall = invoke(targetPackage.cli, [
+    "refresh", "prepare", "--invoking-skill", targetSkill,
+    "--file", partialFencePath, "--json",
+  ], root);
+  assert.notEqual(partialFenceCall.status, 0);
+  assert.match(partialFenceCall.stderr, /outside the admitted run fence envelope/);
 
   const preparePath = await jsonFile(requests, "refresh-v096-direct-coordinator-prepare", {
     source_namespace: "v0.9.7-rc.7",
@@ -497,8 +553,9 @@ test("v0.9 refresh keeps completed coordinator work on the true no-work clean-st
 test("assignment-lived reporting binds the exact target before refresh source deletion", async (t) => {
   const root = await createGitFixture("codex-flow-refresh-v097-assignment-");
   const requests = await mkdtemp(resolve(tmpdir(), "codex-flow-refresh-v097-assignment-requests-"));
-  const sourcePackage = await extractTaggedPackage("68251f17077edc9e71ef8758f85a27d25c87ee14");
-  const targetPackage = await copyCurrentPackage();
+  const sourcePackage = await copyCurrentPackage();
+  const targetPackage = await copyCurrentPackage({ version: "0.9.11-rc.3" });
+  const sourceNamespace = RUNTIME_DIRECTORY;
   t.after(async () => {
     await Promise.all([
       removeFixture(root),
@@ -539,6 +596,25 @@ test("assignment-lived reporting binds the exact target before refresh source de
         repositoryRoot: root,
         repositoryBranch: "main",
       });
+      await installRepositoryReportLocator({
+        stateRoot: result.state_root,
+        route: result.route,
+        packageRoot: targetPackage.root,
+        nativeQueue: {
+          binary_path: CODEX_APP_BINARY_PATH,
+          expected_version: CODEX_APP_CLI_VERSION,
+          sqlite_home: resolve(homedir(), ".codex"),
+        },
+      });
+      await markAssignmentRegistrationStage({
+        stateRoot: result.state_root,
+        assignmentId: result.route.assignment.assignment_id,
+        stage: "locator",
+      });
+      await publishAssignmentReadiness({
+        stateRoot: result.state_root,
+        assignmentId: result.route.assignment.assignment_id,
+      });
       await rm(planPath);
       return result;
     },
@@ -557,7 +633,7 @@ test("assignment-lived reporting binds the exact target before refresh source de
   assertSuccess(inspectionCall, "assignment refresh inspection");
   const inspection = JSON.parse(inspectionCall.stdout);
   assert.equal(inspection.route, "refresh-ready", inspection.reason);
-  assert.equal(inspection.authority.source.package_version, "0.9.7-rc.7");
+  assert.equal(inspection.authority.source.package_version, "0.9.11-rc.2");
 
   const replacement = {
     ...source.workflowTask,
@@ -575,7 +651,7 @@ test("assignment-lived reporting binds the exact target before refresh source de
     branchFences: [],
   });
   const preparePath = await jsonFile(requests, "refresh-v097-assignment-prepare", {
-    source_namespace: "v0.9.7-rc.7",
+    source_namespace: sourceNamespace,
     source_run_id: source.request.run_id,
     source_resume: source.activated.run.binding,
     decisions: [{
@@ -624,10 +700,12 @@ test("assignment-lived reporting binds the exact target before refresh source de
   assert.equal(interrupted.execution_bindings.length, 2);
   assert.deepEqual(interrupted.execution_bindings[0], originalAssignment.execution_bindings[0]);
   assert.equal(interrupted.execution_bindings[1].run_id, targetActivation.run_id);
-  assert.equal((await refreshStatus({
-    commonDir: registered.route.assignment.common_dir,
-    refreshId: handoff.refresh_id,
-  })).status, "source-retired");
+  const interruptedStatusCall = invoke(targetPackage.cli, [
+    "refresh", "status", "--invoking-skill", targetSkill,
+    "--refresh-id", handoff.refresh_id, "--json",
+  ], root);
+  assertSuccess(interruptedStatusCall, "interrupted current-source refresh status");
+  assert.equal(JSON.parse(interruptedStatusCall.stdout).status, "source-retired");
 
   const targetActivationPath = await jsonFile(requests, "refresh-v097-assignment-target", targetActivation);
   const activatedCall = invoke(targetPackage.cli, [
@@ -635,6 +713,7 @@ test("assignment-lived reporting binds the exact target before refresh source de
     "--refresh-id", handoff.refresh_id, "--file", targetActivationPath, "--json",
   ], root, { CODEX_THREAD_ID: source.request.runtime.lineage.thread_id });
   assertSuccess(activatedCall, "assignment refresh target activation replay");
+  const activatedTarget = JSON.parse(activatedCall.stdout);
   const rebound = await assignmentAuthority({
     stateRoot: registered.state_root,
     assignmentId: originalAssignment.assignment_id,
@@ -646,8 +725,52 @@ test("assignment-lived reporting binds the exact target before refresh source de
     threadId: source.request.runtime.lineage.thread_id,
     runId: targetActivation.run_id,
   })).assignment_id, originalAssignment.assignment_id);
-  await assert.rejects(stat(resolve(root, ".git/codex-flow/v0.9.7-rc.7")), /ENOENT/);
+  await assert.rejects(stat(resolve(root, ".git/codex-flow", sourceNamespace)), /ENOENT/);
   await assert.rejects(stat(resolve(root, ".git/codex-flow/refresh-v1")), /ENOENT/);
+
+  const afterCutover = await assignmentAuthority({
+    stateRoot: registered.state_root,
+    assignmentId: originalAssignment.assignment_id,
+  });
+  const sourceRetirement = afterCutover.execution_retirements.find(
+    (entry) => entry.run_id === source.request.run_id,
+  );
+  assert.equal(sourceRetirement.terminal_status, "abandoned");
+  assert.equal(sourceRetirement.evidence_source, "refresh");
+  assert.equal(sourceRetirement.resource_disposition, "refresh-retired");
+
+  const abandonPath = await jsonFile(requests, "refresh-v097-assignment-target-abandon", {
+    run_id: targetActivation.run_id,
+    resume: activatedTarget.run.binding,
+    reason: "The replacement was interrupted after cutover and the assignment must be cancelled honestly.",
+  });
+  const abandonedTargetCall = invoke(targetPackage.cli, [
+    "run", "abandon", "--run-id", targetActivation.run_id,
+    "--file", abandonPath, "--json",
+  ], root);
+  assertSuccess(abandonedTargetCall, "assignment refresh target abandonment");
+
+  const cancellationPath = await jsonFile(requests, "refresh-v097-assignment-cancel", {
+    assignment_id: originalAssignment.assignment_id,
+    reason: "The post-cutover replacement failed and no further execution belongs to this assignment.",
+  });
+  const cancellationCall = invoke(targetPackage.cli, [
+    "assignment", "cancel", "--assignment-id", originalAssignment.assignment_id,
+    "--file", cancellationPath, "--json",
+  ], root, { CODEX_THREAD_ID: recipient.thread_id });
+  assertSuccess(cancellationCall, "same-assignment cancellation after refresh source removal");
+  const cancelled = JSON.parse(cancellationCall.stdout);
+  assert.equal(cancelled.assignment.state, "cancelled");
+  assert.deepEqual(
+    cancelled.assignment.execution_retirements.map((entry) => entry.run_id).sort(),
+    [source.request.run_id, targetActivation.run_id].sort(),
+  );
+  const targetObligation = cancelled.obligations.find(
+    (entry) => entry.run_id === targetActivation.run_id,
+  );
+  assert.equal(targetObligation.resource_disposition, "retained");
+  assert.equal(targetObligation.owner_thread_id, source.request.runtime.lineage.thread_id);
+  assert.match(targetObligation.next_action, /release|reconcile|resolve/i);
 });
 
 test("RC2 snapshot abandonment cancellation permits same-coordinator fresh assignment admission", async (t) => {
@@ -706,6 +829,15 @@ test("RC2 snapshot abandonment cancellation permits same-coordinator fresh assig
           expected_version: CODEX_APP_CLI_VERSION,
           sqlite_home: resolve(homedir(), ".codex"),
         },
+      });
+      await markAssignmentRegistrationStage({
+        stateRoot: registration.state_root,
+        assignmentId: registration.route.assignment.assignment_id,
+        stage: "locator",
+      });
+      await publishAssignmentReadiness({
+        stateRoot: registration.state_root,
+        assignmentId: registration.route.assignment.assignment_id,
       });
       const assignmentPath = resolve(
         registration.state_root,
@@ -858,6 +990,25 @@ test("RC2 snapshot abandonment cancellation permits same-coordinator fresh assig
     purpose: "Fresh assignment after failed exit",
     repositoryRoot: root,
     repositoryBranch: "main",
+  });
+  await installRepositoryReportLocator({
+    stateRoot: freshRegistration.state_root,
+    route: freshRegistration.route,
+    packageRoot: targetPackage.root,
+    nativeQueue: {
+      binary_path: CODEX_APP_BINARY_PATH,
+      expected_version: CODEX_APP_CLI_VERSION,
+      sqlite_home: resolve(homedir(), ".codex"),
+    },
+  });
+  await markAssignmentRegistrationStage({
+    stateRoot: freshRegistration.state_root,
+    assignmentId: freshRegistration.route.assignment.assignment_id,
+    stage: "locator",
+  });
+  await publishAssignmentReadiness({
+    stateRoot: freshRegistration.state_root,
+    assignmentId: freshRegistration.route.assignment.assignment_id,
   });
   const freshAssignment = await assignmentAuthority({
     stateRoot: freshRegistration.state_root,

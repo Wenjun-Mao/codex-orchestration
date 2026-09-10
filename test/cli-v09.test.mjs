@@ -170,8 +170,6 @@ test("v0.9 CLI activates a clean run through current launch-era wiring", async (
       tasks: [task],
     },
     fences: {
-      path_fences: task.write_paths,
-      resource_fences: task.shared_resources,
       branch_fences: ["codex/cli-v09-visible"],
     },
   };
@@ -187,6 +185,8 @@ test("v0.9 CLI activates a clean run through current launch-era wiring", async (
   assertSuccess(activated, "run activation");
   const result = JSON.parse(activated.stdout);
   assert.equal(result.run.run_id, runId);
+  assert.deepEqual(result.workflow_authority.fences.path_fences, task.write_paths);
+  assert.deepEqual(result.workflow_authority.fences.resource_fences, task.shared_resources);
   assert.equal(result.coordinator_identity.matched, true);
   assert.match(
     result.runtime_authority.bundle_root,

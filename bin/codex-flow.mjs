@@ -21,8 +21,11 @@ import { assertInstalledDistributionIdentity } from "../lib/distribution-identit
 import { cleanupPlan } from "../lib/cleanup.mjs";
 import {
   assignmentAuthority,
+  assignmentRegistration,
   assignmentStateRoot,
+  markAssignmentRegistrationStage,
   openAssignmentForSender,
+  publishAssignmentReadiness,
 } from "../lib/assignment-authority.mjs";
 import { acceptAssignmentResult, cancelAssignmentResult } from "../lib/assignment-acceptance.mjs";
 import { generateCoordinatorBrief } from "../lib/assignment-brief.mjs";
@@ -152,6 +155,7 @@ import {
 import {
   coordinatorBindingDigest,
   createWorkflowPlanRevision,
+  workflowReservationClaims,
 } from "../lib/workflow-plan.mjs";
 import { recipientBindingDigest } from "../lib/task-results.mjs";
 import {
@@ -164,6 +168,7 @@ import {
 import {
   assertRepositoryReportLocatorAvailable,
   installRepositoryReportLocator,
+  repositoryReportLocatorStatus,
   retireRepositoryReportLocator,
   retireRepositoryReportLocatorsForRun,
   withRepositoryReportLocatorRegistration,
@@ -581,13 +586,17 @@ async function rebindRunCoordinatorRecipient({ git, runId, resume, next, rebound
   };
 }
 
-function activationFences(value) {
+function activationFences(value, workflow = null) {
   requireExactFields(value, {
-    required: ["path_fences", "resource_fences", "branch_fences"],
+    required: ["branch_fences"],
+    optional: ["path_fences", "resource_fences"],
   }, "run activation request.fences");
+  const claims = workflow === null
+    ? { path_fences: [], resource_fences: [] }
+    : workflowReservationClaims(workflow);
   return buildFencePlan({
-    pathFences: value.path_fences,
-    resourceFences: value.resource_fences,
+    pathFences: value.path_fences ?? claims.path_fences,
+    resourceFences: value.resource_fences ?? claims.resource_fences,
     branchFences: value.branch_fences,
   });
 }
@@ -619,7 +628,7 @@ async function commandRunV09(args) {
     }
     await assertNoUnplugInProgress({ gitCommonDirectory: git.commonDir });
     const workflow = createWorkflowPlanRevision(request.workflow);
-    const fences = activationFences(request.fences);
+    const fences = activationFences(request.fences, workflow);
     assertWorkflowReservationCovered(fences, workflow);
     const bundleSource = await loadRuntimeBundleSource({ packageRoot });
     const runtime = buildRuntimeContext({
@@ -1323,7 +1332,16 @@ async function commandReportV09(args, mutationAuthority = null) {
         packageRoot,
         nativeQueue: supportedNativeQueue(),
       });
-      return registered;
+      await markAssignmentRegistrationStage({
+        stateRoot: registered.state_root,
+        assignmentId: registered.route.assignment.assignment_id,
+        stage: "locator",
+      });
+      const assignment = await publishAssignmentReadiness({
+        stateRoot: registered.state_root,
+        assignmentId: registered.route.assignment.assignment_id,
+      });
+      return { ...registered, assignment };
     });
     v09Output(result);
     return;
@@ -1393,8 +1411,72 @@ async function commandAssignmentV097(args) {
   const assignmentId = requireText(values["assignment-id"], "--assignment-id", { max: 128, safeId: true });
   const assignment = await assignmentAuthority({ stateRoot, assignmentId });
   if (subcommand === "status") {
-    const iteration = await iterationStatus({ commonDir: git.commonDir, iterationId: assignment.iteration_id });
-    v09Output({ assignment, iteration });
+    const registration = assignmentRegistration(assignment);
+    const iteration = await iterationStatus({
+      commonDir: git.commonDir,
+      iterationId: assignment.iteration_id,
+      allowMissing: true,
+    });
+    if (iteration === null && registration.iteration === "ready") {
+      throw new CliError("Assignment recorded a ready iteration that is absent", 73);
+    }
+    const recipient = await recipientStatus({
+      stateRoot,
+      lineageId: assignment.recipient.lineage_id,
+    });
+    if (recipient === null && registration.recipient_binding === "ready") {
+      throw new CliError("Assignment recorded a ready recipient binding that is absent", 73);
+    }
+    if (recipient !== null && (
+      recipient.lineage_id !== assignment.recipient.lineage_id
+      || recipient.current.thread_id !== assignment.recipient.thread_id
+      || recipient.current.generation !== assignment.recipient.generation
+    )) throw new CliError("Assignment recipient binding drifted", 73);
+    const route = await reportRoute({
+      stateRoot,
+      routeId: assignment.route_id,
+      allowMissing: true,
+    });
+    if (route === null && registration.route === "ready") {
+      throw new CliError("Assignment recorded a ready report route that is absent", 73);
+    }
+    const locator = route === null
+      ? { status: "absent", locator: null, retirement: null }
+      : await repositoryReportLocatorStatus({ stateRoot, route });
+    if (locator.status === "absent" && registration.locator === "ready") {
+      throw new CliError("Assignment recorded a ready report locator that is absent", 73);
+    }
+    const nextStage = ["iteration", "recipient_binding", "route", "locator"]
+      .find((stage) => registration[stage] === "pending") ?? null;
+    const registrationExecutionsTerminal = assignment.state === "registering" && (
+      assignment.execution_bindings.every((binding) => (
+        (assignment.execution_retirements ?? []).some((retirement) => (
+          retirement.namespace === binding.namespace && retirement.run_id === binding.run_id
+        ))
+      ))
+    );
+    const closedRegistrationRoute = assignment.state === "registering" && route?.state === "closed";
+    v09Output({
+      assignment,
+      registration: {
+        ...registration,
+        next_action: assignment.state === "registering"
+          ? (registrationExecutionsTerminal
+            ? "cancel the assignment; terminal execution cannot complete registration"
+            : closedRegistrationRoute
+              ? "terminalize every bound execution, then cancel the assignment; the closed route cannot resume registration"
+            : nextStage === null
+              ? "retry coordinator registration to publish readiness"
+              : `retry coordinator registration from ${nextStage}`)
+          : assignment.state === "open"
+            ? "continue assignment work or cancel after terminal execution"
+            : null,
+      },
+      iteration,
+      recipient,
+      route,
+      locator,
+    });
     return;
   }
   if (!values.file) throw new CliError(`assignment ${subcommand} requires --file <request.json>`);
@@ -1468,7 +1550,13 @@ async function commandAssignmentV097(args) {
       hostResult: request.host_result ?? null,
       coordinatorRecovery: request.coordinator_recovery ?? null,
       observeArchivedThread,
-      retireLocator: ({ routeId, reason, now }) => retireRepositoryReportLocator({ stateRoot, routeId, reason, now }),
+      retireLocator: ({ routeId, reason, now, allowNeverInstalled }) => retireRepositoryReportLocator({
+        stateRoot,
+        routeId,
+        reason,
+        now,
+        allowNeverInstalled,
+      }),
     }));
     return;
   }
@@ -1482,7 +1570,13 @@ async function commandAssignmentV097(args) {
       assignmentId,
       directorThreadId: threadId,
       reason: request.reason,
-      retireLocator: ({ routeId, reason, now }) => retireRepositoryReportLocator({ stateRoot, routeId, reason, now }),
+      retireLocator: ({ routeId, reason, now, allowNeverInstalled }) => retireRepositoryReportLocator({
+        stateRoot,
+        routeId,
+        reason,
+        now,
+        allowNeverInstalled,
+      }),
     }));
     return;
   }
@@ -2110,7 +2204,10 @@ async function commandRefreshV09(args) {
       optional: [],
     }, "refresh prepare request");
     const preparedAt = new Date().toISOString();
-    const fences = activationFences(request.target_fences);
+    const targetWorkflow = request.target_workflow === null
+      ? null
+      : createWorkflowPlanRevision(request.target_workflow);
+    const fences = activationFences(request.target_fences, targetWorkflow);
     v09Output(await prepareRefresh({
       commonDir: git.commonDir,
       sourceNamespace: request.source_namespace,

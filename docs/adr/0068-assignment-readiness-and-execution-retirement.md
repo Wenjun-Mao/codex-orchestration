@@ -44,14 +44,19 @@ its evidence source, resource disposition, authorized owner, and next action.
 Ordinary cancellation and acceptance may reconcile a still-readable runtime
 into this record. Refresh must persist the source execution's authenticated
 retirement and refresh-cleanup disposition before deleting its namespace.
-Replays preserve the first observation time and reject different evidence.
+Exact replays preserve the first observation time. Matching runtime retirement
+may be monotonically superseded by later refresh evidence only when the terminal
+fact is identical and refresh has actually retired the source resources; all
+other different evidence remains a conflict.
 
 Consumers keep distinct eligibility rules:
 
 - Registration may reconcile only its own deterministic artifacts while the
   bound run remains active.
 - Status is available during registration and identifies the next supported
-  continuation without publishing readiness.
+  continuation without publishing readiness. A closed route with active
+  execution requires execution termination before cancellation; it is not
+  described as resumable registration.
 - Cancellation requires every execution to be terminal, every existing report
   to be settled, and every live executor to be archived. For never-published
   pending artifacts, absence is an expected state; an artifact recorded ready
@@ -61,7 +66,9 @@ Consumers keep distinct eligibility rules:
   coordinator archival and locator retirement remain pending until all bound
   executions have retirement evidence eligible for cleanup. A closed execution
   is eligible; a refresh-retired predecessor is eligible; an abandoned
-  execution with retained fences is not.
+  execution with retained fences is not. An accepted decision whose execution
+  later retains obligations may still be cancelled, preserving both decision
+  and cancellation evidence rather than stranding the assignment.
 - Successor admission continues to use its existing repository, assignment,
   iteration, locator, and run-fence checks. The new records explain retained or
   transferred obligations; they do not bypass a conflicting active or retained
@@ -70,8 +77,16 @@ Consumers keep distinct eligibility rules:
 Run activation also derives path and shared-resource reservations from the
 canonical workflow revision when callers omit those repeated fields. Branch
 reservations remain explicit, and supplied path/resource reservations are still
-jointly validated against the workflow. This removes transcription without
-weakening independent admission checks.
+jointly validated against the workflow. Refresh validates that coverage before
+persisting a handoff, so a partial explicit envelope cannot create an
+unactivatable prepared transition. This removes transcription without weakening
+independent admission checks.
+
+Terminal-retirement discovery is deliberately distinct from open-assignment
+discovery. Run closure may find `registering`, `open`, or `accepted` assignments
+to preserve terminal evidence. Refresh target binding continues to require an
+`open` assignment, and refresh preparation rejects a replacement for an
+accepted or registering assignment before source retirement or target admission.
 
 ## What this replaces
 

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
 import { mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { basename, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import test from "node:test";
@@ -14,7 +14,13 @@ import {
 import {
   assignmentAuthority,
   assignmentStateRoot,
+  markAssignmentRegistrationStage,
+  publishAssignmentReadiness,
 } from "../lib/assignment-authority.mjs";
+import {
+  CODEX_APP_BINARY_PATH,
+  CODEX_APP_CLI_VERSION,
+} from "../lib/codex-app-report-adapter.mjs";
 import { inspectRefresh } from "../lib/compat/refresh.mjs";
 import {
   loadRefreshSourceAuthority,
@@ -28,6 +34,7 @@ import {
   captureReport,
 } from "../lib/report-records.mjs";
 import { registerCoordinatorReportRoute } from "../lib/report-routes.mjs";
+import { installRepositoryReportLocator } from "../lib/report-hook.mjs";
 import { bindRecipient } from "../lib/recipients.mjs";
 import { recipientBindingDigest } from "../lib/task-results.mjs";
 import { RUNTIME_DIRECTORY } from "../lib/runtime-context.mjs";
@@ -57,6 +64,29 @@ function invoke(cli, args, cwd, env = {}) {
     env: { ...process.env, GIT_OPTIONAL_LOCKS: "0", GIT_TERMINAL_PROMPT: "0", ...env },
     encoding: "utf8",
   });
+}
+
+async function finishCoordinatorRegistration(registration) {
+  await installRepositoryReportLocator({
+    stateRoot: registration.state_root,
+    route: registration.route,
+    packageRoot,
+    nativeQueue: {
+      binary_path: CODEX_APP_BINARY_PATH,
+      expected_version: CODEX_APP_CLI_VERSION,
+      sqlite_home: resolve(homedir(), ".codex"),
+    },
+  });
+  await markAssignmentRegistrationStage({
+    stateRoot: registration.state_root,
+    assignmentId: registration.route.assignment.assignment_id,
+    stage: "locator",
+  });
+  await publishAssignmentReadiness({
+    stateRoot: registration.state_root,
+    assignmentId: registration.route.assignment.assignment_id,
+  });
+  return registration;
 }
 
 async function taggedPackage(tag) {
@@ -236,6 +266,7 @@ async function currentRecoveryFixture(t, { wrongInitialBinding = false, captureR
     repositoryBranch: wrongInitialBinding ? "main" : coordinatorBranch,
     now: TIME + 1_000,
   });
+  await finishCoordinatorRegistration(registration);
   const gitDir = git(coordinatorPath, ["rev-parse", "--path-format=absolute", "--git-dir"]);
   await writeFile(resolve(gitDir, "codex-thread.json"), `${JSON.stringify({
     version: 1,
@@ -302,6 +333,15 @@ async function completeExactCoordinatorWork(fixture) {
     if (previousThread === undefined) delete process.env.CODEX_THREAD_ID;
     else process.env.CODEX_THREAD_ID = previousThread;
   }
+}
+
+async function closeCurrentRecoveryRun(fixture, now = TIME + 2_900) {
+  return closeRun({
+    gitCommonDirectory: fixture.commonDir,
+    runId: fixture.activation.run.run_id,
+    resume: fixture.activation.run.binding,
+    closedAt: new Date(now).toISOString(),
+  });
 }
 
 test("local-only coordinator delivery closes and admits the next assignment", async (t) => {
@@ -392,6 +432,7 @@ test("local-only coordinator delivery closes and admits the next assignment", as
     repositoryBranch: "main",
     now: TIME + 4_100,
   });
+  await finishCoordinatorRegistration(registration);
   assert.equal(registration.route.assignment.run_id, activated.run.run_id);
 });
 
@@ -480,6 +521,7 @@ async function settledV097Fixture(t) {
     repositoryBranch: coordinatorBranch,
     now: TIME + 1_000,
   });
+  await finishCoordinatorRegistration(registration);
   // Registration has already snapshotted this fixture-only source plan. Remove
   // the untracked original so the successor CLI journey tests its real clean
   // activation precondition instead of inheriting fixture residue.
@@ -502,15 +544,6 @@ async function settledV097Fixture(t) {
     reportId: report.report.report_id,
     clientMessageId: "v097-closeout-recovery-queue",
     now: TIME + 2_002,
-  });
-  await acceptAssignmentResult({
-    stateRoot: registration.state_root,
-    assignmentId: registration.route.assignment.assignment_id,
-    reportId: acceptedReport.report.report_id,
-    directorThreadId: director.thread_id,
-    taskObservation: archivedObservation(coordinator.thread_id),
-    retireLocator: async () => ({ status: "retired" }),
-    now: TIME + 4_000,
   });
   const lifecycle = JSON.parse(await readFile(resolve(
     commonDir,
@@ -537,6 +570,15 @@ async function settledV097Fixture(t) {
     encoding: "utf8",
   });
   assert.equal(closed.status, 0, closed.stderr);
+  await acceptAssignmentResult({
+    stateRoot: registration.state_root,
+    assignmentId: registration.route.assignment.assignment_id,
+    reportId: acceptedReport.report.report_id,
+    directorThreadId: director.thread_id,
+    taskObservation: archivedObservation(coordinator.thread_id),
+    retireLocator: async () => ({ status: "retired" }),
+    now: TIME + 5_100,
+  });
   git(primary, ["tag", "v099-closeout-recovery-preserved", "HEAD"]);
   return {
     primary,
@@ -624,6 +666,7 @@ test("settled v0.9.7 coordinator reconciliation requires accepted closeout evide
     repositoryBranch: "main",
     now: TIME + 7_000,
   });
+  await finishCoordinatorRegistration(nextRegistration);
   assert.equal(nextRegistration.route.assignment.run_id, "v099-next-assignment-run");
 
   git(fixture.primary, ["tag", "-d", "v099-closeout-recovery-preserved"]);
@@ -670,6 +713,7 @@ test("settled v0.9.7 reconciliation fails closed on missing accepted-report evid
 
 test("accepted coordinator binding correction preserves the recorded primary binding and closes only the authenticated worktree", async (t) => {
   const fixture = await currentRecoveryFixture(t, { wrongInitialBinding: true });
+  await closeCurrentRecoveryRun(fixture);
   await assert.rejects(
     acceptAssignmentResult({
       stateRoot: fixture.registration.state_root,
@@ -719,6 +763,7 @@ test("accepted coordinator binding correction preserves the recorded primary bin
 
 test("accepted coordinator resource loss without an exact completed result record fails with an actionable disposition", async (t) => {
   const fixture = await currentRecoveryFixture(t);
+  await closeCurrentRecoveryRun(fixture);
   git(fixture.primary, ["worktree", "remove", fixture.coordinatorPath]);
   git(fixture.primary, ["branch", "-D", fixture.coordinatorBranch]);
 
@@ -754,6 +799,7 @@ test("accepted coordinator resource loss without an exact completed result recor
 test("completed coordinator work from another checkout cannot supply a vanished coordinator result tip", async (t) => {
   const fixture = await currentRecoveryFixture(t);
   const completed = await completeExactCoordinatorWork(fixture);
+  await closeCurrentRecoveryRun(fixture);
   const recordPath = resolve(
     fixture.commonDir,
     "codex-flow",
@@ -789,6 +835,7 @@ test("completed coordinator work from another checkout cannot supply a vanished 
 test("accepted coordinator resource loss reuses one exact completed coordinator-work result when pre-archive capture never ran", async (t) => {
   const fixture = await currentRecoveryFixture(t);
   const completed = await completeExactCoordinatorWork(fixture);
+  await closeCurrentRecoveryRun(fixture);
   const unrelatedAncestor = completed.result.baseline_revision;
   git(fixture.primary, ["worktree", "remove", fixture.coordinatorPath]);
   git(fixture.primary, ["branch", "-D", fixture.coordinatorBranch]);
@@ -870,6 +917,7 @@ test("accepted coordinator resource-loss recovery reuses the captured result tip
   git(fixture.coordinatorPath, ["commit", "--quiet", "-m", "accepted coordinator result"]);
   const preservedTip = git(fixture.coordinatorPath, ["rev-parse", "HEAD"]);
   git(fixture.primary, ["merge", "--ff-only", preservedTip]);
+  await closeCurrentRecoveryRun(fixture);
 
   const initialRequestPath = resolve(fixture.requests, "initial-archive.json");
   await writeFile(initialRequestPath, `${JSON.stringify({
@@ -940,12 +988,6 @@ test("accepted coordinator resource-loss recovery reuses the captured result tip
   })).state, "retired");
   assert.equal(git(fixture.primary, ["branch", "--list", fixture.coordinatorBranch]), "");
 
-  await closeRun({
-    gitCommonDirectory: fixture.commonDir,
-    runId: fixture.activation.run.run_id,
-    resume: fixture.activation.run.binding,
-    closedAt: new Date(TIME + 5_000).toISOString(),
-  });
   const nextPath = resolve(fixture.primary, `../${basename(fixture.primary)}-next`);
   const nextBranch = "codex/v099-current-recovery-next";
   git(fixture.primary, ["worktree", "add", "--quiet", "-b", nextBranch, nextPath]);
@@ -987,6 +1029,7 @@ test("accepted coordinator resource-loss recovery reuses the captured result tip
     repositoryBranch: nextBranch,
     now: TIME + 7_000,
   });
+  await finishCoordinatorRegistration(nextRegistration);
   assert.equal(nextRegistration.route.assignment.run_id, "current-recovery-next-run");
   assert.equal((await assignmentAuthority({
     stateRoot: nextRegistration.state_root,
