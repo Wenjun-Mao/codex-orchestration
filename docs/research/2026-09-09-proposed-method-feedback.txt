@@ -1,0 +1,187 @@
+**I would use this approach. It is a better basis for the next engineering decision than either “keep patching” or “the architecture is too complicated, so redesign it.”** It keeps the findings testable, groups related failures, and asks whether a proposed correction actually removes a source of complexity.
+
+My main adjustments would be to **bring targeted reproduction forward, distinguish shared evidence from identical decision rules, and give the diagnosis phase an explicit stopping point.** Otherwise, this could become another thoughtful document followed by another release candidate that encounters the next missing connection.
+
+## 1. The evidence/disposition split is right—add scope, not more statuses
+
+Separating **“What supports this finding?”** from **“What have we done about it?”** is important. A defect does not become speculative because it has not been fixed, and a source correction does not become operationally verified because its tests passed.
+
+Your proposed labels are sufficient. I would not build a more elaborate classification system. Instead, attach the **version and verification scope** to each entry.
+
+For example:
+
+> **Evidence:** Reported reproduction in installed RC2; failure mechanism supported by inspected source.
+> **Disposition:** Corrected at `fa2b548…`; focused regression reported passing; installed successor journey not yet verified.
+
+For the director, which may have directly witnessed the canary, “reproduced” can be appropriate. For an external reviewer, the same incident is a **reported reproduction**. The document should preserve that distinction without requiring a third status dimension.
+
+Two other details matter:
+
+**“Verified end to end” should name the journey.** A test of cancellation followed by a new assignment does not establish that cancellation works after an existing assignment survives refresh. They may share many operations while exercising a different evidence-lifetime requirement.
+
+**“Deferred” is not a resolution.** A deferred issue may be nonblocking, or it may prevent promotion. Record that decision explicitly for the few consequential findings.
+
+However, do not require a separate full end-to-end test for every correction. One well-chosen journey can verify several connected changes, with focused tests covering their distinct negative cases.
+
+## 2. The four groups are useful review lenses—not four implementation projects
+
+I particularly agree with grouping by the broken rule rather than the file. A file-by-file assignment would encourage local fixes that reproduce the problem: each component becomes internally consistent while their expectations still disagree.
+
+But I would give the four groups different roles:
+
+| Group                                     | Role in the next intervention                                      |
+| ----------------------------------------- | ------------------------------------------------------------------ |
+| Assignment readiness and recovery         | Core design decision                                               |
+| Execution, evidence lifetime, and cleanup | Core design decision, considered jointly with readiness            |
+| Task intent and generated requests        | Targeted usability correction where a concrete failure warrants it |
+| Verification and delivery efficiency      | Evidence and feedback mechanism supporting the intervention        |
+
+**The first two groups should determine the next architectural change. The other two should help make that change usable and verifiable.**
+
+That avoids turning a bounded lifecycle correction into four parallel workstreams, each with its own abstractions, deliverables, and release requirements.
+
+It also keeps test optimization proportionate. Profiling and eliminating repeated setup are worthwhile, but an extensive suite-optimization project should not become a prerequisite for fixing an unsafe or unrecoverable lifecycle.
+
+## 3. The most important refinement: shared facts do not imply identical eligibility rules
+
+Your proposed **“one shared terminal-evidence contract”** is promising, but it needs a precise interpretation.
+
+I would **not** make cancellation, cleanup, reporting retirement, and successor admission use one universal definition of “terminal enough.”
+
+They need overlapping facts but can legitimately require different conditions:
+
+| Consumer             | What it needs to establish                                                                                   |
+| -------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Cancellation         | The relevant execution is stopped or lawfully terminated; remaining obligations are identified and preserved |
+| Resource cleanup     | The exact resource is eligible for removal, execution cannot still use it, and necessary work is preserved   |
+| Reporting retirement | Reporting obligations are settled or explicitly terminated; no unresolved delivery is silently discarded     |
+| Successor admission  | The previous assignment no longer exercises conflicting authority over the proposed successor’s resources    |
+
+For example, **an abandoned run can be terminal while still owning unresolved resources**. That may support an honest failed-assignment transition without authorizing resource deletion.
+
+The design principle should therefore be:
+
+> **Share authenticated facts and their lifetime. Keep each consumer’s necessary eligibility conditions explicit.**
+
+This prevents the redesign from replacing several inconsistent meanings of “done” with one overly permissive Boolean.
+
+Your connection map should make this distinction visible. “Which record owns the decision?” is valuable, but separate it from “Which record proves the underlying fact?” A completion record may prove that execution finished; a director’s acceptance remains a different decision.
+
+## 4. Add two questions to the connection map
+
+Your five questions cover the central issues. I would add only these:
+
+> **Can the supported status command describe every intermediate state that this operation can create?**
+
+> **Can the next authorized actor recover that state using an available command and surviving evidence?**
+
+These make the map operational rather than merely descriptive.
+
+“Retry is supported” is not enough when the retry requires a deleted source path, an unavailable runtime, or information that was never persisted.
+
+Similarly, “the system fails closed” is not a complete recovery design. A genuine contradiction should block. But an expected partial local write should have a defined continuation or lawful abort.
+
+For each important connection, I would distinguish:
+
+**Before publication:** What exists but is not yet usable?
+
+**After publication:** What may consumers now assume exists?
+
+**After interruption:** Which persisted fact determines the next step?
+
+**After retirement:** What evidence remains available to the last consumer?
+
+That is enough. There is no need to map every function, every field, or every historical version. Limit the review surface to the transitions implicated by the current findings and their immediate consumers.
+
+## 5. Move targeted reproduction into the design phase
+
+This is the main change I would make to your proposed sequence.
+
+As written—
+
+> inventory → evidence labels → groups → connection map → joint design choices → verification
+
+—it could be read as deciding the architecture before testing the important source-supported findings.
+
+I would use:
+
+> **Existing inventory and scoped evidence → connection map plus targeted reproductions → smallest coherent design choice → implementation and connected verification.**
+
+The map and reproductions should develop together.
+
+For example, the cancellation-after-refresh hypothesis should influence the redesign differently depending on whether the existing public path actually fails, already has an overlooked source of surviving evidence, or fails only under an unsupported sequence.
+
+A focused reproduction is not merely a future regression test. **It helps decide what needs redesigning.**
+
+Also, start from the inventory you already have. Do not commission another broad discovery exercise to recreate it. The immediate task is to resolve the consequential uncertainties and inspect adjacent assumptions—not generate the longest possible list of lifecycle risks.
+
+## 6. Keep the three endings, but make them test the dangerous assumptions
+
+Your three endings are well chosen. I would strengthen them with a few assertions rather than add more journeys.
+
+### Successful delivery → useful successor work
+
+Do not only test that cleanup succeeds after the happy path.
+
+**Attempt coordinator cleanup before execution is properly terminal and verify that it does not proceed.** Then perform the legitimate terminal transition, finish cleanup, and run a useful operation in the successor.
+
+That checks both sides of the contract: rejecting premature cleanup and permitting legitimate progress.
+
+The journey should also include actual committed work and a changed baseline. Otherwise, identity/snapshot mistakes can remain invisible.
+
+### Interrupted registration → resume or lawful abort
+
+Interrupt at the important persistence boundaries, then use the supported entrypoint to inspect and recover.
+
+Test both outcomes: the original registration can finish, and a registration that cannot or should not finish can be lawfully abandoned or cancelled.
+
+**Do not make successful replay the only escape route.** A dependency may remain unavailable or an ownership conflict may remain genuine.
+
+Conversely, do not treat every missing record as harmless partial registration. Missing state from an assignment that was already published as ready is a different condition.
+
+### Refresh → failure → cancellation
+
+Keep the **same assignment** open across refresh, allow the old execution namespace to disappear through the normal process, and only then terminate the replacement execution and attempt cancellation.
+
+That ordering is the point of the test. Cancelling before refresh would answer a different question.
+
+These assertions belong in the existing tests and command journeys. They do not require a new testing framework.
+
+## 7. “Express intent once” should remove transcription—not independent verification
+
+I agree with this direction, with one qualification: **not every repeated representation is wasteful duplication.**
+
+An approved outcome, a technical task breakdown, and an observed host result serve different purposes. Collapsing them into one representation could weaken the boundaries you want.
+
+The useful target is repeated **manual assembly of the same machine facts**.
+
+For example, the model should decide that a bounded executor is needed and what it should accomplish. Tools can derive a consistent branch reservation and launch request from that decision. The system must still independently verify the branch and identity actually returned by the host.
+
+Likewise, a refresh tool can derive which completed work must remain preserved and which unfinished task facts are eligible for reissue. The model should make the authorized choice—not reconstruct unchanged identities and semantics from conversation.
+
+**Generate repeated facts; independently verify external observations.** That is simplification without removing safeguards.
+
+## 8. Give the working document a hard exit condition
+
+“One concise working document” is appropriate. The greater risk is not the document’s length; it is the absence of a decision boundary.
+
+I would say the mapping phase is finished when it contains:
+
+* A disposition for the release-relevant findings, including the remaining evidence gaps.
+* A chosen registration/recovery and execution-retirement design, with named authoritative facts and supported continuations.
+* The existing decisions, code paths, or manual steps that the proposal replaces.
+* Concrete tests for the three endings.
+
+At that point, stop expanding the architecture review and implement the agreed intervention.
+
+Do not wait for certainty about every possible future lifecycle. Equally, do not dispatch separate agents to “solve readiness” and “solve cleanup” while their shared contract remains undecided.
+
+**Agree on the transition contract first. Delegate bounded implementation afterward.** An independent reviewer can then inspect whether the implementation and tests actually honor that contract.
+
+## My recommendation to the director
+
+I would send your proposal with this additional instruction:
+
+> **Use the existing inventory rather than restarting discovery. Build the connection map alongside targeted reproductions, then choose one bounded intervention at the assignment readiness and execution-retirement boundary. Share authoritative evidence without conflating cancellation, acceptance, and cleanup eligibility. Every added mechanism must replace a named duplication or unsupported partial state. Before another candidate install, prove the three endings through the actual public command boundaries, including real baseline changes and useful successor work. Stop the design phase once those decisions and verification conditions are explicit.**
+
+**Overall, your approach is sound. The important shift is from organizing the findings to making a falsifiable engineering decision.** The result should be fewer independent decisions that must agree—not simply better documentation of all the existing ones.

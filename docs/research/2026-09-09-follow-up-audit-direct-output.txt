@@ -1,0 +1,319 @@
+# Follow-up audit: simplify the assignment lifecycle before another release candidate
+
+**My recommendation is to pause candidate promotion for a focused redesign of the assignment/run boundary—not a rewrite of the plugin, and not another sequence of isolated fixes followed immediately by App installs.**
+
+The previous corrections are meaningful. But the remaining problem is broader than the ownership classifier that most recently failed: **the system can create a locally valid record before the surrounding workflow is usable, and later remove evidence or resources that another still-live part of the workflow requires.**
+
+[**Download the complete Markdown audit, with commit-pinned source references**](sandbox:/mnt/data/Codex_Orchestration_Follow_Up_Audit_fa2b548.md)
+
+## 1. Scope and answer-first assessment
+
+I inspected **`fa2b548b0310603a359539bf5b25f2bfbfa06695`** exactly, with tree `fc422db04a5113d765c71e9b9ecc0d806372898e`. I did not substitute `main`. The comparison baseline is released v0.9.10 at `21096a7ad7aca10221a90bcb1b404dbb0c89aacc`.
+
+These three surfaces must remain distinct:
+
+| Surface                   | What this audit establishes                                                                                                                                               |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Released v0.9.10**      | Historical baseline; it does not contain the subsequent reliability corrections.                                                                                          |
+| **Installed v0.9.11 RC2** | Its failure and state are **reported observations**, supported by the tracked incident account—not independently inspected App state.                                     |
+| **Source at `fa2b548…`**  | Directly inspected. It contains newer corrections, while `package.json` still declares `0.9.11-rc.2`. That version string does not establish equality with installed RC2. |
+
+The tracked incident note explicitly distinguishes the installed runtime from source-only corrections. A future packaged candidate needs a new immutable identity rather than replacement bytes under the already-used RC2 identity.
+
+**Verification boundary:** I inspected source, tests, relevant instructions, the release plan, ADRs, and the incident note. **I did not execute the test suite or reproduce live behavior.** A container download attempt failed because its network proxy could not resolve; GitHub connector inspection remained available. No repository changes were made.
+
+### What improved
+
+The original four issues have received substantive source corrections:
+
+* Completed coordinator-work is now consumed as dependency authority, including verification and its presence in the current baseline.
+* Local start/completion replay preserves the persisted operation and reconciles its claim.
+* Acceptance and cancellation select their terminal state under the assignment lock before dependent closeout actions.
+* The latest ownership correction separates revision-bearing snapshot evidence from stable coordinator/repository ownership.
+
+The tests also improved. There is now a genuine mixed journey covering local work, a dependent executor, integration on a delivery branch, audit, coordinator closeout, and successor registration. It would be wrong to dismiss the suite as unit-only.
+
+**What remains structurally wrong:** registration readiness, execution termination, and assignment termination still do not have sufficiently coherent handoffs. I found three consequential source-level gaps below.
+
+---
+
+## 2. The important connections and their authority
+
+| Connection                       | Current authoritative records                                                                  | Assessment                                                                                        |
+| -------------------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| Approved intent → preparation    | Plan snapshot and assignment preparation                                                       | Keep. Preparation is not proof that execution/reporting is ready.                                 |
+| Run → registered assignment      | Run/runtime binding, assignment, iteration, route, recipient bindings, locator                 | **Partial-publication problem:** assignment becomes `open` before the chain finishes.             |
+| Local result → dependent task    | Coordinator-work record, completed claim, generated contract                                   | Improved; producer and consumer now recognize the same result.                                    |
+| Executor result → preservation   | Receipt/disposition, integration verification, named result owner                              | Keep the distinctions and exact preservation owner.                                               |
+| Report → acceptance              | Assignment-lived report route and delivery record; director’s acceptance                       | Transport acceptance is not run termination.                                                      |
+| Refresh → later cancellation     | Assignment execution-binding history; removable run namespaces                                 | **Lifetime mismatch:** cancellation may require deleted execution evidence.                       |
+| Acceptance → cleanup → successor | Assignment decision, iteration membership, host evidence, Git preservation, separate run state | **Eligibility gap:** host-idle and preserved Git work do not prove that the Flow run has stopped. |
+
+These connections are visible in registration, cancellation, refresh, and owning-host closeout code.
+
+**Multiple records are not automatically overengineering.** Execution, reporting, user acceptance, host archival, and physical reclamation genuinely have different lifetimes. The problem is that their transition decisions are sometimes duplicated, implicit, or dependent on evidence with a shorter lifetime.
+
+---
+
+## 3. Prioritized findings
+
+Here, **P1 means a supported lifecycle can become blocked or contradictory**. These are reliability findings, not claims of demonstrated exploitation or data loss.
+
+### F1 — P1: registration lacks a coherent incomplete-state contract
+
+**Evidence:** inspected write order; reported RC2 manifestation; remaining architectural risk.
+
+**Files/functions at `fa2b548…`:**
+
+`lib/report-routes.mjs` → `registerCoordinatorReportRoute()`
+`lib/assignment-authority.mjs` → `createAssignmentAuthority()`
+`bin/codex-flow.mjs` → `commandReportV09()` and assignment status
+`lib/assignment-acceptance.mjs` → `cancelAssignmentResult()`
+
+Registration creates assignment authority, then iteration membership, then the route. The CLI installs the locator afterward. But the assignment’s initial state is already **`open`**. The sender registration lock and individual locks help with concurrency; they do not make these separate writes one crash-atomic operation.
+
+The failure sequence is:
+
+```text
+Run activated
+→ open assignment persisted
+→ iteration creation fails
+→ no usable iteration/route/locator
+→ status/cancellation expects those records
+→ ordinary recovery is blocked
+```
+
+There is an additional usability problem: the assignment status command reads the iteration unconditionally. Thus even the diagnostic path assumes registration has already completed. Cancellation likewise requires iteration and route records.
+
+**Correcting the classifier removes one trigger, not this failure class.** A process interruption, filesystem failure, or later local validation failure could expose the same structure.
+
+**Cheapest verification:** Interrupt public registration after assignment persistence, after iteration persistence, and around locator installation. Restart the same pinned runtime and exercise status, exact retry, and lawful cancellation/abort. Check that no replacement identity or direct journal editing is needed.
+
+**Smallest correction:** Give registration one owner and one readiness publication point. Preflight predictable failures, but also represent and reconcile interrupted registration. Do not solve this by weakening ownership checks.
+
+### F2 — P1: cancellation can require execution evidence that refresh has deleted
+
+**Evidence:** high-confidence static inference; not reproduced here.
+
+**Files/functions:**
+
+`lib/assignment-acceptance.mjs` → `terminalExecutionEvidence()`
+`lib/compat/refresh.mjs` → `consumeRefreshActivation()`
+`lib/assignment-authority.mjs` → `bindAssignmentRefreshExecution()`
+
+Cancellation iterates over **every execution binding** and opens that binding’s:
+
+```text
+codex-flow/<namespace>/runs/lifecycle.json
+```
+
+It validates the exact run and requires terminal status. Successful refresh, however, appends the replacement binding to the same open assignment and then removes the source namespace and consumed handoff. The historical binding survives; the lifecycle file cancellation requires does not.
+
+The consequential sequence is:
+
+```text
+Assignment A runs on R1
+→ refresh A into R2
+→ delete R1 namespace
+→ R2 later fails and is lawfully stopped
+→ cancel assignment A
+→ cancellation attempts to read deleted R1 lifecycle
+```
+
+The new frozen-RC test does **not** cover that ordering. It cancels the predecessor assignment **before** refresh, then creates a different successor assignment. That is useful, but a different lifecycle.
+
+**Cheapest verification:** Extend an existing *open-assignment refresh* test through source deletion, target-run termination, and cancellation of that same assignment. No App installation is needed.
+
+**Smallest correction:** Preserve the finite authenticated execution-terminal/retirement evidence needed by the longer-lived assignment **before** deleting its source. Store it with an existing owning record, such as the execution binding—not in another general evidence registry.
+
+Keeping source evidence until assignment termination is an alternative, but it retains more state and interacts with foreign-namespace admission. Either way, **missing files must not mean “successfully terminated.”**
+
+### F3 — P1: coordinator cleanup can proceed without establishing that its Flow run is terminal
+
+**Evidence:** inspected missing cross-stage condition, supported by a test path that permits it; operational consequence remains a static inference.
+
+**Files/functions:**
+
+`lib/iteration-registry.mjs` → `assertMemberEligible()`, `coordinatorGitAuthority()`, `closeoutIterationWithOwningHost()`
+`lib/assignment-acceptance.mjs` → `acceptAssignmentResult()`
+
+For a coordinator, eligibility permits closeout when `allowCoordinator` is set. The path checks host state, exact Git ownership, cleanliness, and preservation in primary. **It does not establish termination of the corresponding Flow run before coordinator reclamation.**
+
+The frozen-RC public-CLI test makes this particularly concrete. It activates the successor run, registers its assignment, injects a report through the reporting helper, and accepts/reclaims the coordinator. It does not start/complete that successor’s planned local task or close its run first. Its final assertion is worktree absence—not terminal run state and successful subsequent admission.
+
+The risk is:
+
+```text
+App task idle, Flow run active
+→ director accepts a report
+→ Git result is preserved
+→ coordinator archived and worktree removed
+→ active run still refers to removed checkout
+→ next assignment or old-run recovery encounters contradictory state
+```
+
+This does **not** establish lost committed work; the preservation guard remains valuable. It establishes that **App idleness, director acceptance, and execution termination are different facts**.
+
+**Cheapest verification:** Extend that existing CLI test. Assert the run is active before acceptance; require cleanup to remain pending without emitting coordinator archival until a legitimate execution-terminal transition; then complete the correct path and admit another assignment.
+
+**Smallest correction:** Acceptance may record the director’s decision before cleanup finishes, but physical coordinator archival/reclamation must consume exact execution-terminal evidence. Reuse the same terminal-evidence contract needed by cancellation.
+
+---
+
+## 4. Why the stages still fail to compose
+
+There are three recurring mechanisms—not one generic “complexity” problem.
+
+### A. Record validity is being mistaken for workflow readiness
+
+An assignment record can be internally valid while its iteration, route, and locator are absent. Readers see `open` and assume downstream records exist.
+
+The missing concept is not another validation layer. It is **a defined publication boundary for a usable assignment**.
+
+### B. Evidence does not consistently live as long as its consumers
+
+Assignment reporting was deliberately made longer-lived than execution. But cancellation still reaches back into removable execution namespaces. The lifetime separation has therefore been implemented for one consumer and not consistently for the others.
+
+### C. Different meanings of “finished” remain connected by convention
+
+An App task can be idle, a report can be accepted, a commit can be preserved, and an iteration can be closed while execution authority remains active. The instructions describe the intended order, but that order is not fully enforced by the consuming operations.
+
+**This explains why individually careful guards are insufficient:** each guard can correctly validate its local input while the combination has no supported next step.
+
+---
+
+## 5. The smallest coherent intervention
+
+I would make **one assignment-lifecycle boundary correction**, covering registration, execution retirement, and coordinator-closeout eligibility.
+
+### Registration: one owner, one publication point
+
+Move the broader coordination responsibility out of `registerCoordinatorReportRoute()` into the existing assignment lifecycle. Reporting should be a dependent operation, not the hidden creator of overall assignment/resource authority.
+
+Use the existing assignment record to distinguish an incomplete registration from `open`. Conceptually:
+
+```text
+prepared → registering → open
+                    ↘ lawful abort/cancellation
+```
+
+That is a proposed replacement for the current immediate-`open` behavior—not a new registration ledger.
+
+Preflight owner/runtime/recipient conflicts, reconcile deterministic iteration/route/locator records, and publish readiness only after the chain is usable. A retry preserves original identity, timestamps, and legitimate progress.
+
+A missing record during *known incomplete registration* can be recoverable. A missing record belonging to a *previously ready assignment* is a different situation and must not automatically be treated as harmless.
+
+### Retirement: retain the terminal fact needed by the assignment
+
+Before removing an execution namespace, retain its validated terminal/retirement fact with the existing execution binding. Include enough meaning to account for transferred or unresolved obligations; a bare digest or `closed: true` flag is insufficient.
+
+This replaces later attempts to reconstruct authority from deleted paths. It should reuse the existing source-runtime authentication, not introduce a universal predecessor reader.
+
+### Cleanup: consume that same terminal fact
+
+Acceptance records the director’s decision. Coordinator cleanup consumes the bound execution-terminal fact plus the existing host and Git guards.
+
+That replaces the implicit assumption that an accepted report or an idle App task proves execution has ended.
+
+### What should actually disappear or be consolidated
+
+| Current burden                                                       | Replacement                                                      |
+| -------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| Open assignment published before registration finishes               | One explicit readiness publication point                         |
+| Reporting function secretly creating assignment/resource authority   | Assignment-owned registration with narrower dependent operations |
+| Cancellation reopening all historical namespaces                     | Assignment-lived terminal evidence captured before deletion      |
+| Separate assumptions about whether coordinator cleanup is eligible   | One execution-terminal eligibility rule                          |
+| Repeated model reconstruction of branch/activation/replacement facts | Generated or jointly validated requests from existing task state |
+
+I would **not** merge report transport with director acceptance, archive status with physical reclamation, or cancellation with successful delivery. Those distinctions protect real requirements.
+
+Nor would I begin by merging every JSON file into a database. That would broaden schema changes while leaving App operations non-atomic. First reduce the duplicated decisions and undefined partial states.
+
+---
+
+## 6. Planning errors, ergonomics, and self-hosting
+
+Your first two incidents should remain classified as planning mistakes. The reservation rejection and semantic-refresh rejection were correct. The refresh skill already says completed coordinator work remains in the baseline and must not be reissued.
+
+But **correct rejection does not necessarily imply adequate ergonomics**.
+
+The activation builders themselves derive path/resource fences while taking branch fences separately. This illustrates how the same intended task can be described in several requests that must agree.
+
+The economical improvement is to derive or jointly validate planned launch reservations before activation—not automatically broaden authority after a launch fails. Similarly, refresh should expose preserved completed work and canonical eligible reissue facts so the agent chooses a disposition rather than reconstructing unchanged semantics.
+
+The remaining incident classifications are:
+
+| Issue                                                        | Classification                                                       |
+| ------------------------------------------------------------ | -------------------------------------------------------------------- |
+| Cancelled ownership blocking lawful same-worktree succession | Product ownership defect; latest correction is appropriately bounded |
+| Snapshot digest mistaken for stable repository identity      | Product data-model misuse; corrected in reviewed source              |
+| Assignment-only state without ordinary cancellation          | Product lifecycle defect                                             |
+| Corrected code refusing to hot-switch RC2                    | Intended runtime protection exposing an earlier defect               |
+| Repeated installs discovering local prerequisites            | Verification/release sequencing problem                              |
+
+The isolated canary and separation from candidate-governed development are good changes. But these lifecycle defects also affect ordinary projects. **Self-hosting exposes them; it does not excuse them.**
+
+The existing release plan already contains strong instructions about connected journeys and a fixed outer development environment. The next step should be executable evidence for those conditions, not another broad planning document.
+
+---
+
+## 7. Lean verification and release plan
+
+### Strengthen one existing journey, rather than build another framework
+
+The mixed journey is useful, but its final proof still stubs local locator retirement and starts the successor through lower-level fixture activation/direct route registration. Those shortcuts are appropriate in focused tests, but not sufficient to establish the complete public workflow.
+
+Upgrade it to use the packaged/pinned CLI for the important entrypoints and the real local locator installation/retirement code. Fake only genuinely external App observations and transport at the adapter boundary.
+
+Its endpoint should be **a useful successor operation**, not merely successful registration.
+
+Retain focused tests for dependency identities, replay, terminal races, preservation-owner divergence, dirty/wrong-owner rejection, and archive no-replay. Add the two missing failure endings: partial registration, and cancellation after an open assignment survives refresh.
+
+Do not forbid all constructed fixtures. They are valuable for pure validation and corruption tests. The rule is narrower: **success-path journey evidence must not depend on a fixture creating or repairing authority the public product cannot produce.**
+
+### Test cost: there are concrete candidates, but no measured attribution yet
+
+The reported four-to-five-minute runtime does not by itself establish waste. I found these identifiable costs:
+
+| Inspected mechanism                                                                      | Practical candidate                                           |
+| ---------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| `--test-concurrency=1` serializes the matched test files                                 | Measure first; parallelize only independently isolated groups |
+| Fixture activation repeatedly reads/hashes/acquires full runtime bundles                 | Cache immutable test inputs, not mutable state                |
+| Frozen-source tests repeat archive extraction and package copying                        | Reuse read-only extracted packages where safe                 |
+| Git initialization/configuration/commits and Node CLI subprocesses recur across fixtures | Reserve full setup for tests whose distinct risk requires it  |
+
+These mechanisms are visible in the package script, helpers, bundle loader, and refresh fixtures. I have **not measured their shares or estimated savings**.
+
+Keep separate mutable repositories. Bypass caching in tamper/packaging tests. Do not globally enable concurrency before checking shared environment and host-path use.
+
+### Avoid another prerequisite-discovery sequence through App installs
+
+**Before the next install**, finish the three boundary decisions together, run their focused tests, and rehearse the generated canary command sequence locally with real commits and typed fake host results.
+
+Then freeze a **new candidate identity**, run the settled-candidate suite and packaging checks, and perform one scoped installed App journey covering the changed host boundary through successor admission.
+
+Crash/concurrency/local-JSON variants belong in automated tests. A separate upgrade gate is justified when upgrade behavior changed and remains advertised; it should not replace the ordinary-delivery proof.
+
+This cannot eliminate every host-only surprise. It can stop the App canary from being the first test of ordinary local registration, cancellation, and successor eligibility.
+
+---
+
+## 8. Uncertainties and what would change my recommendation
+
+The new cancellation-after-refresh and active-run-reclamation sequences are **static findings requiring executable confirmation**, not claimed live incidents. I also have not verified installed RC2, the complete canary, or actual setup timings.
+
+I would narrow the recommendation back to ordinary bounded repairs if public-command evidence demonstrates:
+
+1. Every produced partial registration can be queried, resumed, or lawfully cancelled without journal editing or hot-switching.
+2. An open assignment can survive source retirement and later cancel using retained authoritative evidence.
+3. Coordinator cleanup rejects active execution, and proper closure permits the next assignment to do useful work.
+
+Conversely, if those transitions still require independent repair in several records after one publication/replay model is applied, then a broader consolidation of the **assignment control representation** would be justified. That decision should remove a demonstrated duplicated authority—not respond to line count or frustration.
+
+## Final decision
+
+**Keep the roles and the safety distinctions. Pause the release-install loop. Simplify the assignment lifecycle’s registration and execution-retirement handoffs as one coherent change, then verify through the next public consumer.**
+
+The target is not “a sufficiently capable director eventually closes the release.” It is:
+
+> **Ordinary delivery reaches a legitimate terminal state, its evidence survives until its last consumer, and the next assignment begins without the director becoming a protocol-recovery agent.**

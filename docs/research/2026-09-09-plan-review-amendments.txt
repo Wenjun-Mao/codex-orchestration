@@ -1,0 +1,130 @@
+**I would recommend approving this plan after three targeted amendments—not sending it back for another broad architecture review.** It is a strong continuation of the earlier work: it treats the audit findings as claims to test, concentrates the architectural intervention on the assignment boundary, and makes useful successor work—not eventual manual cleanup—the completion criterion.  
+
+The amendments concern **what the tests permit, what an incomplete-registration abort must settle, and which identities can actually be bound before task creation**. They do not change the overall direction.
+
+This is a review of the attached plan. I have not rechecked implementation changes, installed artifacts, or the reported canary cleanup.
+
+## What the plan gets right
+
+**It continues the existing work rather than restarting it.** Keeping the completed repairs, replacing the remaining delivery sequence, and using this document as the working inventory avoids creating another layer of planning authority. The distinction between two versions of the same consultation and two independent confirmations is also handled correctly.  
+
+**It has the right architectural boundaries.** Sharing authenticated facts without imposing a universal `done` flag is particularly important. The plan explicitly distinguishes cancellation, cleanup, reporting retirement, and successor admission, and recognizes that an abandoned execution can retain obligations. That is more precise than either “merge all the state” or “add another validation layer.” 
+
+**It puts reproduction before architectural commitment.** R2 and R3 must be reproduced before they dictate the correction, and disproving evidence must narrow the intervention. That protects the project from implementing my earlier static inferences merely because they appeared in an audit. 
+
+**Its verification plan addresses the previous weaknesses.** Actual command boundaries, real locator handling, changed commits, premature-cleanup rejection, and useful successor work are all present. The distinction between focused library tests and final journey evidence is sensible; it does not require every test to become a slow end-to-end test. 
+
+**It limits the release loop.** Local journeys and a rehearsal of the canary requests precede another installation. The candidate receives a new identity, and a new live contract gap triggers a combined design decision rather than an automatic RC-specific rescue.  
+
+Those are meaningful improvements in the proposed process. I would preserve them.
+
+## Amendment 1: do not let the refresh test silently choose the evidence-retention design
+
+This is the clearest tension in the draft.
+
+Checkpoint 2 explicitly leaves two approaches open: retain finite terminal/retirement evidence in an existing owning record, or retain the necessary source evidence until its last consumer. 
+
+But ending 3 requires the source namespace to disappear **before** terminating the replacement and cancelling the same assignment. 
+
+**Those requirements can conflict.** If the selected design retains the required evidence in the old namespace until cancellation, the acceptance test would reject it—not because it fails the user’s objective, but because the test has already chosen where evidence must live.
+
+There are two different tests here:
+
+**The original-defect reproduction** should preserve the exact problematic ordering: refresh removes the source namespace, then cancellation tries to consume evidence from it.
+
+**The corrected-design acceptance test** should prove that cancellation works after a legitimate refresh and that evidence survives for its required lifetime, using the chosen retirement policy.
+
+I suggest replacing ending 3 with:
+
+> **Same assignment refresh → failure → cancellation:** Keep the assignment open across authenticated refresh. Exercise the selected source-retirement policy: either remove the source namespace after retaining sufficient authenticated evidence elsewhere, or retain the necessary source evidence until its last consumer. Terminate the replacement execution, cancel that same assignment, preserve completed work, and account for remaining obligations before successor admission. Verify that evidence and resources become eligible for retirement at the intended point.
+
+That preserves the functional requirement without prematurely selecting its implementation. It also prevents the alternative from becoming “retain everything indefinitely.”
+
+## Amendment 2: define the boundary of a lawful registration abort
+
+The plan correctly requires incomplete registration to support both retry and a lawful failed exit. It also correctly distinguishes that state from missing records belonging to an assignment that was previously ready.  
+
+What remains insufficiently explicit is **what the abort must settle**.
+
+When a run has already been activated before registration fails, does the abort end only the incomplete assignment, or does it also arrange the legitimate termination or retention of the associated execution and reservations?
+
+Without an explicit answer, a correction could achieve this:
+
+```text
+Partial assignment can now be cancelled.
+Reporting state is settled.
+But its execution remains active or its reservations remain unexplained.
+The intended successor still cannot proceed.
+```
+
+That would repair the immediate command failure while leaving the larger connection unresolved.
+
+I would add this requirement to the connection-map and interrupted-registration acceptance criteria:
+
+> **An incomplete-registration abort must account for the associated execution, reservations, reporting state, and resource ownership—not only change the assignment’s status. Each obligation must be lawfully settled or explicitly retained with an available next action and authorized owner. Do not describe recovery as complete, or permit conflicting successor work, while an unexplained active obligation remains.**
+
+This does **not** mean “automatically cancel everything” or “delete all partially created records.” Completed work and valid ownership evidence must remain protected. The design may legitimately require a separate execution-terminal operation, provided the supported continuation identifies and performs it under the proper authority.
+
+There is a related decision worth making explicitly in checkpoint 1:
+
+> **Which ordinary assignment-driven operations require readiness, and which operations must remain available before readiness to support status, reconciliation, and abort?**
+
+Otherwise, readiness risks becoming a descriptive label rather than an enforced boundary. The plan already asks what consumers may assume after publication; naming the relevant consumers makes that question actionable. 
+
+I would keep this scoped to ordinary assignment-driven execution, rather than imposing an assignment requirement on every lower-level library operation or on the specifically approved source-only development exception.
+
+## Amendment 3: separate pre-creation intent from host-assigned identity
+
+The live-canary section says:
+
+> “Bind their exact task/worktree/branch/result-preservation ownership before launch.” 
+
+The intent is good, but **“before launch” needs to distinguish native task creation from the start of useful execution**.
+
+For any task ID or actual worktree path that the host assigns during creation, exact binding cannot be a precondition of that creation. Leaving this ambiguous could encourage another improvised preparatory step—or require an agent to invent information the host has not returned.
+
+I suggest:
+
+> **Before native task creation, bind the approved intent, known project/repository, explicit selectors, intended branch reservations, and result-preservation policy. Reconcile host-assigned task and worktree identities through the existing creation/start mechanism, and authenticate them before source mutation. Preserve the existing useful first-turn workflow.**
+
+This is the same principle the plan already states: derive repeated machine facts, but independently verify actual host observations. It simply applies that principle to the canary’s dispatch sequence. 
+
+## Two small wording clarifications
+
+### Put option evaluation in checkpoint 1, implementation in checkpoint 2
+
+Checkpoint 1’s exit requires that the shared boundary design is chosen. Checkpoint 2 then says to “evaluate, rather than preselect” the candidate mechanisms. 
+
+I understand the intended sequence, but the wording could send the coordinator back into architectural evaluation after it has supposedly completed that phase.
+
+Move the candidate-mechanism comparison into checkpoint 1, and begin checkpoint 2 with:
+
+> Implement the joint design selected at checkpoint 1. Reopen that decision only when implementation or reproduction reveals evidence that invalidates it.
+
+That gives the director a clearer distinction between routine implementation and a substantive design change.
+
+### Clarify what counts as a “broader storage/lifetime change”
+
+Checkpoint 1 permits implementation without another routine approval, but says broader storage/lifetime changes trigger escalation. The intervention itself may intentionally change the lifetime of execution evidence.  
+
+I would clarify that **bounded changes to existing records and their retention, required by the selected assignment-boundary design, are within scope**. A new storage system, broad migration, compatibility expansion, or altered ownership/permission boundary remains an escalation.
+
+Otherwise, the coordinator might ask for renewed approval for the very change this plan authorizes.
+
+## What I would not add
+
+I would not turn this review into another list of mandatory gates.
+
+The plan already preserves the earlier repairs and their distinct coverage, allows focused tests during development, limits optimization to measured repeated setup, and avoids making a broad performance project a prerequisite. Those provisions are sufficient for the next intervention.   
+
+I would retain the existing zero-child coverage as part of that obligation, rather than add another live canary simply because the principal live journey uses a dependent executor.
+
+Likewise, **R8 should remain a bounded evidence check**. The plan appropriately says to inspect original creation arguments only where available and not infer them from the current interface. If that evidence is unavailable, record the limitation and enforce explicit selections prospectively; do not let historical selector attribution delay the lifecycle correction. 
+
+Finally, the explicit Sol-high canary is a legitimate test configuration. A pass would establish functional behavior under that configuration—not, by itself, economical or low-babysitting behavior with a cheaper coordinator. That distinction belongs in the final evidence statement, not in a new model-benchmarking workstream.  
+
+## Recommendation to send back to the director
+
+> **The plan’s direction and bounded scope are appropriate. Before approval, make three adjustments: keep the post-fix refresh/cancellation test compatible with the selected evidence-retention policy; require incomplete-registration abort to account for associated execution and reservations, not only assignment state; and distinguish pre-creation intent binding from authentication of host-assigned identities before mutation. Also move design-option evaluation into checkpoint 1 and clarify that bounded existing-record retention changes are within the approved intervention. Preserve the rest of the sequence, particularly public-command continuations, changed baselines, real local retirement, and useful successor work.**
+
+**My overall judgment: this is ready to become an execution plan after those amendments.** Its remaining risk is not a missing architectural framework; it is allowing a few ambiguous acceptance boundaries to become different assumptions in the implementation and its tests.
