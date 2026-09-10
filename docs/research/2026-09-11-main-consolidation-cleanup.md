@@ -1,5 +1,33 @@
 # Main consolidation and bounded cleanup
 
+## Final disposition — explicit one-time cleanup approved
+
+The user subsequently explicitly requested removal of all remaining non-main
+branches and cleanup of finished coordinators, superseding the retention decision
+below for these obsolete resources. This is administrative retirement, not a
+claim that incomplete historical Flow runs completed successfully.
+
+All ten remaining secondary worktree tips were verified as ancestors of main.
+Nine exact task owners were read and had completed turns with no active work;
+each was archived through the App. The one untracked audit note was compared
+byte-for-byte with its preserved backup and moved into the same cleanup-evidence
+directory. All ten secondary worktrees were removed using non-force Git removal,
+including the detached stable source checkout; its artifact area was retained.
+The previously archived ea5e checkout had already been reclaimed by the App.
+
+The five remaining non-main local branches and final remote delivery branch
+were deleted after their commits were preserved on main. Only main and its
+primary checkout remain. Published tags, installed v0.9.12, other projects, and
+the director task were untouched. Archived tasks can be restored; removed
+checkouts and branch tips can be recreated from main's history or release tags.
+
+Historical Flow journals were not rewritten or unplugged. They may still report
+unresolved historical obligations referencing these administratively retired
+resources. Do not interpret this cleanup as a successful protocol closeout or
+automatically resume those old assignments.
+
+## Prior bounded pass (superseded retention inventory)
+
 The user requested merging completed work back to main and cleaning branches
 and worktrees after a successful initial v0.9.12 project trial.
 
