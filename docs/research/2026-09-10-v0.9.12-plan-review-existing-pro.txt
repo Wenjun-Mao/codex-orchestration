@@ -1,0 +1,145 @@
+**I recommend approving this plan after two focused additions to its local verification criteria. I would not send it back for another architectural redesign.**
+
+The direction is right: **one read-side interpretation of existing evidence, shared by inspection and admission, without turning completed history into a new lifecycle or requiring its deletion.** The remaining gap is that the planned live release sequence exercises a more demanding history topology than the local journey explicitly tests. There is also one promised command behavior that deserves a direct assertion.
+
+I reviewed the attached **v0.9.12 draft** and rechecked the relevant discovery, inspection, refresh-preparation, settlement, and test-helper code at **`ee24c2382a20acb0d50ab4a7dd8a7981653ec163`**. I did not substitute `main`, execute tests, or inspect private canary records. No repository changes were made.
+
+## What I would preserve
+
+**The scope is appropriately narrow.** The plan targets predecessor classification and its immediate consumers, explicitly requires identifying the predicates replaced, and prohibits another stored settlement mechanism. That addresses the duplicated interpretation identified in the audit without reopening assignment registration, task identity, or cleanup execution.  
+
+**It preserves the important distinctions.** A closed run is not a retired assignment; fresh-admission permission is not deletion permission; historical provenance is not live infrastructure. It also specifies preservation in the authorized destination, rather than arbitrary Git reachability. Those are the right constraints on the proposed consolidation. 
+
+**Checkpoint 1 has a useful stopping rule.** It must establish applicability to the retained case, identify any specifically missing fact, and then proceed to implementation rather than expanding the investigation indefinitely. That is a better decision boundary than either “assume the audit is correct” or “investigate everything before proceeding.” 
+
+**The local journey is substantially better than the previous regression.** It uses a frozen predecessor, public audited closure, normal reclamation, real locator handling, a changing baseline, and useful new work. It explicitly prohibits repairing the successful fixture through direct terminal-state construction. 
+
+I would keep all of that.
+
+## Amendment 1: test multiple retained namespaces before the stable live gate
+
+This is the most consequential addition.
+
+Checkpoint 2 creates **two closed assignments under the same frozen v0.9.11 package**, then admits and completes work under the candidate. That establishes multiple runs within one predecessor namespace. 
+
+But the proposed live sequence creates a different situation. Because predecessor records remain unchanged, the stable gate will encounter:
+
+```text
+Before the RC gate:
+    v0.9.11-rc.4
+        └── two closed, fully reclaimed assignments
+
+Before the stable gate:
+    v0.9.11-rc.4
+        └── the same retained history
+    v0.9.12-rc.N
+        └── the newly completed and reclaimed RC-gate assignment
+```
+
+Here, `rc.N` represents the new candidate’s eventual identity. **Stable must accept two settled predecessor namespaces, not merely two runs in one namespace.** That follows directly from the plan’s two live gates and its requirement not to remove predecessor records. 
+
+This matters against the actual source. `inspectRefresh()` currently permits at most one **unresolved** predecessor namespace after classification. Therefore, every fully settled namespace must be classified and excluded from that unresolved set consistently; recognizing only the oldest supported producer or only one settled namespace would leave the release sequence blocked.
+
+**This is a mismatch between the planned local proof and live topology—not a claim that the future implementation already contains this bug.**
+
+### Smallest adjustment
+
+Extend the existing local journey **after the candidate has completed its normal ending**:
+
+> Retain both the frozen predecessor namespace and the candidate-produced namespace. Invoke a separate later-package consumer representing the RC-to-stable identity transition. Require inspection, ordinary public activation without a refresh ID, and useful work to succeed without changing either predecessor namespace.
+
+This does not require another full A→B workflow, live task, or testing framework. The existing `copyCurrentPackage({ version })` helper already provides a test-only package-identity variation mechanism. Keep the original predecessor genuinely frozen; distinguish the simulated later-package consumer from proof of an actual installed stable artifact.
+
+Also make the compatibility decision name **the candidate’s own emitted records as inputs to the stable consumer**, alongside the retained RC4 and frozen v0.9.11 records. The plan explicitly names the latter two; its stable ending necessarily requires the former as well. 
+
+The intended rule should be:
+
+> **Multiple authenticated, fully settled namespaces are permissible within existing bounds. Multiple unfinished or unsupported predecessors do not become permissible merely because settled history is now accepted.**
+
+That prevents a cardinality exception from becoming the next release failure while preserving the existing caution around competing live sources.
+
+## Amendment 2: directly test the promised non-mutating `refresh prepare` continuation
+
+The plan explicitly promises:
+
+> “Explicit preparation against fully settled history gives a non-mutating direction to fresh activation.” 
+
+But the successful local journey names inspection and ordinary activation—not an explicit preparation request against the settled source. “No artificial handoff” during ordinary activation does not establish how `refresh prepare` behaves when an agent invokes it directly. 
+
+This is worth checking because the current `prepareRefresh()` independently calls `loadRefreshSourceAuthority()` before deciding what work remains. It can therefore retain the missing-checkout failure even after inspection and activation have been corrected.
+
+### Smallest adjustment
+
+On the **same already-settled fixture**, issue a schema-valid public `refresh prepare` request naming the exact settled predecessor. Assert that it:
+
+* Gives an unambiguous continuation to ordinary fresh activation.
+* Creates no persistent handoff and changes no historical records.
+* Does not require the deleted checkout or synthesize a replacement baseline.
+
+Then perform the ordinary activation already required by the journey.
+
+The ADR should specify the structured outcome and exit behavior sufficiently for an agent to distinguish **“there is nothing to refresh; begin fresh work”** from **“recovery failed.”** There is no need to prescribe a new command or elaborate response format here.
+
+Keep pending-handoff behavior distinct. A settled-history classification must not become permission to ignore an existing authenticated transition. The plan already preserves that distinction; retain its existing coverage rather than create another large journey. 
+
+## Two implementation cautions—not additional checkpoints
+
+### Share facts without making every consumer demand full assignment retirement
+
+The plan correctly asks for operation-specific permissions. I would make sure the implementation follows that wording rather than turning the shared classifier into one universal Boolean. 
+
+For example, **fresh admission past completely reclaimed assignment history** and **checking whether an earlier run is safe during an ongoing semantic refresh** are different questions. The latter can involve an assignment that legitimately remains open.
+
+The current `assertOtherRefreshSourceRunsSafe()` and `assertRefreshNamespaceRemovalSafe()` already serve different purposes: sibling-run settlement versus the conditions for removing a source namespace, including exact discarded-executor allowances.
+
+The desired consolidation is:
+
+```text
+Shared authenticated evidence
+        ↓
+Explicit permission for this operation
+```
+
+—not:
+
+```text
+One “fully retired” test
+        ↓
+Required everywhere
+```
+
+Otherwise, the correction could make post-closeout upgrades work while unnecessarily blocking the unfinished-refresh cases the plan intends to preserve.
+
+### “Read-only reuse” must not call a mutating closeout path
+
+The draft already says to compose owner-level read-only validations and avoid duplicating closeout algorithms. That is the correct boundary.  
+
+In implementation review, check that the historical reader actually reuses validation—not a convenience function that also reconciles, updates, or repairs records.
+
+Extracting a narrow pure validation helper can be appropriate. Calling closeout “just to see whether everything is settled” would violate the plan’s requirement that history remain unchanged.
+
+Neither caution requires another planning document. They belong in the named consumer map and independent review.
+
+## The two live tasks are justified
+
+I would retain the allowance of **two fresh coordinator tasks**.
+
+They answer distinct questions: whether the candidate can consume the retained RC4 history, and whether stable can consume the now-expanded history after the candidate’s own coordinator has been reclaimed. The plan requires useful work and complete retirement in both cases, rather than treating installation or version equality as success. 
+
+The multi-namespace local addition should come **before** these installations so that the stable live gate is not the first discovery of that requirement.
+
+The publication rule is also honest. An immutable stable tag may exist before the installed stable ending is demonstrated; the plan explicitly prohibits rewriting that tag or claiming final acceptance prematurely. I would preserve that distinction rather than demand an impossible guarantee that a published artifact has already passed every post-publication observation. 
+
+## What I would not add
+
+I would not add another executor canary, model benchmark, broad cleanup review, or historical migration project. A coordinator-only journey is suitable for this boundary because the changed question is historical settlement and admission, not executor dependency semantics; the draft explicitly retains the existing dependency coverage. 
+
+I would also retain the test-consolidation and proportional-rerun provisions. The plan already protects distinct legacy, cancellation, replay, and deletion coverage, while requiring measured—not presumed—efficiency improvements. 
+
+Finally, checkpoint 1’s remaining uncertainty is legitimate: **do the actual retained records contain sufficient authenticated evidence?** The draft correctly requires answering that before proceeding and escalating a specific missing fact rather than inventing a general evidence system. I cannot independently answer that from GitHub because the relevant journals are private. 
+
+## Suggested response to the director
+
+> **The plan’s architecture, scope, and stopping rules are appropriate. Add two explicit local acceptance checks before implementation proceeds to the live gates: first, extend the journey through a later-package consumer while both the frozen predecessor namespace and the completed candidate namespace remain, proving the actual multi-namespace RC-to-stable topology; second, invoke public `refresh prepare` against fully settled history and verify its non-mutating direction to fresh activation. Include candidate-emitted records in the stable consumer’s supported evidence contracts. Preserve operation-specific permissions and keep historical validation read-only. These are additions to the existing fixture, not new workstreams or live-task allowances.**
+
+**My overall judgment: approve with those two verification edits.** The plan does not need more machinery. It needs the local proof to cover the complete release sequence it already promises.

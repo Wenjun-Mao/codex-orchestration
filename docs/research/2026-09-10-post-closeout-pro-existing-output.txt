@@ -1,0 +1,298 @@
+# Recommendation: consolidate predecessor classification—not the whole lifecycle
+
+**The next correction should be a bounded shared-classifier change, but it must replace the competing interpretations used by inspection, refresh, and admission. An `ENOENT` fallback or another selected-run exception would be insufficient.**
+
+For the reported topology—normally closed runs, retired assignments, reclaimed coordinator resources, and preserved results—the preferred outcome is **fresh admission under the new package, leaving authenticated historical records untouched**. There is no unfinished execution to refresh. The deleted coordinator checkout should remain historical provenance, not a prerequisite for recognizing completion.
+
+[**Download the complete Markdown audit**](sandbox:/mnt/data/Codex_Orchestration_Post_Closeout_Upgrade_Audit_ee24c238.md)
+
+## Scope and evidence
+
+I inspected **`ee24c2382a20acb0d50ab4a7dd8a7981653ec163`**, tree `2ac33f79f602c395f55123aa83bed70302de1f5d`. Its parent is the supplied released source, **`6292c7fcb25744417590ce955dc7388bc9726a46`**. The review commit adds only the research note; the executable source is unchanged from that parent. I did not substitute another revision.
+
+**Source and tests were inspected; no repository tests were executed.** GitHub connector access worked. A container Git connectivity attempt failed with `Could not resolve host: github.com`, preventing a local checkout. No GitHub, App, installed-runtime, or historical-state changes were made.
+
+The successful RC4 delivery, useful successor, installed-stable failure, and **226/226 tests in approximately 338.5 seconds** remain supplied observations recorded in the sanitized note—not independently reproduced results.
+
+---
+
+## 1. Findings
+
+All file and function references below refer to the exact review commit.
+
+| Finding                                                                                       | Evidence status                                  | Consequence                                                                      |
+| --------------------------------------------------------------------------------------------- | ------------------------------------------------ | -------------------------------------------------------------------------------- |
+| **F1. Selected predecessor loading requires a live checkout before terminal classification.** | Confirmed in source; live manifestation reported | Legitimate coordinator reclamation blocks upgrade inspection.                    |
+| **F2. Fresh admission does not share the broader closed-run interpretation.**                 | Confirmed in source                              | Making inspection return `fresh` alone would leave activation blocked.           |
+| **F3. Several downstream consumers still require the selected source’s live root.**           | Confirmed in source                              | Catching the first exception would relocate the failure.                         |
+| **F4. The existing settlement helpers prove different scopes of completion.**                 | Confirmed scope mismatch                         | Neither helper should become a universal admission/deletion predicate unchanged. |
+| **F5. The named regressions leave the selected checkout intact.**                             | Confirmed test gap                               | They do not establish post-reclamation upgrade followed by actual admission.     |
+
+### F1 — The diagnosis is correct
+
+`lib/compat/refresh.mjs::inspectRefresh()` selects the active run or the most recently updated terminal run, calls `loadRefreshSourceAuthority()`, and **only afterward** calls `assertOtherRefreshSourceRunsSafe()`.
+
+In `lib/compat/refresh-source.mjs::locateRefreshSourceSnapshot()`, content-addressed run/context checks are followed by:
+
+```text
+Git invocation with cwd = context.repository.root
+```
+
+That occurs before the remaining runtime-bundle/exporter authentication. A legitimately deleted coordinator root therefore prevents the later historical-settlement logic from being reached.
+
+This supports your diagnosis. The reported observation that Git worked from primary but failed with the removed checkout as its working directory is consistent with the code. **Nothing in the inspected path suggests that changing Git’s executable path would solve this ordering problem.**
+
+### F2 — Inspection and admission would still disagree after a superficial correction
+
+`classifyFreshStartPredecessors()` invokes `reconcileSettledV097CoordinatorPredecessor()`. That helper applies only to **namespace `v0.9.7`, exactly one closed run, and no active run**. RC4 history does not qualify.
+
+The public `run activate` path calls `assertFreshStartPredecessors()` under `foreign-active-run.lock`, before preparing target state and admitting the run. Thus an inspection-only change would produce:
+
+```text
+refresh inspect → fresh
+run activate    → incompatible historical namespace
+```
+
+The second refusal would follow the unchanged admission code.
+
+This is why the correction must reach **public activation**, not merely the inspector.
+
+### F3 — Bypassing the initial Git call is not enough
+
+There are further live-root dependencies:
+
+| Path                                  | Live-checkout requirement                                                                    |
+| ------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `loadRefreshSourceAuthority()`        | Starts the authenticated source exporter with the recorded root as its working directory.    |
+| `deriveRefreshSourceAuthority()`      | Calls `gitSnapshot()` on that root and derives current baseline/task semantics.              |
+| `prepareRefresh()`                    | Requires the caller’s clean root, branch, and revision to match the source baseline exactly. |
+| `assertRefreshNamespaceRemovalSafe()` | Runs source cleanup inspection through the selected source’s CLI and repository root.        |
+
+These requirements are visible in the source-loading, preparation, and namespace-removal paths.
+
+**Those are reasonable requirements for live semantic refresh. They are the wrong interface for recognizing already-settled history.**
+
+Do not substitute primary into the old runtime context or fabricate a live-source baseline. That would turn a historical recognition problem into an ownership change.
+
+### F4 — Existing terminal evidence is reusable, but no current helper is sufficient unchanged
+
+`assertReclaimedClosedRunSettled()` authenticates runtime/bundle authority, matching workflow evidence, and a uniquely matching terminal-ready closure audit. Its caller separately checks terminal status and unresolved fences.
+
+However, that helper does **not** itself join retired assignment, accepted report, closed iteration, locator retirement, or current Git preservation.
+
+This is not a demonstrated data-loss defect in its limited current use. It means:
+
+> **“This execution was audited closed” is narrower than “this assignment and its resources are fully retired, with the result still preserved.”**
+
+Conversely, the v0.9.7-specific helper joins assignment/report/iteration and Git facts, but has release-name and single-run restrictions. Its `preservedNonHostRef()` also requires a ref to point **exactly at** the captured tip, rather than allowing a preserving descendant.
+
+**The correction should consolidate these evidence checks at the appropriate scope—not simply elevate one existing helper into universal authority.**
+
+### F5 — The test explanation is accurate
+
+The named regression removes the older run’s checkout, then creates the selected closed run in surviving primary. It exercises inspection, namespace-removal eligibility, and a tampered-audit rejection. It does not remove the selected root or admit useful work under the next runtime.
+
+The related reclaimed-coordinator-work and selector-replan tests repeat the same older-missing/newer-live topology. Their distinct semantic cases are useful, but they do not close this particular gap.
+
+---
+
+## 2. The architectural defect is broader than “selected versus non-selected”—but still bounded
+
+**Selected-versus-non-selected is the immediate branching defect. The deeper problem is that discovery order determines which interpretation of terminal authority is available.**
+
+A run’s position in an `updated_at` sort should not determine whether its completed evidence is usable.
+
+The relevant ownership distinction is:
+
+> **A coordinator checkout is execution infrastructure. After legitimate retirement, it must not remain necessary to recognize the historical result.**
+
+Importantly, the current producers already implement much of that boundary correctly:
+
+* Public closure requires a current terminal-ready audit.
+* Assignment acceptance now waits for execution-terminal evidence and refuses retained obligations before coordinator cleanup.
+* Reclamation revalidates exact ownership, cleanliness, and preservation before non-force removal.
+* Final assignment retirement follows iteration closeout and route/locator retirement.
+
+**I would preserve those boundaries.** This failure does not establish that the recent assignment/launch corrections need another fundamental redesign. It points primarily to their **historical consumers still applying an execution-time requirement**.
+
+### Compact authority map
+
+| Layer                    | Fact it owns                                            | What the upgrade boundary needs                                           |
+| ------------------------ | ------------------------------------------------------- | ------------------------------------------------------------------------- |
+| Run/runtime              | Immutable execution identity and terminal status/fences | Exact supported binding; closed execution; no unresolved authority        |
+| Audit/workflow           | Evidence permitting execution closure                   | Matching terminal-ready audit, workflow revision, integrity, and ordering |
+| Assignment/reporting     | Accepted outcome and assignment retirement              | Exact assignment/execution relationship and settled reporting             |
+| Iteration/archive        | Cleanup identity and progress                           | Completed disposable-resource obligations and captured result identity    |
+| Surviving Git repository | Current preservation and attachments                    | Correct repository; preserved result; no conflicting attachment           |
+| New admission            | Permission to begin new execution                       | Revalidated historical classification plus normal new-run checks          |
+
+This is a shared interpretation of existing facts, **not another stored `done` flag**.
+
+---
+
+## 3. Recommended smallest durable correction
+
+### A. Classify before choosing a live refresh source
+
+Introduce one read-only classification path **inside the existing compatibility machinery**, with conceptual outcomes such as:
+
+**Settled history:** the obligations relevant to the requested continuation are complete.
+
+**Live-source required:** supported unfinished or retained work still needs the existing live source-runtime path.
+
+**Blocked or unsupported:** evidence is incomplete, contradictory, unresolved, or outside the supported contract.
+
+These need not become a new registry or elaborate schema.
+
+Authenticate supported lifecycle/context/bundle records before demanding a live coordinator checkout. Keep the historical root unchanged. Require live ownership checks when the operation actually needs live execution or semantic refresh.
+
+For your reported topology, **classify every run in the namespace**. If all relevant obligations are settled, return fresh-admission eligibility and retain the historical namespace.
+
+For a namespace containing a legitimate live source and settled siblings, select the live source and apply the same historical proof to its siblings. Do not select an older convenient checkout merely to avoid investigating a newer unresolved run.
+
+### B. Reuse existing evidence, with an explicit sufficiency boundary
+
+For the post-closeout fast path, I would require the following combined proof:
+
+**Execution settlement.** Exact supported run/context/bundle identity, normal closed status, empty unresolved fences, and matching terminal-ready audit/workflow evidence. Preserve the audit-before-close interpretation; do not try to re-audit through a deleted working directory.
+
+**Assignment settlement.** The exact assignment-to-execution binding, retired assignment, accepted report, closed iteration, and corresponding reporting retirement. A closed run with unfinished assignment cleanup is not the fully settled fast path.
+
+**Current preservation.** Authenticate the surviving repository and prove that the captured result remains preserved using the existing preservation destination semantics. For coordinator results, retain primary-preservation requirements while allowing primary to have advanced to a descendant containing the exact captured commit.
+
+**Resource consistency.** Absence alone does not establish legitimate reclamation. Bind it to completed cleanup evidence and reject conflicting attachments or resources that have reappeared inconsistently.
+
+The existing locator-retirement reader can authenticate the exact closed route and its retirement instead of treating a missing locator as sufficient evidence.
+
+**My sufficiency judgment:** existing records appear adequate for the reported RC4-to-stable case. That remains conditional on the unavailable local records satisfying these joins. I do not see evidence justifying another settlement registry or general migration layer.
+
+For older or unassigned executions, retain their specifically supported contracts. Do not infer “no assignment existed” from a missing assignment file, or replace the v0.9.7 restriction with an indiscriminate “all v0.9 versions” condition.
+
+### C. Make every consumer use the same interpretation
+
+| Code area                                                             | Minimal change                                                                               | What it replaces                                                |
+| --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| `inspectRefresh()`                                                    | Classify history before live-source selection                                                | Newest-terminal selection forcing live loading                  |
+| `classifyFreshStartPredecessors()` / `assertFreshStartPredecessors()` | Apply the shared proof during admission                                                      | Sole reliance on the exact v0.9.7 exception                     |
+| `prepareRefresh()`                                                    | Recognize already-settled history and direct the caller to fresh activation without mutation | Requiring a deleted baseline for already-finished work          |
+| `assertOtherRefreshSourceRunsSafe()`                                  | Reuse the historical classifier                                                              | Separate selected/non-selected settlement semantics             |
+| `assertRefreshNamespaceRemovalSafe()`                                 | Reuse historical facts while retaining deletion-specific requirements                        | Repeated live execution checks for historical siblings          |
+| Existing v0.9.7 compatibility code                                    | Preserve its supported format through a thin compatibility reader where necessary            | A parallel full settlement algorithm where checks can be shared |
+
+**Non-blocking history is not deletion authority.** The preferred all-settled path leaves old records untouched. Semantic refresh and namespace removal still need their own authorization and last-consumer checks.
+
+An explicit `prepareRefresh` request against fully settled history should produce a clear, non-mutating continuation—not manufacture a handoff, and not fail with a missing-directory error.
+
+### D. Revalidate during activation
+
+Inspection is advisory. Activation must rerun the necessary predecessor proof under its existing repository lock.
+
+Keep `assertNoForeignActiveRunCollision()`: its purpose is competing active execution, not complete historical settlement. It is a justified independent guard, not redundant lifecycle interpretation.
+
+Do not cache a prior `fresh` answer as an authorization ticket. Also, the repository lock does not serialize arbitrary external Git operations; retain the checks at the mutations they protect.
+
+---
+
+## 4. Nearby issues worth addressing—and limits on scope
+
+### Required within this correction
+
+The selected-source bootstrap, exporter/cleanup live-root dependencies, fresh-admission divergence, and namespace-wide classification are all part of the same immediate connection. Leaving any of them independent risks moving the failure one command later.
+
+### Relevant when generalizing the old helper
+
+The v0.9.7 helper’s **exact-ref-tip equality**, **single-run cardinality**, and **initial-execution-binding-only matching** should not become accidental requirements for newer supported histories. Use the exact matching execution binding and supported effective resource identity—not whichever record is first or newest.
+
+The ref predicate matters particularly after useful successor work: an older result can remain safely preserved in a descendant without any ref pointing directly at the old commit.
+
+### Preserve rather than redesign
+
+Keep strict live ownership, immutable runtime snapshots, source-owned semantic export, unresolved-work protection, and exact preservation before deletion. The new fast path must not treat active or abandoned execution as settled merely because its checkout disappeared.
+
+### Optional improvements—not prerequisites
+
+Clearer missing-cwd diagnostics and avoiding repeated authentication of the same immutable bundle within one operation would help. Neither is the primary correction.
+
+Retaining historical namespaces also encounters existing inventory limits; it should not be described as unlimited retention. A general historical-state collector is outside this intervention.
+
+---
+
+## 5. Cheapest decisive regression
+
+### One public-operation journey, extended through upgrade
+
+Use an existing public closeout fixture rather than build another harness:
+
+1. **Produce genuine terminal history.** Under a frozen supported source package, complete real committed work, verify it, close the run through the public audited command, accept the report, and archive/reclaim the coordinator through normal operations. Fake only external App transport/observations.
+
+2. **Create the actual selection topology.** Complete and reclaim a second useful source-package assignment. Prefer a real baseline advance so the first captured result is an ancestor, rather than requiring both runs to end at an identical commit.
+
+3. **Remove every predecessor coordinator checkout through closeout.** Assert that their disposable branches are gone, assignments/reporting are retired, and the historical namespace remains. No selected run may live in primary merely to make loading succeed.
+
+4. **Cross the package boundary.** Invoke the next package’s authenticated `refresh inspect` from surviving primary, followed by **public `run activate`**, normal assignment readiness, and useful work under the new pinned runtime. Read the preserved result and commit/verify a small change.
+
+5. **Check continuity and noninterference.** Reinspect with the new run active, finish its normal ending, and assert that no old runtime was revived, no historical journal was rewritten, no old worktree was recreated, and no prior host action was replayed.
+
+The endpoint is **authorized useful execution**, not `route: fresh`, a registration record, or a direct call to low-level admission.
+
+The existing full A→B lifecycle need not be repeated for every predecessor variant. Its closeout output is the starting material for this boundary test.
+
+### Necessary negative cases
+
+| Case                                                                                                       | Required outcome                                                         |
+| ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| Selected **or non-selected** active run with missing checkout; abandoned missing checkout; retained fences | Block without new admission or host action                               |
+| Mismatched/corrupt context, bundle, audit, workflow authority, or settlement ordering                      | Block; do not fall back to another convenient run                        |
+| Run closed but assignment/iteration/reporting retirement incomplete                                        | Refuse the fully settled fast path and identify the remaining obligation |
+| Captured result no longer preserved; wrong repository; conflicting recreated attachment                    | Block without root substitution or recreation                            |
+| Preservation destination advances to a legitimate descendant                                               | Pass while still proving exact captured-commit inclusion                 |
+| Evidence changes after inspection but before activation                                                    | Activation revalidates and rejects invalidated authority                 |
+
+Use compact selected/non-selected variants for shared predicates. Do not rerun the complete lifecycle for every negative case. Corrupt copies are appropriate for negative tests; successful lifecycle evidence should come from public operations.
+
+### Consolidate existing tests
+
+I would **replace or extend**, rather than simply add alongside:
+
+* The named older-reclaimed/newer-live regression becomes the all-reclaimed upgrade-to-useful-successor test, retaining its blocked-audit-then-valid-audit and corruption assertions.
+* The reclaimed coordinator-work and selector-replan cases become focused variants of the common settlement check, preserving their distinct semantics without repeating the entire upgrade setup.
+* Retain one exact v0.9.7 compatibility journey if that release remains supported. Do not recreate it for every release number.
+* Keep active semantic refresh and interrupted deletion coverage: they exercise different permissions and are not redundant with passive historical classification.
+
+No speedup is established by this review. Profile the affected group before claiming savings. Reuse frozen package extraction only where it is genuinely immutable; keep mutable repositories and journals isolated.
+
+---
+
+## 6. Release-process implication
+
+The successful same-package successor and the failed later upgrade are not contradictory evidence.
+
+Discovery excludes the current namespace. After a package change, those same completed records become foreign predecessor history and enter a different path. The existing delivery gate therefore proved a valuable journey—but not this package-boundary interpretation.
+
+After the local regression passes, use **one scoped installed post-closeout upgrade gate**: source closeout/reclamation → next artifact loaded → inspection → useful new execution. Reuse applicable mixed-delivery evidence rather than initiating another broad orchestration campaign.
+
+The retained canary may provide an especially valuable applicability check if its use is authorized. This review itself authorizes no recovery action or installation.
+
+---
+
+## 7. Why this prevents the family rather than relocating it
+
+The proposed invariant is:
+
+> **For every supported predecessor, settlement means the same thing regardless of selection order and regardless of whether the caller is inspection or admission.**
+
+That removes two causes simultaneously:
+
+**First**, already-settled history no longer enters a loader that requires execution infrastructure which cleanup was authorized to delete.
+
+**Second**, the next public operation no longer applies a different historical-eligibility rule.
+
+The historical checkout path remains unchanged evidence of where execution occurred. It is not rebound, recreated, or used as a substitute for current preservation checks.
+
+### Final assessment
+
+**I would not reopen fundamental lifecycle ownership at this point.** The inspected source more strongly supports **duplicated historical interpretation and premature live loading** than missing ownership records.
+
+I would broaden the intervention only if targeted reproduction shows that existing run, audit, assignment, iteration, locator, and preservation records cannot express the necessary settlement fact without reconstructing vanished authority. In that case, identify the specific missing fact—not a generalized need for another framework.
+
+**Proceed with the shared-classifier consolidation, require actual public successor work from the all-reclaimed topology, and preserve the existing live and unresolved-work protections.**
