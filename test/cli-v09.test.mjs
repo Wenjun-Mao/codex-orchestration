@@ -426,6 +426,11 @@ test("v0.9 CLI activates a clean run through current launch-era wiring", async (
   const contract = JSON.parse(contracted.stdout);
   const baseline = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
   assert.equal(contract.accepted_dependencies[0].authority_id, localWork.local_work_id);
+  assert.notEqual(
+    execFileSync("git", ["rev-parse", "refs/heads/main"], { cwd: root, encoding: "utf8" }).trim(),
+    baseline,
+    "Keep primary behind the coordinator so branch-selector mistakes remain observable",
+  );
   const requestedSelectors = {
     project_id: "fixture-project",
     model: task.model,
@@ -433,7 +438,7 @@ test("v0.9 CLI activates a clean run through current launch-era wiring", async (
     worktree: {
       mode: "host-worktree",
       starting_revision: baseline,
-      starting_branch: "main",
+      starting_branch: coordinatorBranch,
       executor_branch: "codex/cli-v09-visible",
       path: null,
     },
@@ -462,7 +467,29 @@ test("v0.9 CLI activates a clean run through current launch-era wiring", async (
     "task", "launch", "attempt", "--run-id", runId, "--file", attemptRequestPath, "--json",
   ], { cwd: root, env: { CODEX_THREAD_ID: coordinatorThreadId } });
   assertSuccess(attempted, "assignment-bound task launch attempt");
-  assert.equal(JSON.parse(attempted.stdout).host_request.title, canonicalExecutorTitle);
+  const hostRequest = JSON.parse(attempted.stdout).host_request;
+  assert.equal(hostRequest.title, canonicalExecutorTitle);
+  assert.equal(hostRequest.target.environment.startingState.type, "branch");
+  const startingBranch = hostRequest.target.environment.startingState.branchName;
+  assert.equal(startingBranch, coordinatorBranch);
+
+  // Rehearse the explicit v0.9.12 trial guard, not a production preflight claim.
+  // A native host must honor the emitted branch instead of substituting baseline.
+  const assertStartingBaseline = (branch) => assert.equal(
+    execFileSync("git", ["rev-parse", "--verify", `refs/heads/${branch}^{commit}`], {
+      cwd: root, encoding: "utf8",
+    }).trim(),
+    contract.current_baseline.revision,
+    "Emitted starting branch must match the contracted baseline before host creation",
+  );
+  const inventoryBeforeGuard = execFileSync("git", ["worktree", "list", "--porcelain"], {
+    cwd: root, encoding: "utf8",
+  });
+  assert.throws(() => assertStartingBaseline("main"), /Emitted starting branch must match/);
+  assert.equal(execFileSync("git", ["worktree", "list", "--porcelain"], {
+    cwd: root, encoding: "utf8",
+  }), inventoryBeforeGuard, "Wrong-branch preflight creates no host worktree");
+  assertStartingBaseline(startingBranch);
 
   const reconcileRequestPath = resolve(requests, "task-launch-reconcile.json");
   await writeFile(reconcileRequestPath, `${JSON.stringify({
@@ -492,7 +519,8 @@ test("v0.9 CLI activates a clean run through current launch-era wiring", async (
   const originalAuthorityDigest = executor.authority.authority_digest;
   const originalCreationObservedAt = JSON.parse(reconciled.stdout).creation_evidence.observed_at;
   const executorPath = resolve(root, `../${basename(root)}-cli-v09-executor`);
-  execFileSync("git", ["worktree", "add", "--quiet", "--detach", executorPath, baseline], { cwd: root });
+  assertStartingBaseline(startingBranch);
+  execFileSync("git", ["worktree", "add", "--quiet", "--detach", executorPath, startingBranch], { cwd: root });
   t.after(() => {
     spawnSync("git", ["worktree", "remove", "--force", executorPath], { cwd: primary });
   });

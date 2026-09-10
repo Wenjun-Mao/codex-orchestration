@@ -21,7 +21,7 @@ import {
   refreshSourceCutoverBlocker,
   refreshStatus,
 } from "../lib/compat/refresh.mjs";
-import { sha256, stableStringify, withProcessLock } from "../lib/core.mjs";
+import { PACKAGE_VERSION, sha256, stableStringify, withProcessLock } from "../lib/core.mjs";
 import { reportRouteIdFor, validateReportRoute } from "../lib/report-routes.mjs";
 import { recipientBindingDigest } from "../lib/task-results.mjs";
 import {
@@ -1269,7 +1269,10 @@ test(`applyRefresh retires an assigned ${creationOutcome}-first launch whose ite
   const root = await createGitFixture("codex-flow-refresh-v0911-launch-assignment-");
   const requests = await mkdtemp(resolve(tmpdir(), "codex-flow-refresh-v0911-launch-requests-"));
   const codexHome = await mkdtemp(resolve(tmpdir(), "codex-flow-refresh-v0911-launch-home-"));
-  const targetPackage = await copyCurrentPackage({ version: "0.9.12" });
+  // This producer is current code, so the synthetic consumer must stay later
+  // than it after promotion. The separate historical journey keeps its frozen producer.
+  const [major, minor, patch] = PACKAGE_VERSION.split(/[.+-]/).map(Number);
+  const targetPackage = await copyCurrentPackage({ version: `${major}.${minor}.${patch + 1}` });
   const source = await createActiveTaskLaunch(root, "refresh-assigned-provisional", {
     taskTitle: "Executor · v0.9.7 · Assignment reporting",
     creationOutcome,
