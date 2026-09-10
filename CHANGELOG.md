@@ -3,6 +3,22 @@
 This file records concise user-facing changes. Immutable tags and the linked
 decision records remain the detailed release evidence.
 
+## 0.9.12-rc.1 - 2026-09-10
+
+- Classify reclaimed modern predecessor runs from their exact run audit,
+  retired assignment, accepted reporting, locator retirement, closed iteration,
+  resource absence, and primary-ancestry authorities before selecting any live
+  refresh source.
+- Admit ordinary fresh work across multiple retained settled namespaces while
+  revalidating under the repository admission lock and preserving pending
+  handoff precedence.
+- Return a non-mutating `fresh-start-required` result when `refresh prepare`
+  explicitly names settled history, without recreating a checkout, writing a
+  handoff, or deleting historical records.
+- Serialize assignment-backed refresh admission with cancellation, revalidate
+  unrelated retained history on first refresh-ID admission, and reject target
+  Git drift before runtime or workflow preparation.
+
 ## 0.9.11 - 2026-09-09
 
 - Resolve executor identity from persisted launch authority across provisional,

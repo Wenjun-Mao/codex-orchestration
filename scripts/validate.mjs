@@ -15,7 +15,7 @@ import {
 import { validateReleaseIdentity } from "./release-identity.mjs";
 
 const root = resolve(import.meta.dirname, "..");
-const EXPECTED_PACKAGE_VERSION = "0.9.11";
+const EXPECTED_PACKAGE_VERSION = "0.9.12-rc.1";
 
 const ACTIVE_SCHEMA_NAMES = Object.freeze([
   "assignment-authority",
@@ -30,6 +30,7 @@ const ACTIVE_SCHEMA_NAMES = Object.freeze([
   "iteration",
   "refresh-handoff-v1",
   "refresh-inspection",
+  "refresh-preparation",
   "refresh-origin",
   "report-delivery",
   "report-envelope",
@@ -504,6 +505,12 @@ assertMarkers(await readRequired("docs/adr/0057-delivery-owner-selector-starting
   "Terra-xhigh",
   "child count",
 ], "ADR 0057");
+assertMarkers(await readRequired("docs/adr/0070-read-side-historical-settlement.md"), [
+  "settled-history",
+  "live-source-required",
+  "fresh-start-required",
+  "No settlement record or cache is written",
+], "ADR 0070");
 
 assertMarkers(await readRequired("README.md"), [
   "Native-first visible-task launch",
@@ -527,6 +534,7 @@ assertMarkers(await readRequired("SECURITY.md"), [
   "does not promise a response SLA",
 ], "SECURITY.md");
 assertMarkers(await readRequired("CHANGELOG.md"), [
+  "0.9.12-rc.1 - 2026-09-10",
   "0.9.11 - 2026-09-09",
   "0.9.10 - 2026-09-08",
   "0.9.9 - 2026-09-08",

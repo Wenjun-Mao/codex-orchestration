@@ -11,7 +11,7 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
-import { resolve } from "node:path";
+import { basename, resolve } from "node:path";
 import test from "node:test";
 import {
   applyRefresh,
@@ -30,14 +30,24 @@ import {
 } from "../lib/codex-app-report-adapter.mjs";
 import {
   assignmentAuthority,
+  assignmentRegistration,
   markAssignmentRegistrationStage,
   openAssignmentForSender,
   publishAssignmentReadiness,
 } from "../lib/assignment-authority.mjs";
 import { installRepositoryReportLocator } from "../lib/report-hook.mjs";
-import { closeoutIterationWithOwningHost, iterationStatus } from "../lib/iteration-registry.mjs";
+import {
+  assertArchivedCoordinatorIterationSettled,
+  closeoutIterationWithOwningHost,
+  iterationStatus,
+} from "../lib/iteration-registry.mjs";
 import { bindRecipient } from "../lib/recipients.mjs";
 import { registerCoordinatorReportRoute, reportRoute } from "../lib/report-routes.mjs";
+import {
+  acceptReportSubmission,
+  beginReportSubmission,
+  captureReport,
+} from "../lib/report-records.mjs";
 import {
   captureRefreshGitAuthority,
   deleteRefreshExecutorBranch,
@@ -46,8 +56,13 @@ import {
 import {
   assertRefreshNamespaceRemovalSafe,
   loadRefreshSourceAuthority,
+  refreshNamespaceTreeDigest,
 } from "../lib/compat/refresh-source.mjs";
-import { RUNTIME_DIRECTORY } from "../lib/runtime-context.mjs";
+import {
+  assertRuntimeRepositoryCurrent,
+  RUNTIME_DIRECTORY,
+} from "../lib/runtime-context.mjs";
+import { gitSnapshot } from "../lib/git.mjs";
 import { createGitFixture, packageRoot, removeFixture } from "./helpers.mjs";
 import { createActiveTaskLaunch } from "./v09-lifecycle-fixture.mjs";
 
@@ -195,6 +210,224 @@ async function copyCurrentPackage({ version = null } = {}) {
   return { root, cli: resolve(root, "bin", "codex-flow.mjs") };
 }
 
+function gitText(root, args) {
+  return execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
+}
+
+async function produceSettledCoordinatorRun({
+  primary,
+  requests,
+  sourcePackage,
+  suffix,
+  expectedResult,
+  afterReadiness = null,
+}) {
+  const coordinatorPath = resolve(primary, `../${basename(primary)}-${suffix}-coordinator`);
+  const coordinatorBranch = `codex/${suffix}-coordinator`;
+  execFileSync("git", ["worktree", "add", "--quiet", "-b", coordinatorBranch, coordinatorPath], {
+    cwd: primary,
+  });
+  const coordinator = {
+    lineage_id: `${suffix}-lineage`,
+    thread_id: `${suffix}-coordinator-thread`,
+    generation: 1,
+  };
+  const director = {
+    lineage_id: `${suffix}-director-lineage`,
+    thread_id: `${suffix}-director-thread`,
+    generation: 1,
+  };
+  const coordinatorGitDir = gitText(coordinatorPath, [
+    "rev-parse", "--path-format=absolute", "--git-dir",
+  ]);
+  await writeFile(resolve(coordinatorGitDir, "codex-thread.json"), `${JSON.stringify({
+    version: 1,
+    ownerThreadId: coordinator.thread_id,
+  })}\n`, "utf8");
+  const work = task(`${suffix}-work`, {
+    execution_kind: "coordinator",
+    mode: "write",
+    write_paths: ["historical-result.txt"],
+    shared_resources: ["historical-result"],
+  });
+  const request = activation({
+    runId: `${suffix}-run`,
+    workflowTask: work,
+    lineageId: coordinator.lineage_id,
+    threadId: coordinator.thread_id,
+    branch: coordinatorBranch,
+    branchFences: [],
+  });
+  const activationPath = await jsonFile(requests, `${suffix}-activation`, request);
+  const activatedCall = invoke(sourcePackage.cli, [
+    "run", "activate", "--run-id", request.run_id,
+    "--file", activationPath, "--json",
+  ], coordinatorPath, { CODEX_THREAD_ID: coordinator.thread_id });
+  assertSuccess(activatedCall, `${suffix} activation`);
+  const activated = JSON.parse(activatedCall.stdout);
+  const runtimeCli = resolve(activated.runtime_authority.bundle_root, "bin", "codex-flow.mjs");
+
+  const approvedPlanPath = resolve(requests, `${suffix}-approved-plan.md`);
+  await writeFile(approvedPlanPath, `# ${suffix} approved plan\n`, "utf8");
+  const preparationPath = await jsonFile(requests, `${suffix}-assignment-preparation`, {
+    approved_plan_path: approvedPlanPath,
+    recipient: { host_id: "local", ...director },
+    iteration_label: `${suffix} historical settlement`,
+    purpose: `Complete and reclaim ${suffix}.`,
+    outcome: `Preserve the useful ${suffix} result.`,
+    scope: ["Commit and verify one bounded result."],
+    acceptance_criteria: ["The result is preserved in primary."],
+    constraints: [],
+    reasons: [],
+  });
+  const preparationCall = invoke(sourcePackage.cli, [
+    "assignment", "prepare", "--file", preparationPath, "--json",
+  ], coordinatorPath, { CODEX_THREAD_ID: director.thread_id });
+  assertSuccess(preparationCall, `${suffix} assignment preparation`);
+  const preparation = JSON.parse(preparationCall.stdout).preparation;
+  const routePath = await jsonFile(requests, `${suffix}-route`, {
+    run_id: request.run_id,
+    sender_thread_id: coordinator.thread_id,
+    preparation_id: preparation.preparation_id,
+  });
+  const routeCall = invoke(runtimeCli, [
+    "report", "route", "coordinator", "--run-id", request.run_id,
+    "--file", routePath, "--json",
+  ], coordinatorPath, { CODEX_THREAD_ID: coordinator.thread_id });
+  assertSuccess(routeCall, `${suffix} assignment readiness`);
+  const registration = JSON.parse(routeCall.stdout);
+  const assignmentId = registration.route.assignment.assignment_id;
+  const readyAssignment = await assignmentAuthority({
+    stateRoot: registration.state_root,
+    assignmentId,
+  });
+  assert.equal(assignmentRegistration(readyAssignment).status, "ready");
+  if (afterReadiness !== null) {
+    await afterReadiness({ activated, coordinator, registration, request, runtimeCli });
+  }
+
+  const startPath = await jsonFile(requests, `${suffix}-local-start`, {
+    run_id: request.run_id,
+    plan_id: request.workflow.plan_id,
+    task_id: work.task_id,
+    dependency_authorities: [],
+  });
+  const startedCall = invoke(runtimeCli, [
+    "workflow", "local", "start", "--run-id", request.run_id,
+    "--file", startPath, "--json",
+  ], coordinatorPath, { CODEX_THREAD_ID: coordinator.thread_id });
+  assertSuccess(startedCall, `${suffix} useful work start`);
+  const started = JSON.parse(startedCall.stdout);
+  await writeFile(resolve(coordinatorPath, "historical-result.txt"), `${expectedResult}\n`, "utf8");
+  execFileSync("git", ["add", "historical-result.txt"], { cwd: coordinatorPath });
+  execFileSync("git", ["commit", "--quiet", "-m", `${suffix} useful result`], { cwd: coordinatorPath });
+  const completePath = await jsonFile(requests, `${suffix}-local-complete`, {
+    run_id: request.run_id,
+    local_work_id: started.local_work_id,
+    checks: [{
+      check_id: `${suffix}-result`,
+      argv: [process.execPath, "-e", `const fs=require('fs');if(fs.readFileSync('historical-result.txt','utf8').trim()!==${JSON.stringify(expectedResult)})process.exit(1)`],
+    }],
+  });
+  const completedCall = invoke(runtimeCli, [
+    "workflow", "local", "complete", "--run-id", request.run_id,
+    "--file", completePath, "--json",
+  ], coordinatorPath, { CODEX_THREAD_ID: coordinator.thread_id });
+  assertSuccess(completedCall, `${suffix} useful work completion`);
+  execFileSync("git", ["merge", "--ff-only", coordinatorBranch], { cwd: primary });
+
+  const auditCall = invoke(runtimeCli, [
+    "run", "audit", "--run-id", request.run_id, "--json",
+  ], coordinatorPath);
+  assertSuccess(auditCall, `${suffix} closure audit`);
+  const audit = JSON.parse(auditCall.stdout).audit;
+  assert.equal(audit.terminal_ready, true, JSON.stringify(audit.blockers));
+  const closePath = await jsonFile(requests, `${suffix}-close`, {
+    run_id: request.run_id,
+    resume: activated.run.binding,
+    audit_id: audit.audit_id,
+  });
+  const closeCall = invoke(runtimeCli, [
+    "run", "close", "--run-id", request.run_id,
+    "--file", closePath, "--json",
+  ], coordinatorPath);
+  assertSuccess(closeCall, `${suffix} audited close`);
+
+  const captured = await captureReport({
+    stateRoot: registration.state_root,
+    routeId: registration.route.route_id,
+    source: {
+      host_id: "local",
+      thread_id: coordinator.thread_id,
+      turn_id: `${suffix}-final-turn`,
+      output_kind: "final-assistant-output",
+    },
+    finalText: `${suffix} completed normally.`,
+  });
+  await beginReportSubmission({ stateRoot: registration.state_root, reportId: captured.report.report_id });
+  const accepted = await acceptReportSubmission({
+    stateRoot: registration.state_root,
+    reportId: captured.report.report_id,
+    clientMessageId: `${suffix}-accepted-message`,
+  });
+  const observationTime = Date.now();
+  const pendingPath = await jsonFile(requests, `${suffix}-accept-pending`, {
+    assignment_id: assignmentId,
+    report_id: accepted.report.report_id,
+    task_observation: {
+      execution_kind: "task-thread",
+      thread_id: coordinator.thread_id,
+      source: "typed-host-activity-v1",
+      active_visible: true,
+      archived_visible: false,
+      activity_state: "idle",
+      observed_at: new Date(observationTime).toISOString(),
+    },
+  });
+  const pendingCall = invoke(runtimeCli, [
+    "assignment", "accept", "--assignment-id", assignmentId,
+    "--file", pendingPath, "--json",
+  ], primary, { CODEX_THREAD_ID: director.thread_id });
+  assertSuccess(pendingCall, `${suffix} pending closeout`);
+  const pending = JSON.parse(pendingCall.stdout);
+  assert.equal(pending.status, "closeout-pending");
+  const retiredPath = await jsonFile(requests, `${suffix}-accept-retired`, {
+    assignment_id: assignmentId,
+    report_id: accepted.report.report_id,
+    task_observation: {
+      execution_kind: "task-thread",
+      thread_id: coordinator.thread_id,
+      source: "host-observed",
+      active_visible: false,
+      archived_visible: true,
+      observed_at: new Date(observationTime + 1).toISOString(),
+    },
+    host_result: {
+      attempt_id: pending.closeout.host_request.attempt_id,
+      thread_id: coordinator.thread_id,
+      outcome: "accepted",
+    },
+  });
+  const retiredCall = invoke(runtimeCli, [
+    "assignment", "accept", "--assignment-id", assignmentId,
+    "--file", retiredPath, "--json",
+  ], primary, { CODEX_THREAD_ID: director.thread_id });
+  assertSuccess(retiredCall, `${suffix} normal reclamation`);
+  assert.equal(JSON.parse(retiredCall.stdout).status, "retired");
+  await assert.rejects(stat(coordinatorPath), /ENOENT/);
+  assert.equal(gitText(primary, ["branch", "--list", coordinatorBranch]), "");
+  return {
+    request,
+    assignmentId,
+    registration,
+    audit,
+    coordinator,
+    director,
+    coordinatorPath,
+    coordinatorBranch,
+  };
+}
+
 async function createAbandonedV08Run({
   root,
   requests,
@@ -260,7 +493,7 @@ async function createAbandonedDirectCoordinatorRun({
     workflowTask,
     lineageId: `${runId}-lineage`,
     threadId: `${runId}-coordinator`,
-    branch: "main",
+    branch: `codex/${runId}`,
     branchFences: [],
   });
   const activationPath = await jsonFile(requests, `${runId}-activation`, request);
@@ -287,7 +520,9 @@ async function createAbandonedDirectCoordinatorRun({
     : await beforeAbandon({ activated, request, runtimeCli, workflowTask, localWork });
   let audit = null;
   let terminal;
-  if (terminalKind === "closed") {
+  if (terminalKind === "active") {
+    terminal = { active: activated };
+  } else if (terminalKind === "closed") {
     const auditCall = invoke(runtimeCli, ["run", "audit", "--run-id", runId, "--json"], root);
     assertSuccess(auditCall, "v0.9 direct coordinator source closure audit");
     audit = JSON.parse(auditCall.stdout).audit;
@@ -373,7 +608,7 @@ test("v0.9 refresh reissues unfinished coordinator work without inventing child 
     workflowTask: replacement,
     lineageId: "refresh-v096-direct-coordinator-target-lineage",
     threadId: source.request.runtime.lineage.thread_id,
-    branch: "main",
+    branch: "codex/refresh-v096-direct-coordinator-target",
     branchFences: [],
   });
   const invalidWaitPath = await jsonFile(requests, "refresh-v096-direct-coordinator-wait", {
@@ -446,6 +681,37 @@ test("v0.9 refresh reissues unfinished coordinator work without inventing child 
   const handoff = JSON.parse(preparedCall.stdout).handoff;
   assert.deepEqual(handoff.cleanup, []);
   assert.equal(handoff.intent.replacements[0].source_operation_id, source.localWork.local_work_id);
+  const handoffPath = resolve(root, ".git", "codex-flow", "refresh-v1", "handoff.json");
+  const handoffBeforeUnrelatedActivation = await readFile(handoffPath, "utf8");
+  const unrelatedActivation = activation({
+    runId: "refresh-v096-unrelated-ordinary-run",
+    workflowTask: task("refresh-v096-unrelated-ordinary-work", {
+      execution_kind: "coordinator",
+      mode: "read",
+      write_paths: [],
+      shared_resources: [],
+    }),
+    lineageId: "refresh-v096-unrelated-lineage",
+    threadId: "refresh-v096-unrelated-thread",
+    branch: "codex/refresh-v096-unrelated",
+    branchFences: [],
+  });
+  const unrelatedActivationPath = await jsonFile(
+    requests,
+    "refresh-v096-unrelated-ordinary-activation",
+    unrelatedActivation,
+  );
+  const unrelatedActivationCall = invoke(targetPackage.cli, [
+    "run", "activate", "--run-id", unrelatedActivation.run_id,
+    "--file", unrelatedActivationPath, "--json",
+  ], root, { CODEX_THREAD_ID: unrelatedActivation.runtime.lineage.thread_id });
+  assert.notEqual(unrelatedActivationCall.status, 0);
+  assert.match(
+    `${unrelatedActivationCall.stderr}\n${unrelatedActivationCall.stdout}`,
+    /Pending refresh handoff .* must be resumed/,
+  );
+  await assert.rejects(stat(resolve(root, ".git", "codex-flow", RUNTIME_DIRECTORY)), /ENOENT/);
+  assert.equal(await readFile(handoffPath, "utf8"), handoffBeforeUnrelatedActivation);
 
   const applyPath = await jsonFile(requests, "refresh-v096-direct-coordinator-apply", {
     refresh_id: handoff.refresh_id,
@@ -552,13 +818,15 @@ test("v0.9 refresh keeps completed coordinator work on the true no-work clean-st
 test("assignment-lived reporting binds the exact target before refresh source deletion", async (t) => {
   const root = await createGitFixture("codex-flow-refresh-v097-assignment-");
   const requests = await mkdtemp(resolve(tmpdir(), "codex-flow-refresh-v097-assignment-requests-"));
-  const sourcePackage = await copyCurrentPackage();
-  const targetPackage = await copyCurrentPackage({ version: "0.9.12-rc.1" });
-  const sourceNamespace = RUNTIME_DIRECTORY;
+  const historicalPackage = await extractTaggedPackage("v0.9.11");
+  const sourcePackage = await copyCurrentPackage({ version: "0.9.12-rc.1" });
+  const targetPackage = await copyCurrentPackage({ version: "0.9.12" });
+  const sourceNamespace = "v0.9.12-rc.1";
   t.after(async () => {
     await Promise.all([
       removeFixture(root),
       rm(requests, { recursive: true, force: true }),
+      rm(historicalPackage.root, { recursive: true, force: true }),
       rm(sourcePackage.root, { recursive: true, force: true }),
       rm(targetPackage.root, { recursive: true, force: true }),
     ]);
@@ -570,6 +838,13 @@ test("assignment-lived reporting binds the exact target before refresh source de
     generation: 1,
   };
   const planPath = resolve(root, "refresh-assignment-plan.md");
+  const unrelated = await produceSettledCoordinatorRun({
+    primary: root,
+    requests,
+    sourcePackage: historicalPackage,
+    suffix: "refresh-unrelated-settled",
+    expectedResult: "unrelated-settled",
+  });
   const source = await createAbandonedDirectCoordinatorRun({
     root,
     requests,
@@ -632,7 +907,7 @@ test("assignment-lived reporting binds the exact target before refresh source de
   assertSuccess(inspectionCall, "assignment refresh inspection");
   const inspection = JSON.parse(inspectionCall.stdout);
   assert.equal(inspection.route, "refresh-ready", inspection.reason);
-  assert.equal(inspection.authority.source.package_version, "0.9.11");
+  assert.equal(inspection.authority.source.package_version, "0.9.12-rc.1");
 
   const replacement = {
     ...source.workflowTask,
@@ -685,6 +960,56 @@ test("assignment-lived reporting binds the exact target before refresh source de
 
   targetActivation.refresh_id = handoff.refresh_id;
   targetActivation.activated_at = new Date().toISOString();
+  const targetActivationPath = await jsonFile(requests, "refresh-v097-assignment-target", targetActivation);
+  const flowRoot = resolve(root, ".git", "codex-flow");
+  const preAdmissionBackup = resolve(requests, "assignment-refresh-pre-admission-state");
+  await cp(flowRoot, preAdmissionBackup, { recursive: true });
+  const handoffPath = resolve(flowRoot, "refresh-v1", "handoff.json");
+  const handoffBytes = await readFile(handoffPath, "utf8");
+
+  const preAdmissionCancellationPath = await jsonFile(requests, "refresh-v097-assignment-pre-admission-cancel", {
+    assignment_id: originalAssignment.assignment_id,
+    reason: "Exercise cancellation after source retirement and before target admission.",
+  });
+  const cancelledCall = invoke(targetPackage.cli, [
+    "assignment", "cancel", "--assignment-id", originalAssignment.assignment_id,
+    "--file", preAdmissionCancellationPath, "--json",
+  ], root, { CODEX_THREAD_ID: recipient.thread_id });
+  assertSuccess(cancelledCall, "post-apply assignment cancellation");
+  const cancelledActivation = invoke(targetPackage.cli, [
+    "run", "activate", "--run-id", targetActivation.run_id,
+    "--refresh-id", handoff.refresh_id, "--file", targetActivationPath, "--json",
+  ], root, { CODEX_THREAD_ID: source.request.runtime.lineage.thread_id });
+  assert.notEqual(cancelledActivation.status, 0);
+  assert.match(`${cancelledActivation.stderr}\n${cancelledActivation.stdout}`, /Only an open assignment can bind/);
+  await assert.rejects(stat(resolve(flowRoot, "v0.9.12")), /ENOENT/);
+  assert.equal(await readFile(handoffPath, "utf8"), handoffBytes);
+  await rm(flowRoot, { recursive: true, force: true });
+  await cp(preAdmissionBackup, flowRoot, { recursive: true });
+
+  const unrelatedAssignmentPath = resolve(
+    flowRoot,
+    "assignments-v1",
+    "records",
+    `${unrelated.assignmentId}.json`,
+  );
+  const unrelatedAssignment = JSON.parse(await readFile(unrelatedAssignmentPath, "utf8"));
+  unrelatedAssignment.acceptance.report_digest = "0".repeat(64);
+  await writeFile(unrelatedAssignmentPath, `${JSON.stringify(unrelatedAssignment)}\n`, "utf8");
+  const unrelatedDriftActivation = invoke(targetPackage.cli, [
+    "run", "activate", "--run-id", targetActivation.run_id,
+    "--refresh-id", handoff.refresh_id, "--file", targetActivationPath, "--json",
+  ], root, { CODEX_THREAD_ID: source.request.runtime.lineage.thread_id });
+  assert.notEqual(unrelatedDriftActivation.status, 0);
+  assert.match(
+    `${unrelatedDriftActivation.stderr}\n${unrelatedDriftActivation.stdout}`,
+    /Historical accepted report does not match/,
+  );
+  await assert.rejects(stat(resolve(flowRoot, "v0.9.12")), /ENOENT/);
+  assert.equal(await readFile(handoffPath, "utf8"), handoffBytes);
+  await rm(flowRoot, { recursive: true, force: true });
+  await cp(preAdmissionBackup, flowRoot, { recursive: true });
+
   await assert.rejects(consumeWithHooks({
     targetPackage,
     root,
@@ -706,7 +1031,6 @@ test("assignment-lived reporting binds the exact target before refresh source de
   assertSuccess(interruptedStatusCall, "interrupted current-source refresh status");
   assert.equal(JSON.parse(interruptedStatusCall.stdout).status, "source-retired");
 
-  const targetActivationPath = await jsonFile(requests, "refresh-v097-assignment-target", targetActivation);
   const activatedCall = invoke(targetPackage.cli, [
     "run", "activate", "--run-id", targetActivation.run_id,
     "--refresh-id", handoff.refresh_id, "--file", targetActivationPath, "--json",
@@ -777,7 +1101,7 @@ test(`applyRefresh retires an assigned ${creationOutcome}-first launch whose ite
   const root = await createGitFixture("codex-flow-refresh-v0911-launch-assignment-");
   const requests = await mkdtemp(resolve(tmpdir(), "codex-flow-refresh-v0911-launch-requests-"));
   const codexHome = await mkdtemp(resolve(tmpdir(), "codex-flow-refresh-v0911-launch-home-"));
-  const targetPackage = await copyCurrentPackage({ version: "0.9.12-rc.1" });
+  const targetPackage = await copyCurrentPackage({ version: "0.9.12" });
   const source = await createActiveTaskLaunch(root, "refresh-assigned-provisional", {
     taskTitle: "Executor · v0.9.7 · Assignment reporting",
     creationOutcome,
@@ -2052,7 +2376,234 @@ test("v0.9 refresh rejects an abandoned predecessor that retains a live Git fenc
   assert.match(inspection.reason, /Earlier source run retains unresolved fences/);
 });
 
-test("v0.9 refresh recognizes a reclaimed closed predecessor only through its authenticated terminal audit", async (t) => {
+test("run activation preparation rejects clean target Git drift from its initial authority", async (t) => {
+  const root = await createGitFixture("codex-flow-refresh-target-drift-");
+  t.after(() => removeFixture(root));
+  const initial = gitSnapshot(root);
+  await writeFile(resolve(root, "target-drift.txt"), "drifted after initial snapshot\n", "utf8");
+  execFileSync("git", ["add", "target-drift.txt"], { cwd: root });
+  execFileSync("git", ["commit", "--quiet", "-m", "target drift"], { cwd: root });
+  assert.throws(() => assertRuntimeRepositoryCurrent({
+    common_dir: initial.commonDir,
+    root: initial.root,
+    branch: initial.branch,
+    revision: initial.revision,
+  }), /Target repository drifted before run activation preparation/);
+  await assert.rejects(stat(resolve(initial.commonDir, "codex-flow", RUNTIME_DIRECTORY)), /ENOENT/);
+});
+
+test("settled v0.9.11 assignments admit candidate work and a later stable consumer across two namespaces", async (t) => {
+  const primary = await createGitFixture("codex-flow-refresh-v0912-settled-history-");
+  const requests = await mkdtemp(resolve(tmpdir(), "codex-flow-refresh-v0912-settled-history-requests-"));
+  const frozenPackage = await extractTaggedPackage("v0.9.11");
+  const candidatePackage = await copyCurrentPackage({ version: "0.9.12-rc.1" });
+  const stablePackage = await copyCurrentPackage({ version: "0.9.12" });
+  const coordinatorRoots = [
+    resolve(primary, `../${basename(primary)}-settled-frozen-first-coordinator`),
+    resolve(primary, `../${basename(primary)}-settled-frozen-second-coordinator`),
+    resolve(primary, `../${basename(primary)}-settled-candidate-coordinator`),
+    resolve(primary, `../${basename(primary)}-settled-stable-coordinator`),
+  ];
+  t.after(async () => {
+    for (const path of coordinatorRoots) {
+      spawnSync("git", ["worktree", "remove", "--force", path], { cwd: primary, stdio: "ignore" });
+    }
+    await Promise.all([
+      removeFixture(primary),
+      rm(requests, { recursive: true, force: true }),
+      rm(frozenPackage.root, { recursive: true, force: true }),
+      rm(candidatePackage.root, { recursive: true, force: true }),
+      rm(stablePackage.root, { recursive: true, force: true }),
+    ]);
+  });
+
+  await produceSettledCoordinatorRun({
+    primary,
+    requests,
+    sourcePackage: frozenPackage,
+    suffix: "settled-frozen-first",
+    expectedResult: "frozen-first",
+  });
+  const second = await produceSettledCoordinatorRun({
+    primary,
+    requests,
+    sourcePackage: frozenPackage,
+    suffix: "settled-frozen-second",
+    expectedResult: "frozen-first+frozen-second",
+  });
+  const commonDir = await realpath(resolve(primary, ".git"));
+  const frozenBefore = await refreshNamespaceTreeDigest({ commonDir, namespace: "v0.9.11" });
+  const secondAssignment = await assignmentAuthority({
+    stateRoot: second.registration.state_root,
+    assignmentId: second.assignmentId,
+  });
+  const secondIteration = await iterationStatus({
+    commonDir,
+    iterationId: secondAssignment.iteration_id,
+  });
+  const archivedCoordinator = secondIteration.members.find((entry) => entry.role === "coordinator");
+  assert.ok(archivedCoordinator);
+  execFileSync("git", ["commit", "--quiet", "--allow-empty", "-m", "independent preserved result"], {
+    cwd: primary,
+  });
+  const independentlyPreservedTip = gitText(primary, ["rev-parse", "HEAD"]);
+  assert.equal(spawnSync("git", [
+    "merge-base", "--is-ancestor", independentlyPreservedTip, archivedCoordinator.archive_attempt.branch_tip,
+  ], { cwd: primary }).status, 1);
+  await assertArchivedCoordinatorIterationSettled({
+    commonDir,
+    iterationId: secondAssignment.iteration_id,
+    assignmentId: second.assignmentId,
+    stateRoot: second.registration.state_root,
+    hostId: archivedCoordinator.host_id,
+    threadId: archivedCoordinator.thread_id,
+    reportingParentThreadId: archivedCoordinator.reporting_parent_thread_id,
+    worktreePath: archivedCoordinator.worktree_path,
+    branch: archivedCoordinator.branch,
+    requiredResultTip: independentlyPreservedTip,
+  });
+  const unrelatedTree = gitText(primary, ["rev-parse", "HEAD^{tree}"]);
+  const unrelatedTip = execFileSync("git", ["commit-tree", unrelatedTree], {
+    cwd: primary,
+    encoding: "utf8",
+    input: "unrelated audited result\n",
+  }).trim();
+  await assert.rejects(assertArchivedCoordinatorIterationSettled({
+    commonDir,
+    iterationId: secondAssignment.iteration_id,
+    assignmentId: second.assignmentId,
+    stateRoot: second.registration.state_root,
+    hostId: archivedCoordinator.host_id,
+    threadId: archivedCoordinator.thread_id,
+    reportingParentThreadId: archivedCoordinator.reporting_parent_thread_id,
+    worktreePath: archivedCoordinator.worktree_path,
+    branch: archivedCoordinator.branch,
+    requiredResultTip: unrelatedTip,
+  }), /Authenticated primary does not preserve the audited result/);
+  const candidateSkill = resolve(candidatePackage.root, "skills", "refresh", "SKILL.md");
+  const candidateInspectionCall = invoke(candidatePackage.cli, [
+    "refresh", "inspect", "--invoking-skill", candidateSkill, "--json",
+  ], primary);
+  assertSuccess(candidateInspectionCall, "settled history candidate inspection");
+  const candidateInspection = JSON.parse(candidateInspectionCall.stdout);
+  assert.equal(candidateInspection.route, "fresh", candidateInspection.reason);
+  assert.equal(candidateInspection.authority.settled_predecessors.length, 2);
+
+  const secondAssignmentPath = resolve(
+    commonDir,
+    "codex-flow",
+    "assignments-v1",
+    "records",
+    `${second.assignmentId}.json`,
+  );
+  const secondAssignmentBytes = await readFile(secondAssignmentPath, "utf8");
+  const tamperedAssignment = JSON.parse(secondAssignmentBytes);
+  tamperedAssignment.acceptance.report_digest = "0".repeat(64);
+  await writeFile(secondAssignmentPath, `${JSON.stringify(tamperedAssignment)}\n`, "utf8");
+  const driftedActivation = activation({
+    runId: "settled-drifted-admission-run",
+    workflowTask: task("settled-drifted-admission-work", {
+      execution_kind: "coordinator",
+      mode: "read",
+      write_paths: [],
+      shared_resources: [],
+    }),
+    lineageId: "settled-drifted-admission-lineage",
+    threadId: "settled-drifted-admission-thread",
+    branch: "codex/settled-drifted-admission",
+    branchFences: [],
+  });
+  const driftedActivationPath = await jsonFile(
+    requests,
+    "settled-drifted-admission",
+    driftedActivation,
+  );
+  const driftedActivationCall = invoke(candidatePackage.cli, [
+    "run", "activate", "--run-id", driftedActivation.run_id,
+    "--file", driftedActivationPath, "--json",
+  ], primary, { CODEX_THREAD_ID: driftedActivation.runtime.lineage.thread_id });
+  assert.notEqual(driftedActivationCall.status, 0);
+  assert.match(
+    `${driftedActivationCall.stderr}\n${driftedActivationCall.stdout}`,
+    /Historical accepted report does not match/,
+  );
+  await assert.rejects(stat(resolve(commonDir, "codex-flow", "v0.9.12-rc.1")), /ENOENT/);
+  await writeFile(secondAssignmentPath, secondAssignmentBytes, "utf8");
+
+  const settledPreparePath = await jsonFile(requests, "settled-history-prepare", {
+    source_namespace: "v0.9.11",
+    source_run_id: second.request.run_id,
+    source_resume: null,
+    decisions: [],
+    replacements: [],
+    target_workflow: null,
+    target_fences: { path_fences: [], resource_fences: [], branch_fences: [] },
+    target_coordinator_thread_id: "settled-candidate-coordinator-thread",
+  });
+  const settledPrepareCall = invoke(candidatePackage.cli, [
+    "refresh", "prepare", "--invoking-skill", candidateSkill,
+    "--file", settledPreparePath, "--json",
+  ], primary);
+  assertSuccess(settledPrepareCall, "settled history non-mutating preparation");
+  const settledPreparation = JSON.parse(settledPrepareCall.stdout);
+  assert.equal(settledPreparation.kind, "codex-flow-refresh-v1-preparation");
+  assert.equal(settledPreparation.status, "fresh-start-required");
+  assert.equal(settledPreparation.mutation_performed, false);
+  assert.equal(settledPreparation.next_action.refresh_id, null);
+  await assert.rejects(stat(resolve(commonDir, "codex-flow", "refresh-v1")), /ENOENT/);
+  assert.deepEqual(
+    await refreshNamespaceTreeDigest({ commonDir, namespace: "v0.9.11" }),
+    frozenBefore,
+  );
+
+  await produceSettledCoordinatorRun({
+    primary,
+    requests,
+    sourcePackage: candidatePackage,
+    suffix: "settled-candidate",
+    expectedResult: "frozen-first+frozen-second+candidate",
+    afterReadiness: async () => {
+      const activeInspectionCall = invoke(candidatePackage.cli, [
+        "refresh", "inspect", "--invoking-skill", candidateSkill, "--json",
+      ], primary);
+      assertSuccess(activeInspectionCall, "candidate active-run reinspection");
+      assert.equal(JSON.parse(activeInspectionCall.stdout).route, "resume-source");
+    },
+  });
+  const candidateBefore = await refreshNamespaceTreeDigest({
+    commonDir,
+    namespace: "v0.9.12-rc.1",
+  });
+  const stableSkill = resolve(stablePackage.root, "skills", "refresh", "SKILL.md");
+  const stableInspectionCall = invoke(stablePackage.cli, [
+    "refresh", "inspect", "--invoking-skill", stableSkill, "--json",
+  ], primary);
+  assertSuccess(stableInspectionCall, "two-namespace stable rehearsal inspection");
+  const stableInspection = JSON.parse(stableInspectionCall.stdout);
+  assert.equal(stableInspection.route, "fresh", stableInspection.reason);
+  assert.deepEqual(
+    [...new Set(stableInspection.authority.settled_predecessors.map((entry) => entry.namespace))].sort(),
+    ["v0.9.11", "v0.9.12-rc.1"],
+  );
+
+  await produceSettledCoordinatorRun({
+    primary,
+    requests,
+    sourcePackage: stablePackage,
+    suffix: "settled-stable",
+    expectedResult: "frozen-first+frozen-second+candidate+stable",
+  });
+  assert.deepEqual(
+    await refreshNamespaceTreeDigest({ commonDir, namespace: "v0.9.11" }),
+    frozenBefore,
+  );
+  assert.deepEqual(
+    await refreshNamespaceTreeDigest({ commonDir, namespace: "v0.9.12-rc.1" }),
+    candidateBefore,
+  );
+});
+
+test("reclaimed standalone history remains blocked without exact retired assignment authority", async (t) => {
   const root = await createGitFixture("codex-flow-refresh-v09-reclaimed-closed-");
   const requests = await mkdtemp(resolve(tmpdir(), "codex-flow-refresh-v09-reclaimed-closed-requests-"));
   const worktreeParent = await mkdtemp(resolve(tmpdir(), "codex-flow-refresh-v09-reclaimed-closed-worktree-"));
@@ -2095,7 +2646,8 @@ test("v0.9 refresh recognizes a reclaimed closed predecessor only through its au
   ], root);
   assertSuccess(inspectionCall, "reclaimed closed predecessor refresh inspection");
   const inspection = JSON.parse(inspectionCall.stdout);
-  assert.equal(inspection.route, "refresh-ready", inspection.reason);
+  assert.equal(inspection.route, "blocked", inspection.reason);
+  assert.match(inspection.reason, /exactly one retired assignment authority/);
 
   const commonDir = await realpath(resolve(root, ".git"));
   const selectedSource = await loadRefreshSourceAuthority({
@@ -2103,10 +2655,30 @@ test("v0.9 refresh recognizes a reclaimed closed predecessor only through its au
     namespace: "v0.9.9",
     runId: selected.request.run_id,
   });
-  await assert.doesNotReject(assertRefreshNamespaceRemovalSafe({
+  await assert.rejects(assertRefreshNamespaceRemovalSafe({
     source: selectedSource,
     handoff: { cleanup: [] },
-  }));
+  }), /exactly one retired assignment authority/);
+  const blockedActivation = activation({
+    runId: "refresh-v0912-blocked-standalone",
+    workflowTask: task("refresh-v0912-blocked-standalone-work", {
+      execution_kind: "coordinator",
+      mode: "read",
+      write_paths: [],
+      shared_resources: [],
+    }),
+    lineageId: "refresh-v0912-blocked-standalone-lineage",
+    threadId: "refresh-v0912-blocked-standalone-thread",
+    branch: "codex/refresh-v0912-blocked-standalone",
+  });
+  const blockedActivationPath = await jsonFile(requests, "blocked-standalone-activation", blockedActivation);
+  const blockedActivationCall = invoke(targetPackage.cli, [
+    "run", "activate", "--run-id", blockedActivation.run_id,
+    "--file", blockedActivationPath, "--json",
+  ], root, { CODEX_THREAD_ID: blockedActivation.runtime.lineage.thread_id });
+  assert.notEqual(blockedActivationCall.status, 0);
+  assert.match(`${blockedActivationCall.stderr}\n${blockedActivationCall.stdout}`, /exactly one retired assignment authority/);
+  await assert.rejects(stat(resolve(commonDir, "codex-flow", RUNTIME_DIRECTORY)), /ENOENT/);
   const auditPath = resolve(
     commonDir,
     "codex-flow",
@@ -2127,7 +2699,7 @@ test("v0.9 refresh recognizes a reclaimed closed predecessor only through its au
   assert.match(tamperedInspection.reason, /Run-closure audit record digest is invalid/);
 });
 
-test("v0.9 refresh recognizes reclaimed closed coordinator work from terminal audit evidence", async (t) => {
+test("reclaimed coordinator work does not substitute for retired outer assignment authority", async (t) => {
   const root = await createGitFixture("codex-flow-refresh-v09-reclaimed-coordinator-");
   const requests = await mkdtemp(resolve(tmpdir(), "codex-flow-refresh-v09-reclaimed-coordinator-requests-"));
   const worktreeParent = await mkdtemp(resolve(tmpdir(), "codex-flow-refresh-v09-reclaimed-coordinator-worktree-"));
@@ -2183,10 +2755,49 @@ test("v0.9 refresh recognizes reclaimed closed coordinator work from terminal au
   ], root);
   assertSuccess(inspectionCall, "reclaimed coordinator predecessor refresh inspection");
   const inspection = JSON.parse(inspectionCall.stdout);
-  assert.equal(inspection.route, "refresh-ready", inspection.reason);
+  assert.equal(inspection.route, "blocked", inspection.reason);
+  assert.match(inspection.reason, /exactly one retired assignment authority/);
 });
 
-test("v0.9 refresh recognizes a reclaimed closed selector-replan run", async (t) => {
+test("active and abandoned modern predecessors require their recorded live checkout", async (t) => {
+  for (const terminalKind of ["active", "abandoned"]) {
+    const root = await createGitFixture(`codex-flow-refresh-v09-missing-${terminalKind}-`);
+    const requests = await mkdtemp(resolve(tmpdir(), `codex-flow-refresh-v09-missing-${terminalKind}-requests-`));
+    const worktreeParent = await mkdtemp(resolve(tmpdir(), `codex-flow-refresh-v09-missing-${terminalKind}-worktree-`));
+    const sourceRoot = resolve(worktreeParent, "source");
+    const sourcePackage = await extractTaggedPackage("v0.9.11");
+    const targetPackage = await copyCurrentPackage({ version: "0.9.12-rc.1" });
+    t.after(async () => {
+      spawnSync("git", ["worktree", "remove", "--force", sourceRoot], { cwd: root, stdio: "ignore" });
+      await Promise.all([
+        removeFixture(root),
+        rm(requests, { recursive: true, force: true }),
+        rm(worktreeParent, { recursive: true, force: true }),
+        rm(sourcePackage.root, { recursive: true, force: true }),
+        rm(targetPackage.root, { recursive: true, force: true }),
+      ]);
+    });
+    execFileSync("git", ["worktree", "add", "--quiet", "--detach", sourceRoot, "HEAD"], { cwd: root });
+    await createAbandonedDirectCoordinatorRun({
+      root: sourceRoot,
+      requests,
+      sourcePackage,
+      runId: `missing-${terminalKind}-predecessor`,
+      terminalKind: terminalKind === "active" ? "active" : "abandoned",
+    });
+    execFileSync("git", ["worktree", "remove", "--force", sourceRoot], { cwd: root });
+    const skill = resolve(targetPackage.root, "skills", "refresh", "SKILL.md");
+    const inspectionCall = invoke(targetPackage.cli, [
+      "refresh", "inspect", "--invoking-skill", skill, "--json",
+    ], root);
+    assertSuccess(inspectionCall, `${terminalKind} missing-root inspection`);
+    const inspection = JSON.parse(inspectionCall.stdout);
+    assert.equal(inspection.route, "blocked");
+    assert.match(inspection.reason, new RegExp(`${terminalKind === "active" ? "Active" : "abandoned"} source run requires a live checkout`, "i"));
+  }
+});
+
+test("reclaimed selector-replan history still requires retired outer assignment authority", async (t) => {
   const root = await createGitFixture("codex-flow-refresh-v09-reclaimed-replan-");
   const requests = await mkdtemp(resolve(tmpdir(), "codex-flow-refresh-v09-reclaimed-replan-requests-"));
   const worktreeParent = await mkdtemp(resolve(tmpdir(), "codex-flow-refresh-v09-reclaimed-replan-worktree-"));
@@ -2230,7 +2841,8 @@ test("v0.9 refresh recognizes a reclaimed closed selector-replan run", async (t)
   ], root);
   assertSuccess(inspectionCall, "reclaimed selector-replan refresh inspection");
   const inspection = JSON.parse(inspectionCall.stdout);
-  assert.equal(inspection.route, "refresh-ready", inspection.reason);
+  assert.equal(inspection.route, "blocked", inspection.reason);
+  assert.match(inspection.reason, /exactly one retired assignment authority/);
 });
 
 test("v0.9 refresh recognizes a selected source already abandoned before preparation", async (t) => {

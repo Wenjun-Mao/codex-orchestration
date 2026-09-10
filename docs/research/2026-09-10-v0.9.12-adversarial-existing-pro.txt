@@ -1,0 +1,226 @@
+## Recommendation
+
+**Keep the approved direction, but make the preservation proof explicitly connect the audited result to the surviving preservation destination.** That is the strongest concrete counterexample I found: **a valid execution-closure audit and a valid later cleanup record can describe different Git tips. Validating each independently does not prove that the audited work survived.**
+
+I also found a genuine information limit behind the standalone-execution rule, and a concrete safe-history case that a flattened identity comparison would reject. Neither justifies another registry or a broader redesign.
+
+I inspected **`ee24c2382a20acb0d50ab4a7dd8a7981653ec163`**, whose parent is the supplied v0.9.11 release commit. **I did not inspect ongoing v0.9.12 implementation or execute tests.** GitHub source access succeeded; private journals and App sessions remain unavailable. The sanitized canary account is supplied observation, not my reproduction.
+
+| Priority | Actionable issue                                                                         | Evidence status                                                                                                       |
+| -------- | ---------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| **1**    | Join the audited terminal result to current preservation—not only the later archive tip. | Source-confirmed separation; concrete failure sequence inferred, not executed.                                        |
+| **2**    | Treat unprovable standalone status as unknown, not as an empty assignment search.        | Source-confirmed information gap; reinforces an already-approved constraint.                                          |
+| **3**    | Keep historical execution identity distinct from effective resource identity.            | Source-confirmed supported distinction; false-rejection risk for the new reader, not a claimed implementation defect. |
+
+## 1. Strongest counterexample: the archive captures an older tip after execution closed
+
+### The two histories
+
+Let:
+
+* **B** be the original baseline.
+* **X** be the committed result that passed the run’s terminal audit.
+* **C** be the coordinator tip subsequently captured for archival.
+* **P** be the current authenticated primary tip.
+
+A normal safe history is:
+
+```text
+B → X
+    execution audited and closed at X
+    X preserved in primary
+    cleanup captures C = X
+    primary subsequently advances to P, containing X
+```
+
+The counterexample is:
+
+```text
+B → X
+    execution audited and closed at X
+
+    coordinator branch is accidentally reset to B
+    primary still contains B, not X
+
+    cleanup captures C = B
+    C is clean and preserved in primary
+    coordinator is archived/reclaimed
+```
+
+Under a proof that independently asks:
+
+```text
+Was this run validly audited closed?       Yes: at X.
+Was its assignment subsequently retired?  Potentially yes.
+Is the captured archive tip preserved?     Yes: B is in primary.
+```
+
+**All three answers can be affirmative while X is not preserved in the authorized destination.** No historical JSON needs to be rewritten to create the mismatch; the intervening operation is a real Git rewind.
+
+This is a **source-supported counterexample to an insufficient join**, not a claim that v0.9.12 currently admits it.
+
+### What the baseline establishes
+
+`lib/run-audit.mjs::closeRunFromAudit()` validates that the submitted audit is terminal-ready and still matches freshly derived evidence **at closure time**. The persisted audit includes repository evidence representing the authenticated terminal result.
+
+Later, `lib/iteration-registry.mjs::coordinatorGitAuthority()` authenticates the coordinator’s **current** clean checkout, verifies that its current tip is an ancestor of primary, and returns that tip. That tip becomes the archive capture. The inspected function does not compare it with the run’s audited result.
+
+Assignment execution-retirement evidence preserves terminal status, fences, binding identity, and resource disposition, but its terminal payload does not include the result commit. Consequently, the acceptance path’s execution-terminal check does not itself establish that result-to-Git relationship.
+
+The historical `closedSettlementAuthorityMatches()` validates audit/run/runtime/workflow correspondence and audit-before-close ordering. Its checks do not join the audit’s result tip to the coordinator’s later archive capture or current primary.
+
+### The distinguishing fact
+
+For this normally closed, assignment-backed contract, the proof needs to establish:
+
+> **The authenticated result of the closed execution remains included in the authenticated preservation destination.**
+
+Checking only `C ≤ P`, where `≤` means Git ancestry, is insufficient. Also check **`X ≤ P`**, using X from the exact accepted terminal-evidence chain.
+
+Do not unnecessarily require `X = C = P`. Legitimate subsequent commits must remain acceptable. Nor should the reader always require `X ≤ C`: primary might preserve X even when the disposable checkout’s later captured tip differs. The essential preservation conclusion concerns the **authorized destination**, not forced equality between every historical observation.
+
+**Existing records express the required facts.** The audit carries terminal repository evidence; the iteration carries the archive capture; the surviving Git repository establishes current ancestry. No new settlement certificate or audit-ID schema is needed for this case.
+
+Do not choose an older passing audit merely because its commit happens to survive. Preserve the existing exact-authority and ambiguity rules.
+
+### Cheapest decisive test
+
+Use the approved frozen-producer/public-command fixture, but place the negative variation **after public audited closure and before the coordinator’s first archive-tip capture**:
+
+```text
+Commit X → public audit/close
+→ rewind disposable coordinator to B; do not preserve X in primary
+→ attempt ordinary acceptance/closeout
+→ test historical classification and actual admission
+```
+
+The expected outcome is rejection before new admission. If an existing public closeout path rejects earlier, that would disprove the corresponding part of my reachability inference and provide the desired protection earlier.
+
+An unrelated retained ref may keep X available for the test without satisfying primary preservation; that also checks that arbitrary reachability does not substitute for the authorized destination.
+
+**Coverage already present:** `test/assignment-lifecycle-v097.test.mjs` contains “run audit rejects rollback to an older local fact after a later integrated result.” It rewinds **before the audit**. That is useful but does not test the post-close/pre-capture interval. Your approved preservation-loss negative can absorb this ordering rather than adding another full journey.
+
+## 2. Standalone versus lost assignment-only registration: a real information boundary
+
+Your approved rule is correct. The baseline explains why it cannot safely be reduced to “scan more directories.”
+
+### The indistinguishable histories
+
+Consider two executions with the same surviving run, workflow, result, and audit evidence:
+
+**S — genuinely standalone:** No assignment registration completed—or began—and the execution was performed under the supported standalone path.
+
+**U — assignment evidence lost:** Registration persisted assignment A, stopped before creating its iteration and route, and A’s record was subsequently lost. No assignment retirement occurred.
+
+To make the comparison precise, both histories can contain the same prepared plan: preparation alone need not have resulted in a registered assignment.
+
+`registerCoordinatorReportRoute()` writes assignment authority **before** iteration creation, assignment-lived recipient binding, and route persistence. Therefore, an assignment-only intermediate state is a real persistence boundary.
+
+However:
+
+* `validateRunActivation()` has no assignment reference or explicit standalone marker.
+* The closure audit’s authority and `SOURCE_KINDS` contain no assignment-registration fact.
+* `assignmentForSender()` returns `null` when no matching assignment record survives. That is discovery behavior, not evidence that registration never occurred.
+
+Thus, once the sole registration record is missing, the remaining execution evidence may not distinguish S from U.
+
+### What fact is missing?
+
+The missing fact is:
+
+> **For this exact execution, assignment registration was never established—not merely that its record cannot now be found.**
+
+A surviving iteration, route, or locator can positively demonstrate that an assignment existed and that a missing assignment file is inconsistent. But the assignment-only crash boundary means those backlinks are not guaranteed to exist.
+
+**The inspected baseline does not provide a universal positive standalone declaration for modern executions capable of either mode.** A package version that supports both modes cannot answer the question by itself.
+
+This is not a reason to expand the approved project into an evidence-registry redesign. It is a reason to specify the reader’s limit honestly:
+
+> **Where the supported producer contract cannot establish standalone status, classify the history as unknown/unsupported rather than settled standalone.**
+
+That can reject some genuinely safe but unprovable histories. It is an explicit evidence limitation, not a reason to fabricate an assignment or silently relax the proof. A genuinely older producer contract that could not create this assignment state is a separate compatibility case, provided that contract is actually established.
+
+### Cheapest decisive test
+
+Specialize the already-approved missing-evidence negative:
+
+1. Reach the real assignment-only registration boundary using the existing interruption mechanism.
+2. On an isolated negative-case copy, remove that assignment record.
+3. Require the historical reader to report insufficient assignment/standalone evidence.
+4. Require actual admission to reject before target preparation.
+
+The fault injection matters. Removing an assignment from a **fully retired** fixture leaves many backlinks and tests an easier case.
+
+Also check a genuinely standalone fixture. Its expected result should follow the explicit supported-producer policy—not an assumption that standalone must always be admitted.
+
+**Coverage already present:** the approved missing-evidence tests and previous registration-interruption work provide the necessary components. This is a precise variant and policy decision, not another framework.
+
+## 3. A safe-history equivalence case: recorded binding versus corrected cleanup binding
+
+This is a concrete way for two equally safe histories to receive different decisions.
+
+### The two safe histories
+
+**H1:** The coordinator’s disposable worktree W was recorded correctly at registration. Its result was preserved, W was reclaimed, and the assignment retired.
+
+**H2:** Registration recorded the wrong resource binding, such as primary/main. The supported host-authenticated correction recorded W as the effective coordinator binding **without rewriting the original assignment or member fields**. W was then legitimately reclaimed and the assignment retired.
+
+The baseline intentionally supports H2. `reconcileCoordinatorWorktreeBinding()` preserves the original binding and records a correction with owner identity, revision, and evidence digest. Cleanup uses `effectiveCoordinatorBinding()` through its existing consumers.
+
+The test “accepted coordinator binding correction preserves the recorded primary binding and closes only the authenticated worktree” explicitly asserts:
+
+```text
+member.worktree_path remains primary
+member.branch remains main
+binding_correction.corrected identifies the disposable coordinator
+```
+
+It then completes retirement without deleting primary.
+
+### Where an otherwise careful historical proof goes wrong
+
+A reader that uses the original binding for **both** historical authentication and current resource-absence checks will conclude that primary still exists and the coordinator was not reclaimed.
+
+Conversely, replacing every original field with the corrected binding would damage the exact historical execution join.
+
+The required chain is:
+
+```text
+Run/context
+    → exact matching assignment execution binding
+    → assignment and original member identity
+    → authenticated effective resource correction, where present
+    → captured cleanup result and present preservation/attachment facts
+```
+
+**Existing records express this distinction.** The reader should consume it, not create a new correction or rerun the live correction command.
+
+The same non-flattening principle applies across refresh: match the inspected run to its exact `execution_bindings` entry, while recognizing that the assignment’s route was created against its initial execution. `bindAssignmentRefreshExecution()` appends a binding without changing assignment identity or rewriting the original route. Requiring every related record to name the inspected replacement run would reject lawful history.
+
+### Cheapest decisive test
+
+Reuse the existing corrected-binding fixture as a **supported historical-evidence variant**, completing real locator retirement before invoking the new historical reader. Require H1 and H2 to have the same admission outcome.
+
+Pair it with an incorrect-owner or inconsistent-correction negative. No extra installed canary is necessary.
+
+**Coverage already present:** correction and protected-primary behavior are tested. The inspected correction test stubs locator retirement and stops at closeout, so it is not itself proof of complete historical admission. Strengthen the affected boundary rather than duplicating the entire fixture.
+
+## Conclusions that survived the challenge
+
+I found **no basis to abandon the shared read-only classifier**. The following distinctions in the approved direction remain important:
+
+An accepted report, director acceptance, route closure, and locator retirement must be joined by their exact identities—not merely by matching statuses. The existing locator-retirement contract can tie the retirement to the exact closed route and its digests; absence alone remains insufficient.
+
+Likewise, an open assignment’s settled earlier execution can support semantic-refresh decisions without proving full assignment retirement. The consumer’s permission must remain separate from the underlying facts. Nothing found here warrants forcing full retirement on every refresh consumer.
+
+The multi-namespace journey, pending-handoff precedence, unresolved-sibling negatives, and admission-time revalidation already cover the other major concerns named in this request. **I would not add another broad test matrix or repeat the release plan.**
+
+### Bottom line
+
+The most valuable implementation check is:
+
+> **Does the historical proof establish that the execution’s audited result—not just whichever tip cleanup later captured—remains in the authenticated preservation destination?**
+
+Then keep standalone uncertainty explicit and preserve the historical-versus-effective identity distinction.
+
+**These are two missing-or-ambiguous evidence joins and one genuine information limit. They call for precise reader rules and focused variants of the approved tests—not another lifecycle subsystem.**

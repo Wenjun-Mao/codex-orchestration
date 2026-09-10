@@ -13,6 +13,14 @@ actionable coordination:
 - `refresh-ready`: prepare the supported semantic handoff.
 - `blocked`: resolve the named ambiguity.
 
+`fresh` can include authenticated `settled_predecessors`. Their reclaimed
+checkouts stay absent and their historical records stay unchanged. Activate
+ordinary fresh work without a refresh ID. If an existing caller explicitly
+invokes `refresh prepare` for one exact settled run, use `source_resume: null`
+and empty decisions, replacements, workflow, and fences; the successful
+`fresh-start-required` response is non-mutating and directs the same ordinary
+activation. Never use that route to bypass a pending handoff.
+
 A stale loaded skill requires App reload, not an attempt to hot-switch a run.
 Unsupported predecessor state uses an explicitly approved unplug.
 

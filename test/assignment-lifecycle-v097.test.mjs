@@ -23,7 +23,7 @@ import {
   prepareCoordinatorAssignment,
   validateAssignmentPreparation,
 } from "../lib/assignment-preparation.mjs";
-import { PACKAGE_VERSION, sha256, stableStringify } from "../lib/core.mjs";
+import { sha256, stableStringify } from "../lib/core.mjs";
 import { taskLaunchStatus } from "../lib/core/task-launch.mjs";
 import { deliverCallback, observeCallback } from "../lib/callbacks.mjs";
 import { finalizeTaskDisposition, prepareTaskDisposition } from "../lib/dispositions.mjs";
@@ -1416,6 +1416,31 @@ test("assignment refresh binding appends once and rejects conflicting or stale t
       namespace: "v0.9.7-second-target",
     },
   }), /source is not its latest/);
+
+  const interruptedTarget = {
+    ...target,
+    run_id: "assignment-refresh-interrupted-target",
+    namespace: "v0.9.7-interrupted-target",
+    bound_at: new Date(TIME + 2_000).toISOString(),
+  };
+  await assert.rejects(bindAssignmentRefreshExecution({
+    ...request,
+    source: {
+      run_id: target.run_id,
+      runtime_context_digest: target.runtime_context_digest,
+      plan_id: target.plan_id,
+      namespace: target.namespace,
+    },
+    targetExecutionBinding: interruptedTarget,
+    beforeBinding: async () => {
+      throw new Error("simulated post-binding interruption");
+    },
+  }), /simulated post-binding interruption/);
+  const interrupted = await assignmentAuthority({
+    stateRoot: context.state_root,
+    assignmentId: before.assignment_id,
+  });
+  assert.deepEqual(interrupted.execution_bindings, [source, target, interruptedTarget]);
 });
 
 test("pre-dispatch preparation generates the useful first prompt from bound authority", async (t) => {
@@ -2087,8 +2112,15 @@ test("a cancelled coordinator can be rebound to a successor assignment and recla
 });
 
 test("frozen RC1 cancellation admits and reclaims an exact v0.9.11 successor", async (t) => {
-  assert.equal(PACKAGE_VERSION, "0.9.11");
   const source = await frozenRc1Package(t);
+  const successorPackageRoot = await mkdtemp(resolve(tmpdir(), "codex-flow-v0911-stable-package-"));
+  const successorArchive = resolve(successorPackageRoot, "source.tar");
+  execFileSync("git", [
+    "archive", "--format=tar", `--output=${successorArchive}`, "v0.9.11",
+  ], { cwd: packageRoot });
+  execFileSync("tar", ["-xf", successorArchive, "-C", successorPackageRoot]);
+  await rm(successorArchive);
+  t.after(() => rm(successorPackageRoot, { recursive: true, force: true }));
   const requests = await mkdtemp(resolve(tmpdir(), "codex-flow-v0911-cross-version-requests-"));
   t.after(() => rm(requests, { recursive: true, force: true }));
   const primaryRoot = await createGitFixture("codex-flow-v0911-cross-version-");
@@ -2220,8 +2252,8 @@ test("frozen RC1 cancellation admits and reclaims an exact v0.9.11 successor", a
   assert.equal(cancelled.status, "cancelled");
   assert.equal(cancelled.assignment.execution_bindings[0].namespace, "v0.9.11-rc.1");
 
-  const successorCli = resolve(packageRoot, "bin", "codex-flow.mjs");
-  const refreshSkill = resolve(packageRoot, "skills", "refresh", "SKILL.md");
+  const successorCli = resolve(successorPackageRoot, "bin", "codex-flow.mjs");
+  const refreshSkill = resolve(successorPackageRoot, "skills", "refresh", "SKILL.md");
   const refreshPreparePath = await jsonRequest(requests, "rc1-to-rc4-refresh-prepare", {
     source_namespace: "v0.9.11-rc.1",
     source_run_id: predecessorRunId,

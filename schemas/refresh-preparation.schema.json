@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://private.local/codex-flow/refresh-preparation.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "kind", "status", "mutation_performed", "source", "target", "next_action"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "kind": { "const": "codex-flow-refresh-v1-preparation" },
+    "status": { "const": "fresh-start-required" },
+    "mutation_performed": { "const": false },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version", "kind", "namespace", "run_id", "runtime_id",
+        "runtime_context_digest", "workflow_plan_id", "workflow_revision_digest",
+        "closure_audit_id", "closure_audit_digest", "assignment_id",
+        "execution_binding_index", "report_id", "route_id", "iteration_id",
+        "locator_retirement_id", "preserved_tip"
+      ],
+      "properties": {
+        "schema_version": { "const": 1 },
+        "kind": { "const": "codex-flow-v0912-settled-predecessor" },
+        "namespace": { "type": "string", "pattern": "^v0\\.9\\.[0-9]+(?:-(?:dev|rc)\\.[0-9]+)?$" },
+        "run_id": { "$ref": "#/$defs/safeId" },
+        "runtime_id": { "$ref": "#/$defs/digest" },
+        "runtime_context_digest": { "$ref": "#/$defs/digest" },
+        "workflow_plan_id": { "$ref": "#/$defs/safeId" },
+        "workflow_revision_digest": { "$ref": "#/$defs/digest" },
+        "closure_audit_id": { "$ref": "#/$defs/safeId" },
+        "closure_audit_digest": { "$ref": "#/$defs/digest" },
+        "assignment_id": { "$ref": "#/$defs/safeId" },
+        "execution_binding_index": { "type": "integer", "minimum": 0 },
+        "report_id": { "$ref": "#/$defs/safeId" },
+        "route_id": { "$ref": "#/$defs/safeId" },
+        "iteration_id": { "$ref": "#/$defs/safeId" },
+        "locator_retirement_id": { "$ref": "#/$defs/safeId" },
+        "preserved_tip": { "$ref": "#/$defs/revision" }
+      }
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["package_version", "bundle_sha256", "coordinator_thread_id"],
+      "properties": {
+        "package_version": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "bundle_sha256": { "$ref": "#/$defs/digest" },
+        "coordinator_thread_id": { "$ref": "#/$defs/safeId" }
+      }
+    },
+    "next_action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["command", "refresh_id"],
+      "properties": {
+        "command": { "const": "run activate" },
+        "refresh_id": { "type": "null" }
+      }
+    }
+  },
+  "$defs": {
+    "safeId": { "type": "string", "minLength": 1, "maxLength": 256, "pattern": "^[A-Za-z0-9_.-]+$" },
+    "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "revision": { "type": "string", "pattern": "^[0-9a-f]{40,64}$" }
+  }
+}

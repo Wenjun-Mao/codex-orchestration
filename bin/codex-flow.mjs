@@ -112,6 +112,7 @@ import {
 } from "../lib/compat/refresh.mjs";
 import {
   acquireRuntimeContext,
+  assertRuntimeRepositoryCurrent,
   buildRuntimeContext,
   loadRuntimeBundleSource,
   readRuntimeContext,
@@ -689,20 +690,23 @@ async function commandRunV09(args) {
         throw new CliError(`Run plan conflicts with retained fences from ${retained.run_id}`, 75);
       }
     }
-    const prepareTargetState = async () => ({
-      acquired: await acquireRuntimeContext({
-        gitCommonDirectory: git.commonDir,
-        context: runtime,
-        bundleSource,
-      }),
-      journal: await createWorkflowJournal({
-        stateRoot: git.stateRoot,
-        runId,
-        planId: workflow.plan_id,
-        planRevision: workflow,
-        now: Date.parse(activatedAt),
-      }),
-    });
+    const prepareTargetState = async () => {
+      assertRuntimeRepositoryCurrent(runtime.repository);
+      return {
+        acquired: await acquireRuntimeContext({
+          gitCommonDirectory: git.commonDir,
+          context: runtime,
+          bundleSource,
+        }),
+        journal: await createWorkflowJournal({
+          stateRoot: git.stateRoot,
+          runId,
+          planId: workflow.plan_id,
+          planRevision: workflow,
+          now: Date.parse(activatedAt),
+        }),
+      };
+    };
     const readExistingTargetState = async () => {
       const acquired = await readRuntimeContext({
         gitCommonDirectory: git.commonDir,
