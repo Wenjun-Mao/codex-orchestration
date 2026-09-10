@@ -5,6 +5,9 @@ decision records remain the detailed release evidence.
 
 ## 0.9.11 - 2026-09-09
 
+- Resolve executor identity from persisted launch authority across provisional,
+  ready, and opaque creation ordering while preserving original creation and
+  selector provenance through assignment cleanup and refresh.
 - Publish coordinator assignments only after iteration, recipient, route, and
   locator readiness; expose deterministic interrupted-registration status,
   retry, and cancellation without weakening published-artifact checks.
