@@ -179,10 +179,11 @@ import {
 } from "../lib/codex-app-report-adapter.mjs";
 import {
   closeoutIterationWithOwningHost,
+  iterationLaunchProjectionStatus,
   iterationTitle,
   iterationStatus,
+  reconcileExecutorIterationMembers,
   reconcileCoordinatorWorktreeBinding,
-  registerExecutorIterationMember,
 } from "../lib/iteration-registry.mjs";
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -1101,6 +1102,18 @@ async function commandTaskLaunchV09(args, mutationAuthority = null) {
         repositoryPath: git.root,
         now: Date.now(),
       });
+      const assignment = await openAssignmentForSender({
+        stateRoot: assignmentStateRoot(git.commonDir),
+        hostId: mutationAuthority.run.binding.host.host_id,
+        threadId: mutationAuthority.run.binding.lineage.thread_id,
+        runId,
+      });
+      if (assignment !== null) {
+        await reconcileExecutorIterationMembers({
+          commonDir: assignment.common_dir,
+          iterationId: assignment.iteration_id,
+        });
+      }
       const route = await registerReportRoute({
         stateRoot: git.stateRoot,
         launchId,
@@ -1189,6 +1202,11 @@ async function commandTaskLaunchV09(args, mutationAuthority = null) {
       if (nativeEvidence.classification !== request.outcome) {
         throw new CliError("Codex App result shape does not match the requested launch outcome", 73);
       }
+      if (
+        mutationAuthority !== null
+        && nativeEvidence.host_id !== "unknown"
+        && nativeEvidence.host_id !== mutationAuthority.run.binding.host.host_id
+      ) throw new CliError("Task launch creation host does not match authenticated run authority", 73);
     }
     const acceptedAt = nativeEvidence?.observed_at ?? new Date().toISOString();
     const observed = request.observed_selectors === undefined
@@ -1235,7 +1253,10 @@ async function commandTaskLaunchV09(args, mutationAuthority = null) {
       runId,
     });
     if (assignment !== null) {
-      await registerExecutorIterationMember({ assignment, launch: result, stateRoot: git.stateRoot });
+      await reconcileExecutorIterationMembers({
+        commonDir: assignment.common_dir,
+        iterationId: assignment.iteration_id,
+      });
     }
   }
   v09Output(subcommand === "attempt" ? taskLaunchAttemptView(result) : result);
@@ -1456,6 +1477,12 @@ async function commandAssignmentV097(args) {
       ))
     );
     const closedRegistrationRoute = assignment.state === "registering" && route?.state === "closed";
+    const iterationLaunchProjection = iteration === null
+      ? null
+      : await iterationLaunchProjectionStatus({
+          commonDir: git.commonDir,
+          iterationId: assignment.iteration_id,
+        });
     v09Output({
       assignment,
       registration: {
@@ -1473,6 +1500,7 @@ async function commandAssignmentV097(args) {
             : null,
       },
       iteration,
+      iteration_launch_projections: iterationLaunchProjection?.launch_projections ?? [],
       recipient,
       route,
       locator,

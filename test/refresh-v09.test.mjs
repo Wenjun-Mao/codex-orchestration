@@ -49,6 +49,7 @@ import {
 } from "../lib/compat/refresh-source.mjs";
 import { RUNTIME_DIRECTORY } from "../lib/runtime-context.mjs";
 import { createGitFixture, packageRoot, removeFixture } from "./helpers.mjs";
+import { createActiveTaskLaunch } from "./v09-lifecycle-fixture.mjs";
 
 function invoke(cli, args, cwd, env = {}) {
   return spawnSync(process.execPath, [cli, ...args], {
@@ -103,16 +104,14 @@ test("refresh cutover accepts an active v0.9 launch representation without confu
   assert.equal(refreshSourceCutoverBlocker(source), null);
 });
 
-test("refresh discard distinguishes an absent direct-coordinator launch from resource-bearing authority", () => {
+test("refresh discard distinguishes an absent direct-coordinator launch from launch authority", () => {
   const direct = {
     task: task("direct-coordinator", { execution_kind: "coordinator" }),
     launch: null,
   };
   assert.equal(refreshDiscardCreationAuthority(direct), null);
-  assert.throws(
-    () => refreshDiscardCreationAuthority({ ...direct, launch: { status: "active" } }),
-    /cannot represent launch-identity source discard cleanup/,
-  );
+  const launch = { status: "active", launch_id: "task-launch-v1-source" };
+  assert.equal(refreshDiscardCreationAuthority({ ...direct, launch }), launch);
   assert.throws(
     () => refreshDiscardCreationAuthority({ task: direct.task }),
     /contradictory operation authority/,
@@ -772,6 +771,204 @@ test("assignment-lived reporting binds the exact target before refresh source de
   assert.equal(targetObligation.owner_thread_id, source.request.runtime.lineage.thread_id);
   assert.match(targetObligation.next_action, /release|reconcile|resolve/i);
 });
+
+for (const creationOutcome of ["provisional", "opaque"]) {
+test(`applyRefresh retires an assigned ${creationOutcome}-first launch whose iteration projection is absent`, async (t) => {
+  const root = await createGitFixture("codex-flow-refresh-v0911-launch-assignment-");
+  const requests = await mkdtemp(resolve(tmpdir(), "codex-flow-refresh-v0911-launch-requests-"));
+  const codexHome = await mkdtemp(resolve(tmpdir(), "codex-flow-refresh-v0911-launch-home-"));
+  const targetPackage = await copyCurrentPackage({ version: "0.9.11-rc.4" });
+  const source = await createActiveTaskLaunch(root, "refresh-assigned-provisional", {
+    taskTitle: "Executor · v0.9.7 · Assignment reporting",
+    creationOutcome,
+    creationBeforeStart: true,
+    creationHostId: creationOutcome === "opaque" ? "unknown" : "local",
+  });
+  t.after(async () => {
+    spawnSync("git", ["worktree", "remove", "--force", source.executorPath], {
+      cwd: root,
+      stdio: "ignore",
+    });
+    await Promise.all([
+      removeFixture(root),
+      rm(requests, { recursive: true, force: true }),
+      rm(codexHome, { recursive: true, force: true }),
+      rm(targetPackage.root, { recursive: true, force: true }),
+    ]);
+  });
+
+  const director = {
+    lineage_id: "refresh-launch-director-lineage",
+    thread_id: "refresh-launch-director",
+    generation: 1,
+  };
+  const planText = "# Refresh launch assignment fixture\n";
+  const planPath = resolve(root, "refresh-launch-assignment-plan.md");
+  await writeFile(planPath, planText, "utf8");
+  await bindRecipient({ stateRoot: source.stateRoot, recipient: director });
+  const registered = await registerCoordinatorReportRoute({
+    stateRoot: source.stateRoot,
+    runId: source.contract.run_id,
+    senderThreadId: source.coordinator.thread_id,
+    senderHostId: "fixture-host",
+    recipient: {
+      host_id: "fixture-host",
+      ...director,
+      binding_digest: recipientBindingDigest(director),
+    },
+    approvedPlanPath: planPath,
+    approvedPlanDigest: sha256(planText),
+    iterationLabel: "v0.9.7",
+    purpose: "Assignment reporting",
+    repositoryRoot: root,
+    repositoryBranch: "main",
+  });
+  await installRepositoryReportLocator({
+    stateRoot: registered.state_root,
+    route: registered.route,
+    packageRoot: targetPackage.root,
+    nativeQueue: {
+      binary_path: CODEX_APP_BINARY_PATH,
+      expected_version: CODEX_APP_CLI_VERSION,
+      sqlite_home: resolve(homedir(), ".codex"),
+    },
+  });
+  await markAssignmentRegistrationStage({
+    stateRoot: registered.state_root,
+    assignmentId: registered.route.assignment.assignment_id,
+    stage: "locator",
+  });
+  await publishAssignmentReadiness({
+    stateRoot: registered.state_root,
+    assignmentId: registered.route.assignment.assignment_id,
+  });
+  await rm(planPath);
+  const assignment = await assignmentAuthority({
+    stateRoot: registered.state_root,
+    assignmentId: registered.route.assignment.assignment_id,
+  });
+  const before = await iterationStatus({
+    commonDir: source.commonDir,
+    iterationId: assignment.iteration_id,
+  });
+  assert.equal(before.members.some((entry) => entry.role === "executor"), false);
+
+  const targetSkill = resolve(targetPackage.root, "skills/refresh/SKILL.md");
+  const inspectionCall = invoke(targetPackage.cli, [
+    "refresh", "inspect", "--invoking-skill", targetSkill, "--json",
+  ], root);
+  assertSuccess(inspectionCall, "assigned provisional launch refresh inspection");
+  const inspection = JSON.parse(inspectionCall.stdout);
+  assert.equal(inspection.route, "refresh-ready", inspection.reason);
+
+  const replacement = {
+    ...source.contract.task,
+    task_id: "refresh-assigned-provisional-replacement",
+    model: "gpt-5.6-sol",
+    reasoning_effort: "xhigh",
+    selector_rationale: "Sol-xhigh is freshly selected for the replacement assignment.",
+  };
+  const targetActivation = activation({
+    runId: "refresh-assigned-provisional-target",
+    workflowTask: replacement,
+    lineageId: "refresh-assigned-provisional-target-lineage",
+    threadId: source.coordinator.thread_id,
+    branch: "codex/refresh-assigned-provisional-target",
+  });
+  const preparePath = await jsonFile(requests, "refresh-assigned-provisional-prepare", {
+    source_namespace: RUNTIME_DIRECTORY,
+    source_run_id: source.contract.run_id,
+    source_resume: source.activated.run.binding,
+    decisions: [{
+      source_task_id: source.contract.task_id,
+      disposition: "discard",
+      rationale: "The exact provisional-first launch is disposable and will be reissued.",
+    }],
+    replacements: [{
+      source_task_id: source.contract.task_id,
+      target_task_id: replacement.task_id,
+    }],
+    target_workflow: targetActivation.workflow,
+    target_fences: targetActivation.fences,
+    target_coordinator_thread_id: source.coordinator.thread_id,
+  });
+  const preparedCall = invoke(targetPackage.cli, [
+    "refresh", "prepare", "--invoking-skill", targetSkill,
+    "--file", preparePath, "--json",
+  ], root);
+  assertSuccess(preparedCall, "assigned provisional launch refresh preparation");
+  const handoff = JSON.parse(preparedCall.stdout).handoff;
+  assert.deepEqual(handoff.cleanup.map((entry) => entry.source_task_id), [source.contract.task_id]);
+
+  await writeArchivedSession(codexHome, source.executorThreadId, source.executorPath);
+  const observedCall = invoke(targetPackage.cli, [
+    "refresh", "observe-private", "--invoking-skill", targetSkill,
+    "--refresh-id", handoff.refresh_id, "--json",
+  ], root, { CODEX_HOME: codexHome });
+  assertSuccess(observedCall, "assigned provisional launch archive observation");
+  const observed = JSON.parse(observedCall.stdout);
+  const applyPath = await jsonFile(requests, "refresh-assigned-provisional-apply", {
+    refresh_id: handoff.refresh_id,
+    expected_handoff_digest: handoff.handoff_digest,
+    archive_evidence: observed.archive_evidence,
+  });
+  const appliedCall = invoke(targetPackage.cli, [
+    "refresh", "apply", "--invoking-skill", targetSkill,
+    "--file", applyPath, "--json",
+  ], root, { CODEX_HOME: codexHome });
+  assertSuccess(appliedCall, "assigned provisional launch refresh apply");
+  const applied = JSON.parse(appliedCall.stdout);
+  assert.equal(applied.status, "source-retired");
+  const retired = await iterationStatus({
+    commonDir: source.commonDir,
+    iterationId: assignment.iteration_id,
+  });
+  const retiredExecutor = retired.members.find(
+    (entry) => entry.authority.kind === "task-launch" && entry.authority.authority_id === source.launch.launch_id,
+  );
+  assert.equal(retiredExecutor.state, "archived");
+  assert.equal(retiredExecutor.thread_id, source.executorThreadId);
+  assert.equal(retiredExecutor.archive_attempt.reason, "refresh-retired");
+  await assert.rejects(stat(source.executorPath), /ENOENT/);
+
+  targetActivation.refresh_id = handoff.refresh_id;
+  targetActivation.activated_at = new Date().toISOString();
+  const activationPath = await jsonFile(requests, "refresh-assigned-provisional-target", targetActivation);
+  const activatedCall = invoke(targetPackage.cli, [
+    "run", "activate", "--run-id", targetActivation.run_id,
+    "--refresh-id", handoff.refresh_id, "--file", activationPath, "--json",
+  ], root, { CODEX_THREAD_ID: source.coordinator.thread_id });
+  assertSuccess(activatedCall, "assigned provisional launch target activation");
+  const activatedTarget = JSON.parse(activatedCall.stdout);
+  await assert.rejects(stat(resolve(source.commonDir, "codex-flow", RUNTIME_DIRECTORY)), /ENOENT/);
+
+  const abandonPath = await jsonFile(requests, "refresh-assigned-provisional-target-abandon", {
+    run_id: targetActivation.run_id,
+    resume: activatedTarget.run.binding,
+    reason: "The replacement stopped after cutover so the assignment can be cancelled honestly.",
+  });
+  const abandonedCall = invoke(targetPackage.cli, [
+    "run", "abandon", "--run-id", targetActivation.run_id,
+    "--file", abandonPath, "--json",
+  ], root);
+  assertSuccess(abandonedCall, "assigned provisional launch target abandonment");
+  const cancellationPath = await jsonFile(requests, "refresh-assigned-provisional-cancel", {
+    assignment_id: assignment.assignment_id,
+    reason: "No further execution belongs to the refreshed assignment.",
+  });
+  const cancellationCall = invoke(targetPackage.cli, [
+    "assignment", "cancel", "--assignment-id", assignment.assignment_id,
+    "--file", cancellationPath, "--json",
+  ], root, { CODEX_THREAD_ID: director.thread_id });
+  assertSuccess(cancellationCall, "assigned provisional launch cancellation after source removal");
+  const cancelled = JSON.parse(cancellationCall.stdout);
+  assert.equal(cancelled.assignment.state, "cancelled");
+  assert.equal(
+    cancelled.iteration.iteration.members.find((entry) => entry.member_id === retiredExecutor.member_id).state,
+    "archived",
+  );
+});
+}
 
 test("RC2 snapshot abandonment cancellation permits same-coordinator fresh assignment admission", async (t) => {
   const root = await createGitFixture("codex-flow-refresh-rc2-failed-assignment-");

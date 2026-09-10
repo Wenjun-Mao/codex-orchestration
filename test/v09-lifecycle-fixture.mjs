@@ -62,6 +62,9 @@ export async function createActiveTaskLaunch(root, suffix, {
   executorPath = resolve(root, `../${basename(root)}-${suffix}-executor`),
   startingBranch = git(root, ["branch", "--show-current"]),
   reconcileCreation = true,
+  creationOutcome = "ready",
+  creationBeforeStart = false,
+  creationHostId = "local",
   baseTime = BASE_TIME,
 } = {}) {
   const commonDir = await realpath(git(root, ["rev-parse", "--path-format=absolute", "--git-common-dir"]));
@@ -151,6 +154,28 @@ export async function createActiveTaskLaunch(root, suffix, {
   });
   git(root, ["worktree", "add", "--quiet", "--detach", executorPath, baseline]);
   const executorThreadId = `lifecycle-executor-${suffix}`;
+  const creationTime = creationBeforeStart ? baseTime + 1_500 : baseTime + 2_500;
+  const reconcile = () => reconcileTaskLaunch({
+    stateRoot,
+    launchId: prepared.launch_id,
+    outcome: creationOutcome,
+    hostId: creationHostId,
+    readyThreadId: creationOutcome === "ready" ? executorThreadId : null,
+    provisionalId: creationOutcome === "provisional" ? `client-new-thread:${suffix}` : null,
+    opaqueEvidence: creationOutcome === "opaque" ? { digest: "a".repeat(64), length: 42 } : null,
+    selectorEvidence: {
+      accepted: {
+        project_id: requestedSelectors.project_id,
+        model: requestedSelectors.model,
+        reasoning_effort: requestedSelectors.reasoning_effort,
+        observed_at: new Date(creationTime).toISOString(),
+      },
+      observed: null,
+    },
+    observedAt: new Date(creationTime).toISOString(),
+    now: creationTime,
+  });
+  if (reconcileCreation && creationBeforeStart) await reconcile();
   const started = await startTaskLaunch({
     stateRoot,
     launchId: prepared.launch_id,
@@ -159,28 +184,10 @@ export async function createActiveTaskLaunch(root, suffix, {
     repositoryPath: executorPath,
     now: baseTime + 2_000,
   });
-  const launch = reconcileCreation
-    ? await reconcileTaskLaunch({
-      stateRoot,
-      launchId: prepared.launch_id,
-      outcome: "ready",
-      hostId: "local",
-      readyThreadId: executorThreadId,
-      selectorEvidence: {
-        accepted: {
-          project_id: requestedSelectors.project_id,
-          model: requestedSelectors.model,
-          reasoning_effort: requestedSelectors.reasoning_effort,
-          observed_at: new Date(baseTime + 2_500).toISOString(),
-        },
-        observed: null,
-      },
-      observedAt: new Date(baseTime + 2_500).toISOString(),
-      now: baseTime + 2_500,
-    })
-    : started;
+  const launch = reconcileCreation && !creationBeforeStart ? await reconcile() : started;
   return {
     root,
+    activated,
     stateRoot,
     commonDir,
     baseline,

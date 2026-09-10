@@ -12,6 +12,7 @@ with the automated and live gates recorded below.
 | Workflow DAG, ownership, goal-proximate fields, selectors, generated contracts, and completed coordinator-work dependency authority with exact baseline inclusion | `workflow-plan-v09.test.mjs`, `coordinator-work-v097.test.mjs`, `v09-lifecycle-fixture.mjs` |
 | Replaceable selector policy, three delivery-owner judgment bands independent of staffing, and deliberate overrides | `selector-policy-v09.test.mjs` |
 | Typed Codex App evidence, ready/provisional/opaque shapes, duplicate discovery, and contradictions | `codex-app-adapter-v09.test.mjs` |
+| Stable launch-referenced executor membership, semantic reconciliation replay, missing/stale projection convergence, provisional/opaque refresh retirement before source deletion, and legacy duplicate blocking | `task-launch-v09.test.mjs`, `cli-v09.test.mjs`, `assignment-lifecycle-v097.test.mjs`, `refresh-v09.test.mjs` |
 | First-turn launch, exact executor claim, linked-worktree activation, one-shot creation, crash recovery, and negative identity/Git cases | `task-launch-v09.test.mjs` |
 | Full launch through callback, disposition, integration/no-change, verification, archive, cleanup, and audit joins, including callback-before-App-result selector enrichment and cross-revision task-disposition dependencies | `lifecycle-v09.test.mjs`, `run-lifecycle-v09.test.mjs` |
 | Quiet completion and separate one-shot urgent interruption | `lifecycle-v09.test.mjs`, `urgent-v09.test.mjs` |

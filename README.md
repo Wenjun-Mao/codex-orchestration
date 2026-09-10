@@ -94,6 +94,13 @@ unknown future result is retained as bounded evidence but never authorizes a
 retry. Project, title, timing, and worktree path can narrow discovery but never
 establish identity.
 
+Equivalent reconciliation replays compare the creation and selector facts,
+retain their original timestamps, and preserve the original creation shape.
+Iteration membership references the persisted launch rather than hashing a
+changing launch view, so authenticated start can advance one provisional or
+opaque projection without rekeying cleanup history. A completed exact start may
+finish bookkeeping after legitimate branch work without rerunning activation.
+
 There is no bootstrap-only executor turn, coordinator-side branch-binding wait,
 second objective prompt, ordinary release message, or normal-path private
 history scan.
@@ -207,9 +214,11 @@ the exact source package: v0.8 retains operation identity, while v0.9 retains
 launch identity. Exact v0.8 executor-local work may be archived and discarded,
 then only its semantic assignment is reissued with fresh task, launch, branch,
 worktree, selector, and rationale identities. Launch-based v0.9 discard is not
-relabelled as a legacy creation operation and fails closed. The target never
-parses or migrates source journals. Unsupported older state uses the explicit
-unplug path.
+relabelled as a legacy creation operation: refresh retains the exact launch ID,
+archives and retires its exact task/worktree/branch authority, and records that
+cleanup in any owning assignment iteration before source deletion. The target
+never parses or migrates source journals. Unsupported older state uses the
+explicit unplug path.
 
 Current v0.9 sources also expose coordinator-owned workflow claims. Refresh
 reissues an unfinished coordinator claim with fresh task and selector identity,

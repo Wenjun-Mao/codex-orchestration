@@ -27,9 +27,13 @@ import { PACKAGE_VERSION, sha256, stableStringify } from "../lib/core.mjs";
 import { deliverCallback, observeCallback } from "../lib/callbacks.mjs";
 import { finalizeTaskDisposition, prepareTaskDisposition } from "../lib/dispositions.mjs";
 import {
+  cancelIteration,
   closeoutIterationWithOwningHost,
+  iterationLaunchProjectionStatus,
   iterationStatus,
+  reconcileExecutorIterationMembers,
   registerExecutorIterationMember,
+  retireExecutorIterationMembersForRefresh,
 } from "../lib/iteration-registry.mjs";
 import {
   integrationVerificationRequest,
@@ -474,6 +478,9 @@ async function acceptedChildFixture(
     patchEquivalentIntegration = false,
     stateNamespace = RUNTIME_DIRECTORY,
     localPredecessor = false,
+    registerExecutor = true,
+    launchCreationOutcome = "ready",
+    launchCreationBeforeStart = false,
   } = {},
 ) {
   const selectedIntegrationOutcome = patchEquivalentIntegration
@@ -520,6 +527,8 @@ async function acceptedChildFixture(
     taskTitle,
     task: localPredecessor ? { dependencies: [predecessorTask.task_id] } : {},
     predecessorTask,
+    creationOutcome: launchCreationOutcome,
+    creationBeforeStart: launchCreationBeforeStart,
     baseTime: localPredecessor ? TIME - 5_000 : undefined,
     beforeTaskContract: localPredecessor ? async ({
       stateRoot,
@@ -626,12 +635,14 @@ async function acceptedChildFixture(
     stateRoot: registered.state_root,
     assignmentId: registered.route.assignment.assignment_id,
   });
-  await registerExecutorIterationMember({
-    assignment,
-    launch: context.launch,
-    stateRoot: context.stateRoot,
-    now: TIME + 100,
-  });
+  if (registerExecutor) {
+    await registerExecutorIterationMember({
+      assignment,
+      launch: context.launch,
+      stateRoot: context.stateRoot,
+      now: TIME + 100,
+    });
+  }
   if (usesLegacyState) {
     await rename(legacyStateRoot, currentStateRoot);
     context.stateRoot = currentStateRoot;
@@ -783,13 +794,215 @@ async function closeoutAcceptedExecutor(child, { now = TIME + 12_000 } = {}) {
   return { prepared, closed };
 }
 
+test("cleanup converges a missing executor projection from completed launch authority after work advances", async (t) => {
+  const child = await acceptedChildFixture(t, "missing-launch-projection", {
+    integrationOutcome: "ancestor",
+    registerExecutor: false,
+  });
+  const iterationPath = resolve(
+    child.context.commonDir,
+    "codex-flow",
+    "iterations-v1",
+    "records",
+    `${child.assignment.iteration_id}.json`,
+  );
+  const beforeBytes = await readFile(iterationPath, "utf8");
+  const before = await iterationLaunchProjectionStatus({
+    commonDir: child.context.commonDir,
+    iterationId: child.assignment.iteration_id,
+  });
+  assert.equal(before.launch_projections.length, 1);
+  assert.equal(before.launch_projections[0].publication, "absent");
+  assert.equal(before.launch_projections[0].effective.thread_id, child.context.executorThreadId);
+  assert.equal(before.iteration.members.filter((entry) => entry.role === "executor").length, 0);
+  assert.equal(await readFile(iterationPath, "utf8"), beforeBytes, "status must remain read-only");
+  await assert.rejects(cancelIteration({
+    commonDir: child.context.commonDir,
+    iterationId: child.assignment.iteration_id,
+    assignmentId: child.assignment.assignment_id,
+    now: TIME + 11_900,
+  }), /requires archived executor evidence/);
+
+  const prepared = await closeoutIterationWithOwningHost({
+    commonDir: child.context.commonDir,
+    iterationId: child.assignment.iteration_id,
+    taskObservation: activeTaskObservation(child.context.executorThreadId, TIME + 12_000),
+    now: TIME + 12_000,
+  });
+  assert.equal(prepared.status, "host-action-required");
+  const executor = prepared.iteration.members.find((entry) => entry.role === "executor");
+  assert.equal(executor.thread_id, child.context.executorThreadId);
+  assert.equal(executor.registered_at, new Date(TIME + 11_900).toISOString());
+});
+
+test("duplicate legacy launch references block instead of selecting a member", async (t) => {
+  const child = await acceptedChildFixture(t, "duplicate-legacy-launch-reference");
+  const recordPath = resolve(
+    child.context.commonDir,
+    "codex-flow",
+    "iterations-v1",
+    "records",
+    `${child.assignment.iteration_id}.json`,
+  );
+  const iteration = JSON.parse(await readFile(recordPath, "utf8"));
+  const executor = iteration.members.find((entry) => entry.role === "executor");
+  const duplicateAuthority = { ...executor.authority, authority_digest: "b".repeat(64) };
+  const duplicate = {
+    ...executor,
+    authority: duplicateAuthority,
+    member_id: `iteration-member-v1-${sha256(stableStringify({
+      role: executor.role,
+      host_id: executor.host_id,
+      authority: duplicateAuthority,
+    }))}`,
+  };
+  iteration.members.push(duplicate);
+  iteration.members.sort((left, right) => left.member_id.localeCompare(right.member_id));
+  iteration.record_digest = sha256(stableStringify({
+    assignment_id: iteration.assignment_id,
+    label: iteration.label,
+    members: iteration.members,
+    state: iteration.state,
+    created_at: iteration.created_at,
+    updated_at: iteration.updated_at,
+  }));
+  await writeFile(recordPath, `${JSON.stringify(iteration, null, 2)}\n`, "utf8");
+  await assert.rejects(
+    closeoutIterationWithOwningHost({
+      commonDir: child.context.commonDir,
+      iterationId: child.assignment.iteration_id,
+      taskObservation: activeTaskObservation(child.context.executorThreadId, TIME + 12_000),
+      now: TIME + 12_000,
+    }),
+    /duplicate executor members for one launch reference/,
+  );
+});
+
+test("legacy provisional member converges in place without rekeying or rewriting cleanup history", async (t) => {
+  const child = await acceptedChildFixture(t, "legacy-provisional-convergence", {
+    launchCreationOutcome: "provisional",
+    launchCreationBeforeStart: true,
+  });
+  const recordPath = resolve(
+    child.context.commonDir,
+    "codex-flow",
+    "iterations-v1",
+    "records",
+    `${child.assignment.iteration_id}.json`,
+  );
+  const iteration = JSON.parse(await readFile(recordPath, "utf8"));
+  const index = iteration.members.findIndex((entry) => entry.role === "executor");
+  const executor = iteration.members[index];
+  const legacyAuthority = {
+    ...executor.authority,
+    authority_digest: sha256(stableStringify(child.context.launch)),
+  };
+  const legacy = {
+    ...executor,
+    authority: legacyAuthority,
+    member_id: `iteration-member-v1-${sha256(stableStringify({
+      role: executor.role,
+      host_id: executor.host_id,
+      authority: legacyAuthority,
+    }))}`,
+    thread_id: null,
+    provisional_id: child.context.launch.creation_evidence.provisional_id,
+  };
+  iteration.members[index] = legacy;
+  iteration.members.sort((left, right) => left.member_id.localeCompare(right.member_id));
+  iteration.record_digest = sha256(stableStringify({
+    assignment_id: iteration.assignment_id,
+    label: iteration.label,
+    members: iteration.members,
+    state: iteration.state,
+    created_at: iteration.created_at,
+    updated_at: iteration.updated_at,
+  }));
+  await writeFile(recordPath, `${JSON.stringify(iteration, null, 2)}\n`, "utf8");
+
+  const status = await iterationLaunchProjectionStatus({
+    commonDir: child.context.commonDir,
+    iterationId: child.assignment.iteration_id,
+  });
+  assert.equal(status.launch_projections[0].publication, "stale");
+  const converged = await reconcileExecutorIterationMembers({
+    commonDir: child.context.commonDir,
+    iterationId: child.assignment.iteration_id,
+    now: TIME + 12_000,
+  });
+  const current = converged.members.find((entry) => entry.role === "executor");
+  assert.equal(current.member_id, legacy.member_id);
+  assert.equal(current.authority.authority_digest, legacy.authority.authority_digest);
+  assert.equal(current.registered_at, legacy.registered_at);
+  assert.equal(current.archive_attempt, legacy.archive_attempt);
+  assert.equal(current.thread_id, child.context.executorThreadId);
+  assert.equal(current.provisional_id, null);
+});
+
+test("refresh-retired launch cleanup survives source deletion and leaves cancellation lawful", async (t) => {
+  const child = await acceptedChildFixture(t, "refresh-retired-missing-projection", {
+    launchCreationOutcome: "provisional",
+    launchCreationBeforeStart: true,
+    registerExecutor: false,
+  });
+  const converged = await reconcileExecutorIterationMembers({
+    commonDir: child.context.commonDir,
+    iterationId: child.assignment.iteration_id,
+    now: TIME + 11_000,
+  });
+  const executor = converged.members.find((entry) => entry.role === "executor");
+  const branchTip = git(child.root, ["rev-parse", child.context.executorBranch]);
+  git(child.root, ["worktree", "remove", "--force", child.context.executorPath]);
+  git(child.root, ["branch", "-D", child.context.executorBranch]);
+  const retired = await retireExecutorIterationMembersForRefresh({
+    commonDir: child.context.commonDir,
+    iterationId: child.assignment.iteration_id,
+    sourceStateRoot: child.context.stateRoot,
+    retirements: [{
+      source_task_id: child.context.contract.task_id,
+      thread_id: child.context.executorThreadId,
+      host_id: executor.host_id,
+      attempt_id: `refresh-archive-v1-${"a".repeat(64)}`,
+      result_digest: "b".repeat(64),
+      observed_at: new Date(TIME + 11_100).toISOString(),
+      completed_at: new Date(TIME + 11_200).toISOString(),
+      worktree_path: executor.worktree_path,
+      branch: executor.branch,
+      branch_tip: branchTip,
+    }],
+    now: TIME + 11_200,
+  });
+  const retiredExecutor = retired.members.find((entry) => entry.role === "executor");
+  assert.equal(retiredExecutor.state, "archived");
+  assert.equal(retiredExecutor.archive_attempt.reason, "refresh-retired");
+  await rm(child.context.stateRoot, { recursive: true, force: false });
+  const cancelled = await cancelIteration({
+    commonDir: child.context.commonDir,
+    iterationId: child.assignment.iteration_id,
+    assignmentId: child.assignment.assignment_id,
+    now: TIME + 11_300,
+  });
+  assert.equal(cancelled.status, "cancelled");
+});
+
 test("mixed local and visible delivery preserves its owner through closeout and successor admission", async (t) => {
   const child = await acceptedChildFixture(t, "mixed-connected-journey", {
     deliveryBranch: true,
     integrationOutcome: "ancestor",
     localPredecessor: true,
+    launchCreationOutcome: "provisional",
+    launchCreationBeforeStart: true,
   });
   assert.equal(child.localWork.state, "completed");
+  assert.equal(child.context.launch.creation_evidence.classification, "provisional");
+  assert.equal(child.context.launch.creation_evidence.ready_thread_id, null);
+  assert.equal(
+    (await iterationStatus({
+      commonDir: child.context.commonDir,
+      iterationId: child.assignment.iteration_id,
+    })).members.find((entry) => entry.role === "executor").thread_id,
+    child.context.executorThreadId,
+  );
   assert.equal(child.context.contract.accepted_dependencies[0].authority_kind, "coordinator-work");
   assert.notEqual(
     git(child.root, ["rev-parse", "main"]),
@@ -1807,7 +2020,7 @@ test("a cancelled coordinator can be rebound to a successor assignment and recla
       stateRoot: predecessor.stateRoot,
       now: TIME + 15_850,
     }),
-    /shared by another persisted member/,
+    /Task launch does not exist/,
   );
   await installRepositoryReportLocator({
     stateRoot: successor.state_root,
@@ -2227,7 +2440,7 @@ test("successor admission does not collide with a cancelled coordinator on anoth
   }
 });
 
-test("concurrent member registration persists at most one owner for a worktree", async (t) => {
+test("member registration rejects unpersisted caller launch views", async (t) => {
   const context = await fixture(t);
   const assignment = await assignmentAuthority({
     stateRoot: context.state_root,
@@ -2262,15 +2475,15 @@ test("concurrent member registration persists at most one owner for a worktree",
         now: TIME + 17_301,
       }),
     ]);
-    assert.equal(outcomes.filter((entry) => entry.status === "fulfilled").length, 1);
-    assert.equal(outcomes.filter((entry) => entry.status === "rejected").length, 1);
+    assert.equal(outcomes.filter((entry) => entry.status === "fulfilled").length, 0);
+    assert.equal(outcomes.filter((entry) => entry.status === "rejected").length, 2);
     const persisted = await iterationStatus({
       commonDir: context.commonDir,
       iterationId: assignment.iteration_id,
     });
     assert.equal(
       persisted.members.filter((entry) => entry.worktree_path === executorPath).length,
-      1,
+      0,
     );
   } finally {
     spawnSync("git", ["worktree", "remove", "--force", executorPath], {

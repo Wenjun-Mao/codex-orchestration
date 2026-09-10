@@ -160,8 +160,19 @@ claims with ordinary child claims, so zero-child and mixed workflows use the
 same accounting contract.
 
 An assignment's iteration registry records members only from authenticated
-assignment and launch commands. The assignment-derived executor title is the
-exact title passed to the host and recorded by the registry. Closeout prepares
+assignment and persisted launch authority. A logical executor member is keyed
+by its stable launch reference; start identity and completed Git activation are
+derived from that launch while registration time and cleanup progress remain in
+the iteration. Start, reconciliation, cleanup, cancellation, and refresh-source
+retirement share the same monotonic resolver. Read-only status reports absent,
+stale, current, or duplicate projection state without repairing it. Legacy
+member IDs and digest provenance remain unchanged and require one unique exact
+launch reference; duplicates block rather than being ranked or merged. The
+refresh capsule transfers its already-authenticated archive and Git-retirement
+result into the exact member before deleting the launch namespace, so later
+cancellation does not depend on retired source files. The
+assignment-derived executor title is the exact title passed to the host and
+recorded by the registry. Closeout prepares
 eligible idle children before the coordinator as one exact owning-host App action,
 persists the attempt before returning it, and reconciles the owning role's
 bounded result and exact private archive observation without replay. Executor

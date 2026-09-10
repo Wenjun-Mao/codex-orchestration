@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
 import { cp, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { resolve } from "node:path";
+import { basename, resolve } from "node:path";
 import test from "node:test";
 import { assignmentAuthority } from "../lib/assignment-authority.mjs";
 import { RUNTIME_DIRECTORY } from "../lib/runtime-context.mjs";
@@ -357,4 +357,51 @@ test("v0.9 CLI activates a clean run through current launch-era wiring", async (
   const executor = iteration.members.find((member) => member.role === "executor");
   assert.equal(executor.requested_title, canonicalExecutorTitle);
   assert.equal(executor.provisional_id, "client-new-thread:cli-v09-executor");
+  const originalMemberId = executor.member_id;
+  const originalRegisteredAt = executor.registered_at;
+  const originalAuthorityDigest = executor.authority.authority_digest;
+  const originalCreationObservedAt = JSON.parse(reconciled.stdout).creation_evidence.observed_at;
+  const executorPath = resolve(root, `../${basename(root)}-cli-v09-executor`);
+  execFileSync("git", ["worktree", "add", "--quiet", "--detach", executorPath, baseline], { cwd: root });
+  t.after(() => {
+    spawnSync("git", ["worktree", "remove", "--force", executorPath], { cwd: root });
+  });
+  const runtimeCli = resolve(result.runtime_authority.bundle_root, "bin", "codex-flow.mjs");
+  const started = spawnSync(process.execPath, [
+    runtimeCli,
+    "task", "launch", "start",
+    "--run-id", runId,
+    "--launch-id", launch.launch_id,
+    "--nonce", launch.launch_nonce,
+    "--json",
+  ], {
+    cwd: executorPath,
+    env: { ...process.env, CODEX_THREAD_ID: "cli-v09-executor" },
+    encoding: "utf8",
+  });
+  assertSuccess(started, "assignment-bound task launch start");
+  const replayed = runCli([
+    "task", "launch", "reconcile", "--run-id", runId, "--file", reconcileRequestPath, "--json",
+  ], { cwd: root, env: { CODEX_THREAD_ID: coordinatorThreadId } });
+  assertSuccess(replayed, "assignment-bound task launch reconciliation replay");
+  assert.equal(JSON.parse(replayed.stdout).creation_evidence.observed_at, originalCreationObservedAt);
+  const promoted = await iterationStatus({
+    commonDir: resolve(root, ".git"),
+    iterationId: assignment.iteration_id,
+  });
+  const promotedExecutor = promoted.members.find((member) => member.role === "executor");
+  assert.equal(promoted.members.filter((member) => member.role === "executor").length, 1);
+  assert.equal(promotedExecutor.member_id, originalMemberId);
+  assert.equal(promotedExecutor.registered_at, originalRegisteredAt);
+  assert.equal(promotedExecutor.authority.authority_digest, originalAuthorityDigest);
+  assert.equal(promotedExecutor.thread_id, "cli-v09-executor");
+  assert.equal(promotedExecutor.provisional_id, null);
+  const assignmentStatus = runCli([
+    "assignment", "status", "--assignment-id", assignment.assignment_id, "--json",
+  ], { cwd: root });
+  assertSuccess(assignmentStatus, "assignment launch projection status");
+  assert.equal(
+    JSON.parse(assignmentStatus.stdout).iteration_launch_projections[0].publication,
+    "current",
+  );
 });

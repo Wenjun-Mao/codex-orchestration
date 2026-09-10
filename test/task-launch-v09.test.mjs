@@ -441,6 +441,73 @@ test("provisional and opaque App results remain non-authoritative until exact ta
   }
 });
 
+test("creation replay preserves original evidence timestamps and completed start replays after work advances", async (t) => {
+  const root = await createGitFixture("codex-flow-v09-semantic-replay-");
+  const context = await launchContext(root, "semantic-replay");
+  const { attempted } = await preparedAttempt(context);
+  const worktree = await linkedWorktree(context);
+  t.after(async () => {
+    await removeWorktree(context, worktree);
+    await rm(root, { recursive: true, force: true });
+  });
+  const firstObservedAt = context.baseTime + 5_000;
+  const first = await reconcileTaskLaunch({
+    ...readyEvidence(context, attempted, firstObservedAt),
+    hostId: "local",
+  });
+  const replay = await reconcileTaskLaunch({
+    ...readyEvidence(context, attempted, firstObservedAt + 600_000),
+    hostId: "local",
+  });
+  assert.equal(replay.creation_evidence.observed_at, first.creation_evidence.observed_at);
+  assert.equal(
+    replay.selector_evidence.accepted.observed_at,
+    first.selector_evidence.accepted.observed_at,
+  );
+  const omittedSelectors = await reconcileTaskLaunch({
+    ...readyEvidence(context, attempted, firstObservedAt + 610_000),
+    selectorEvidence: null,
+  });
+  assert.deepEqual(omittedSelectors.selector_evidence, first.selector_evidence);
+  await assert.rejects(reconcileTaskLaunch({
+    ...readyEvidence(context, attempted, firstObservedAt + 620_000),
+    hostId: "different-host",
+  }), /conflicts with recorded evidence/);
+  await assert.rejects(reconcileTaskLaunch({
+    ...readyEvidence(context, attempted, firstObservedAt + 630_000),
+    readyThreadId: "different-executor",
+  }), /conflicts with recorded evidence/);
+  await assert.rejects(reconcileTaskLaunch({
+    ...readyEvidence(context, attempted, firstObservedAt + 640_000),
+    outcome: "provisional",
+    readyThreadId: null,
+    provisionalId: "client-new-thread:different",
+  }), /conflicts with recorded evidence/);
+
+  const executorThreadId = `executor-${context.runId}`;
+  const active = await startTaskLaunch({
+    stateRoot: context.stateRoot,
+    launchId: attempted.launch_id,
+    launchNonce: attempted.launch_nonce,
+    executorThreadId,
+    repositoryPath: worktree,
+    now: context.baseTime + 6_000,
+  });
+  await writeFile(resolve(worktree, "advanced.txt"), "advanced\n", "utf8");
+  git(worktree, ["add", "advanced.txt"]);
+  git(worktree, ["commit", "--quiet", "-m", "advance after activation"]);
+  const lateReplay = await startTaskLaunch({
+    stateRoot: context.stateRoot,
+    launchId: attempted.launch_id,
+    launchNonce: attempted.launch_nonce,
+    executorThreadId,
+    repositoryPath: worktree,
+    now: context.baseTime + 600_000,
+  });
+  assert.equal(lateReplay.activation_performed, false);
+  assert.equal(lateReplay.git_activation.completed_at, active.git_activation.completed_at);
+});
+
 test("task start is crash-resumable on both sides of branch attachment", async (t) => {
   for (const boundary of ["after-intent", "after-switch"]) {
     const root = await createGitFixture(`codex-flow-v09-crash-${boundary}-`);
