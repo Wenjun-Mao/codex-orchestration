@@ -553,7 +553,7 @@ test("assignment-lived reporting binds the exact target before refresh source de
   const root = await createGitFixture("codex-flow-refresh-v097-assignment-");
   const requests = await mkdtemp(resolve(tmpdir(), "codex-flow-refresh-v097-assignment-requests-"));
   const sourcePackage = await copyCurrentPackage();
-  const targetPackage = await copyCurrentPackage({ version: "0.9.11-rc.5" });
+  const targetPackage = await copyCurrentPackage({ version: "0.9.12-rc.1" });
   const sourceNamespace = RUNTIME_DIRECTORY;
   t.after(async () => {
     await Promise.all([
@@ -632,7 +632,7 @@ test("assignment-lived reporting binds the exact target before refresh source de
   assertSuccess(inspectionCall, "assignment refresh inspection");
   const inspection = JSON.parse(inspectionCall.stdout);
   assert.equal(inspection.route, "refresh-ready", inspection.reason);
-  assert.equal(inspection.authority.source.package_version, "0.9.11-rc.4");
+  assert.equal(inspection.authority.source.package_version, "0.9.11");
 
   const replacement = {
     ...source.workflowTask,
@@ -777,7 +777,7 @@ test(`applyRefresh retires an assigned ${creationOutcome}-first launch whose ite
   const root = await createGitFixture("codex-flow-refresh-v0911-launch-assignment-");
   const requests = await mkdtemp(resolve(tmpdir(), "codex-flow-refresh-v0911-launch-requests-"));
   const codexHome = await mkdtemp(resolve(tmpdir(), "codex-flow-refresh-v0911-launch-home-"));
-  const targetPackage = await copyCurrentPackage({ version: "0.9.11-rc.5" });
+  const targetPackage = await copyCurrentPackage({ version: "0.9.12-rc.1" });
   const source = await createActiveTaskLaunch(root, "refresh-assigned-provisional", {
     taskTitle: "Executor · v0.9.7 · Assignment reporting",
     creationOutcome,
