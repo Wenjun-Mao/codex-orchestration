@@ -798,6 +798,31 @@ test("mixed local and visible delivery preserves its owner through closeout and 
   const now = Date.now();
   const executorCloseout = await closeoutAcceptedExecutor(child, { now });
   assert.equal(executorCloseout.closed.status, "phase-complete");
+  const report = await acceptedFinal(
+    child.reporting,
+    "mixed-connected-final",
+    "Mixed local and visible delivery complete.",
+    now + 500 - TIME,
+  );
+  const retireLocator = ({ routeId, reason, now: retirementNow }) => (
+    retireRepositoryReportLocator({
+      stateRoot: child.reporting.state_root,
+      routeId,
+      reason,
+      now: retirementNow,
+    })
+  );
+  const premature = await acceptAssignmentResult({
+    stateRoot: child.reporting.state_root,
+    assignmentId: child.assignment.assignment_id,
+    reportId: report.report_id,
+    directorThreadId: child.assignment.recipient.thread_id,
+    taskObservation: activeTaskObservation(child.context.coordinator.thread_id, now + 600),
+    retireLocator,
+    now: now + 600,
+  });
+  assert.equal(premature.reason, "execution-terminal-required");
+  assert.equal(Object.hasOwn(premature, "closeout"), false);
   const audit = await auditRunClosure({
     stateRoot: child.context.stateRoot,
     runId: child.context.launch.run_id,
@@ -813,12 +838,6 @@ test("mixed local and visible delivery preserves its owner through closeout and 
     resume: run.binding,
     closedAt: new Date(now + 1_000).toISOString(),
   });
-  const report = await acceptedFinal(
-    child.reporting,
-    "mixed-connected-final",
-    "Mixed local and visible delivery complete.",
-    now + 2_000 - TIME,
-  );
   git(child.root, ["merge", "--ff-only", "--quiet", child.coordinatorBranch]);
   const preservedTip = git(child.root, ["rev-parse", child.coordinatorBranch]);
   assert.equal(git(child.root, ["rev-parse", "main"]), preservedTip);
@@ -828,7 +847,7 @@ test("mixed local and visible delivery preserves its owner through closeout and 
     reportId: report.report_id,
     directorThreadId: child.assignment.recipient.thread_id,
     taskObservation: activeTaskObservation(child.context.coordinator.thread_id, now + 3_000),
-    retireLocator: async () => ({ status: "retired" }),
+    retireLocator,
     now: now + 3_000,
   });
   assert.equal(pending.status, "closeout-pending");
@@ -839,12 +858,13 @@ test("mixed local and visible delivery preserves its owner through closeout and 
     directorThreadId: child.assignment.recipient.thread_id,
     taskObservation: archivedTaskObservation(child.context.coordinator.thread_id, now + 3_100),
     hostResult: hostResult(pending.closeout.host_request, "accepted"),
-    retireLocator: async () => ({ status: "retired" }),
+    retireLocator,
     now: now + 3_100,
   });
   assert.equal(retired.status, "retired");
   assert.equal(git(child.root, ["rev-parse", "main"]), preservedTip);
   assert.equal(git(child.root, ["branch", "--list", child.coordinatorBranch]), "");
+  assert.equal(retired.locator_retirement.status, "retired");
 
   const successorCoordinator = {
     lineage_id: "mixed-successor-lineage",
@@ -877,39 +897,78 @@ test("mixed local and visible delivery preserves its owner through closeout and 
       supporting_authorization: null,
     }],
   });
-  const successor = await activateFixtureRun({
-    root: child.root,
-    runId: "mixed-successor-run",
+  const successorRequests = await mkdtemp(resolve(tmpdir(), "codex-flow-mixed-successor-"));
+  t.after(() => rm(successorRequests, { recursive: true, force: true }));
+  const successorRunId = "mixed-successor-run";
+  const successorNow = Date.now() - 1_000;
+  const successorGitDir = resolve(git(child.root, [
+    "rev-parse", "--path-format=absolute", "--git-dir",
+  ]));
+  await writeFile(resolve(successorGitDir, "codex-thread.json"), `${JSON.stringify({
+    version: 1,
+    ownerThreadId: successorCoordinator.thread_id,
+  })}\n`, "utf8");
+  const successorActivationPath = await jsonRequest(successorRequests, "activation", activationRequest({
+    runId: successorRunId,
     plan: successorPlan,
     lineage: successorCoordinator,
-    now: now + 4_000,
-  });
-  const successorStateRoot = resolve(child.context.commonDir, "codex-flow", RUNTIME_DIRECTORY);
-  await bindRecipient({
-    stateRoot: successorStateRoot,
+    branchFences: [],
+    now: successorNow,
+  }));
+  const successor = assertPackageSuccess(invokePackage(cli, [
+    "run", "activate", "--run-id", successorRunId,
+    "--file", successorActivationPath, "--json",
+  ], child.root, { CODEX_THREAD_ID: successorCoordinator.thread_id }), "mixed successor activation");
+  const successorRuntimeCli = resolve(successor.runtime_authority.bundle_root, "bin", "codex-flow.mjs");
+  const successorPreparationPath = await jsonRequest(successorRequests, "preparation", {
+    approved_plan_path: resolve(child.root, ".gitkeep"),
     recipient: {
+      host_id: "fixture-host",
       lineage_id: child.assignment.recipient.lineage_id,
       thread_id: child.assignment.recipient.thread_id,
       generation: child.assignment.recipient.generation,
     },
-  });
-  const successorPlanPath = resolve(child.root, "mixed-successor-plan.md");
-  await writeFile(successorPlanPath, "# mixed successor\n", "utf8");
-  const registration = await registerCoordinatorReportRoute({
-    stateRoot: successorStateRoot,
-    runId: successor.run.run_id,
-    senderThreadId: successorCoordinator.thread_id,
-    senderHostId: "fixture-host",
-    recipient: child.assignment.recipient,
-    approvedPlanPath: successorPlanPath,
-    approvedPlanDigest: sha256(await readFile(successorPlanPath)),
-    iterationLabel: "mixed successor",
+    iteration_label: "mixed successor",
     purpose: "Prove successor admission after mixed closeout.",
-    repositoryRoot: child.root,
-    repositoryBranch: "main",
-    now: now + 4_100,
+    outcome: "Admit the successor and complete one useful operation.",
+    scope: ["Start and complete the successor's local workflow task."],
+    acceptance_criteria: ["The public successor route is ready and local work completes."],
+    constraints: [],
+    reasons: [],
   });
-  assert.equal(registration.route.assignment.run_id, successor.run.run_id);
+  const preparation = assertPackageSuccess(invokePackage(cli, [
+    "assignment", "prepare", "--file", successorPreparationPath, "--json",
+  ], child.root, { CODEX_THREAD_ID: child.assignment.recipient.thread_id }), "mixed successor preparation");
+  const successorRoutePath = await jsonRequest(successorRequests, "route", {
+    run_id: successorRunId,
+    sender_thread_id: successorCoordinator.thread_id,
+    preparation_id: preparation.preparation.preparation_id,
+  });
+  const registration = assertPackageSuccess(invokePackage(successorRuntimeCli, [
+    "report", "route", "coordinator", "--run-id", successorRunId,
+    "--file", successorRoutePath, "--json",
+  ], child.root, { CODEX_THREAD_ID: successorCoordinator.thread_id }), "mixed successor registration");
+  assert.equal(registration.assignment.state, "open");
+  const successorStartPath = await jsonRequest(successorRequests, "local-start", {
+    run_id: successorRunId,
+    plan_id: successorPlan.plan_id,
+    task_id: successorPlan.tasks[0].task_id,
+    dependency_authorities: [],
+  });
+  const successorWork = assertPackageSuccess(invokePackage(successorRuntimeCli, [
+    "workflow", "local", "start", "--run-id", successorRunId,
+    "--file", successorStartPath, "--json",
+  ], child.root, { CODEX_THREAD_ID: successorCoordinator.thread_id }), "mixed successor useful work start");
+  const successorCompletePath = await jsonRequest(successorRequests, "local-complete", {
+    run_id: successorRunId,
+    local_work_id: successorWork.local_work_id,
+    checks: [{ check_id: "successor-useful-check", argv: [process.execPath, "-e", "process.exit(0)"] }],
+  });
+  const successorComplete = assertPackageSuccess(invokePackage(successorRuntimeCli, [
+    "workflow", "local", "complete", "--run-id", successorRunId,
+    "--file", successorCompletePath, "--json",
+  ], child.root, { CODEX_THREAD_ID: successorCoordinator.thread_id }), "mixed successor useful work completion");
+  assert.equal(successorComplete.state, "completed");
 });
 
 test("run audit rejects rollback to an older local fact after a later integrated result", async (t) => {
