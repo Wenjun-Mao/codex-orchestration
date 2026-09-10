@@ -1183,6 +1183,10 @@ test("assignment-lived reporting binds the exact target before refresh source de
     "--file", preAdmissionCancellationPath, "--json",
   ], root, { CODEX_THREAD_ID: recipient.thread_id });
   assert.notEqual(interruptedCancellation.status, 0);
+  assert.match(
+    `${interruptedCancellation.stderr}\n${interruptedCancellation.stdout}`,
+    /execution|run|v0\.9\.12/i,
+  );
   assert.equal((await assignmentAuthority({
     stateRoot: registered.state_root,
     assignmentId: originalAssignment.assignment_id,
