@@ -1872,8 +1872,8 @@ test("a cancelled coordinator can be rebound to a successor assignment and recla
   assert.equal(retired.status, "retired");
 });
 
-test("frozen RC1 cancellation admits and reclaims an exact RC2 successor", async (t) => {
-  assert.equal(PACKAGE_VERSION, "0.9.11-rc.2");
+test("frozen RC1 cancellation admits and reclaims an exact RC3 successor", async (t) => {
+  assert.equal(PACKAGE_VERSION, "0.9.11-rc.3");
   const source = await frozenRc1Package(t);
   const requests = await mkdtemp(resolve(tmpdir(), "codex-flow-v0911-cross-version-requests-"));
   t.after(() => rm(requests, { recursive: true, force: true }));
@@ -1985,7 +1985,7 @@ test("frozen RC1 cancellation admits and reclaims an exact RC2 successor", async
     "--file", predecessorLocalCompletePath, "--json",
   ], coordinatorPath, { CODEX_THREAD_ID: coordinator.thread_id }), "frozen RC1 local work completion");
   assert.equal(completedLocalWork.state, "completed");
-  const reason = "Exercise the exact frozen RC1 cancellation before RC2 successor admission.";
+  const reason = "Exercise the exact frozen RC1 cancellation before RC3 successor admission.";
   const predecessorAbandonPath = await jsonRequest(requests, "rc1-abandon", {
     run_id: predecessorRunId,
     resume: predecessorActivation.run.binding,
@@ -2008,7 +2008,7 @@ test("frozen RC1 cancellation admits and reclaims an exact RC2 successor", async
 
   const successorCli = resolve(packageRoot, "bin", "codex-flow.mjs");
   const refreshSkill = resolve(packageRoot, "skills", "refresh", "SKILL.md");
-  const refreshPreparePath = await jsonRequest(requests, "rc1-to-rc2-refresh-prepare", {
+  const refreshPreparePath = await jsonRequest(requests, "rc1-to-rc3-refresh-prepare", {
     source_namespace: "v0.9.11-rc.1",
     source_run_id: predecessorRunId,
     source_resume: predecessorActivation.run.binding,
@@ -2021,8 +2021,8 @@ test("frozen RC1 cancellation admits and reclaims an exact RC2 successor", async
   const refresh = assertPackageSuccess(invokePackage(successorCli, [
     "refresh", "prepare", "--invoking-skill", refreshSkill,
     "--file", refreshPreparePath, "--json",
-  ], coordinatorPath), "RC1 to RC2 refresh preparation");
-  const refreshApplyPath = await jsonRequest(requests, "rc1-to-rc2-refresh-apply", {
+  ], coordinatorPath), "RC1 to RC3 refresh preparation");
+  const refreshApplyPath = await jsonRequest(requests, "rc1-to-rc3-refresh-apply", {
     refresh_id: refresh.handoff.refresh_id,
     expected_handoff_digest: refresh.handoff.handoff_digest,
     archive_evidence: [],
@@ -2030,14 +2030,14 @@ test("frozen RC1 cancellation admits and reclaims an exact RC2 successor", async
   const applied = assertPackageSuccess(invokePackage(successorCli, [
     "refresh", "apply", "--invoking-skill", refreshSkill,
     "--file", refreshApplyPath, "--json",
-  ], coordinatorPath), "RC1 to RC2 refresh consumption");
+  ], coordinatorPath), "RC1 to RC3 refresh consumption");
   assert.equal(applied.status, "consumed-clean-start");
 
-  const successorPlan = successorAssignmentPlan("rc2-cross-version");
-  const successorRunId = "v0911-cross-version-rc2-run";
+  const successorPlan = successorAssignmentPlan("rc3-cross-version");
+  const successorRunId = "v0911-cross-version-rc3-run";
   const successorActivationPath = await jsonRequest(
     requests,
-    "rc2-activation",
+    "rc3-activation",
     activationRequest({
       runId: successorRunId,
       plan: successorPlan,
@@ -2049,28 +2049,28 @@ test("frozen RC1 cancellation admits and reclaims an exact RC2 successor", async
   const successorActivation = assertPackageSuccess(invokePackage(successorCli, [
     "run", "activate", "--run-id", successorRunId,
     "--file", successorActivationPath, "--json",
-  ], coordinatorPath, { CODEX_THREAD_ID: coordinator.thread_id }), "RC2 successor activation");
-  assert.equal(successorActivation.package_authority.package_version, "0.9.11-rc.2");
+  ], coordinatorPath, { CODEX_THREAD_ID: coordinator.thread_id }), "RC3 successor activation");
+  assert.equal(successorActivation.package_authority.package_version, "0.9.11-rc.3");
   const successorRuntimeCli = resolve(
     successorActivation.runtime_authority.bundle_root,
     "bin",
     "codex-flow.mjs",
   );
-  const successorPreparationPath = await jsonRequest(requests, "rc2-preparation", {
+  const successorPreparationPath = await jsonRequest(requests, "rc3-preparation", {
     approved_plan_path: resolve(coordinatorPath, ".gitkeep"),
     recipient: { host_id: "fixture-host", ...director },
-    iteration_label: "v0.9.11 RC2 successor",
+    iteration_label: "v0.9.11 RC3 successor",
     purpose: "Cross-version successor reclamation",
-    outcome: "Admit and reclaim the RC2 successor.",
+    outcome: "Admit and reclaim the RC3 successor.",
     scope: ["Use the exact cancelled RC1 predecessor authority."],
-    acceptance_criteria: ["RC2 successor reclamation completes."],
+    acceptance_criteria: ["RC3 successor reclamation completes."],
     constraints: [],
     reasons: [],
   });
   const successorPreparation = assertPackageSuccess(invokePackage(successorCli, [
     "assignment", "prepare", "--file", successorPreparationPath, "--json",
-  ], coordinatorPath, { CODEX_THREAD_ID: director.thread_id }), "RC2 assignment preparation");
-  const successorRoutePath = await jsonRequest(requests, "rc2-route", {
+  ], coordinatorPath, { CODEX_THREAD_ID: director.thread_id }), "RC3 assignment preparation");
+  const successorRoutePath = await jsonRequest(requests, "rc3-route", {
     run_id: successorRunId,
     sender_thread_id: coordinator.thread_id,
     preparation_id: successorPreparation.preparation.preparation_id,
@@ -2078,18 +2078,18 @@ test("frozen RC1 cancellation admits and reclaims an exact RC2 successor", async
   const successor = assertPackageSuccess(invokePackage(successorRuntimeCli, [
     "report", "route", "coordinator", "--run-id", successorRunId,
     "--file", successorRoutePath, "--json",
-  ], coordinatorPath, { CODEX_THREAD_ID: coordinator.thread_id }), "RC2 successor admission");
+  ], coordinatorPath, { CODEX_THREAD_ID: coordinator.thread_id }), "RC3 successor admission");
   const successorAssignment = await assignmentAuthority({
     stateRoot: successor.state_root,
     assignmentId: successor.route.assignment.assignment_id,
   });
-  assert.equal(successorAssignment.execution_bindings[0].namespace, "v0.9.11-rc.2");
+  assert.equal(successorAssignment.execution_bindings[0].namespace, "v0.9.11-rc.3");
   assert.notEqual(
     successorAssignment.repository_digest,
     cancelled.assignment.repository_digest,
-    "the RC2 successor must admit after the completed RC1 baseline advanced",
+    "the RC3 successor must admit after the completed RC1 baseline advanced",
   );
-  const successorLocalStartPath = await jsonRequest(requests, "rc2-successor-local-start", {
+  const successorLocalStartPath = await jsonRequest(requests, "rc3-successor-local-start", {
     run_id: successorRunId,
     plan_id: successorPlan.plan_id,
     task_id: successorPlan.tasks[0].task_id,
@@ -2098,24 +2098,24 @@ test("frozen RC1 cancellation admits and reclaims an exact RC2 successor", async
   const successorLocalWork = assertPackageSuccess(invokePackage(successorRuntimeCli, [
     "workflow", "local", "start", "--run-id", successorRunId,
     "--file", successorLocalStartPath, "--json",
-  ], coordinatorPath, { CODEX_THREAD_ID: coordinator.thread_id }), "RC2 successor useful work start");
-  const successorLocalCompletePath = await jsonRequest(requests, "rc2-successor-local-complete", {
+  ], coordinatorPath, { CODEX_THREAD_ID: coordinator.thread_id }), "RC3 successor useful work start");
+  const successorLocalCompletePath = await jsonRequest(requests, "rc3-successor-local-complete", {
     run_id: successorRunId,
     local_work_id: successorLocalWork.local_work_id,
     checks: [{
-      check_id: "rc2-successor-complete",
+      check_id: "rc3-successor-complete",
       argv: [process.execPath, "-e", "process.exit(0)"],
     }],
   });
   assertPackageSuccess(invokePackage(successorRuntimeCli, [
     "workflow", "local", "complete", "--run-id", successorRunId,
     "--file", successorLocalCompletePath, "--json",
-  ], coordinatorPath, { CODEX_THREAD_ID: coordinator.thread_id }), "RC2 successor useful work completion");
+  ], coordinatorPath, { CODEX_THREAD_ID: coordinator.thread_id }), "RC3 successor useful work completion");
   const successorAudit = assertPackageSuccess(invokePackage(successorRuntimeCli, [
     "run", "audit", "--run-id", successorRunId, "--json",
-  ], coordinatorPath), "RC2 successor run audit").audit;
+  ], coordinatorPath), "RC3 successor run audit").audit;
   assert.equal(successorAudit.terminal_ready, true);
-  const successorClosePath = await jsonRequest(requests, "rc2-successor-close", {
+  const successorClosePath = await jsonRequest(requests, "rc3-successor-close", {
     run_id: successorRunId,
     resume: successorActivation.run.binding,
     audit_id: successorAudit.audit_id,
@@ -2123,16 +2123,16 @@ test("frozen RC1 cancellation admits and reclaims an exact RC2 successor", async
   assertPackageSuccess(invokePackage(successorRuntimeCli, [
     "run", "close", "--run-id", successorRunId,
     "--file", successorClosePath, "--json",
-  ], coordinatorPath), "RC2 successor run close");
+  ], coordinatorPath), "RC3 successor run close");
   const report = await acceptedFinal(
     successor,
     "v0911-cross-version-successor-final",
-    "RC2 successor complete.",
+    "RC3 successor complete.",
     16_240,
   );
   git(primaryRoot, ["merge", "--ff-only", coordinatorBranch]);
   const activeObservationAt = Date.now();
-  const pendingPath = await jsonRequest(requests, "rc2-accept-pending", {
+  const pendingPath = await jsonRequest(requests, "rc3-accept-pending", {
     assignment_id: successorAssignment.assignment_id,
     report_id: report.report_id,
     task_observation: activeTaskObservation(coordinator.thread_id, activeObservationAt),
@@ -2140,9 +2140,9 @@ test("frozen RC1 cancellation admits and reclaims an exact RC2 successor", async
   const pending = assertPackageSuccess(invokePackage(successorRuntimeCli, [
     "assignment", "accept", "--assignment-id", successorAssignment.assignment_id,
     "--file", pendingPath, "--json",
-  ], primaryRoot, { CODEX_THREAD_ID: director.thread_id }), "RC2 pending closeout");
+  ], primaryRoot, { CODEX_THREAD_ID: director.thread_id }), "RC3 pending closeout");
   assert.equal(pending.status, "closeout-pending");
-  const retiredPath = await jsonRequest(requests, "rc2-accept-retired", {
+  const retiredPath = await jsonRequest(requests, "rc3-accept-retired", {
     assignment_id: successorAssignment.assignment_id,
     report_id: report.report_id,
     task_observation: archivedTaskObservation(coordinator.thread_id, activeObservationAt + 1),
@@ -2151,7 +2151,7 @@ test("frozen RC1 cancellation admits and reclaims an exact RC2 successor", async
   const retired = assertPackageSuccess(invokePackage(successorRuntimeCli, [
     "assignment", "accept", "--assignment-id", successorAssignment.assignment_id,
     "--file", retiredPath, "--json",
-  ], primaryRoot, { CODEX_THREAD_ID: director.thread_id }), "RC2 successor reclamation");
+  ], primaryRoot, { CODEX_THREAD_ID: director.thread_id }), "RC3 successor reclamation");
   assert.equal(retired.status, "retired");
   assert.doesNotMatch(git(primaryRoot, ["worktree", "list", "--porcelain"]), new RegExp(
     coordinatorPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),

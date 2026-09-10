@@ -554,7 +554,7 @@ test("assignment-lived reporting binds the exact target before refresh source de
   const root = await createGitFixture("codex-flow-refresh-v097-assignment-");
   const requests = await mkdtemp(resolve(tmpdir(), "codex-flow-refresh-v097-assignment-requests-"));
   const sourcePackage = await copyCurrentPackage();
-  const targetPackage = await copyCurrentPackage({ version: "0.9.11-rc.3" });
+  const targetPackage = await copyCurrentPackage({ version: "0.9.11-rc.4" });
   const sourceNamespace = RUNTIME_DIRECTORY;
   t.after(async () => {
     await Promise.all([
@@ -633,7 +633,7 @@ test("assignment-lived reporting binds the exact target before refresh source de
   assertSuccess(inspectionCall, "assignment refresh inspection");
   const inspection = JSON.parse(inspectionCall.stdout);
   assert.equal(inspection.route, "refresh-ready", inspection.reason);
-  assert.equal(inspection.authority.source.package_version, "0.9.11-rc.2");
+  assert.equal(inspection.authority.source.package_version, "0.9.11-rc.3");
 
   const replacement = {
     ...source.workflowTask,

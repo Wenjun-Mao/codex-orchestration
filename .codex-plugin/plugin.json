@@ -1,6 +1,6 @@
 {
   "name": "codex-orchestration",
-  "version": "0.9.11-rc.2",
+  "version": "0.9.11-rc.3",
   "description": "Direct and orchestrate Codex work with explicit roles, model routing, bounded ownership, and quiet durable results.",
   "author": {
     "name": "Wenjun Mao"
