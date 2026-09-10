@@ -5,6 +5,14 @@ decision records remain the detailed release evidence.
 
 ## 0.9.11 - 2026-09-09
 
+- Publish coordinator assignments only after iteration, recipient, route, and
+  locator readiness; expose deterministic interrupted-registration status,
+  retry, and cancellation without weakening published-artifact checks.
+- Retain authenticated execution retirement with the assignment before runtime
+  namespace removal, gate coordinator cleanup on terminal eligibility, and keep
+  accepted decisions cancellable when failed executions retain obligations.
+- Derive omitted path and shared-resource fences from the canonical workflow,
+  while rejecting partial refresh envelopes before handoff persistence.
 - Rebind one cancelled coordinator's disposable worktree to an exact settled
   successor at both admission and reclamation, with repository-global mutation
   locking and authenticated report-locator retirement.
