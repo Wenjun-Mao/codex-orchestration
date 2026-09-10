@@ -1,0 +1,240 @@
+# Codex Orchestration: launch identity and iteration closeout review
+
+**Recommendation: proceed with a bounded simplification of launch-to-iteration authority before another candidate. Do not reopen the whole assignment architecture.**
+
+The proposed correction is substantially right, but **adding a member-promotion call is not sufficient**. Make the launch the authority for live executor identity; make the iteration a stable reference to that launch plus its own durable cleanup progress.
+
+This is both a missing connection and unnecessary duplicated authority. The launch already supports authenticated start independently of provisional creation provenance. The iteration keeps a second identity snapshot, keys membership partly by changing data, and can reject cleanup before consulting the authoritative launch. Correct that representation and its consumers together—not by adding another ready-confirmation stage.
+
+[**Download the complete Markdown report with commit-pinned source links**](sandbox:/mnt/data/Codex_Orchestration_Launch_Identity_Review_39cb487.md)
+
+## Scope and evidence
+
+I inspected **`39cb487dfe5ae53f11aa67f5283f402121a5ca74`** exactly, with tree `4ba6f9909c82b9421bc1939c96cc5f3246609d68`. Its package declares **`0.9.11-rc.3`**. This does not independently establish equality with an installed artifact.
+
+I inspected source, relevant tests, the current plan, ADR 0068, and host-operation instructions. **No repository tests were executed and no live behavior was independently reproduced.** Local Git access failed on DNS resolution; GitHub connector reads succeeded. No repository changes were made.
+
+The canary ordering, successful blocker delivery, and 219/219 result remain supplied observations—not my execution evidence.  
+
+The current checkpoint introduces assignment-owned readiness and retained execution-retirement facts. I am not assuming the previous revision’s findings remain unresolved; this review concerns the separate launch-to-member connection.
+
+## 1. Findings and diagnosis
+
+All source locations below refer to the exact review commit.
+
+| Finding                                                                       | Evidence status                                             | Source and conclusion                                                                                                                                                                                                                   |
+| ----------------------------------------------------------------------------- | ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **F1 — Authenticated start does not publish executor membership**             | Confirmed in source; live manifestation reported            | `bin/codex-flow.mjs::commandTaskLaunchV09()` starts the launch and installs reporting. Membership registration occurs only after coordinator-side `reconcile`; the start branch returns first.                                          |
+| **F2 — Logical membership depends on a changing launch view**                 | Confirmed in source                                         | `iteration-registry.mjs::registerExecutorIterationMember()` hashes the supplied launch into `authority_digest`; `memberFor()` includes that authority in `member_id`. Another stage of the same launch becomes another member identity. |
+| **F3 — Equivalent creation-result retries are timestamp-sensitive twice**     | Confirmed in source; specific selector error reported       | The CLI generates new observation timestamps. `normalizeSelectorUpdate()` compares complete selector evidence; `reconcileTaskLaunch()` separately compares complete creation evidence.                                                  |
+| **F4 — Provisional creation provenance should not be rewritten as ready**     | Diagnosis confirmed; protection justified                   | `creation_evidence` records the creation result. `start_claim` plus completed `git_activation` independently make the launch active. A later “ready” creation reconciliation is a different assertion.                                  |
+| **F5 — Start replay is insufficient as the general projection-recovery path** | Additional source-supported limitation; reproduction needed | `startTaskLaunch()` checks the current deadline and pristine original baseline before returning an already-completed activation. Late bookkeeping cannot rely solely on replaying start after a commit or expired window.               |
+
+The relevant wiring, identity calculation, comparisons, and replay restrictions are directly visible in these functions.
+
+**None of your four diagnosis points is contradicted by the inspected code.** The important qualification is that a new ready reconciliation is not the right repair: it repurposes creation-result recording to update a downstream identity projection.
+
+There is another detail inside F2: the supplied object is a **view**, not merely the persisted record. `taskLaunchView()` adds `dispatch_permitted`, `activation_performed`, `execution_permitted`, and `host_request`. A hash of that object can depend on which command returned it. Preserving timestamps or excluding `status` alone would not make membership stable.
+
+The provisional cleanup refusal is appropriate for an unresolved identity. The defect is that `assertMemberEligible()` rejects the cached null `thread_id` **before** resolving archive authority, even though that authority subsequently rereads and checks the launch. A stale projection therefore vetoes an authenticated fact.
+
+## 2. Authority map: retain cleanup state, derive live identity
+
+| Fact or decision                                             | Recommended owner                                                        | Iteration’s role                                           |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------ | ---------------------------------------------------------- |
+| Which launch belongs to which run, contract, and coordinator | Immutable launch identity and authenticated assignment execution binding | Stable, validated reference                                |
+| What native creation returned                                | Original `creation_evidence`                                             | No competing creation classification                       |
+| Which executor claimed the launch                            | Authenticated `start_claim`; any known ready creation ID must agree      | Derived identity; optional cached display fields           |
+| Which worktree/branch was activated                          | Completed `git_activation` and existing Git checks                       | Derived binding, checked against cleanup evidence          |
+| Whether work is accepted, integrated, and verified           | Existing receipt, disposition, integration, and verification records     | References—not another success decision                    |
+| Which cleanup action was reserved and how far it progressed  | Existing archive operation and iteration cleanup records                 | Retain durable attempt/progress and child-first accounting |
+
+**Do not make the entire iteration a transient view.** Durable cleanup attempts and reclamation progress must survive retries. But those obligations do not require a second authoritative account of which executor performed the work.
+
+Existing cleanup already consults launch-backed archive authority, so using the launch for live identity does not introduce a new dependency at that boundary.
+
+The desired relationship is:
+
+```text
+Immutable launch reference
+        ├── original creation provenance
+        └── authenticated start + completed Git activation
+                            ↓
+                 effective executor identity
+                            ↓
+         iteration cleanup obligation and archive progress
+```
+
+A crash can still leave a stale stored projection. The improvement is that **the projection is no longer competing authority**: supported consumers resolve the fact and reconcile the cache without inventing an identity.
+
+## 3. Smallest coherent design
+
+### A. Key members by the stable launch reference
+
+Identify a logical executor member by the owning assignment and canonical launch reference: its authenticated state root/namespace and `launch_id`, with run, contract, and coordinator binding validated.
+
+The existing `launchIdFor()` already hashes immutable launch intent rather than lifecycle observations. Reuse that identity instead of hashing the whole returned view again.
+
+For new records, timestamps, accepted-selector observations, lifecycle status, presentation flags, and newly discovered worktree paths should not change logical member identity. Preserve one original `registered_at` and independent cleanup progress.
+
+Also stabilize **host ownership**. Registration currently chooses `creation_evidence.host_id` when present and otherwise the assignment sender’s host. The opaque-result CLI tests explicitly admit creation evidence with host `unknown`. That observation must not replace authenticated owning-host identity or produce another member after start-first ordering. A genuinely contradictory known host must still fail.
+
+**This replaces:** full-view identity hashing, lookup solely by a changing member ID, and new-member creation caused by ordinary launch progress.
+
+### B. Use one authoritative member resolver across publication and consumption
+
+Use the existing locked registration/reconciliation path to resolve the exact persisted launch. Invoke it after authenticated start and supported start replay, and after creation reconciliation. Do not treat an older caller-supplied view as current truth.
+
+The important addition to your proposal is **consumer-side convergence**: status should expose effective identity and an incomplete projection; cleanup must resolve or reconcile the same authoritative link before deciding membership is still provisional. This must also cover interruption **before the first member is written**, not only promotion of an existing member.
+
+Bind the assignment through the launch’s coordinator and exact execution binding—not the executor caller’s thread ID. Preserve assignment readiness, terminal-state restrictions, worktree exclusivity, and existing lock ordering. Replay must not resurrect a cancelled assignment, append an unrelated launch, reset archive progress, or downgrade ready to provisional.
+
+A ready creation ID is not completed branch activation. Ordinary execution/cleanup still requires start and activation authority plus the usual result, host, and Git checks. Keep the existing bounded stalled-provisional archival-recovery path separate.
+
+**This replaces:** the registry’s independent live-identity decision and the need for a second coordinator “ready confirmation.” It adds no new public ready command or registry.
+
+### C. Make creation-result replay idempotent without changing provenance
+
+For replay of the **same recorded creation result**, compare semantic facts: classification, known host identity, ready/provisional ID or opaque-result digest/length, and applicable selector values. Retain the original evidence timestamps.
+
+Apply this to **both** selector and creation evidence. Preserve existing observations when a retry supplies no new observation; never erase a known value. Reject conflicting populated selectors, another task ID, another provisional ID, different opaque payload evidence, or inconsistent known host identity.
+
+Do not classify a provisional-to-ready rewrite as equivalent replay. The launch already becomes active from independent start evidence while its original creation result remains provisional. `expectedStatus()` explicitly supports that separation.
+
+This is **not** permission to ignore timestamps generally. Fresh host-activity evidence used for deletion has a different freshness contract. Nor should a later observation be silently relabelled as the original creation response.
+
+**This replaces:** timestamp-sensitive whole-object equality for same-result replay—not immutable creation provenance or fresh cleanup observations.
+
+### D. Separate activation replay from projection reconciliation
+
+“Publish on start replay” needs a bounded recovery definition. At this commit, start checks the current deadline, exact task baseline, and pristine checkout before returning an already-completed activation.
+
+For an already-completed start/activation, identity reconciliation must read persisted authority—not rerun Git activation or require resetting completed work.
+
+If public start retry finishes bookkeeping, distinguish that continuation from a new claim: preserve the original claim time and operation, authenticate the same actor, and do not grant a new activation window.
+
+Consumer-side resolution is still needed after the executor’s work advances. **Keep fresh-start protections; do not broadly relax them to make projection repair convenient.**
+
+**This replaces:** using a first-execution command as the sole repair route for downstream bookkeeping.
+
+### Alternatives
+
+| Alternative                                                                   | Assessment                                                                             |
+| ----------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| Add the start-to-registration call only                                       | Insufficient: mutable IDs, timestamp conflicts, and crash gaps remain                  |
+| Stable reference + derived live identity + durable cleanup state              | **Recommended:** removes duplicate identity authority while retaining cleanup evidence |
+| Derive the whole iteration solely from current launches                       | Too broad: relocates cleanup history and must solve post-retirement lifetimes          |
+| Add ready-confirmation, another synchronization record, or a migration engine | Unnecessary: authenticated start already establishes the missing identity              |
+
+## 4. Adjacent transitions to cover
+
+| Boundary                                                              | Required behavior                                                                                                |
+| --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Provisional result first, then start                                  | Update one logical member; retain original creation evidence                                                     |
+| Start first, then ready/provisional/opaque result                     | Start establishes identity; late evidence cannot create another member or replace known ownership with `unknown` |
+| Reconciliation repeated later                                         | Same result is idempotent, retaining original evidence times; genuine changes conflict                           |
+| Crash after start persistence, before membership/reporting completion | Resume from durable authority without new task creation or branch activation                                     |
+| Resolution after executor commits                                     | Resolve identity without pristine-baseline reactivation; retain preservation checks                              |
+| Cancellation/refresh during incomplete publication                    | Count the actual assigned launch obligation, not just materialized members                                       |
+| Cleanup followed by source retirement                                 | Resolve pending identity while evidence exists; preserve completed cleanup’s necessary identity/action evidence  |
+
+The cancellation/refresh rows are **required checks, not newly reproduced defects**. Current cancellation already blocks on unarchived iteration members and requires execution-terminal evidence. The remaining question is whether those consumers remain complete when a member is missing or stale.
+
+Likewise, matching a stable key is necessary but insufficient: stale data must not overwrite newer identity or cleanup progress. The merge must remain monotonic under existing synchronization.
+
+## 5. Why tests and rehearsal missed this
+
+Your explanation is supported by the inspected tests:
+
+| Test/fixture                   | Actual coverage boundary                                                              |
+| ------------------------------ | ------------------------------------------------------------------------------------- |
+| `createActiveTaskLaunch()`     | Constructs **start → ready creation reconciliation**                                  |
+| `acceptedChildFixture()`       | Receives that active launch and registers membership once                             |
+| Provisional/opaque launch test | Ends after asserting that start made the launch active                                |
+| Assignment-bound CLI test      | Ends after asserting the provisional member’s title and ID; never starts the executor |
+
+These are directly visible in the fixtures and assertions.
+
+There is more coverage than “happy-path unit tests”: the runtime-CLI test exercises multiple creation/reporting orderings and a partial start. But its fixture has no assignment-bound iteration, so it cannot validate this connection.
+
+**The gap is the intersection of supported ordering, public commands, and assignment-owned cleanup.** Broad lifecycle names or a large pass count do not establish that intersection.
+
+The actual rehearsal logs are unavailable. I cannot establish whether rehearsal was skipped or exactly which commands ran. The source demonstrates that the cited tests do not prove the incident sequence.
+
+Separately, the supplied account says the live coordinator initially received a handwritten brief without its preparation ID. That is reported execution drift from the generated handoff—not an explanation for the executor defect, and not an uninterrupted first-turn coordinator pass. 
+
+## 6. Minimal verification and release checks
+
+### One strengthened public-command journey
+
+Extend the existing assignment-bound CLI/mixed journey rather than add a framework:
+
+```text
+Director prepares the real coordinator brief
+→ assignment registration/readiness
+→ committed local A
+→ derive genuinely dependent visible B
+→ prepare/attempt B; fake only native creation response as provisional
+→ public reconcile persists that original response
+→ executor’s pinned public start establishes identity and branch
+→ replay the original reconciliation later
+→ B commits; receipt, integration, and verification
+→ status/closeout resolves identity after that Git advance
+→ owning-host closeout with typed fake host results
+→ correct run/report/acceptance and real local locator retirement
+→ useful successor operation
+```
+
+Assert one logical member per launch, unchanged original creation evidence/times, real identity from start, and preservation of A and B.
+
+**For executor B**, count one creation, one branch activation, and one archive action, with no repeats during retries. Account for coordinator/successor actions separately. Premature coordinator cleanup must remain blocked; unknown or contradictory identity authorizes zero archive/removal calls.
+
+Use narrow variants for distinct risks instead of repeating the whole journey:
+
+| Variant                                                                          | Decisive assertion                                                         |
+| -------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| Start-first, including late opaque evidence                                      | No second member, host downgrade, or lost ready identity                   |
+| Interruption after completed start, before projection write                      | Ordinary convergence; zero repeated creation/activation                    |
+| Reconciliation after deadline and legitimate Git advance                         | Authenticated identity remains resolvable without resetting work           |
+| Wrong task/nonce/host/selector/reference; stale provisional snapshot after ready | Conflict blocks before effects; stale data cannot downgrade state          |
+| Duplicate legacy references, pending archive, cancellation/refresh boundary      | No guessed winner, lost obligation, rewritten attempt, or false completion |
+
+Use explicit clock seams or synchronization barriers where needed—not arbitrary sleeps. **These are proposed tests; none was executed in this review.**
+
+### Two lean release checks
+
+**First: an ordering-aware local command gate.** Run the generated coordinator handoff and public launch chain through provisional-first and start-first cases, with at least the known failing ordering reaching cleanup. Rehearse actual request shapes, not hand-assembled intermediate records. Existing focused tests cover the other negative/recovery cases.
+
+**Second: one scoped installed canary after the source gate passes.** Use the generated brief containing its preparation ID, record the actual App ordering, and complete delivery through cleanup and useful successor work.
+
+Do not manufacture a provisional result if the App returns ready. State which ordering was observed live and which is supported by automated evidence. A changed candidate needs its own immutable artifact identity, not silently replaced RC3 bytes.
+
+**Neither gate should introduce a manual ready-confirmation step.** That would hide the defect rather than verify the intended workflow.
+
+## 7. Compatibility and the failed canary
+
+**Existing persisted members require an explicit reader policy, not necessarily a migration.** Their IDs were derived from historical launch-view digests. Changing that calculation can invalidate identity or create a second member.
+
+Prefer preserving existing member IDs, original digest provenance, timestamps, and archive progress while resolving logical membership through the stable launch reference. New members use the stable identity contract.
+
+Do not require an old view digest to equal the current launch digest: they describe different bytes, and a digest alone cannot reconstruct the old snapshot.
+
+Any supported legacy reconciliation should authenticate the known record format, exact assignment/run/namespace/launch relationship, original provisional evidence where present, and completed start/Git binding. Require uniqueness by stable reference. Reject conflicting ready IDs, ownership, or archive evidence.
+
+Do not select the newest duplicate member or silently merge attempts. An identity-format change must be explicit—not a blanket bypass of member validation.
+
+The compatibility boundary should name the supported prior format/producers and an exit condition: remove active-normalization behavior when no supported nonterminal members of that format remain. Preserve historical evidence rather than rekeying every archived record. Missing required provenance must block—not trigger identity inference from title, recency, or a similar path.
+
+**This is separate from recovering today’s failed canary.** Your account says no archive call occurred and completed work remains retained. Preserve that evidence. A source correction does not authorize hot-switching a pinned run or editing its journals. Recovery requires a supported, explicitly authorized transition; test-repository disposal is neither proof of this correction nor a normal prescription for real projects. 
+
+## 8. Remaining uncertainties and decision criteria
+
+The live records, installed artifact equality, 219/219 result, and actual rehearsal remain reported evidence. Late-start and legacy-projection consequences are source-supported but unexecuted. I have not established that every cancellation/refresh path mishandles absent members; that is a targeted verification obligation.
+
+The cheapest decisive check is the **exact provisional-first public-command journey through cleanup**, plus an interruption between completed start and member publication. Add delayed reconciliation after real committed work to distinguish identity resolution from reactivation.
+
+**Proceed with the bounded simplification—not a broad redesign—when those checks pass with one authoritative live identity, no manual ready confirmation, no journal repair, and unchanged safety gates.** If consumers still need separate identity repairs afterward, consolidate them around the same resolver before another installation.
+
+The root correction is:
+
+> **One launch establishes executor identity. Iteration records track what must be cleaned up—not a competing version of who executed the work.**
