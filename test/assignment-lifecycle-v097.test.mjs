@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { basename, resolve } from "node:path";
 import test from "node:test";
@@ -24,6 +24,7 @@ import {
   validateAssignmentPreparation,
 } from "../lib/assignment-preparation.mjs";
 import { PACKAGE_VERSION, sha256, stableStringify } from "../lib/core.mjs";
+import { taskLaunchStatus } from "../lib/core/task-launch.mjs";
 import { deliverCallback, observeCallback } from "../lib/callbacks.mjs";
 import { finalizeTaskDisposition, prepareTaskDisposition } from "../lib/dispositions.mjs";
 import {
@@ -3234,6 +3235,166 @@ test("RC3 CLI closes an archived RC2 namespace through its persisted assignment 
   const closed = JSON.parse(result.stdout);
   assert.equal(closed.status, "phase-complete");
   assert.equal(Object.hasOwn(closed, "host_request"), false);
+  assert.equal(git(child.root, ["branch", "--list", child.context.executorBranch]), "");
+});
+
+test("next-namespace CLI closes a live RC3 assignment whose iteration member remains provisional", async (t) => {
+  const child = await acceptedChildFixture(t, "rc3-provisional-cross-version-cli", {
+    deliveryBranch: true,
+    stateNamespace: "v0.9.11-rc.3",
+    launchCreationOutcome: "provisional",
+    launchCreationBeforeStart: true,
+  });
+  const targetRoot = await mkdtemp(resolve(tmpdir(), "codex-flow-v0911-rc4-closeout-package-"));
+  t.after(() => rm(targetRoot, { recursive: true, force: true }));
+  for (const path of ["bin", "lib", "schemas", "skills", "templates", ".codex-plugin"]) {
+    await cp(resolve(packageRoot, path), resolve(targetRoot, path), { recursive: true });
+  }
+  await cp(resolve(packageRoot, "package.json"), resolve(targetRoot, "package.json"));
+  const targetVersion = "0.9.11-rc.4";
+  const packageMetadata = JSON.parse(await readFile(resolve(targetRoot, "package.json"), "utf8"));
+  packageMetadata.version = targetVersion;
+  await writeFile(
+    resolve(targetRoot, "package.json"),
+    `${JSON.stringify(packageMetadata, null, 2)}\n`,
+    "utf8",
+  );
+  const pluginPath = resolve(targetRoot, ".codex-plugin", "plugin.json");
+  const pluginMetadata = JSON.parse(await readFile(pluginPath, "utf8"));
+  pluginMetadata.version = targetVersion;
+  await writeFile(pluginPath, `${JSON.stringify(pluginMetadata, null, 2)}\n`, "utf8");
+  const corePath = resolve(targetRoot, "lib", "core.mjs");
+  const coreSource = await readFile(corePath, "utf8");
+  const targetCoreSource = coreSource.replace(
+    /export const PACKAGE_VERSION = "[^"]+";/,
+    `export const PACKAGE_VERSION = ${JSON.stringify(targetVersion)};`,
+  );
+  assert.notEqual(targetCoreSource, coreSource);
+  await writeFile(
+    corePath,
+    targetCoreSource,
+    "utf8",
+  );
+
+  assert.equal(child.assignment.execution_bindings.length, 1);
+  assert.equal(child.assignment.execution_bindings[0].namespace, "v0.9.11-rc.3");
+  assert.equal(child.context.launch.creation_evidence.classification, "provisional");
+  assert.equal(child.context.launch.start_claim.executor_thread_id, child.context.executorThreadId);
+
+  const iterationPath = resolve(
+    child.context.commonDir,
+    "codex-flow",
+    "iterations-v1",
+    "records",
+    `${child.assignment.iteration_id}.json`,
+  );
+  const iteration = JSON.parse(await readFile(iterationPath, "utf8"));
+  const memberIndex = iteration.members.findIndex((entry) => entry.role === "executor");
+  const memberBefore = iteration.members[memberIndex];
+  const predecessorAuthority = {
+    ...memberBefore.authority,
+    authority_digest: sha256(stableStringify(child.context.launch)),
+  };
+  const provisionalMember = {
+    ...memberBefore,
+    authority: predecessorAuthority,
+    member_id: `iteration-member-v1-${sha256(stableStringify({
+      role: memberBefore.role,
+      host_id: memberBefore.host_id,
+      authority: predecessorAuthority,
+    }))}`,
+    thread_id: null,
+    provisional_id: child.context.launch.creation_evidence.provisional_id,
+  };
+  iteration.members[memberIndex] = provisionalMember;
+  iteration.members.sort((left, right) => left.member_id.localeCompare(right.member_id));
+  iteration.record_digest = sha256(stableStringify({
+    assignment_id: iteration.assignment_id,
+    label: iteration.label,
+    members: iteration.members,
+    state: iteration.state,
+    created_at: iteration.created_at,
+    updated_at: iteration.updated_at,
+  }));
+  await writeFile(iterationPath, `${JSON.stringify(iteration, null, 2)}\n`, "utf8");
+
+  const sourceAssignmentBefore = await assignmentAuthority({
+    stateRoot: assignmentStateRoot(child.context.commonDir),
+    assignmentId: child.assignment.assignment_id,
+  });
+  const { run: sourceRunBefore } = await readRun({
+    gitCommonDirectory: child.context.commonDir,
+    runId: child.context.launch.run_id,
+  });
+  const sourceLaunchBefore = await taskLaunchStatus({
+    stateRoot: child.context.stateRoot,
+    launchId: child.context.launch.launch_id,
+  });
+  const recoveryNow = Date.now();
+  const requestPath = resolve(child.coordinatorPath, "rc4-closeout-request.json");
+  await writeFile(requestPath, `${JSON.stringify({
+    assignment_id: child.assignment.assignment_id,
+    phase: "coordinator",
+    task_observation: activeTaskObservation(child.context.executorThreadId, recoveryNow),
+  })}\n`, "utf8");
+  const targetCli = resolve(targetRoot, "bin", "codex-flow.mjs");
+  const prepared = assertPackageSuccess(invokePackage(targetCli, [
+    "assignment", "closeout",
+    "--assignment-id", child.assignment.assignment_id,
+    "--file", requestPath,
+    "--json",
+  ], child.coordinatorPath, {
+    CODEX_THREAD_ID: child.context.coordinator.thread_id,
+  }), "RC4 closeout of live RC3 provisional member");
+  assert.equal(prepared.status, "host-action-required");
+  const converged = prepared.iteration.members.find((entry) => entry.role === "executor");
+  assert.equal(converged.member_id, provisionalMember.member_id);
+  assert.equal(converged.authority.authority_digest, provisionalMember.authority.authority_digest);
+  assert.equal(converged.registered_at, provisionalMember.registered_at);
+  assert.equal(converged.thread_id, child.context.executorThreadId);
+  assert.equal(converged.provisional_id, null);
+  assert.equal(converged.archive_attempt.attempt_id, prepared.host_request.attempt_id);
+
+  await writeFile(requestPath, `${JSON.stringify({
+    assignment_id: child.assignment.assignment_id,
+    phase: "coordinator",
+    task_observation: archivedTaskObservation(child.context.executorThreadId, recoveryNow + 100),
+    host_result: hostResult(prepared.host_request, "accepted"),
+  })}\n`, "utf8");
+  const closed = assertPackageSuccess(invokePackage(targetCli, [
+    "assignment", "closeout",
+    "--assignment-id", child.assignment.assignment_id,
+    "--file", requestPath,
+    "--json",
+  ], child.coordinatorPath, {
+    CODEX_THREAD_ID: child.context.coordinator.thread_id,
+  }), "RC4 owning-host reconciliation of live RC3 executor");
+  assert.equal(closed.status, "phase-complete");
+  const archived = closed.iteration.members.find((entry) => entry.role === "executor");
+  assert.equal(archived.member_id, provisionalMember.member_id);
+  assert.equal(archived.authority.authority_digest, provisionalMember.authority.authority_digest);
+  assert.equal(archived.registered_at, provisionalMember.registered_at);
+  assert.equal(archived.thread_id, child.context.executorThreadId);
+  assert.equal(archived.provisional_id, null);
+  assert.equal(archived.state, "archived");
+
+  const sourceAssignmentAfter = await assignmentAuthority({
+    stateRoot: assignmentStateRoot(child.context.commonDir),
+    assignmentId: child.assignment.assignment_id,
+  });
+  const { run: sourceRunAfter } = await readRun({
+    gitCommonDirectory: child.context.commonDir,
+    runId: child.context.launch.run_id,
+  });
+  const sourceLaunchAfter = await taskLaunchStatus({
+    stateRoot: child.context.stateRoot,
+    launchId: child.context.launch.launch_id,
+  });
+  assert.deepEqual(sourceAssignmentAfter, sourceAssignmentBefore);
+  assert.deepEqual(sourceRunAfter, sourceRunBefore);
+  assert.deepEqual(sourceLaunchAfter.creation_evidence, sourceLaunchBefore.creation_evidence);
+  assert.deepEqual(sourceLaunchAfter.selector_evidence, sourceLaunchBefore.selector_evidence);
+  assert.deepEqual(sourceLaunchAfter.start_claim, sourceLaunchBefore.start_claim);
   assert.equal(git(child.root, ["branch", "--list", child.context.executorBranch]), "");
 });
 
