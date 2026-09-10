@@ -3,7 +3,7 @@
 This file records concise user-facing changes. Immutable tags and the linked
 decision records remain the detailed release evidence.
 
-## 0.9.12-rc.1 - 2026-09-10
+## 0.9.12 - 2026-09-10
 
 - Classify reclaimed modern predecessor runs from their exact run audit,
   retired assignment, accepted reporting, locator retirement, closed iteration,
