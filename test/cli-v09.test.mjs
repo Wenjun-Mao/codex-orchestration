@@ -220,6 +220,8 @@ test("v0.9 CLI activates a clean run through current launch-era wiring", async (
 
   const local = localTask();
   const task = { ...visibleTask(), dependencies: [local.task_id] };
+  const localAContent = "connected CLI local A\n";
+  const visibleBPrefix = "connected CLI visible B consumed:\n";
   const runId = "cli-v09-run";
   const coordinatorThreadId = "cli-v09-coordinator";
   const request = {
@@ -382,7 +384,7 @@ test("v0.9 CLI activates a clean run through current launch-era wiring", async (
   assertSuccess(localStarted, "connected CLI local A start");
   const localWork = JSON.parse(localStarted.stdout);
   await mkdir(resolve(root, "audit-sentinel"), { recursive: true });
-  await writeFile(resolve(root, local.write_paths[0]), "connected CLI local A\n", "utf8");
+  await writeFile(resolve(root, local.write_paths[0]), localAContent, "utf8");
   execFileSync("git", ["add", local.write_paths[0]], { cwd: root });
   execFileSync("git", ["commit", "--quiet", "-m", "test: connected CLI local A"], { cwd: root });
   const localCompletePath = resolve(requests, "workflow-local-complete.json");
@@ -532,7 +534,13 @@ test("v0.9 CLI activates a clean run through current launch-era wiring", async (
     "current",
   );
 
-  await writeFile(resolve(executorPath, task.write_paths[0]), "connected CLI visible B\n", "utf8");
+  const committedLocalA = await readFile(resolve(executorPath, local.write_paths[0]), "utf8");
+  assert.equal(committedLocalA, localAContent);
+  await writeFile(
+    resolve(executorPath, task.write_paths[0]),
+    `${visibleBPrefix}${committedLocalA}`,
+    "utf8",
+  );
   execFileSync("git", ["add", task.write_paths[0]], { cwd: executorPath });
   execFileSync("git", ["commit", "--quiet", "-m", "test: connected CLI visible B"], {
     cwd: executorPath,
@@ -915,7 +923,18 @@ test("v0.9 CLI activates a clean run through current launch-era wiring", async (
   await writeFile(successorCompletePath, `${JSON.stringify({
     run_id: successorRunId,
     local_work_id: successorWork.local_work_id,
-    checks: [{ check_id: "successor-useful-work", argv: [process.execPath, "-e", "process.exit(0)"] }],
+    checks: [{
+      check_id: "successor-preserved-a-b-relationship",
+      argv: [
+        process.execPath,
+        "-e",
+        "const fs=require('node:fs');const a=fs.readFileSync(process.argv[1],'utf8');const b=fs.readFileSync(process.argv[2],'utf8');if(a!==process.argv[3]||b!==process.argv[4]+a)process.exit(1)",
+        local.write_paths[0],
+        task.write_paths[0],
+        localAContent,
+        visibleBPrefix,
+      ],
+    }],
   })}\n`, "utf8");
   const successorCompletedCall = spawnSync(process.execPath, [
     successorRuntimeCli,
