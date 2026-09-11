@@ -3,7 +3,7 @@
 This file records concise user-facing changes. Immutable tags and the linked
 decision records remain the detailed release evidence.
 
-## 0.9.13-dev.0 - Unreleased
+## 0.9.13-rc.1 - Unreleased
 
 - Derive accepted abandoned-run settlement from existing terminal operations,
   cleanup, archived iteration, reporting, and preservation authorities without
@@ -14,6 +14,8 @@ decision records remain the detailed release evidence.
 - Enforce coordinator committed write scope at completion and run audit across
   the run envelope, task authority, reverted commits, exact integrations, path
   boundaries, and post-check Git resnapshotting.
+- Require an owner to collect native-subagent results before returning idle;
+  continuing unattended work uses a visible task with authenticated reporting.
 
 ## 0.9.12 - 2026-09-10
 
