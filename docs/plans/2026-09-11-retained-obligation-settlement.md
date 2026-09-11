@@ -257,3 +257,11 @@ with `branch_fences: []`, then pass normal audit, close, reporting, acceptance,
 archive and reclamation. Its evidence complements the preserved live settlement
 and overlapping-admission records; it is not an uninterrupted second
 producer-to-successor journey.
+
+The supplementary coordinator also manually invoked the report hook once with
+a synthetic turn ID while still active. Preserve that record as negative
+provenance only: it is not native-final or idle evidence and must not authorize
+acceptance. The actual final was subsequently captured under its real native
+turn identity and accepted only after independent idle verification. Follow up
+through concise operator guidance; do not expand this release with a new report
+transport or runtime change.

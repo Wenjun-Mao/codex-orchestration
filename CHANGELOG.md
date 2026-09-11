@@ -3,7 +3,7 @@
 This file records concise user-facing changes. Immutable tags and the linked
 decision records remain the detailed release evidence.
 
-## 0.9.13-rc.1 - Unreleased
+## 0.9.13 - 2026-09-11
 
 - Derive accepted abandoned-run settlement from existing terminal operations,
   cleanup, archived iteration, reporting, and preservation authorities without
