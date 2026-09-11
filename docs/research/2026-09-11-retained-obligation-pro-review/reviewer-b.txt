@@ -1,0 +1,359 @@
+# Reviewer B assessment
+
+## 1. Verdict: **targeted amendments required**
+
+The draft’s central direction is sound, but it is not yet precise enough to approve as a complete correction.
+
+**Incident 1 exposes a missing ordinary settlement/recognition path for the reported accepted-assignment, abandoned-execution state.** The existing cancellation, refresh, and resource-absence mechanisms are not a complete alternative for that state. However, the missing contract does **not** establish that a new settlement journal, persisted flag, or lifecycle is necessary.
+
+**Incident 2 exposes a separate validation gap in the inspected coordinator path.** Coordinator completion authenticates records, Git identity, ancestry, and passing supplied checks; closure audit authenticates the resulting terminal Git fact. Those checks do not establish that the coordinator’s committed changes respected its task write set and admitted run envelope. The pilot observation is consistent with that source behavior, although I did not reproduce the Plotloom run.
+
+My recommendation is a **derivation-first settlement correction**, plus an **explicitly approved, separately bounded write-scope companion correction**. Resource settlement must remain possible for unsuccessful or noncompliant work; it must never convert that work into a compliant execution.
+
+### Revision and review limits
+
+I inspected repository files at:
+
+`634e86c0863359e94a63d8f15dc97905a079d57a`
+
+Authoritative source reads were pinned to that revision. I inspected the draft, both research documents, the principal implementation paths and relevant helpers, the assignment schema, director skill, and selected tests. **No plugin tests or public-CLI reproductions were executed.** The GitHub connector provided source access, but a local repository checkout was unavailable. I did not inspect either pilot repository’s raw journals or Git objects.
+
+The supplied packet explicitly distinguishes reported pilot observations from independently reproduced evidence; I maintain that distinction here.  
+
+---
+
+## 2. Evidence classification and source findings
+
+### Evidence classification
+
+| Classification                      | Assessment                                                                                                                                                                                                                                                                                                                                                                                               |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Source-confirmed**                | Existing retirement reconciliation skips recorded retirements; ordinary acceptance blocks on retained obligations; the permitted retirement update is refresh-specific; native and public-CLI admission independently inspect original abandoned fences; reclaimed-history classification requires closed executions; coordinator completion/audit lacks the committed-path enforcement described below. |
+| **Reported observations**           | The codex_usage assignment/run/member states and subsequent zero-cleanup assessment; the Plotloom baseline, adding commit, candidate, admitted paths, and successful audit output. Even observations described as another director’s direct inspection remain reported evidence to this reviewer.                                                                                                        |
+| **Supported inference**             | Sticky interpretation of the original retained disposition explains the Incident 1 dead end. Missing actual-write validation explains how the Incident 2 audit can pass. Neither inference proves that the pilots currently satisfy every recovery prerequisite.                                                                                                                                         |
+| **Unresolved before live recovery** | Exact obligation coverage, current preservation and ownership facts, and the Plotloom adding commit’s relationship to both the runtime baseline and the local-work baseline. These affect recovery disposition, not whether the identified source contracts need correction.                                                                                                                             |
+
+### Finding A — Acceptance is already separate from cleanup, but retirement interpretation remains sticky
+
+`acceptAssignmentResult` records the director’s acceptance **before** checking execution-terminal eligibility and retained obligations. Thus an assignment can truthfully be `accepted` while coordinator closeout remains blocked.
+
+`reconcileTerminalExecutionEvidence` immediately skips an execution that already has a retirement record. For newly observed terminal executions, it records closed executions as `released` and abandoned executions as `retained`.
+
+`executionRetirement` allows `released` only for a closed execution. `recordAssignmentExecutionRetirement` permits the special transition to `refresh-retired`, but no ordinary post-abandonment settlement transition. These are mutually reinforcing constraints, not merely an incorrect acceptance error message.
+
+**Challenge to the hypothesis:** “Execution outcome and settlement are coupled” is directionally correct, but too broad. The more precise defect is:
+
+> An immutable, conservative observation made at abandonment is subsequently treated as the current answer to whether obligations remain, without an ordinary mechanism for evaluating later resolution evidence.
+
+That formulation leaves room for deriving the current answer from existing authorities instead of introducing another stored state.
+
+### Finding B — Existing alternatives are incomplete for the reported state
+
+The relevant alternatives fail for different reasons:
+
+* **Cancellation** preserves the coordinator and Git ownership. It changes assignment/reporting disposition; it does not provide the requested accepted-result → reclamation → successor path.
+* **Refresh** has a retirement mechanism, but `bindAssignmentRefreshExecution` requires an **open** assignment. It is not a general escape hatch for an already accepted assignment.
+* **Resource-absence recovery** is behind the retained-obligation gate in acceptance. It also requires exact result authority; disappearance alone is insufficient.
+* **Coordinator-side `assignment closeout`** invokes the existing driver with `allowCoordinator: false`. It handles children, not a public bypass around director-owned coordinator cleanup.
+
+Consequently, I found **no complete lawful public recovery path for the exact accepted-plus-retained state described**, within the supplied constraints. A route that only cancels records, removes resources, or permits nonoverlapping work would not be complete.
+
+### Finding C — An acceptance-only fix would leave at least two admission barriers
+
+`abandonRun` stores the **entire admitted plan** in `terminal.unresolved_fences`.
+
+There are then two separate same-namespace checks:
+
+1. `commandRunV09` performs a public-CLI precheck over abandoned runs’ original fences.
+2. `retainedFenceConflicts`, called by native admission, independently performs the same kind of check.
+
+Neither consumes a later effective-settlement interpretation. Fixing acceptance and cross-version historical classification while leaving these checks unchanged would allow cleanup yet still reject a useful overlapping successor produced under the corrected release itself.
+
+This is a required amendment, not an optional follow-up.
+
+### Finding D — Reclaimed abandoned history needs a different evidence path, not a forged closure audit
+
+`classifyV09HistoricalPredecessor` rejects unresolved original fences and then rejects an absent-checkout execution unless it is `closed`.
+
+Its successful path subsequently requires matching closed-run audit evidence and a retired assignment with a released runtime retirement. The same closed-versus-abandoned distinction also appears in sibling-source safety checks.
+
+Therefore, merely teaching one reader that “retained is now settled” is insufficient. **An abandoned-but-obligation-settled execution must not be forced through `assertReclaimedClosedRunSettled`.** That would demand evidence of successful closure that this execution must never claim.
+
+### Finding E — The coordinator helper chain does not supply the missing path check
+
+The inspected path is:
+
+`commandWorkflowLocalV097`
+→ `completeCoordinatorWork`
+→ persisted task/claim and repository authority checks
+→ passing supplied checks and completed record
+→ `transitionWorkflowOperationClaim`
+→ closure audit.
+
+The workflow helpers verify contract identity, operation identity, baseline identity, and that the **declared workflow** remains inside the admitted envelope. The audit’s coordinator branch checks completed operation/claim states. `deriveRepositoryEvidence` then derives the expected HEAD from authenticated terminal records, and `inspectLiveRepository` checks identity, equality and cleanliness.
+
+That is substantial integrity checking, but not a comparison of actual committed paths against the task and run authorities. `closeRunFromAudit` reruns this audit; revalidation does not add coverage absent from the audit itself.
+
+---
+
+## 3. Smallest complete settlement solution
+
+### 3.1 Prefer derived effective obligations over another stored lifecycle
+
+The existing resource contract is particularly important here. `shared_resources` are exclusive reservations within one Git common directory, with ordering supplied by the task DAG and durable terminal authorities. They are **not a TTL lease system or a global external-resource service**. ADR 0017 explicitly rejected adding a duplicate lease lifecycle and deliberately retained the whole envelope pending a reviewed release mechanism.
+
+I would implement the following contract:
+
+> Preserve terminal outcome and original retirement evidence. Derive an execution’s effective outstanding obligations by joining its exact admitted reservations with the existing owners’ durable resolution evidence and current ownership/preservation checks.
+
+The assignment lifecycle is the appropriate **composition and authorization owner**. Native task, integration, archive, iteration, reporting and Git validators should continue owning their respective facts. Do not move all their validation into an enlarged iteration registry or a second audit engine.
+
+For obligations completely expressible by existing records, the smallest representation is:
+
+**existing terminal record + existing resolution authorities + invocation-local derived proof.**
+
+An explicit assignment lifecycle action can consume that proof; read-only inspection can expose it without mutating anything. Prefer reusing acceptance/reconciliation and admission boundaries rather than requiring a new command for every incident.
+
+A new durable disposition is justified **only when a required owner decision cannot be represented by existing authorities**. Identify that missing fact first. If needed, attach one exact, immutable disposition to the existing assignment/execution owner—not a global settlement registry, mutable `settled=true`, or per-fence state machine.
+
+This also avoids a compatibility trap: both the assignment schema and runtime validator reject unknown fields. Adding an “optional” settlement property is not automatically safe for frozen old readers.
+
+### 3.2 Define proof requirements by obligation type
+
+The draft should contain a normative table along these lines:
+
+| Obligation                                    | Minimum sufficient evidence                                                                                                                                                                                                                                                                                                                                                                |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Execution identity and terminal authority** | Exact assignment binding, namespace, run, runtime/configuration/repository identity, admitted workflow and immutable terminal record. Abandonment remains abandonment.                                                                                                                                                                                                                     |
+| **Native work that could still act**          | Reconcile authoritative launches, operations and claims—not only the currently projected iteration members. No live, ambiguous or unaccounted native operation may retain the target authority. An executor claim’s literal `started` state must be interpreted through its actual terminal disposition/archive chain, not mistaken for either automatic liveness or automatic completion. |
+| **Executor result and Git obligations**       | Exact disposition/integration/archive joins, result preservation under the existing named-owner rules, and current worktree/branch disposition. Preserve existing authenticated patch-equivalent handling; do not replace it with a blanket ancestry-only requirement.                                                                                                                     |
+| **Unused branch reservations**                | Exact reservation identity, proof that no bound or partially prepared operation owns it, and current Git inventory/ref checks. A missing ref alone does not prove that previously owned work was safely disposed.                                                                                                                                                                          |
+| **Path reservations**                         | Coverage of every reservation and every owning task/operation across relevant revisions. The obligation is authority to write, not removal of the project files. Settling one execution must not erase another owner’s overlapping authority.                                                                                                                                              |
+| **Shared-resource reservations**              | Resolve the owning task claims and native work using the repository-local resource contract. No timeout-based expiry and no inference from the number of Git cleanup candidates.                                                                                                                                                                                                           |
+| **Coordinator/result preservation**           | Keep the coordinator checkout and branch as separately owned resources until normal closeout. Authenticate the exact result tip through existing capture/result authority and prove preservation. An accepted report’s text digest is not itself a Git-tip proof.                                                                                                                          |
+| **Outer reporting lifecycle**                 | Acceptance, iteration completion, route closure and locator retirement are required at their own stages. They must not all be prerequisites for settling an earlier execution inside a still-open assignment.                                                                                                                                                                              |
+
+Existing code already provides important preservation machinery: named executor-result owners, authenticated coordinator capture, primary-worktree checks, exact ownership checks, and bounded absence recovery. Reuse those rather than substituting “clean checkout” or a director-selected ancestor. If neither an authenticated capture nor a uniquely bound result exists after resource loss, remain blocked.
+
+**Important shared-ownership distinction:** releasing *this execution’s* claim does not mean the resource is globally free. Another legitimate owner must remain effective. Ambiguous ownership blocks destructive action; a successor must independently satisfy the remaining conflict checks.
+
+### 3.3 Use consistent proof, but retain stage-specific prerequisites
+
+A shared interpretation should support three different questions:
+
+| Question                                               | Additional requirements                                                                                                                                                     |
+| ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Are this terminal execution’s obligations settled?** | Exact terminal identity and complete obligation resolution. Successful execution and final assignment acceptance are not inherently required.                               |
+| **May the coordinator be reclaimed?**                  | Accepted assignment result, settled bound executions, child-first closeout, current owning-host evidence, exact disposable-resource ownership and preservation.             |
+| **May a fresh successor use reclaimed history?**       | The appropriate outer assignment/iteration/route/locator completion, preservation from an authenticated surviving checkout, and absence of conflicting effective ownership. |
+
+Do not replace these with one universal “settled” boolean.
+
+For Incident 1, the connected path should be:
+
+> abandoned execution, original retained evidence preserved
+> → complete obligation resolution authenticated
+> → ordinary director acceptance retry continues closeout
+> → owning-host coordinator archive/reclamation
+> → iteration completion
+> → route and locator retirement
+> → assignment retirement
+> → useful overlapping successor admission.
+
+The existing acceptance function already orders final closeout, route closure, locator retirement and assignment retirement. Preserve that machinery and test its interruption boundaries.
+
+For a future **mid-assignment planning omission**, requiring acceptance of the entire assignment before settling the abandoned execution would be circular: the corrected successor may be needed to finish delivery. An earlier execution can be settled while the assignment remains open and its coordinator/reporting route remains live.
+
+The replacement must nevertheless acquire a **new immutable execution envelope and an exact assignment binding**. Do not assume ordinary activation already does this: the inspected explicit replacement-binding machinery is refresh-specific. Reuse/generalize its existing binding and locking contract where appropriate; do not reopen an accepted assignment or use cancellation as an implicit replan command. If ordinary open-assignment replacement is excluded from this patch, state that limitation explicitly instead of claiming the patch resolves all ordinary mid-assignment planning mistakes.
+
+### 3.4 Preserve the read-side historical design
+
+After legitimate reclamation, authenticate history through the surviving common directory, immutable runtime/bundle records, exact owner records, and current preservation facts. Do not execute an old exporter with the deleted checkout as `cwd`, recreate that checkout, or reinterpret primary as the old execution root.
+
+Keep the v0.9.12 distinction between an earlier settled execution in an **open assignment** and fully retired outer history. Also preserve the existing rule that independently authenticated audit and archive tips may both be preserved in primary without imposing an unnecessary ancestry relationship between those two tips.
+
+### 3.5 Make the transaction boundaries explicit
+
+The shared evaluator must be used by acceptance, native admission, the CLI precheck, historical classification and sibling-source checks.
+
+Admission must repeat the relevant checks **under the repository admission lock and before target runtime/workflow preparation**. Assignment binding and cancellation must retain their existing serialization relationship. Git-resource decisions must reuse the ownership locks and revalidate mutable facts at the destructive boundary.
+
+A Flow process lock is not a global lock against arbitrary external Git writers. Preserve the existing defensive rechecks rather than claiming otherwise. For retries, distinguish durable native outcomes from current permission to delete: a previously accepted archive action does not alone authorize deletion after resources or ownership have changed.
+
+---
+
+## 4. Incident 2: relation, separation, and correct validation basis
+
+### Decision: a bounded companion correction
+
+Write-scope enforcement should be a **separately bounded companion correction**, explicitly added to the approved scope.
+
+It is a prerequisite for treating coordinator completion/closure as evidence of write-scope compliance. It is **not** a prerequisite for safely retiring resources belonging to failed or noncompliant work.
+
+This distinction matters because a coordinator-work record may still identify an exact result commit even when its `PASS` does not establish scope compliance. Incident 2 weakens the latter assertion; it does not automatically invalidate every identity or preservation fact in that record.
+
+Conversely, resource settlement cannot erase the violation, widen the original envelope, or certify the old execution as compliant. The addendum does not itself authorize that expansion of implementation scope.
+
+### Where the check belongs
+
+Use one committed-scope validation implementation with two consumers:
+
+**Coordinator completion:** reject invalid local completion before publishing the completed result/claim.
+
+**Closure audit and close-time revalidation:** validate the complete run result and historical coordinator records, including records produced before the new completion guard existed.
+
+A completion-only fix is insufficient. `workflow local start` adopts the current clean HEAD as the task baseline. Therefore, an unauthorized commit made **after run activation but before local-work start** can otherwise be inherited by a later “no-change” completion.
+
+### Correct comparison basis
+
+There are two authoritative baselines, serving different purposes:
+
+**Run baseline:** the repository revision in the immutable admitted runtime.
+
+**Task baseline:** the persisted generated contract/local-work baseline.
+
+Use the exact authenticated final result, not an arbitrary current branch name or a caller-selected comparison base.
+
+The run-level check must cover changes introduced since admission against the **run envelope**. The task-level check must cover coordinator-owned changes against the **task write set**. Neither check subsumes the other.
+
+In particular:
+
+* A path allowed by the run but excluded from the coordinator task is still a task-scope violation.
+* A commit predating run activation is not a new write by that run.
+* A commit made during the run does not become authorized merely because a later task adopts it as baseline.
+* Commits between recorded work intervals require authority coverage; “some later verified tip contains them” is not enough.
+
+### Legitimate child integrations
+
+Do not compare every change between a coordinator task’s baseline and final tip solely against that coordinator task’s write paths. Authenticated child integrations can legitimately introduce changes under different task authorities.
+
+But do not subtract a union of child filenames either. That would exempt later unauthorized coordinator edits to the same files.
+
+Reuse exact integration provenance, target/baseline/result identities and child contract validation. Distinguish the authenticated integrated change from additional coordinator changes, including conflict-resolution edits. If existing evidence cannot distinguish attribution in an overlapping case, fail closed with a precise diagnostic; do not invent attribution from commit author names.
+
+### Renames, deletions, and intermediate violations
+
+The proposed contract should explicitly cover both sides of a rename, deleted paths, and other committed path changes. Path matching must respect directory boundaries and unambiguous filename handling.
+
+For reachable committed history, I recommend:
+
+> A committed out-of-scope write is not made compliant by a later revert that restores the final tree.
+
+A final-tree-only comparison can establish a weaker deliverable-difference property, but cannot support “the execution stayed within its committed write authority.” The plan must choose and name the promised property.
+
+This remains a bounded Git-evidence check. It must not claim to detect every transient uncommitted write or discarded/unreachable commit; that would require a different enforcement contract.
+
+### Verification freshness
+
+`completeCoordinatorWork` captures its snapshot before running supplied checks and uses that snapshot in the completed result. Include a test where a successful check changes Git state.
+
+The new completion guard should require the verified repository/result identity to remain current before durable completion. The existing closure audit catches ordinary later HEAD drift, so this observation is **not** evidence that every such mutation bypasses closure; it is a reason not to stamp new scope evidence over a stale snapshot.
+
+---
+
+## 5. Smallest decisive test matrix
+
+**These are proposed tests, not executed results.** Use real Git repositories and public commands for the connected acceptance tests. Direct helper tests are useful supplements, not replacements.
+
+| Test                                            | Decisive case and required control                                                                                                                                                                                                                                                                                                                                                                          |
+| ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **T1 — Minimal coordinator scope reproduction** | Activate a run, start local work, commit a path outside both declared authorities, run a genuinely successful check, and invoke public completion/audit. The corrected completion must reject it. A frozen v0.9.12 producer’s completed record must not bypass the new audit-side check. An otherwise identical in-scope commit must pass.                                                                  |
+| **T2 — Baseline and history coverage**          | Test out-of-scope writes before local start, between local operations, and add-then-revert before final completion. Test a path allowed by the run but not the task, plus rename/deletion cases. Control: the same file inherited before run activation must not be attributed to this run.                                                                                                                 |
+| **T3 — Child attribution**                      | Integrate a properly authenticated child change outside the coordinator task’s paths but inside the run envelope; it must pass. The same change without integration authority must fail. An additional coordinator edit to that child-owned file must not be exempted. Preserve valid patch-equivalent controls.                                                                                            |
+| **T4 — Incident 1 end to end**                  | Produce a real abandoned/retained execution with resolved child work, an accepted report and a live coordinator. Demonstrate the existing block, authenticate settlement, continue ordinary host closeout, reclaim the exact coordinator resources, retire route/locator/assignment, and retain original terminal/runtime evidence unchanged.                                                               |
+| **T5 — Useful overlapping successor**           | Under the **same corrected package identity**, perform a real successor write using previously retained path/resource authority—not merely activation or a read-only task. Complete and audit it. Also test frozen-v0.9.12 → candidate and candidate → later stable consumption with legitimately deleted predecessor checkouts. An unsettled predecessor must still block without recreating its checkout. |
+| **T6 — Missing and conflicting evidence**       | Individually introduce an orphan launch, ambiguous native outcome, wrong runtime/binding, missing result object, contradictory retirement, shared worktree or remaining competing resource owner. Require precise refusal and no destructive mutation. A valid unrelated owner must not have its authority erased when the target execution settles.                                                        |
+| **T7 — Mutation and concurrency**               | Recreate a ref/worktree, rewind preservation, or change target Git identity between observation and consumption. Race settlement/admission and cancellation/replacement binding. Test two identical settlement attempts. Require coherent replay and no target preparation on a refused admission.                                                                                                          |
+| **T8 — Interrupted closeout**                   | Interrupt after settlement evidence, after host-action acceptance, after worktree removal, after branch removal, after iteration closure, and around route/locator/assignment retirement. Retry through public commands. No blind host-action replay, lost obligation, fabricated success, or manual journal repair.                                                                                        |
+
+Three existing-test observations should shape these additions:
+
+**First**, the connected test in `test/cli-v09.test.mjs` performs meaningful successor verification, but its successor has `write_paths: []` and `shared_resources: []`. It does not establish release of overlapping abandoned authority. Preserve it as a control and add the write-bearing case.
+
+**Second**, the coordinator test suite already exercises ordinary mutation/no-change, post-completion drift, and divergent terminal facts. Its divergence fixture writes files outside the declared local-output paths. With scope enforcement added, amend those fixture authorities/paths so the test continues reaching the divergence check—do not weaken the new validator merely to preserve the fixture.
+
+**Third**, existing closeout tests cover preservation owners, patch-equivalence and stale host observations. Retain those controls. A settlement patch that makes the new happy path pass by bypassing these protections is a regression.
+
+The draft’s requirement for an actual owning-host segment before stable release should remain. Synthetic archive observations cannot certify that segment.
+
+---
+
+## 6. Exact plan amendments
+
+### A. Tighten the diagnosis
+
+Replace the broad hypothesis with the more specific contract defect:
+
+> Original abandoned-retirement evidence is conservatively retained, but ordinary consumers lack a shared way to authenticate subsequent resolution and distinguish recorded retirement disposition from effective outstanding obligations.
+
+State that this does **not** predetermine a new durable settlement record.
+
+### B. Add a derivation-first representation requirement
+
+Add to the proposed contract:
+
+> Reuse existing durable authorities wherever they completely express resolution. Do not persist a duplicate global settlement flag. Any new disposition must identify a specific required fact absent from existing owners, be immutable and exactly execution-bound, and pass frozen-reader compatibility tests.
+
+Do not silently append fields to the shared v1 assignment record.
+
+### C. Name every affected consumer
+
+The implementation map must explicitly include:
+
+* Acceptance’s retained-obligation gate.
+* The public activation precheck in `commandRunV09`.
+* Native `retainedFenceConflicts` and retained-fence reporting semantics.
+* `terminalFencesRemain`, reclaimed-history classification and sibling-source safety.
+* Relevant iteration ownership/cleanup eligibility joins.
+* Existing route/locator retirement and final assignment-retirement ordering.
+
+Replace duplicated interpretation, not just duplicated error messages. Keep the lower-level admission guard; make it consume the same effective authority.
+
+### D. Separate stage proofs and remove circular prerequisites
+
+Add separate acceptance criteria for:
+
+**execution obligations settled**, **coordinator reclaimable**, and **reclaimed predecessor admissible**.
+
+Explicitly prohibit successful closure, final assignment acceptance, coordinator disappearance, and locator retirement from becoming universal prerequisites for execution settlement.
+
+Also specify whether ordinary open-assignment replacement is supported. If it is, require exact replacement binding under existing serialization. If it is not, narrow the advertised future-planning-error guarantee.
+
+### E. Add the write-scope companion only through explicit approval
+
+Give it a bounded scope:
+
+> Coordinator completion and audit-side committed-scope validation, including task/run baselines, authenticated child integrations, intervening commits, path operations and proof freshness.
+
+Keep separate the three issues:
+
+**planning omission**, **execution violation**, and **validation coverage**.
+
+Do not widen admitted authority retroactively, replace pinned runtimes, or classify settled resources as compliant work.
+
+### F. Make the proof sequence concrete
+
+The revised sequence should be:
+
+1. Establish the source-only failure cases and exact public-CLI reproductions with valid controls.
+2. Specify obligation coverage, proof composition, compatibility and lock ordering.
+3. Implement the shared settlement interpretation and approved scope companion.
+4. Run frozen-producer, same-package overlapping-successor, crash/retry and nonmutation tests.
+5. Execute the owning-host segment and normal release checks.
+6. Authorize pilot recovery separately.
+
+Escalate when a required fact cannot be represented by existing owner evidence, safe integration attribution cannot be derived, or ordinary replacement binding requires a material new contract. Do **not** escalate simply because an old record must truthfully remain blocked.
+
+**Do not add:** a daemon, TTL lease system, global settlement registry, per-incident recovery command, second full audit engine, automatic historical migration, or repository unplug as normal lifecycle repair.
+
+---
+
+## 7. Immediate implications for v0.9.12
+
+For **codex_usage**, retain the accepted decision, abandoned outcome and existing evidence. The reported zero-cleanup plan is not permission to remove the coordinator or release every reservation. Cancellation is not the requested recovery.
+
+For **Plotloom**, preserve the paused commit chain. Do not use the existing `terminal_ready=true` result as proof of write-scope compliance, and do not broaden the old envelope to make the ledger appear authorized.
+
+For other v0.9.12 work, this review does **not** establish that every normal successful lifecycle is broken. It does establish that coordinator completion and closure audit should not currently be treated as sufficient committed-write-scope attestation. Review actual changes against both the admitted run envelope and task authority before relying on that claim. The director skill already requires reviewing actual artifacts and verification against the approved plan; report delivery alone is not acceptance, and pending closeout is not completion.
+
+**Bottom line:** approve a correction that makes later obligation resolution consumable everywhere without rewriting execution history. Pair it with bounded actual-write validation, but keep the two judgments separate: **“safe to retire these resources” must never mean “this execution was compliant.”**

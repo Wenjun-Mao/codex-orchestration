@@ -1,0 +1,55 @@
+{
+  "scope": "Synthetic real-Git experiments only; no Codex Flow library or CLI was executed.",
+  "git_version": "git version 2.47.3",
+  "probes": [
+    {
+      "name": "committed addition then reversion",
+      "baseline": "973523457383dafe5d8078dd4af25e454abace49",
+      "adding_commit": "4bc4689c7e9afd6eb6524a70212717a020a2b348",
+      "final": "d7044ecbf44ade03525cf34b8f500d4ef9965711",
+      "endpoint_paths": [],
+      "per_commit_paths": [
+        {
+          "commit": "4bc4689c7e9afd6eb6524a70212717a020a2b348",
+          "changed_paths": [
+            "docs/verification/ledger.md"
+          ]
+        },
+        {
+          "commit": "d7044ecbf44ade03525cf34b8f500d4ef9965711",
+          "changed_paths": [
+            "docs/verification/ledger.md"
+          ]
+        }
+      ],
+      "control_passed": true
+    },
+    {
+      "name": "rename deletes outside path and adds inside path",
+      "baseline": "339ce112632c3c40cd019671b484b300ac9aa55b",
+      "final": "6d8de0215562f8b6d01b146c91da1c12c8aa4bd1",
+      "rename_detecting_name_only": [
+        "src/moved.txt"
+      ],
+      "no_rename_name_status": [
+        "D",
+        "docs/outside.txt",
+        "A",
+        "src/moved.txt"
+      ],
+      "control_passed": true
+    },
+    {
+      "name": "child path-name subtraction hides a later coordinator edit",
+      "baseline": "6d8de0215562f8b6d01b146c91da1c12c8aa4bd1",
+      "child_tip": "05c294ce4b0416e58efd3d06d642ec9e34132371",
+      "final": "90d0065e18b99ab4f88ff420fe7601e094d2b9a3",
+      "naive_residual_path_names": [],
+      "coordinator_transition_paths": [
+        "docs/child-result.md"
+      ],
+      "control_passed": true
+    }
+  ],
+  "assertions_passed": 3
+}
