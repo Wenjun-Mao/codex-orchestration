@@ -106,3 +106,28 @@ Plotloom's separate v0.9.8 wrong-runtime-root incident is out of scope. Broad
 permission to settle any abandoned run is not intended. If a narrow correction
 cannot safely recover persisted v0.9.12 state, explain the precise missing proof
 instead of recommending a permissive bypass.
+
+## Post-implementation RC1 live-gate observation
+
+The installed RC1 gate later produced a distinct operational failure after the
+retained producer had settled successfully. A detached, coordinator-only
+successor was activated with an operator-authored `main` branch fence despite
+having no executor launch. The useful write and coordinator committed-scope
+checks passed; cleanup and the run audit then refused normal closure because the
+unbound fence named the live branch attached to the primary checkout.
+
+The causal input error and product behavior must remain separate. The operator
+should have supplied an empty branch fence array. Downstream cleanup was safely
+conservative and no branch was changed. The admission layer nevertheless lacks
+a detached-primary prevention guard: comparing a proposed fence only with the
+coordinator's literal recorded branch cannot identify a protected primary branch
+when that coordinator is detached. This is a future guardrail correction, not
+evidence against retained settlement or committed-write-scope enforcement, and
+it does not authorize repairing immutable run state.
+
+For RC1 release evidence, the user approved one fresh isolated supplementary
+coordinator run with the same useful write and explicit `branch_fences: []`.
+That run may prove ordinary completion, audit, close, reporting and cleanup. It
+does not reproduce the earlier settled-predecessor admission, so final reporting
+must preserve the split-evidence boundary rather than claim one continuous
+journey.

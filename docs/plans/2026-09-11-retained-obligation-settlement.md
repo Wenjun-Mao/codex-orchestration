@@ -230,3 +230,30 @@ wake-up alternatives, new watchdog, or notification/lifecycle mechanism.
 - Prove derived assessment survives closeout without a supplemental receipt.
 - Establish exact integration attribution; stop on genuinely unavailable authority.
 - Verify frozen v0.9.12 and same-package overlapping successor paths separately.
+
+## RC1 live-gate split-evidence follow-up
+
+The first installed RC1 successor authenticated the retired v0.9.12 producer,
+admitted the same path/resource authority, committed the exact useful successor
+write, and passed coordinator completion. Its operator also supplied
+`branch_fences: ["main"]` even though the coordinator checkout was detached and
+the workflow contained no executor task. That unused reservation made the
+public audit fail solely with `unbound-branch-fence-live` against the protected
+primary checkout.
+
+This is first an operator construction error. Cleanup and audit behaved
+correctly by refusing to reinterpret, delete, or detach the live primary branch.
+It also exposes a bounded prevention gap: admission rejects a branch fence equal
+to the coordinator's recorded branch, but a detached coordinator records
+`detached`, so the same check does not reject a branch already attached to the
+authenticated primary checkout. Address that gap in a separately scoped future
+change with one focused admission regression; do not widen this RC or duplicate
+the committed-write-scope suite.
+
+The user approved split evidence for RC1. Preserve and truthfully abandon/cancel
+the failed run with its immutable fences. A fresh isolated supplementary run
+must repeat the same one-line useful write from an exact producer-line baseline
+with `branch_fences: []`, then pass normal audit, close, reporting, acceptance,
+archive and reclamation. Its evidence complements the preserved live settlement
+and overlapping-admission records; it is not an uninterrupted second
+producer-to-successor journey.
