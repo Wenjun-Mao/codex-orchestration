@@ -17,13 +17,17 @@
       "required": [
         "schema_version", "kind", "namespace", "run_id", "runtime_id",
         "runtime_context_digest", "workflow_plan_id", "workflow_revision_digest",
-        "closure_audit_id", "closure_audit_digest", "assignment_id",
-        "execution_binding_index", "report_id", "route_id", "iteration_id",
+        "assignment_id", "execution_binding_index", "report_id", "route_id", "iteration_id",
         "locator_retirement_id", "preserved_tip"
       ],
       "properties": {
         "schema_version": { "const": 1 },
-        "kind": { "const": "codex-flow-v0912-settled-predecessor" },
+        "kind": {
+          "enum": [
+            "codex-flow-v0912-settled-predecessor",
+            "codex-flow-v0913-retained-settled-predecessor"
+          ]
+        },
         "namespace": { "type": "string", "pattern": "^v0\\.9\\.[0-9]+(?:-(?:dev|rc)\\.[0-9]+)?$" },
         "run_id": { "$ref": "#/$defs/safeId" },
         "runtime_id": { "$ref": "#/$defs/digest" },
@@ -39,7 +43,13 @@
         "iteration_id": { "$ref": "#/$defs/safeId" },
         "locator_retirement_id": { "$ref": "#/$defs/safeId" },
         "preserved_tip": { "$ref": "#/$defs/revision" }
-      }
+      },
+      "allOf": [{
+        "if": {
+          "properties": { "kind": { "const": "codex-flow-v0912-settled-predecessor" } }
+        },
+        "then": { "required": ["closure_audit_id", "closure_audit_digest"] }
+      }]
     },
     "target": {
       "type": "object",

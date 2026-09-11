@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import test from "node:test";
 import { bindRecipient } from "../lib/recipients.mjs";
 import {
@@ -12,6 +12,7 @@ import {
 import { prepareTaskLaunch } from "../lib/core/task-launch.mjs";
 import { sha256 } from "../lib/core.mjs";
 import { auditRunClosure } from "../lib/run-audit.mjs";
+import { assertCommittedWriteScope } from "../lib/committed-write-scope.mjs";
 import { prepareSubagentOperation } from "../lib/subagent-operations.mjs";
 import {
   createWorkflowJournal,
@@ -27,6 +28,7 @@ function git(root, args) {
 
 async function commitSibling(root, baseline, name) {
   git(root, ["reset", "--hard", baseline]);
+  await mkdir(dirname(resolve(root, `${name}.txt`)), { recursive: true });
   await writeFile(resolve(root, `${name}.txt`), `${name}\n`, "utf8");
   git(root, ["add", `${name}.txt`]);
   git(root, ["commit", "--quiet", "-m", `test: ${name}`]);
@@ -137,6 +139,282 @@ test("coordinator-owned mutation closes through current audit without a fabricat
   assert.equal(audited.audit.counts.task_launches, 0);
 });
 
+test("coordinator completion rejects committed paths outside task and run authority", async (t) => {
+  const context = await fixture(t, "outside-authority");
+  const started = await startCoordinatorWork({
+    stateRoot: context.stateRoot,
+    taskContract: context.contract,
+    repositoryPath: context.root,
+  });
+  await writeFile(resolve(context.root, "outside-authority.txt"), "not admitted\n", "utf8");
+  git(context.root, ["add", "outside-authority.txt"]);
+  git(context.root, ["commit", "--quiet", "-m", "test: commit outside admitted authority"]);
+  await assert.rejects(
+    completeCoordinatorWork({
+      stateRoot: context.stateRoot,
+      localWorkId: started.local_work_id,
+      repositoryPath: context.root,
+      checks: [{ check_id: "passes", argv: [process.execPath, "-e", "process.exit(0)"] }],
+    }),
+    /committed write scope.*outside-authority\.txt/i,
+  );
+});
+
+test("coordinator completion rejects a committed add then revert outside authority", async (t) => {
+  const context = await fixture(t, "reverted-outside-authority");
+  const started = await startCoordinatorWork({
+    stateRoot: context.stateRoot,
+    taskContract: context.contract,
+    repositoryPath: context.root,
+  });
+  const path = resolve(context.root, "reverted-outside-authority.txt");
+  await writeFile(path, "temporarily committed\n", "utf8");
+  git(context.root, ["add", "reverted-outside-authority.txt"]);
+  git(context.root, ["commit", "--quiet", "-m", "test: add out-of-scope path"]);
+  await rm(path);
+  git(context.root, ["add", "-u", "--", "reverted-outside-authority.txt"]);
+  git(context.root, ["commit", "--quiet", "-m", "test: revert out-of-scope path"]);
+  await assert.rejects(
+    completeCoordinatorWork({
+      stateRoot: context.stateRoot,
+      localWorkId: started.local_work_id,
+      repositoryPath: context.root,
+      checks: [{ check_id: "passes", argv: [process.execPath, "-e", "process.exit(0)"] }],
+    }),
+    /committed write scope.*reverted-outside-authority\.txt/i,
+  );
+});
+
+test("committed scope rejects side-branch add, rename, and deletion hidden by a merge", async (t) => {
+  const root = await createGitFixture("codex-flow-committed-scope-side-branch-");
+  t.after(() => removeFixture(root));
+  const baseline = git(root, ["rev-parse", "HEAD"]);
+  git(root, ["checkout", "-q", "-b", "codex/scope-child"]);
+  await mkdir(resolve(root, "allowed"), { recursive: true });
+  await writeFile(resolve(root, "allowed/output.txt"), "child output\n", "utf8");
+  git(root, ["add", "allowed/output.txt"]);
+  git(root, ["commit", "--quiet", "-m", "test: allowed child output"]);
+  await writeFile(resolve(root, "outside-side-branch.txt"), "temporary\n", "utf8");
+  git(root, ["add", "outside-side-branch.txt"]);
+  git(root, ["commit", "--quiet", "-m", "test: add outside side branch"]);
+  git(root, ["mv", "outside-side-branch.txt", "outside-side-branch-renamed.txt"]);
+  git(root, ["commit", "--quiet", "-m", "test: rename outside side branch"]);
+  await rm(resolve(root, "outside-side-branch-renamed.txt"));
+  git(root, ["add", "-u", "--", "outside-side-branch-renamed.txt"]);
+  git(root, ["commit", "--quiet", "-m", "test: delete outside side branch"]);
+  const executorTip = git(root, ["rev-parse", "HEAD"]);
+  git(root, ["checkout", "-q", "main"]);
+  git(root, ["merge", "--no-ff", "--no-edit", "codex/scope-child"]);
+  const reconciledTip = git(root, ["rev-parse", "HEAD"]);
+  assert.throws(() => assertCommittedWriteScope({
+    repositoryPath: root,
+    admissionRevision: baseline,
+    finalRevision: reconciledTip,
+    runPathFences: ["allowed"],
+    coordinatorWorks: [],
+    integrations: [{
+      taskId: "side-branch-child",
+      prepared_main_tip: baseline,
+      executor_tip: executorTip,
+      reconciled_main_tip: reconciledTip,
+      outcome: "ancestor",
+      writePaths: ["allowed"],
+    }],
+  }), /outside-side-branch/);
+});
+
+test("committed scope does not credit a pre-preparation coordinator edit to a later matching child patch", async (t) => {
+  const root = await createGitFixture("codex-flow-committed-scope-patch-collision-");
+  t.after(() => removeFixture(root));
+  const baseline = git(root, ["rev-parse", "HEAD"]);
+  git(root, ["checkout", "-q", "-b", "codex/patch-child", baseline]);
+  await mkdir(resolve(root, "child-output"), { recursive: true });
+  await writeFile(resolve(root, "child-output/result.txt"), "same patch\n", "utf8");
+  git(root, ["add", "child-output/result.txt"]);
+  git(root, ["commit", "--quiet", "-m", "test: child patch"]);
+  const executorTip = git(root, ["rev-parse", "HEAD"]);
+  git(root, ["checkout", "-q", "main"]);
+  await mkdir(resolve(root, "child-output"), { recursive: true });
+  await writeFile(resolve(root, "child-output/result.txt"), "same patch\n", "utf8");
+  git(root, ["add", "child-output/result.txt"]);
+  git(root, ["commit", "--quiet", "-m", "test: unauthorized coordinator duplicate"]);
+  const coordinatorTip = git(root, ["rev-parse", "HEAD"]);
+  assert.throws(() => assertCommittedWriteScope({
+    repositoryPath: root,
+    admissionRevision: baseline,
+    finalRevision: coordinatorTip,
+    runPathFences: ["child-output", "coordinator-output"],
+    coordinatorWorks: [{
+      taskId: "coordinator-task",
+      baselineRevision: baseline,
+      finalRevision: coordinatorTip,
+      writePaths: ["coordinator-output"],
+    }],
+    integrations: [{
+      taskId: "later-child",
+      prepared_main_tip: coordinatorTip,
+      executor_tip: executorTip,
+      reconciled_main_tip: coordinatorTip,
+      outcome: "patch-equivalent",
+      writePaths: ["child-output"],
+    }],
+  }), /outside coordinator task coordinator-task/);
+});
+
+test("committed scope rejects a coordinator-owned patch duplicate after integration preparation", async (t) => {
+  const root = await createGitFixture("codex-flow-committed-scope-post-prepare-collision-");
+  t.after(() => removeFixture(root));
+  const baseline = git(root, ["rev-parse", "HEAD"]);
+  git(root, ["checkout", "-q", "-b", "codex/post-prepare-child", baseline]);
+  await mkdir(resolve(root, "child-output"), { recursive: true });
+  await writeFile(resolve(root, "child-output/result.txt"), "same post-prepare patch\n", "utf8");
+  git(root, ["add", "child-output/result.txt"]);
+  git(root, ["commit", "--quiet", "-m", "test: post-prepare child patch"]);
+  const executorTip = git(root, ["rev-parse", "HEAD"]);
+  git(root, ["checkout", "-q", "main"]);
+  const preparedMainTip = git(root, ["rev-parse", "HEAD"]);
+  await mkdir(resolve(root, "child-output"), { recursive: true });
+  await writeFile(resolve(root, "child-output/result.txt"), "same post-prepare patch\n", "utf8");
+  git(root, ["add", "child-output/result.txt"]);
+  git(root, ["commit", "--quiet", "-m", "test: coordinator duplicate after preparation"]);
+  const reconciledTip = git(root, ["rev-parse", "HEAD"]);
+  assert.throws(() => assertCommittedWriteScope({
+    repositoryPath: root,
+    admissionRevision: baseline,
+    finalRevision: reconciledTip,
+    runPathFences: ["child-output", "coordinator-output"],
+    coordinatorWorks: [{
+      taskId: "coordinator-task",
+      baselineRevision: baseline,
+      finalRevision: reconciledTip,
+      writePaths: ["coordinator-output"],
+    }],
+    integrations: [{
+      taskId: "child-task",
+      prepared_main_tip: preparedMainTip,
+      executor_tip: executorTip,
+      reconciled_main_tip: reconciledTip,
+      outcome: "patch-equivalent",
+      writePaths: ["child-output"],
+    }],
+  }), /ambiguous patch-equivalent coordinator attribution/);
+});
+
+test("coordinator completion rejects a path inside the run envelope but outside its task", async (t) => {
+  const owned = localTask("task-envelope");
+  const other = localTask("other-run-envelope");
+  const context = await fixture(t, "task-versus-run-envelope", { tasks: [owned, other] });
+  const started = await startCoordinatorWork({
+    stateRoot: context.stateRoot,
+    taskContract: context.contract,
+    repositoryPath: context.root,
+  });
+  await mkdir(resolve(context.root, "local-output"), { recursive: true });
+  await writeFile(resolve(context.root, other.write_paths[0]), "belongs to another task\n", "utf8");
+  git(context.root, ["add", other.write_paths[0]]);
+  git(context.root, ["commit", "--quiet", "-m", "test: mutate another task path"]);
+  await assert.rejects(
+    completeCoordinatorWork({
+      stateRoot: context.stateRoot,
+      localWorkId: started.local_work_id,
+      repositoryPath: context.root,
+      checks: [{ check_id: "passes", argv: [process.execPath, "-e", "process.exit(0)"] }],
+    }),
+    new RegExp(`outside coordinator task ${owned.task_id}.*${other.write_paths[0]}`, "i"),
+  );
+});
+
+test("coordinator completion resnapshots after checks that commit outside authority", async (t) => {
+  const context = await fixture(t, "check-mutates-git");
+  const started = await startCoordinatorWork({
+    stateRoot: context.stateRoot,
+    taskContract: context.contract,
+    repositoryPath: context.root,
+  });
+  const mutationScript = [
+    "const fs=require('node:fs');",
+    "const cp=require('node:child_process');",
+    "fs.writeFileSync('check-mutated.txt','committed by check\\n');",
+    "cp.execFileSync('git',['add','check-mutated.txt']);",
+    "cp.execFileSync('git',['commit','--quiet','-m','test: check mutation']);",
+  ].join("");
+  await assert.rejects(
+    completeCoordinatorWork({
+      stateRoot: context.stateRoot,
+      localWorkId: started.local_work_id,
+      repositoryPath: context.root,
+      checks: [{ check_id: "mutates-git", argv: [process.execPath, "-e", mutationScript] }],
+    }),
+    /committed write scope.*check-mutated\.txt/i,
+  );
+});
+
+test("coordinator committed scope uses path-component boundaries", async (t) => {
+  const owned = localTask("path-boundary", { write_paths: ["local-output/prefix"] });
+  const context = await fixture(t, "path-boundary", { tasks: [owned] });
+  const started = await startCoordinatorWork({
+    stateRoot: context.stateRoot,
+    taskContract: context.contract,
+    repositoryPath: context.root,
+  });
+  await mkdir(resolve(context.root, "local-output/prefix-sibling"), { recursive: true });
+  await writeFile(resolve(context.root, "local-output/prefix-sibling/value.txt"), "not owned\n", "utf8");
+  git(context.root, ["add", "local-output/prefix-sibling/value.txt"]);
+  git(context.root, ["commit", "--quiet", "-m", "test: path prefix collision"]);
+  await assert.rejects(
+    completeCoordinatorWork({
+      stateRoot: context.stateRoot,
+      localWorkId: started.local_work_id,
+      repositoryPath: context.root,
+      checks: [{ check_id: "passes", argv: [process.execPath, "-e", "process.exit(0)"] }],
+    }),
+    /prefix-sibling\/value\.txt/,
+  );
+});
+
+test("coordinator completion rejects an unattributed commit between local-work operations", async (t) => {
+  const firstTask = localTask("before-gap");
+  const secondTask = localTask("after-gap");
+  const context = await fixture(t, "between-local-operations", { tasks: [firstTask, secondTask] });
+  const firstStarted = await startCoordinatorWork({
+    stateRoot: context.stateRoot,
+    taskContract: context.contract,
+    repositoryPath: context.root,
+  });
+  await completeCoordinatorWork({
+    stateRoot: context.stateRoot,
+    localWorkId: firstStarted.local_work_id,
+    repositoryPath: context.root,
+    checks: [{ check_id: "first-passes", argv: [process.execPath, "-e", "process.exit(0)"] }],
+  });
+  await mkdir(resolve(context.root, "local-output"), { recursive: true });
+  await writeFile(resolve(context.root, secondTask.write_paths[0]), "between operations\n", "utf8");
+  git(context.root, ["add", secondTask.write_paths[0]]);
+  git(context.root, ["commit", "--quiet", "-m", "test: mutation before local-work start"]);
+  const secondContract = await persistWorkflowTaskContract({
+    stateRoot: context.stateRoot,
+    runId: context.runId,
+    planId: context.plan.plan_id,
+    taskId: secondTask.task_id,
+    currentBaseline: { revision: git(context.root, ["rev-parse", "HEAD"]) },
+    dependencyAuthorities: [],
+  });
+  const started = await startCoordinatorWork({
+    stateRoot: context.stateRoot,
+    taskContract: secondContract,
+    repositoryPath: context.root,
+  });
+  await assert.rejects(
+    completeCoordinatorWork({
+      stateRoot: context.stateRoot,
+      localWorkId: started.local_work_id,
+      repositoryPath: context.root,
+      checks: [{ check_id: "passes", argv: [process.execPath, "-e", "process.exit(0)"] }],
+    }),
+    /committed write scope violation \(unattributed transition\)/i,
+  );
+});
+
 test("coordinator-owned no-change requires real passing checks and preserves the baseline", async (t) => {
   const context = await fixture(t, "no-change");
   const started = await startCoordinatorWork({
@@ -209,8 +487,9 @@ test("run audit rejects divergent maximal coordinator terminal facts", async (t)
     taskContract: secondContract,
     repositoryPath: context.root,
   });
-  await writeFile(resolve(context.root, "first-divergent.txt"), "first\n", "utf8");
-  git(context.root, ["add", "first-divergent.txt"]);
+  await mkdir(resolve(context.root, "local-output"), { recursive: true });
+  await writeFile(resolve(context.root, firstTask.write_paths[0]), "first\n", "utf8");
+  git(context.root, ["add", firstTask.write_paths[0]]);
   git(context.root, ["commit", "--quiet", "-m", "test: first divergent result"]);
   await completeCoordinatorWork({
     stateRoot: context.stateRoot,
@@ -218,7 +497,7 @@ test("run audit rejects divergent maximal coordinator terminal facts", async (t)
     repositoryPath: context.root,
     checks: [{ check_id: "first-pass", argv: [process.execPath, "-e", "process.exit(0)"] }],
   });
-  await commitSibling(context.root, baseline, "second-divergent");
+  await commitSibling(context.root, baseline, "local-output/divergent-second");
   await completeCoordinatorWork({
     stateRoot: context.stateRoot,
     localWorkId: secondStart.local_work_id,
@@ -406,8 +685,9 @@ test("coordinator dependency admission rejects a sibling baseline that omits the
     taskContract: context.contract,
     repositoryPath: context.root,
   });
-  await writeFile(resolve(context.root, "source-mutation.txt"), "required\n", "utf8");
-  git(context.root, ["add", "source-mutation.txt"]);
+  await mkdir(resolve(context.root, "local-output"), { recursive: true });
+  await writeFile(resolve(context.root, context.contract.task.write_paths[0]), "required\n", "utf8");
+  git(context.root, ["add", context.contract.task.write_paths[0]]);
   git(context.root, ["commit", "--quiet", "-m", "test: required dependency mutation"]);
   const completed = await completeCoordinatorWork({
     stateRoot: context.stateRoot,
@@ -439,8 +719,9 @@ test("coordinator authority rejects a self-consistent terminal record with a sub
     taskContract: context.contract,
     repositoryPath: context.root,
   });
-  await writeFile(resolve(context.root, "substituted-baseline.txt"), "mutation\n", "utf8");
-  git(context.root, ["add", "substituted-baseline.txt"]);
+  await mkdir(resolve(context.root, "local-output"), { recursive: true });
+  await writeFile(resolve(context.root, context.contract.task.write_paths[0]), "mutation\n", "utf8");
+  git(context.root, ["add", context.contract.task.write_paths[0]]);
   git(context.root, ["commit", "--quiet", "-m", "test: substituted baseline mutation"]);
   const completed = await completeCoordinatorWork({
     stateRoot: context.stateRoot,
@@ -574,8 +855,9 @@ test("completion replay rejects a sibling checkout that omits the persisted muta
     taskContract: context.contract,
     repositoryPath: context.root,
   });
-  await writeFile(resolve(context.root, "persisted-mutation.txt"), "required\n", "utf8");
-  git(context.root, ["add", "persisted-mutation.txt"]);
+  await mkdir(resolve(context.root, "local-output"), { recursive: true });
+  await writeFile(resolve(context.root, context.contract.task.write_paths[0]), "required\n", "utf8");
+  git(context.root, ["add", context.contract.task.write_paths[0]]);
   git(context.root, ["commit", "--quiet", "-m", "test: persisted replay mutation"]);
   await assert.rejects(
     completeCoordinatorWork({

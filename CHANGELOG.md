@@ -3,6 +3,18 @@
 This file records concise user-facing changes. Immutable tags and the linked
 decision records remain the detailed release evidence.
 
+## 0.9.13-dev.0 - Unreleased
+
+- Derive accepted abandoned-run settlement from existing terminal operations,
+  cleanup, archived iteration, reporting, and preservation authorities without
+  rewriting the abandoned outcome or retained retirement observation.
+- Revalidate retained settlement for same-package and frozen v0.9.12 historical
+  admission, including a real overlapping successor write after coordinator
+  reclamation.
+- Enforce coordinator committed write scope at completion and run audit across
+  the run envelope, task authority, reverted commits, exact integrations, path
+  boundaries, and post-check Git resnapshotting.
+
 ## 0.9.12 - 2026-09-10
 
 - Classify reclaimed modern predecessor runs from their exact run audit,

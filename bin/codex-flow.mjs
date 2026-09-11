@@ -744,9 +744,10 @@ async function commandRunV09(args) {
         prepare: prepareTargetState,
         readExisting: readExistingTargetState,
         existingRun: existing,
-        admit: (repositoryLockToken) => admitRunWithRepositoryLockHeld({
+        admit: (repositoryLockToken, refreshAdmissionCapability) => admitRunWithRepositoryLockHeld({
           ...admissionRequest,
           repositoryLockToken,
+          refreshAdmissionCapability,
         }),
       });
     const freshActivation = refresh === null

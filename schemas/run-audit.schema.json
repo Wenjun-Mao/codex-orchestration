@@ -241,6 +241,7 @@
             "selector-replan-exhausted",
             "subagent-incomplete",
             "coordinator-work-incomplete",
+            "committed-write-scope",
             "callback-missing",
             "callback-unconsumed",
             "disposition-missing",

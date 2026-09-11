@@ -7,6 +7,7 @@ import test from "node:test";
 import { assignmentAuthority } from "../lib/assignment-authority.mjs";
 import { RUNTIME_DIRECTORY } from "../lib/runtime-context.mjs";
 import { iterationStatus } from "../lib/iteration-registry.mjs";
+import { auditRunClosure } from "../lib/run-audit.mjs";
 import { PACKAGE_VERSION, sha256 } from "../lib/core.mjs";
 import { captureStopReport } from "../lib/report-hook.mjs";
 import {
@@ -98,6 +99,314 @@ function nativeQueue() {
     sqlite_home: resolve(homedir(), ".codex"),
   };
 }
+
+async function frozenV0912Package(t) {
+  const root = await mkdtemp(resolve(tmpdir(), "codex-flow-v0912-package-"));
+  const archive = resolve(root, "source.tar");
+  execFileSync("git", ["archive", "--format=tar", `--output=${archive}`, "v0.9.12"], {
+    cwd: packageRoot,
+  });
+  execFileSync("tar", ["-xf", archive, "-C", root]);
+  await rm(archive);
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const metadata = JSON.parse(await readFile(resolve(root, "package.json"), "utf8"));
+  assert.equal(metadata.version, "0.9.12");
+  return { root, cli: resolve(root, "bin", "codex-flow.mjs") };
+}
+
+test("candidate CLI settles a frozen v0.9.12 abandoned producer and admits an overlapping write", async (t) => {
+  const frozen = await frozenV0912Package(t);
+  const primary = await createGitFixture("codex-flow-v0912-retained-producer-");
+  const root = resolve(primary, `../${basename(primary)}-coordinator`);
+  execFileSync("git", ["worktree", "add", "--quiet", "-b", "codex/frozen-v0912-retained", root], {
+    cwd: primary,
+  });
+  const requests = await mkdtemp(resolve(tmpdir(), "codex-flow-v0912-retained-requests-"));
+  t.after(async () => {
+    spawnSync("git", ["worktree", "remove", "--force", root], { cwd: primary });
+    await Promise.all([
+      removeFixture(primary),
+      rm(requests, { recursive: true, force: true }),
+    ]);
+  });
+  const commonDir = resolve(execFileSync("git", [
+    "rev-parse", "--path-format=absolute", "--git-common-dir",
+  ], { cwd: root, encoding: "utf8" }).trim());
+  const coordinatorGitDir = resolve(execFileSync("git", [
+    "rev-parse", "--path-format=absolute", "--git-dir",
+  ], { cwd: root, encoding: "utf8" }).trim());
+  const coordinatorThreadId = "frozen-v0912-retained-coordinator";
+  const directorThreadId = "frozen-v0912-retained-director";
+  await writeFile(resolve(coordinatorGitDir, "codex-thread.json"), `${JSON.stringify({
+    version: 1,
+    ownerThreadId: coordinatorThreadId,
+  })}\n`, "utf8");
+  const task = {
+    ...localTask(),
+    task_id: "frozen-v0912-retained-local",
+    title: "Produce frozen retained output",
+    write_paths: ["retained-overlap/output.txt"],
+    shared_resources: ["retained-overlap-resource"],
+  };
+  const runId = "frozen-v0912-retained-run";
+  const activationPath = resolve(requests, "frozen-activation.json");
+  const activationRequest = {
+    run_id: runId,
+    activated_at: new Date().toISOString(),
+    runtime: {
+      config: { config_id: "frozen-v0912-config", snapshot: {} },
+      policy: { policy_id: "frozen-v0912-policy", snapshot: {} },
+      host: { host_id: "local", session_id: "frozen-v0912-session" },
+      lineage: { lineage_id: "frozen-v0912-lineage", thread_id: coordinatorThreadId, generation: 1 },
+    },
+    workflow: {
+      schema_version: 1,
+      plan_id: "frozen-v0912-retained-plan",
+      revision: 1,
+      parent_revision_digest: null,
+      tasks: [task],
+    },
+    fences: { branch_fences: [] },
+  };
+  await writeFile(activationPath, `${JSON.stringify(activationRequest)}\n`, "utf8");
+  const activate = spawnSync(process.execPath, [
+    frozen.cli, "run", "activate", "--run-id", runId, "--file", activationPath, "--json",
+  ], { cwd: root, env: { ...process.env, CODEX_THREAD_ID: coordinatorThreadId }, encoding: "utf8" });
+  assertSuccess(activate, "frozen v0.9.12 activation");
+  const frozenActivation = JSON.parse(activate.stdout);
+  const frozenRuntimeCli = resolve(frozenActivation.runtime_authority.bundle_root, "bin", "codex-flow.mjs");
+
+  const preparationPath = resolve(requests, "frozen-assignment-prepare.json");
+  await writeFile(preparationPath, `${JSON.stringify({
+    approved_plan_path: activationPath,
+    recipient: {
+      host_id: "local",
+      lineage_id: "frozen-v0912-director-lineage",
+      thread_id: directorThreadId,
+      generation: 1,
+    },
+    iteration_label: "Frozen v0.9.12 retained producer",
+    purpose: "Prove candidate settlement compatibility",
+    outcome: "Produce one accepted abandoned result.",
+    scope: ["Exercise frozen retained history."],
+    acceptance_criteria: ["Candidate settlement admits an overlapping successor."],
+    constraints: [],
+    reasons: [],
+  })}\n`, "utf8");
+  const preparedCall = spawnSync(process.execPath, [
+    frozen.cli, "assignment", "prepare", "--file", preparationPath, "--json",
+  ], { cwd: root, env: { ...process.env, CODEX_THREAD_ID: directorThreadId }, encoding: "utf8" });
+  assertSuccess(preparedCall, "frozen assignment preparation");
+  const preparation = JSON.parse(preparedCall.stdout).preparation;
+  const routePath = resolve(requests, "frozen-route.json");
+  await writeFile(routePath, `${JSON.stringify({
+    run_id: runId,
+    sender_thread_id: coordinatorThreadId,
+    preparation_id: preparation.preparation_id,
+  })}\n`, "utf8");
+  const routeCall = spawnSync(process.execPath, [
+    frozenRuntimeCli, "report", "route", "coordinator", "--run-id", runId,
+    "--file", routePath, "--json",
+  ], { cwd: root, env: { ...process.env, CODEX_THREAD_ID: coordinatorThreadId }, encoding: "utf8" });
+  assertSuccess(routeCall, "frozen coordinator route");
+  const reporting = JSON.parse(routeCall.stdout);
+
+  const startPath = resolve(requests, "frozen-local-start.json");
+  await writeFile(startPath, `${JSON.stringify({
+    run_id: runId,
+    plan_id: activationRequest.workflow.plan_id,
+    task_id: task.task_id,
+    dependency_authorities: [],
+  })}\n`, "utf8");
+  const startCall = spawnSync(process.execPath, [
+    frozenRuntimeCli, "workflow", "local", "start", "--run-id", runId,
+    "--file", startPath, "--json",
+  ], { cwd: root, env: { ...process.env, CODEX_THREAD_ID: coordinatorThreadId }, encoding: "utf8" });
+  assertSuccess(startCall, "frozen local start");
+  const work = JSON.parse(startCall.stdout);
+  await mkdir(resolve(root, "retained-overlap"), { recursive: true });
+  await writeFile(resolve(root, task.write_paths[0]), "frozen producer\n", "utf8");
+  await writeFile(resolve(root, "outside-frozen-scope.txt"), "old completion failed to reject this\n", "utf8");
+  execFileSync("git", ["add", task.write_paths[0], "outside-frozen-scope.txt"], { cwd: root });
+  execFileSync("git", ["commit", "--quiet", "-m", "test: frozen retained producer"], { cwd: root });
+  const completePath = resolve(requests, "frozen-local-complete.json");
+  await writeFile(completePath, `${JSON.stringify({
+    run_id: runId,
+    local_work_id: work.local_work_id,
+    checks: [{ check_id: "frozen-output", argv: [process.execPath, "-e", "process.exit(0)"] }],
+  })}\n`, "utf8");
+  const completeCall = spawnSync(process.execPath, [
+    frozenRuntimeCli, "workflow", "local", "complete", "--run-id", runId,
+    "--file", completePath, "--json",
+  ], { cwd: root, env: { ...process.env, CODEX_THREAD_ID: coordinatorThreadId }, encoding: "utf8" });
+  assertSuccess(completeCall, "frozen local completion");
+  const candidateAudit = await auditRunClosure({
+    stateRoot: resolve(commonDir, "codex-flow", "v0.9.12"),
+    runId,
+  });
+  assert.equal(candidateAudit.audit.terminal_ready, false);
+  assert.equal(candidateAudit.audit.blockers.some((blocker) => (
+    blocker.code === "committed-write-scope"
+    && blocker.detail.includes("outside-frozen-scope.txt")
+  )), true, JSON.stringify(candidateAudit.audit.blockers));
+
+  const finalReport = await captureStopReport({
+    event: {
+      hook_event_name: "Stop",
+      session_id: coordinatorThreadId,
+      turn_id: "frozen-v0912-final",
+      last_assistant_message: "Frozen v0.9.12 delivery is accepted.",
+    },
+    route: reporting.route,
+    stateRoot: reporting.state_root,
+    nativeQueue: nativeQueue(),
+    submit: async () => ({
+      outcome: "accepted",
+      queued_submission_id: "frozen-v0912-report",
+      queue_attempted: true,
+      diagnostics: {},
+    }),
+  });
+  const abandonPath = resolve(requests, "frozen-abandon.json");
+  await writeFile(abandonPath, `${JSON.stringify({
+    run_id: runId,
+    resume: frozenActivation.run.binding,
+    reason: "Preserve a frozen abandoned producer with retained authority.",
+  })}\n`, "utf8");
+  const abandonCall = spawnSync(process.execPath, [
+    frozenRuntimeCli, "run", "abandon", "--run-id", runId,
+    "--file", abandonPath, "--json",
+  ], { cwd: root, env: { ...process.env, CODEX_THREAD_ID: coordinatorThreadId }, encoding: "utf8" });
+  assertSuccess(abandonCall, "frozen run abandonment");
+  execFileSync("git", ["merge", "--ff-only", "--quiet", "codex/frozen-v0912-retained"], {
+    cwd: primary,
+  });
+
+  const blockedThreadId = "candidate-unsettled-overlap";
+  await writeFile(resolve(primary, ".git", "codex-thread.json"), `${JSON.stringify({
+    version: 1,
+    ownerThreadId: blockedThreadId,
+  })}\n`, "utf8");
+  const blockedActivationPath = resolve(requests, "candidate-unsettled-overlap.json");
+  await writeFile(blockedActivationPath, `${JSON.stringify({
+    ...activationRequest,
+    run_id: "candidate-unsettled-overlap-run",
+    runtime: {
+      ...activationRequest.runtime,
+      config: { config_id: "candidate-unsettled-config", snapshot: {} },
+      policy: { policy_id: "candidate-unsettled-policy", snapshot: {} },
+      host: { host_id: "local", session_id: "candidate-unsettled-session" },
+      lineage: { lineage_id: "candidate-unsettled-lineage", thread_id: blockedThreadId, generation: 1 },
+    },
+    workflow: {
+      ...activationRequest.workflow,
+      plan_id: "candidate-unsettled-overlap-plan",
+    },
+  })}\n`, "utf8");
+  const blockedSuccessor = runCli([
+    "run", "activate", "--run-id", "candidate-unsettled-overlap-run",
+    "--file", blockedActivationPath, "--json",
+  ], { cwd: primary, env: { CODEX_THREAD_ID: blockedThreadId } });
+  assert.notEqual(blockedSuccessor.status, 0, blockedSuccessor.stdout);
+  assert.match(blockedSuccessor.stderr, /retained|unresolved|settlement|incompatible Codex Flow namespace/i);
+
+  const acceptPath = resolve(requests, "candidate-accept.json");
+  await writeFile(acceptPath, `${JSON.stringify({
+    assignment_id: reporting.assignment.assignment_id,
+    report_id: finalReport.report_id,
+    task_observation: activeTaskObservation(coordinatorThreadId),
+  })}\n`, "utf8");
+  const acceptCall = runCli([
+    "assignment", "accept", "--assignment-id", reporting.assignment.assignment_id,
+    "--file", acceptPath, "--json",
+  ], { cwd: primary, env: { CODEX_THREAD_ID: directorThreadId } });
+  assertSuccess(acceptCall, "candidate acceptance of frozen retained producer");
+  const pending = JSON.parse(acceptCall.stdout);
+  assert.equal(pending.status, "closeout-pending", pending.settlement_blocker);
+  assert.equal(pending.closeout?.status, "host-action-required", JSON.stringify(pending));
+  await writeFile(acceptPath, `${JSON.stringify({
+    assignment_id: reporting.assignment.assignment_id,
+    report_id: finalReport.report_id,
+    task_observation: archivedTaskObservation(coordinatorThreadId),
+    host_result: {
+      attempt_id: pending.closeout.host_request.attempt_id,
+      thread_id: pending.closeout.host_request.thread_id,
+      outcome: "accepted",
+    },
+  })}\n`, "utf8");
+  const retiredCall = runCli([
+    "assignment", "accept", "--assignment-id", reporting.assignment.assignment_id,
+    "--file", acceptPath, "--json",
+  ], { cwd: primary, env: { CODEX_THREAD_ID: directorThreadId } });
+  assertSuccess(retiredCall, "candidate frozen coordinator retirement");
+  const accepted = JSON.parse(retiredCall.stdout);
+  assert.equal(accepted.status, "retired", accepted.settlement_blocker);
+  await assert.rejects(stat(root), /ENOENT/);
+
+  const successorThreadId = "candidate-retained-successor";
+  await writeFile(resolve(primary, ".git", "codex-thread.json"), `${JSON.stringify({
+    version: 1,
+    ownerThreadId: successorThreadId,
+  })}\n`, "utf8");
+  const successorRunId = "candidate-retained-successor-run";
+  const successorTask = {
+    ...task,
+    task_id: "candidate-retained-successor-task",
+    title: "Perform candidate overlapping write",
+  };
+  const successorPath = resolve(requests, "candidate-successor.json");
+  await writeFile(successorPath, `${JSON.stringify({
+    ...activationRequest,
+    run_id: successorRunId,
+    runtime: {
+      ...activationRequest.runtime,
+      config: { config_id: "candidate-retained-config", snapshot: {} },
+      policy: { policy_id: "candidate-retained-policy", snapshot: {} },
+      host: { host_id: "local", session_id: "candidate-retained-session" },
+      lineage: { lineage_id: "candidate-retained-lineage", thread_id: successorThreadId, generation: 1 },
+    },
+    workflow: {
+      ...activationRequest.workflow,
+      plan_id: "candidate-retained-successor-plan",
+      tasks: [successorTask],
+    },
+  })}\n`, "utf8");
+  const successorCall = runCli([
+    "run", "activate", "--run-id", successorRunId, "--file", successorPath, "--json",
+  ], { cwd: primary, env: { CODEX_THREAD_ID: successorThreadId } });
+  assertSuccess(successorCall, "candidate overlapping successor activation");
+  const successorActivation = JSON.parse(successorCall.stdout);
+  assert.equal(successorActivation.run.run_id, successorRunId);
+  const successorRuntimeCli = resolve(successorActivation.runtime_authority.bundle_root, "bin", "codex-flow.mjs");
+  const successorStartPath = resolve(requests, "candidate-successor-start.json");
+  await writeFile(successorStartPath, `${JSON.stringify({
+    run_id: successorRunId,
+    plan_id: "candidate-retained-successor-plan",
+    task_id: successorTask.task_id,
+    dependency_authorities: [],
+  })}\n`, "utf8");
+  const successorStartCall = spawnSync(process.execPath, [
+    successorRuntimeCli, "workflow", "local", "start", "--run-id", successorRunId,
+    "--file", successorStartPath, "--json",
+  ], { cwd: primary, env: { ...process.env, CODEX_THREAD_ID: successorThreadId }, encoding: "utf8" });
+  assertSuccess(successorStartCall, "candidate overlapping successor start");
+  const successorWork = JSON.parse(successorStartCall.stdout);
+  await writeFile(resolve(primary, successorTask.write_paths[0]), "candidate successor write\n", "utf8");
+  execFileSync("git", ["add", successorTask.write_paths[0]], { cwd: primary });
+  execFileSync("git", ["commit", "--quiet", "-m", "test: candidate retained successor write"], { cwd: primary });
+  const successorCompletePath = resolve(requests, "candidate-successor-complete.json");
+  await writeFile(successorCompletePath, `${JSON.stringify({
+    run_id: successorRunId,
+    local_work_id: successorWork.local_work_id,
+    checks: [{ check_id: "candidate-successor-output", argv: [process.execPath, "-e", "process.exit(0)"] }],
+  })}\n`, "utf8");
+  const successorCompleteCall = spawnSync(process.execPath, [
+    successorRuntimeCli, "workflow", "local", "complete", "--run-id", successorRunId,
+    "--file", successorCompletePath, "--json",
+  ], { cwd: primary, env: { ...process.env, CODEX_THREAD_ID: successorThreadId }, encoding: "utf8" });
+  assertSuccess(successorCompleteCall, "candidate overlapping successor completion");
+  assert.equal(JSON.parse(successorCompleteCall.stdout).state, "completed");
+});
 
 test("v0.9 help exposes launch authority and no retired bootstrap or release commands", () => {
   const help = runCli(["--help"]);

@@ -198,6 +198,28 @@ approval-gated repository clean-start lifecycle. It inventories exact state,
 archives known tasks first, removes eligible worktrees before local branches,
 deletes state last, and never mutates remote refs or source history.
 
+### Retained-obligation recovery
+
+When `assignment accept` reports `execution-obligations-retained`, inspect its
+`settlement_blocker` and run `cleanup plan --run-id RUN --json` through that
+run's immutable runtime. Complete the named ordinary archive, integration,
+preservation, or branch cleanup action, then repeat the same `assignment accept`
+request. A successful retry continues owning-host coordinator closeout and can
+itself be repeated after interruption. Never edit the abandoned terminal object,
+its retained retirement, or old runtime files.
+
+Overlapping admission remains blocked across v0.9 runtime namespaces until this
+derived proof is complete. An authenticated refresh is the sole exception: it
+may exclude its exact source-retired namespace while consuming the persisted
+handoff, without weakening checks for any unrelated predecessor.
+
+When coordinator completion or run audit reports `committed-write-scope`, review
+the named commit/path against both the task write set and admitted run envelope.
+Preserve the evidence, correct the planning or integration authority before a
+new operation, and re-execute through normal workflow commands. A revert does
+not erase the earlier committed violation, and safe retirement does not turn a
+noncompliant execution into a compliant one.
+
 ## Long-lived coordinator refresh
 
 A refreshed coordinator inspects authority once:

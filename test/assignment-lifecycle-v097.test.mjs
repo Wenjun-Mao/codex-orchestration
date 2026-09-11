@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { cp, mkdir, mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
-import { basename, resolve } from "node:path";
+import { basename, dirname, resolve } from "node:path";
 import test from "node:test";
 import { acceptAssignmentResult, cancelAssignmentResult } from "../lib/assignment-acceptance.mjs";
 import { completeCoordinatorWork, startCoordinatorWork } from "../lib/coordinator-work.mjs";
@@ -64,12 +64,13 @@ import { bindRecipient } from "../lib/recipients.mjs";
 import { auditRunClosure } from "../lib/run-audit.mjs";
 import { abandonRun, closeRun, readRun } from "../lib/run-lifecycle.mjs";
 import { RUNTIME_DIRECTORY } from "../lib/runtime-context.mjs";
+import { assessRetainedRunSettlement } from "../lib/retained-obligation-settlement.mjs";
 import { recipientBindingDigest } from "../lib/task-results.mjs";
 import { runCombinedVerification } from "../lib/verifications.mjs";
 import { activateFixtureRun, createGitFixture, packageRoot } from "./helpers.mjs";
 import { createActiveTaskLaunch, terminalReceiptV4 } from "./v09-lifecycle-fixture.mjs";
 import { coordinatorBindingDigest, createWorkflowPlanRevision } from "../lib/workflow-plan.mjs";
-import { persistWorkflowTaskContract } from "../lib/workflow-journal.mjs";
+import { createWorkflowJournal, persistWorkflowTaskContract } from "../lib/workflow-journal.mjs";
 
 const TIME = Date.parse("2026-09-06T15:00:00.000Z");
 const FROZEN_RC1_COMMIT = "ac301363976d4433885323530e7ccedbc5fcc5e5";
@@ -660,8 +661,10 @@ async function acceptedChildFixture(
   }
   let executorCommit = null;
   if (selectedIntegrationOutcome !== null) {
-    await writeFile(resolve(context.executorPath, "integration-result.txt"), `${suffix}\n`, "utf8");
-    git(context.executorPath, ["add", "integration-result.txt"]);
+    const integrationResultPath = context.contract.task.write_paths[0];
+    await mkdir(resolve(context.executorPath, dirname(integrationResultPath)), { recursive: true });
+    await writeFile(resolve(context.executorPath, integrationResultPath), `${suffix}\n`, "utf8");
+    git(context.executorPath, ["add", integrationResultPath]);
     git(context.executorPath, ["commit", "--quiet", "-m", `executor ${suffix}`]);
     executorCommit = git(context.executorPath, ["rev-parse", "HEAD"]);
   }
@@ -1731,6 +1734,156 @@ test("an accepted decision can still cancel retained execution obligations witho
   assert.equal(assignment.state, "cancelled");
   assert.equal(assignment.acceptance.report_id, report.report_id);
   assert.equal(route.state, "closed");
+});
+
+test("accepted abandoned execution derives settlement without rewriting its terminal retirement", async (t) => {
+  const child = await acceptedChildFixture(t, "derived-retained-settlement", {
+    disposableCoordinator: true,
+  });
+  const report = await acceptedFinal({
+    state_root: child.reporting.state_root,
+    route: child.reporting.route,
+  }, "derived-retained-settlement", "Accepted product delivery.", 10_000);
+  await closeoutAcceptedExecutor(child, { now: TIME + 11_000 });
+  const before = (await readRun({
+    gitCommonDirectory: child.context.commonDir,
+    runId: child.context.launch.run_id,
+  })).run;
+  await abandonRun({
+    gitCommonDirectory: child.context.commonDir,
+    runId: before.run_id,
+    resume: before.binding,
+    reason: "The execution envelope was incomplete although delivery was accepted.",
+    abandonedAt: new Date(TIME + 12_000).toISOString(),
+  });
+  const abandoned = (await readRun({
+    gitCommonDirectory: child.context.commonDir,
+    runId: before.run_id,
+  })).run;
+  const first = await acceptAssignmentResult({
+    stateRoot: child.reporting.state_root,
+    assignmentId: child.assignment.assignment_id,
+    reportId: report.report_id,
+    directorThreadId: child.assignment.recipient.thread_id,
+    taskObservation: activeTaskObservation(child.context.coordinator.thread_id, TIME + 13_000),
+    retireLocator: ({ routeId, reason, now }) => retireRepositoryReportLocator({
+      stateRoot: child.reporting.state_root,
+      routeId,
+      reason,
+      now,
+    }),
+    now: TIME + 13_000,
+  });
+  assert.equal(first.status, "closeout-pending", first.settlement_blocker);
+  assert.equal(first.closeout.status, "host-action-required");
+  const retired = await acceptAssignmentResult({
+    stateRoot: child.reporting.state_root,
+    assignmentId: child.assignment.assignment_id,
+    reportId: report.report_id,
+    directorThreadId: child.assignment.recipient.thread_id,
+    taskObservation: archivedTaskObservation(child.context.coordinator.thread_id, TIME + 13_100),
+    hostResult: hostResult(first.closeout.host_request, "accepted"),
+    retireLocator: ({ routeId, reason, now }) => retireRepositoryReportLocator({
+      stateRoot: child.reporting.state_root,
+      routeId,
+      reason,
+      now,
+    }),
+    now: TIME + 13_100,
+  });
+  assert.equal(retired.status, "retired");
+  assert.equal(retired.retained_settlement[0].stage, "accepted");
+  const assignment = await assignmentAuthority({
+    stateRoot: child.reporting.state_root,
+    assignmentId: child.assignment.assignment_id,
+  });
+  assert.equal(assignment.execution_retirements[0].resource_disposition, "retained");
+  assert.deepEqual(assignment.execution_retirements[0].terminal, abandoned.terminal);
+  const historicalSettlement = await assessRetainedRunSettlement({
+    commonDir: child.context.commonDir,
+    namespace: RUNTIME_DIRECTORY,
+    run: abandoned,
+  });
+  assert.equal(historicalSettlement.stage, "retired");
+
+  await assert.rejects(stat(child.coordinatorPath), /ENOENT/);
+  const overlappingPath = child.context.contract.task.write_paths[0];
+  const successorTask = {
+    task_id: "derived-retained-successor-task",
+    title: "Write through released retained authority",
+    execution_kind: "coordinator",
+    mode: "write",
+    model: "gpt-5.6-terra",
+    reasoning_effort: "high",
+    selector_rationale: "Terra-high is sufficient for the bounded successor proof.",
+    fork_turns: null,
+    dependencies: [],
+    read_paths: [],
+    write_paths: [overlappingPath],
+    shared_resources: [...child.context.contract.task.shared_resources],
+    primary_outcome: "Perform one useful overlapping successor write.",
+    causal_question: null,
+    cheapest_safe_direct_attempt: "Commit the successor output once.",
+    instrument_role: "none",
+    supporting_follow_up: null,
+    supporting_authorization: null,
+  };
+  const successorPlan = createWorkflowPlanRevision({
+    schema_version: 1,
+    plan_id: "derived-retained-successor-plan",
+    revision: 1,
+    parent_revision_digest: null,
+    tasks: [successorTask],
+  });
+  const successorRunId = "derived-retained-successor-run";
+  const successorThreadId = "derived-retained-successor-thread";
+  const successor = await activateFixtureRun({
+    root: child.root,
+    runId: successorRunId,
+    plan: successorPlan,
+    lineage: {
+      lineage_id: "derived-retained-successor-lineage",
+      thread_id: successorThreadId,
+      generation: 1,
+    },
+    branchFences: [],
+    now: TIME + 14_000,
+  });
+  const successorStateRoot = resolve(child.context.commonDir, "codex-flow", RUNTIME_DIRECTORY);
+  await createWorkflowJournal({
+    stateRoot: successorStateRoot,
+    runId: successor.run.run_id,
+    planId: successorPlan.plan_id,
+    planRevision: successorPlan,
+  });
+  const successorContract = await persistWorkflowTaskContract({
+    stateRoot: successorStateRoot,
+    runId: successor.run.run_id,
+    planId: successorPlan.plan_id,
+    taskId: successorTask.task_id,
+    currentBaseline: { revision: git(child.root, ["rev-parse", "HEAD"]) },
+    dependencyAuthorities: [],
+  });
+  const previousThread = process.env.CODEX_THREAD_ID;
+  process.env.CODEX_THREAD_ID = successorThreadId;
+  const started = await startCoordinatorWork({
+    stateRoot: successorStateRoot,
+    taskContract: successorContract,
+    repositoryPath: child.root,
+  });
+  await mkdir(resolve(child.root, dirname(overlappingPath)), { recursive: true });
+  await writeFile(resolve(child.root, overlappingPath), "useful successor write\n", "utf8");
+  git(child.root, ["add", overlappingPath]);
+  git(child.root, ["commit", "--quiet", "-m", "test: useful retained-authority successor"]);
+  const completed = await completeCoordinatorWork({
+    stateRoot: successorStateRoot,
+    localWorkId: started.local_work_id,
+    repositoryPath: child.root,
+    checks: [{ check_id: "successor-write", argv: [process.execPath, "-e", "process.exit(0)"] }],
+  });
+  assert.equal(completed.state, "completed");
+  if (previousThread === undefined) delete process.env.CODEX_THREAD_ID;
+  else process.env.CODEX_THREAD_ID = previousThread;
 });
 
 test("assignment cancellation proves terminal ownership, retires reporting, and preserves coordinator resources", async (t) => {

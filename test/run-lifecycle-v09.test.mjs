@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdir, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, rename, rm, stat, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import {
   acquireRuntimeContext,
@@ -26,6 +26,10 @@ import {
 } from "../lib/foreign-active-run-sentinel.mjs";
 import { createWorkflowJournal } from "../lib/workflow-journal.mjs";
 import { createWorkflowPlanRevision } from "../lib/workflow-plan.mjs";
+import {
+  consumeRefreshAdmissionCapability,
+  issueRefreshAdmissionCapability,
+} from "../lib/refresh-admission-capability.mjs";
 import { createGitFixture, removeFixture } from "./helpers.mjs";
 
 const REVISION = "a".repeat(40);
@@ -104,6 +108,37 @@ function workflowBinding(suffix) {
     workflowRevisionDigest: "c".repeat(64),
   };
 }
+
+test("refresh admission capability is single-use and binds target run and runtime identity", () => {
+  const target = {
+    run_id: "refresh-target-run",
+    runtime_context_digest: "a".repeat(64),
+    configuration_digest: "b".repeat(64),
+    repository_digest: "c".repeat(64),
+    repository_root: "/tmp/refresh-target",
+    repository_branch: "main",
+    plan_id: "refresh-target-plan",
+    revision_digest: "d".repeat(64),
+    namespace: RUNTIME_DIRECTORY,
+    bound_at: INITIAL_TIME,
+    assignment_id: "refresh-assignment",
+  };
+  const wrongRun = issueRefreshAdmissionCapability({ sourceNamespace: "v0.9.12", target });
+  assert.throws(() => consumeRefreshAdmissionCapability({
+    capability: wrongRun,
+    expectedTarget: { ...target, run_id: "different-run" },
+  }), /does not match target admission/);
+  const wrongRuntime = issueRefreshAdmissionCapability({ sourceNamespace: "v0.9.12", target });
+  assert.throws(() => consumeRefreshAdmissionCapability({
+    capability: wrongRuntime,
+    expectedTarget: { ...target, runtime_context_digest: "e".repeat(64) },
+  }), /does not match target admission/);
+  const exact = issueRefreshAdmissionCapability({ sourceNamespace: "v0.9.12", target });
+  assert.deepEqual(consumeRefreshAdmissionCapability({ capability: exact, expectedTarget: target }), {
+    namespace: "v0.9.12",
+  });
+  assert.throws(() => consumeRefreshAdmissionCapability({ capability: exact, expectedTarget: target }), /lacks authenticated/);
+});
 
 test("v0.9 runtime snapshots are immutable while one active run resumes and rebinds", async (t) => {
   const root = await createGitFixture("codex-flow-v09-run-");
@@ -332,6 +367,48 @@ test("abandoned runs retain all fence types and permit only a disjoint next plan
     resume: next.run.binding,
     closedAt: "2026-08-29T13:04:00.000Z",
   });
+});
+
+test("direct admission rejects an overlapping retained fence from a prior v0.9 namespace", async (t) => {
+  const root = await createGitFixture("codex-flow-v09-foreign-retained-");
+  t.after(() => removeFixture(root));
+  const commonDir = resolve(root, ".git");
+  const { bundleSource } = await runtimeBundleFor(root, "foreign-retained");
+  const runtime = runtimeFor(root, bundleSource);
+  await acquireRuntimeContext({ gitCommonDirectory: commonDir, context: runtime, bundleSource });
+  const plan = fullPlan("foreign-retained");
+  const admitted = await admitRun({
+    gitCommonDirectory: commonDir,
+    runId: "foreign-retained-source",
+    runtimeId: runtime.runtime_id,
+    ...workflowBinding("foreign-retained"),
+    plan,
+    admittedAt: "2026-08-29T13:10:00.000Z",
+  });
+  await abandonRun({
+    gitCommonDirectory: commonDir,
+    runId: "foreign-retained-source",
+    resume: admitted.run.binding,
+    unresolvedFences: plan,
+    reason: "Preserve unresolved authority in a prior namespace.",
+    abandonedAt: "2026-08-29T13:11:00.000Z",
+  });
+  await rename(
+    resolve(commonDir, "codex-flow", RUNTIME_DIRECTORY),
+    resolve(commonDir, "codex-flow", "v0.9.12"),
+  );
+  await acquireRuntimeContext({ gitCommonDirectory: commonDir, context: runtime, bundleSource });
+  await assert.rejects(
+    admitRun({
+      gitCommonDirectory: commonDir,
+      runId: "foreign-retained-overlap",
+      runtimeId: runtime.runtime_id,
+      ...workflowBinding("foreign-retained-overlap"),
+      plan,
+      admittedAt: "2026-08-29T13:12:00.000Z",
+    }),
+    /v0\.9\.12\/foreign-retained-source/,
+  );
 });
 
 test("foreign active-run sentinel blocks admission and bounds foreign namespace scans", async (t) => {
