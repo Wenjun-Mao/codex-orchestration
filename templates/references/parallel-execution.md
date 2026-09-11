@@ -12,6 +12,10 @@ Choose the surface first:
   independent Git lifecycle.
 - **Visible tasks:** independent work requiring durable task/worktree ownership.
 
+Collect native subagent results before ending the owning task's turn. For work
+that must continue after the owner returns to idle, use a visible task with the
+plugin's reporting route.
+
 Obtain delegated selectors from `lib/policy/selector-policy.mjs` in the
 authenticated package: `selectCoordinatorDelivery` for coordinator staffing,
 `routeWork` for other delegated work. Apply a deliberate override only with a

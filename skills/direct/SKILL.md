@@ -12,7 +12,9 @@ Run `assignment prepare --file request.json --json` using the
 [assignment brief](../../templates/references/assignment-and-reporting.md).
 The command snapshots the plan for the coordinator. Use its generated title
 and full first prompt. Select delegated staffing through the package's selector
-policy; children are optional.
+policy; children are optional. Follow the
+[delegation guidance](../../templates/references/parallel-execution.md) when
+choosing supporting agents.
 
 Dispatch one coordinator with the real assignment as its first prompt. Check
 exact identity/acceptance once, report ready, pending, or blocked, and return.

@@ -221,6 +221,11 @@ Do not grow a succession of recovery mechanisms merely to finish the canary.
 
 ## Implementation decision gates
 
+Approved follow-up: shared delegation guidance requires owners to collect native
+subagent results before ending their turn. Work continuing after owner idle uses
+a visible task with the plugin reporting route. This is instruction-only: no
+wake-up alternatives, new watchdog, or notification/lifecycle mechanism.
+
 - Identify existing evidence for every admitted obligation, including unused reservations.
 - Prove derived assessment survives closeout without a supplemental receipt.
 - Establish exact integration attribution; stop on genuinely unavailable authority.
