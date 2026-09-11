@@ -1,16 +1,21 @@
 # Preserve-and-reset recovery
 
-Status: Draft — requires user approval before implementation.
+Status: Approved scope revision following independent review; implementation not dispatched.
+Priority: Paused in favor of [serial-first delivery](2026-09-11-serial-first-delivery.md).
+Existing supported recovery commands remain the interim escape hatch; this pause
+does not authorize resetting a project or changing its retained evidence.
 Target: next bounded release after v0.9.13; no pilot reset is authorized here.
 
 ## Outcome
 
-A project director can recover from a failed or obsolete Flow workflow through
-one understandable, explicitly authorized preserve-and-reset operation: protect
-the work, quiesce the old workers, retire failed workflow authority honestly,
-archive the selected workers, remove exact project-local Flow metadata, and
-prepare fresh work. The user approves meaningful scope rather than repeatedly
-navigating internal lifecycle transitions.
+A project director can recover through one concise, role-aware procedure over
+existing commands: preserve useful work, retire failed authority honestly,
+remove exact Flow metadata, and complete corrected fresh work. Reduce diagnosis
+and improvised handoffs, not the number of safeguards by building a reset engine.
+
+The default is metadata-only recovery, retaining source, refs, worktrees and
+native tasks. Selected native archival is an optional, explicitly authorized
+branch with disclosed host reclamation effects.
 
 Reset is not successful delivery. Its evidence is preservation, quiescence and
 bounded removal, not fabricated completion, compliance, or product acceptance.
@@ -34,111 +39,165 @@ named follow-up rather than a second implementation workstream.
 
 ## Scope and non-goals
 
-Compose existing run, assignment, reporting, archive and unplug operations into
-a concise repository-scoped recovery entrypoint. Prefer extending the existing
-unplug workflow; do not create a parallel cleanup engine or generic framework.
-Include a concise ADR, actionable status/recovery guidance, and connected tests.
+Support coordinator-local failed work, plus children already archived or honestly
+eligible for existing closeout. Failed/unresolved executors needing new retirement
+semantics are outside this deliverable. Unknown identity, reporting or ownership
+blocks the affected action; never manufacture acceptance to unblock recovery.
+
+Extend the existing unplug skill with one linked procedure and exact request
+examples, linked from director/reporting guidance. Include one concise ADR and
+connected proof. A new command or runtime helper is not required by default.
 
 Exclude same-version live scope amendment, replacement claim states, automatic
 reset on failure, product acceptance, version bumps to unlock transitions,
 global plugin removal, cross-host recovery, dashboards and background daemons.
+Also exclude additional Git cleanup, automatic failed-executor retirement,
+parent-approval derivation and a second recovery journal.
 Do not reset Plotloom or another pilot as part of implementation. Do not modify
 already-published artifacts or retroactively certify historical writes.
 
 ## Consequential decisions
 
-1. **Preservation first.** Inventory the exact Git common directory, refs,
-   worktrees, committed work, uncommitted/untracked files, Flow records and
-   pending assignments. Verify a recoverable external backup before retiring
-   authority. A Git bundle alone is insufficient for working-tree files.
-   Exclude unrelated/large ignored caches from copying by explicit inventory,
-   not an assumption that ignored files are disposable. Store backups privately;
-   environment files and reporting history may contain secrets. Never push them.
-2. **Separate reset from Git cleanup.** Default to preserving all source,
-   worktrees, branches and remote refs. Archive only the exact selected old
-   worker tasks, never the director or unrelated tasks. Explain App-managed
-   worktree reclamation effects before authorization; verify preservation first.
-   Optional Git deletion requires explicit targets and existing cleanup checks.
-3. **Quiesce before retirement.** No reset while selected workers, native
-   subagents, or relevant tool/background operations can still write or report.
-   Resolve provisional identities rather than guessing task membership from
-   titles. Revalidate activity and repository facts at action boundaries.
-4. **Truthful terminal states.** Reuse owning-run abandonment and assigned-director
-   cancellation. A started claim remains historical failed/unfinished evidence,
-   never completed merely to unblock reset. Reconcile every bound execution and
-   pending report through supported paths. Queue acceptance is not product
-   acceptance. Preserve ambiguous host/report outcomes; do not blindly replay.
-5. **A bounded authorization, not blanket deletion.** Present preserved work,
-   selected tasks, exact metadata roots, optional Git deletions and expected
-   effects together. Existing unplug still validates its exact final plan/digest.
-   Determine during design whether one parent authorization can safely cover
-   the predictable abandonment/cancellation changes before that final digest is
-   known. If current contracts require two approvals, say so; do not bypass the
-   digest gate to promise one click. Unexpected scope/resource changes require
-   renewed approval; ordinary planned transitions must not cause endless prompts.
-6. **Reuse durable progress.** Resume from existing run/assignment/archive/unplug
-   records. Keep backup manifests and returned transition receipts outside roots
-   scheduled for removal. Do not add a second lifecycle journal unless a concrete
-   interruption case proves a fact cannot be recovered from existing records.
-7. **Fresh means fresh.** Verify unplug's actual postconditions and reporting
-   retirement before preparation. Old run/assignment/preparation IDs must not be
-   restored as live authority. Reusing an idle native task is allowed only if
-   existing fresh-registration rules permit it; it does not reuse old authority.
-   Retained worktrees/tasks are reported separately from zero Flow-state residue.
+1. **Scope the whole Git common directory.** Inventory all affected namespaces,
+   assignments, owners, worktrees and exact task identities. Empty unplug
+   resources select no Git cleanup; they do not restrict metadata removal to one
+   assignment or prove task coverage. Account for all shared work before removal.
+2. **Two meaningful approvals.** First authorize bounded preservation and
+   owner/director transitions, including any named archival/reclamation effects.
+   Later approve the final exact unplug plan after those effects settle. Routine
+   commands inside the first mandate do not each need approval. An early
+   discovery plan is not the final removal authorization.
+3. **Stop product work, then verify preservation.** Stop source writers, new
+   delegation, native children and relevant background operations. Permit only
+   controlled retirement administration and reporting. Verify a private external
+   backup covering committed tips (including detached tips), index and worktree
+   changes, untracked and explicitly selected ignored files, and Flow evidence.
+   Verify recovery in an isolated location. A Git bundle alone is insufficient.
+   Keep backups outside deletion and host-reclamation targets; never publish
+   secrets or private runtime history. Backup verification is procedural, not
+   an existing unplug CLI validator. Reverify source bytes after interruption
+   or drift: unchanged porcelain status or plan digest is not byte equality.
+4. **Finish eligible children before owner abandonment.** Use existing honest
+   disposition/archive paths while required run authority remains active. Their
+   reclamation effects require prior authorization. Stop if prerequisites cannot
+   be met; do not abandon first and discover lost cleanup authority afterward.
+5. **Abandon, settle reports, then cancel.** Each owner terminalizes its bound
+   execution. The assigned director verifies terminal evidence, settles reports
+   and cancels through supported commands. Verify route closure, locator
+   retirement and iteration cancellation, not just terminal flags. Queue
+   acceptance is not product acceptance. Save later terminal records and receipts
+   externally; the original backup does not contain these later transitions.
+6. **Optional native archival.** A cancelled coordinator uses separately
+   authorized native archival and exact observation, not successful assignment
+   acceptance or ordinary iteration closeout. Never archive the director or
+   unrelated tasks. Preserve recoverable content before possible host reclamation;
+   do not promise its original worktree remains. Additional Git cleanup stays
+   separate. Observe ambiguous outcomes rather than repeating archive calls.
+7. **Final quiescence and unplug.** Finish all owner administration before
+   removal; do not resume retired workers afterward. The retained director
+   verifies activity and reporting retirement in a serialized administrative
+   window. Archive evidence is not a concurrent-writer lock. Save the final
+   approved plan, exact archive-evidence object and apply request outside removal
+   roots. Apply existing unplug and verify state-root and journal postconditions
+   separately from task and source outcomes.
+8. **Complete useful fresh work.** Choose a clean, appropriately owned execution
+   checkout while retaining dirty work separately; no silent stash, commit or
+   deletion. Use deliberately fresh authority inputs, never restore old authority
+   IDs. Content-addressed preparation can repeat an ID despite being regenerated.
+   Reusing an idle task is allowed only under existing fresh-registration rules.
+   End with corrected work completed, not merely inspect or activation success.
+
+## Interruption boundaries
+
+Reuse existing records and externally saved exact requests. Fresh observations
+supplement rather than silently replace evidence bound into unplug's journal.
+After interruption, inspect durable outcomes and continue only through supported
+paths. Abandonment writes terminal state before later side effects; blindly
+retrying an active-run-only command is not recovery. Matching cancellation replay
+must finish route, locator and iteration work before removal.
+
+Test two source-derived concerns before making stronger claims:
+
+- Partial recursive namespace deletion may change a retained directory digest
+  and prevent resume. Initially promise an evidence-preserving stop with fresh
+  admission blocked, not universal continuation. Never silently create a new
+  plan over remaining fragments to bypass the interrupted operation's authority.
+- Journaled resume may omit the initial full Git-drift comparison. Reproduce
+  this boundary before deciding on a narrow owning-validator correction. No Git
+  mutation is expected during metadata-only apply; source-byte checks remain
+  separate from Git inventory checks.
+
+These are review hypotheses supported by source inspection, not executed failures.
+Only a reproduced gap in the supported journey justifies a narrow runtime fix.
+No second journal or blanket tolerance; unsupported partial outcomes stop before
+further destructive action.
 
 ## Checkpoints
 
 ### 1. Minimal contract and interface
 
-Map the actual public command sequence and role ownership, including archive
-timing, pending reports, provisional tasks and interruption boundaries. Demonstrate
-which steps can already be composed and name any missing fact or authorization
-contract. Choose a concise skill-led workflow plus only the deterministic helper
-needed for safe inventory/preservation/resume; command names are not prescribed.
-Record the decision in one ADR. Stop for review if a new state machine, relaxed
-safety contract or substantially broader helper is necessary.
+Write the single procedure, exact request examples, owner handoffs and short ADR.
+Map each step to existing public commands and evidence. Rehearse the incident-
+shaped path using established fixtures before deciding code is missing. Only add
+a bounded inventory/copy/verification helper if rehearsal demonstrates a missing
+capability; it must not select workers or own lifecycle. Stop for review if a new
+state machine, relaxed safety contract or substantially broader helper is needed.
 
 ### 2. Implementation and connected proof
 
-Implement the bounded interface with existing validators and host operations.
-Extend established fixtures instead of duplicating lifecycle engines or suites.
-After this checkpoint, attempt the real user-visible reset journey next; do not
-continue building instrumentation without exercising the outcome.
+Extend existing fixtures for actual scope rejection → preservation → honest
+termination/cancellation → metadata-only unplug → corrected fresh work completed.
+Include modified, untracked and selected ignored content. Reuse existing tests;
+add only focused checks for child-ordering refusal, post-terminal-write
+continuation, exact-input resume and the two interruption concerns above.
+Distinguish procedural safeguards from machine enforcement. After this instrument
+checkpoint, attempt the primary isolated journey next; do not expand a parallel
+harness or duplicate the full validator suite.
 
 ### 3. Isolated acceptance and release
 
-In a disposable repository, reproduce a started claim blocked by an out-of-scope
-commit. Preserve useful committed and uncommitted work, perform authorized reset
-with real task/report/archive behavior, then admit and complete a useful fresh
-assignment. Keep the controlling installed runtime stable while staging candidate
-work separately. Coordinate any shared install/restart with active projects.
-Promote one useful release after evidence review, without unnecessary interim
-publishing or repeated full-suite runs.
+In a disposable repository, prove the supported procedure and the native behavior
+claimed for reporting and optional archival. Record exact task ownership and
+before/after Git/worktree state; observe a withheld archive response without
+replay, and verify backup recovery if the host removes a checkout. Complete
+useful fresh work. Disclose manual interventions and distinguish the default
+metadata-only path from optional archival effects.
+
+Keep the controlling runtime stable. A procedure rehearsal need not install a
+new runtime or restart the App. Distribute packaged skill changes normally when
+appropriate; coordinate any shared installation with active projects. No release
+or restart solely to make the recovery procedure available, and no repeated
+full-suite runs for unchanged runtime source.
 
 ## Acceptance evidence
 
 - Failed claim stays honestly failed/unfinished in verified external evidence;
   no successful completion or product acceptance is manufactured.
-- Exact committed, modified and untracked source survives; refs/remote refs and
-  unrelated worktrees/projects are unchanged except explicitly approved effects.
-- Selected workers are quiescent and archived; no stale reporting can reactivate
-  retired assignments. Unknown membership/activity blocks only the unsafe action.
-- Tested interruptions after abandonment, cancellation, host archival and unplug
-  resume without duplicate host calls or lost evidence; source/plan drift stops.
-- Missing backup, changed backup/source, unresolved reports, active workers and
-  unapproved paths are rejected before the relevant destructive action.
+- Committed tips and selected staged, unstaged, untracked and ignored bytes are
+  recoverable. Unrelated work is unchanged; host effects are separately authorized
+  and measured, never hidden under a metadata-only label.
+- Default recovery retains tasks and Git resources. Optional archival has exact
+  native evidence and disclosed reclamation effects; no extra Git cleanup occurs.
+- Every affected execution/reporting obligation is settled through supported
+  paths before removal. Unsupported children, ownership or activity block safely.
+- Supported interruption boundaries continue from exact inputs without duplicate
+  host calls. Unsupported partial deletion stops safely and blocks fresh work.
+- Backup/source verification is an explicit procedural prerequisite; do not claim
+  the CLI enforces it. Preserve exact replay inputs and later transition evidence.
+- Report source preservation, reporting retirement, native archival, unplug zero
+  residue and successful fresh work as distinct postconditions.
 - Public CLI end-to-end test covers failure → preservation → retirement → reset
-  → corrected fresh admission; one isolated live exercise covers owning-host
+  → corrected fresh work completed; one isolated live exercise covers owning-host
   behavior. A read-only fresh inspect alone is not completion evidence.
 - Report user-visible steps and intervention points against the Plotloom sequence.
-  Demonstrate reduced coordination, not merely another wrapper over unchanged
-  manual troubleshooting. Document any remaining approval boundary clearly.
-- Focused tests first, one proportionate final suite; distinguish fixture, live
+  Target one prepared owner handoff and one final exact-plan approval after the
+  recovery mandate; do not invent numerical time/token savings.
+- Focused tests first, broader checks proportional to actual changes; distinguish fixture, live
   and manually assisted evidence. Do not claim uninterrupted success after repair.
 
 ## Execution authority and escalation
 
-After approval, director prepares this saved plan and dispatches one Sol-high
+Implementation requires separate dispatch. Director prepares this saved plan for one
 coordinator. Coordinator owns technical breakdown and bounded implementation;
 use capable cheaper workers where useful. Native subagent results must be
 collected before the owning turn ends. Director owns acceptance and exact live
