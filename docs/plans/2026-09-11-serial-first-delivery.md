@@ -1,6 +1,10 @@
 # Serial-first delivery
 
-Status: Draft — architectural direction agreed; this implementation plan requires approval.
+Status: Review amendments approved; native feasibility probe authorized. Runtime
+implementation remains gated on the probe and explicit slice-inclusion decision.
+Probe result: [native local-surface feasibility passed](../field-tests/2026-09-11-serial-native-feasibility.md).
+This removes the immediate host feasibility blocker, not the Flow implementation
+and connected acceptance requirements. Implementation has not been dispatched.
 Priority: Before new preserve-and-reset implementation. Version assigned at release,
 not used as an architectural constraint.
 
@@ -45,6 +49,13 @@ archival and subsequent assignment admission. Include coordinator-only delivery
 and coordinator → serial executor → coordinator handoff in the same retained
 checkout. Keep one coordinator per serial delivery scope.
 
+Deliver two connected slices within this architectural plan: A is retained-primary
+coordination, task-only archival and a useful successor (with existing isolated
+delegation available); B adds shared-checkout executors. Probe both upfront.
+Prefer delivering both together when feasible. A is independently shippable only
+after an explicit scope decision, not silently relabelled as full serial delivery.
+This division does not require intermediate public releases.
+
 Reuse task identity, reporting, receipts, path checks and verification where their
 semantics remain valid. Keep isolated execution available by explicit selection;
 share common authority/verification logic rather than build two lifecycle engines.
@@ -73,12 +84,19 @@ authorized by writing this plan. Preserve the published package and current runs
    editors or already-running commands. Stop relevant background writers and
    detect source drift before accepting results. Directors must not edit the
    shared repository while another task owns it, including planning files.
+   Reuse enclosing run/assignment admission and one current-writer reference,
+   with an exact claim and transfer generation. Every write-enabling start/resume
+   checks current permission: historical activation replay cannot resurrect it.
 3. **Explicit serial handoff.** The coordinator releases source ownership only
    after a verified checkpoint; an executor acquires against that exact baseline.
    During executor ownership the coordinator may discuss, inspect stable evidence
    or wait, but not edit, switch Git state or run source-mutating commands. After
-   the executor's durable result and writer release, the coordinator verifies and
-   reacquires. Receipt arrival or task idleness alone is not ownership transfer.
+   the executor's durable result, transfer into an exclusive coordinator
+   verification reservation, not a generally available gap. Atomically name the
+   exact intended successor/checkpoint; retries reconcile that same transfer.
+   Verification fixes the subject revision, branch and clean state before and
+   after checks; checks must not change source. A later coordinator edit requires
+   a new current claim. Receipt arrival or idleness alone is not a transfer.
    Background tool completion must be accounted for before release.
 4. **Direct results, not synthetic integration.** A serial executor's accepted
    committed result is already in the retained checkout. Validate its identity,
@@ -87,33 +105,56 @@ authorized by writing this plan. Preserve the published package and current runs
    truthfully. Shared verification should serve both local and delegated work,
    with execution provenance intact. Read-only checks that need stable source
    bytes use a named committed revision or wait for a checkpoint.
+   A commit named in prose does not freeze reads from a moving working tree.
+   Preserve per-commit scope checks, including changes later reverted. Introduce
+   genuine direct-result disposition through dependencies, attribution, audit
+   and closeout; never reattribute executor commits as coordinator work.
 5. **Tasks are disposable; the checkout is not.** Record retained resource
    ownership explicitly. Archive eligible completed tasks and retire their routes
    without deleting the retained checkout or its branch. Do not infer resource
    disposal from role or task completion. Existing isolated tasks retain their
    exact cleanup rules. Real native archive behavior must support this distinction;
    if it cannot, stop and reconsider the surface rather than weakening preservation.
+   Checkout retention is distinct from existing task-member `retained` and from
+   unresolved execution obligations. Bind it into versioned prepared authority.
+   Update eligibility, archive observation, run/iteration completion and historical
+   successor readers together. Preserve each accepted result revision after later
+   owners advance HEAD; history must not require the retained branch to disappear
+   or remain forever frozen. Resolve required final reporting before route closure;
+   source release does not retire the reporter or prevent its final delivery.
 6. **Failure cannot silently transfer ownership.** Preserve partial edits and
    evidence. A crash, timeout, final message or archive does not automatically
    release a writer. Supported recovery must establish the old writer is inactive,
    reconcile its result or failed state, and revalidate the checkout before a new
    owner starts. Prefer the smallest explicit owner recovery over leases, timers
    or another recovery state machine. Do not force successful completion to move on.
+   Unlike isolated work, a rejected direct commit already occupies the selected
+   branch. Block dependents and ordinary continuation until explicitly authorized
+   repair reconciles the source. Releasing failed ownership is not successful
+   dependency acceptance; no automatic rollback, stash or preservation commit.
 7. **Compatibility is bounded.** Existing assignments finish under their pinned
    contracts; do not reinterpret disposable resources as retained. New serial
    assignments explicitly declare retained ownership. Inventory existing active
    writers before admission so new authority cannot overlap old isolated work.
    Serial-to-isolated switching requires a settled checkpoint and explicit plan
    choice, not an executor silently switching surfaces mid-assignment.
+   Test old/new admission in both orders, including closed execution with pending
+   assignment and abandoned obligations. Older pinned code cannot be assumed to
+   honor new permits; declare no coexistence where mutual exclusion is unproven.
 
 ## Checkpoints
 
 ### 1. Host feasibility and minimal contract
 
-After implementation approval, use one bounded disposable-repository probe to
-verify local same-checkout task creation, exact identity/reporting and archival
-without checkout or branch deletion. No candidate installation is needed just to
-test native behavior. Keep this explicitly separate from a successful Flow run.
+Use one disposable repository, native local tasks C/E and successor C2. Confirm
+distinct actual task identities at the same canonical checkout, common directory
+and selected branch. C commits a checkpoint, E makes a sequential follow-up, and
+C remains usable after E is archived. Archive C and have C2 continue useful work.
+Record refs, HEAD, worktree inventory and sentinel bytes around each archive;
+make exactly one native call per intended creation/archive. Ambiguity stays pending.
+No candidate installation or Flow activation is needed to test native behavior.
+Native messages/observations prove only native feasibility, not authenticated
+Flow route delivery or a successful Flow lifecycle.
 If the native surface cannot support retained-checkout tasks, return the evidence
 and options before implementing a runtime design around that assumption.
 
@@ -125,7 +166,8 @@ if this requires a second workflow engine or cannot establish reliable admission
 
 ### 2. One connected serial implementation
 
-Implement the smallest complete vertical slice: prepare → coordinator local work
+After a recorded probe/inclusion decision, implement slice A end to end and slice
+B when included, without a succession of foundation releases. Full B: prepare → coordinator local work
 → executor handoff and result → coordinator verification → final reporting and
 acceptance → task-only closeout → fresh serial assignment. Use the same core
 checks for the coordinator-only path. Update generated briefs, schemas, skills
@@ -156,6 +198,9 @@ explicit approval; no automatic conversion of current projects.
   edits. Source drift and background-writer limitations are documented honestly.
 - At least one interruption during ownership transfer is resumed from existing
   durable facts without two writers or falsely completed work.
+- Stale activation replay cannot regain transferred permission. A check that
+  advances clean HEAD cannot certify the new revision from earlier test results.
+  Dirty/rejected direct work remains preserved and non-unblocking.
 - Exact task identity and reporting remain valid when tasks share a path; path
   equality is not identity. Test stale/late reports and same-path route/locator
   discovery so one task cannot consume another's result or retirement authority.
@@ -164,6 +209,10 @@ explicit approval; no automatic conversion of current projects.
   observed, not replayed. Successor admission works after full closeout.
 - The explicit isolated path and pinned historical assignments keep their
   existing semantics. No mass cleanup, journal rewrite or silent mode conversion.
+- Historical retained results remain valid after successor commits. Delayed final
+  capture is handled before reporter retirement, separately from writer release.
+- If only slice A is approved for delivery, report isolated-executor resource
+  costs honestly; do not claim the no-extra-worktree B acceptance requirement met.
 - Report removed stages/resources and actual user interventions versus the old
   isolated journey. Report test elapsed time; no arbitrary LOC or speed target
   and no claim that fewer mechanisms alone proves correctness.
@@ -173,7 +222,11 @@ explicit approval; no automatic conversion of current projects.
 
 ## Execution authority and escalation
 
-This draft authorizes planning only. After approval, the director prepares one
+The user authorized plan revision and the native probe, including its exact
+disposable local task creation and archival. No Plotloom task, source, installed
+plugin, shared setting, marketplace or restart is in scope. The director runs the
+probe and retains its evidence externally. Runtime implementation is not dispatched
+by this approval. After the gate/inclusion decision, the director prepares one
 assignment for a Sol-high coordinator because this changes interacting ownership
 and lifecycle contracts. Use cheaper workers for bounded independent work when
 useful; collect native subagent results before their owner ends its turn. The
