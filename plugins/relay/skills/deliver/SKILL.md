@@ -24,15 +24,18 @@ requires stopped writers and explicit source disposition. Preserve rejected and
 dirty work. Never use task cancellation or lock recovery as write permission.
 
 After source release, emit the genuine final. The trusted packaged Stop hook captures
-its exact task, turn and bytes against the frozen association. The recipient uses
-the generated `prepare-receipt` wait action and records its unmodified result; do
-not reactivate the sender or copy final text into a claimed receipt. Queue
-acknowledgement, exact recipient receipt and product acceptance are different facts.
+its exact task, turn and bytes against the frozen association. The exact recipient
+uses the generated `read-report` command to retrieve those frozen shared-storage
+facts, then runs its generated `acknowledge` command. Reading, acknowledgement and
+product acceptance are separate. Native wait is optional notification and does not
+prove receipt. Do not reactivate or impersonate the sender, copy final text into a
+claimed receipt, or expand the sender-only message fallback.
 Archive only the exact prepared task, then use the generated archived-list
 observation to record affirmation; never delete its checkout or retry an uncertain
 archive/submission.
 
-This candidate's native adapter and hook remain uninstalled and unqualified. Use
-injected observations only in source tests; do not call them real native delivery.
+Installation and native qualification remain director-owned boundaries. Use
+injected observations only in source tests; label shared-storage receipt accurately
+rather than calling it native message delivery.
 For public command inputs or the current native boundary, read
 [the package README](../../README.md). Do not install this candidate implicitly.

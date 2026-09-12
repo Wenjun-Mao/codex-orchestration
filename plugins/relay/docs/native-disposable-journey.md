@@ -1,9 +1,9 @@
 # Director-owned native disposable journey
 
-Status: director-owned canary started and paused after coordinator READY and commit
-`2a5420f`, before executor creation. Resume only after the director stages the
-corrected exact candidate. This journey remains the native proof and startup
-measurement; do not run a separate feasibility probe.
+Status: director-owned canary reached executor commit `c7d352a` and authentic Stop
+capture, then paused with the coordinator holding exact verification permission.
+Resume only after the director stages the corrected shared-storage candidate. This
+repaired journey remains the native proof and startup measurement.
 
 ## Prerequisites and owners
 
@@ -46,17 +46,17 @@ archive a task whose remaining report/archive duties require that task.
    Ownership must transfer directly to the exact coordinator verification
    reservation. Executor emits its genuine final; the trusted Stop hook must capture
    the exact native thread, completed turn, and bytes after the result is sealed.
-5. Coordinator waits for executor completion using the generated
-   `prepare-receipt` action and records the unmodified `wait_threads` result. Exact
-   receipt must match the hook capture. Coordinator reviews and verifies the exact
-   revision, choosing finish. Queue acknowledgement, if the optional message path
-   is exercised, remains separate and is not receipt.
+5. Coordinator uses `read-report` to retrieve the executor's exact captured final
+   and result association from shared Relay state, then runs the generated explicit
+   acknowledgement command. Coordinator reviews and verifies the exact revision,
+   choosing finish, and accepts separately. Native wait may notify completion but
+   missing message text does not block this receipt path.
 6. Coordinator prepares executor retirement once, invokes the exact
    `set_thread_archived` action, then uses `list_archived_threads` for affirmative
    observation if the background result is not itself affirmative. Ambiguity causes
    observation, never a repeated archive. The retained checkout and refs must remain.
-7. Coordinator emits its genuine final. Director records exact receipt through the
-   same Stop-capture plus `wait_threads` comparison, independently accepts the
+7. Coordinator emits its genuine final. Director reads and acknowledges the same
+   frozen shared-storage report, independently accepts the
    result, and archives the coordinator only after all child duties are affirmatively
    complete. Replay `retire` and show that no second native archive action appears.
 8. Director prepares and creates the useful successor with its selected model/effort.

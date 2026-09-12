@@ -13,13 +13,17 @@ Relay generates current purpose-built App actions and normalizes their unmodifie
 results. Creation binds exact task and host. A plugin-bundled Stop hook captures
 only a bound, source-released sender's exact turn and final bytes. The hook does not
 read unstable transcripts, submit messages, steer turns, or open host IPC. The
-recipient confirms the same task/host/completed turn through a read-only
-`wait_threads` result whose structured assistant message has that turn ID, a
-matching message ID, a `final_answer` phase, and the exact captured bytes; the
-completed turn must have a null error. Commentary, wrong-turn, error, and
-conflicting results remain pending, so a stopped sender need not reactivate.
-Optional message queue acceptance remains a separate transport fact and cannot
-stand in for receipt.
+exact recipient retrieves that immutable report through public `read-report`, which
+returns its exact final bytes and result association plus an acknowledgement command.
+Acknowledgement revalidates the frozen assignment, event, final digest and complete
+association digest, then records `shared-storage` transport. Read, acknowledgement
+and semantic acceptance remain separate. Missing capture blocks retrieval.
+
+Native `wait_threads` remains an optional completion notification. Even an exact
+same-turn `final_answer` observation does not record receipt; missing message text
+does not block shared-storage retrieval. The sender-only message path remains for
+source compatibility, but the adapter does not reactivate or impersonate a stopped
+sender to prepare it. Queue acceptance cannot stand in for receipt.
 
 Constructing Relay and reading control are discovery operations and do not create
 the `.git/relay` namespace. The Stop hook therefore leaves fresh, unrelated, and

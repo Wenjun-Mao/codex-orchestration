@@ -134,7 +134,7 @@ test('report delivery requires purpose-built queue observation and recipient del
   assert.equal(f.relay.status(prepared.assignment).report.receipt.deliveryKey, submission.request.id);
 });
 
-test('recipient confirms exact final through purpose-built wait result without sender reactivation', () => {
+test('native wait remains notification while shared report receipt needs no sender reactivation', () => {
   const f = fixture();
   const prepared = f.relay.prepare({ ...f.spec, recipientHostId: 'director-host' }, 'director');
   f.relay.recordNativeResult(prepared.assignment, 'director', prepared.nativeAction.id,
@@ -154,7 +154,8 @@ test('recipient confirms exact final through purpose-built wait result without s
   });
   const pending = f.relay.recordNativeResult(prepared.assignment, 'director', receipt.nativeAction.id,
     result({ polls: [{ schemaVersion: 1, cursor: 'cursor-1', thread: { id: 'coordinator', hostId: 'coordinator-host' }, latestTurn: { id: 'turn-wait', status: 'completed', error: null }, latestAssistantMessageId: null, latestAssistantMessage: null }] }));
-  assert.equal(pending.status, 'RECEIPT_PENDING');
+  assert.equal(pending.status, 'NOTIFICATION_PENDING');
+  assert.match(pending.nextAction, / read-report /);
   assert.equal(pending.nativeAction.args.targets[0].afterCursor, undefined);
   assert.equal(f.relay.status(prepared.assignment).report.receipt, null);
 
@@ -182,17 +183,20 @@ test('recipient confirms exact final through purpose-built wait result without s
     ], isError: false },
   ]) {
     const refused = f.relay.recordNativeResult(prepared.assignment, 'director', receipt.nativeAction.id, rejected);
-    assert.equal(refused.status, 'RECEIPT_PENDING');
+    assert.equal(refused.status, 'NOTIFICATION_PENDING');
     assert.equal(refused.nativeAction.args.targets[0].afterCursor, undefined);
   }
 
   const received = f.relay.recordNativeResult(prepared.assignment, 'director', receipt.nativeAction.id,
     result({ polls: [poll(message())] }));
-  assert.equal(received.status, 'RECEIVED');
+  assert.equal(received.status, 'NOTIFIED');
+  assert.equal(f.relay.status(prepared.assignment).report.receipt, null);
+  const read = f.relay.readReport(prepared.assignment, 'director');
+  f.relay.report('acknowledge', prepared.assignment, 'director', read.acknowledgement);
   f.relay.report('accept', prepared.assignment, 'director');
   const stored = f.relay.status(prepared.assignment).report.receipt;
-  assert.equal(stored.transport, 'wait_threads');
-  assert.equal(stored.cursor, 'cursor-2');
+  assert.equal(stored.transport, 'shared-storage');
+  assert.equal(f.relay.status(prepared.assignment).report.nativeReceipt.status, 'notified');
   assert.equal(f.relay.status(prepared.assignment).report.submission, null);
 });
 

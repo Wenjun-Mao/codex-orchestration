@@ -93,22 +93,26 @@ explicit `prepare` with a valid request contract initializes that namespace afte
 the Flow exclusion check.
 Conflicting event IDs or bytes are rejected.
 
-The exact recipient uses `prepare-receipt` to generate a read-only `wait_threads`
-action for the frozen sender. `record-native-result` accepts receipt only when the
-returned thread/host, completed turn ID, and structured assistant message match the
-hook capture. The completed turn must have no error, and the message ID, turn ID,
-`final_answer` phase, and exact text bytes must agree; commentary, wrong-turn,
-error, or conflicting results remain pending. A
-nonterminal pending snapshot can repeat only this read observation using
-its cursor. A completed mismatch is reread without advancing the cursor so a
-temporarily absent final remains available. Neither case repeats creation, send,
-or archive actions. Receipt alone is supported;
-`accept` and `reject` are independent semantic decisions.
+The exact recipient runs `read-report`. This read-only command returns the frozen
+sender, recipient, assignment, result association, event, exact final bytes and
+digest directly from Relay's shared repository state. It also generates an explicit
+`acknowledge` command bound to the event, final digest and complete association
+digest. Reading does not record receipt. Acknowledgement rechecks those frozen facts
+and records `transport: "shared-storage"`; `accept` or `reject` remains a separate
+semantic decision. Missing hook capture blocks both reading and acknowledgement.
 
-The optional message path remains available through `submit`. It persists one
-attempt, then generates an exact `send_message_to_thread` request containing the
-data-only final and a unique recipient receipt command. Retrying produces no second
-send request. Queue acknowledgement remains distinct from exact receipt.
+`prepare-receipt` remains available only as optional native completion notification.
+Its `wait_threads` observation validates exact task/host/turn/message facts when the
+host supplies them, but never records receipt and is not required to retrieve the
+report. Null-message, commentary, wrong-turn, error, or conflicting results remain
+pending notification state. Neither notification outcome repeats creation, send,
+or archive actions.
+
+The older optional message path remains available through sender-only `submit` for
+existing source compatibility. It persists one attempt and never returns a second
+send request. Because genuine Stop capture occurs after the sender stops, Relay does
+not use this path as the normal report flow and does not reactivate or impersonate
+the sender to prepare it. Queue acknowledgement remains distinct from receipt.
 
 `retire` generates one exact `set_thread_archived` request after required capture,
 receipt and decision. A coordinator task also remains available until every sequential
@@ -173,7 +177,8 @@ outside this repository, checks every static runtime import stays within Relay o
 Node built-ins, and runs the connected CLI/real-Git journeys against the relocated
 package with Flow unavailable. Test harnesses are not shipped. The native source
 adapter interface uses `record-native-result`, the packaged Stop hook,
-`prepare-receipt`, optional `submit`, and task retirement. Low-level injected
+`read-report`, `acknowledge`, optional `prepare-receipt` notification, legacy
+sender-only `submit`, and task retirement. Low-level injected
 operations remain available for deterministic source tests only.
 
 See [source contracts](docs/decisions/0001-source-contract.md), the

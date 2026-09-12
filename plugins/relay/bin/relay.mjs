@@ -24,8 +24,10 @@ relay handoff --repo PATH --ticket GENERATED --actor TASK --spec FILE
 relay finish --repo PATH --ticket GENERATED --actor TASK
 relay verify --repo PATH --ticket GENERATED --actor TASK --decision continue|finish|reject
 relay capture --repo PATH --assignment ID --actor TASK --event FILE
+relay read-report --repo PATH --assignment ID --actor RECIPIENT
+relay acknowledge --repo PATH --assignment ID --actor RECIPIENT --event-id ID --digest SHA256 --association-digest SHA256
 relay submit --repo PATH --assignment ID --actor TASK
-relay prepare-receipt --repo PATH --assignment ID --actor RECIPIENT
+relay prepare-receipt --repo PATH --assignment ID --actor RECIPIENT  # optional native notification
 relay observe-report --repo PATH --assignment ID --actor TASK --observation FILE
 relay receive --repo PATH --assignment ID --actor TASK --delivery-key KEY [--decision accepted|rejected]
 relay accept|reject|retire --repo PATH --assignment ID --actor TASK
@@ -45,7 +47,8 @@ try {
   const { values, positionals } = parseArgs({ allowPositionals: true, options: {
     repo: { type: 'string' }, actor: { type: 'string' }, spec: { type: 'string' }, ticket: { type: 'string' }, assignment: { type: 'string' },
     observation: { type: 'string' }, event: { type: 'string' }, envelope: { type: 'string' }, result: { type: 'string' }, decision: { type: 'string' }, resolution: { type: 'string' }, token: { type: 'string' },
-    'action-id': { type: 'string' }, 'delivery-key': { type: 'string' },
+    'action-id': { type: 'string' }, 'delivery-key': { type: 'string' }, 'event-id': { type: 'string' },
+    digest: { type: 'string' }, 'association-digest': { type: 'string' },
     'commands-stopped': { type: 'boolean' }, help: { type: 'boolean' },
   }});
   context = values;
@@ -64,6 +67,7 @@ try {
     else if (operation === 'finish') result = relay.finish(values.ticket, values.actor);
     else if (operation === 'verify') result = relay.verify(values.ticket, values.actor, values.decision);
     else if (operation === 'recover') result = relay.recover(values.ticket, values.actor, file('resolution'));
+    else if (operation === 'read-report') result = relay.readReport(values.assignment, values.actor);
     else if (operation === 'status') result = relay.status(values.assignment);
     else if (operation === 'inspect-lock') {
       const lock = JSON.parse(readFileSync(relay.store.root + '/transition.lock', 'utf8'));
@@ -75,6 +79,9 @@ try {
       operation === 'capture' ? file('event') : operation === 'observe-report' ? file('observation') : operation === 'receive' ? {
         envelope: values.envelope ? file('envelope') : null,
         deliveryKey: values['delivery-key'], decision: values.decision,
+      } : operation === 'acknowledge' ? {
+        eventId: values['event-id'], digest: values.digest,
+        associationDigest: values['association-digest'],
       } : {});
     process.stdout.write(JSON.stringify(result, null, 2) + '\n');
   }

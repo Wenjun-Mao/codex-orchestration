@@ -19,12 +19,12 @@ export function fixture() {
 export function deliver(relay, id, sender, recipient, decision = 'accepted') {
   const report = relay.status(id).report;
   const captured = relay.report('capture', id, sender, { sender, correlation: report.correlation, eventId: 'event-' + id, text: `Actual fixture final for ${id}` });
-  const submission = relay.report('submit', id, sender);
-  relay.report('observe-report', id, sender, { submissionId: submission.request.id, status: 'queued' });
-  relay.report('receive', id, recipient, { envelope: captured.envelope, decision });
+  const read = relay.readReport(id, recipient);
+  relay.report('acknowledge', id, recipient, read.acknowledgement);
+  relay.report(decision === 'accepted' ? 'accept' : 'reject', id, recipient);
   const archive = relay.report('retire', id, recipient);
   relay.recordNative(id, recipient, { kind: 'archive', actionId: archive.nativeAction.id, taskId: sender, status: 'archived' });
-  return { captured, submission, archive };
+  return { captured, read, archive };
 }
 export const cliPath = fileURLToPath(new URL('../bin/relay.mjs', import.meta.url));
 export function cli(repo, operation, args = {}, path = cliPath) {

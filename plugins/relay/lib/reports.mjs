@@ -4,6 +4,46 @@ import { digest, same } from './source.mjs';
 
 // Observations enter only through explicit injected adapters/events in this source stage.
 // No current HEAD lookup belongs here: reports remain bound after successors advance.
+function associationDigest(report) {
+  return digest(JSON.stringify(report.association));
+}
+function frozenEnvelope(report) {
+  return { ...report.association, ...report.final };
+}
+function requireFrozenReport(record) {
+  const report = record.report;
+  requireThat(report.association && report.final, 'Genuine captured final required before report retrieval');
+  requireThat(
+    report.association.assignment === record.id
+    && report.association.sender === report.sender
+    && report.association.recipient === report.recipient
+    && report.association.correlation === report.correlation
+    && same(report.association.result, record.result),
+    'Frozen report assignment or result association mismatch',
+  );
+  requireThat(report.final.digest === digest(report.final.text), 'Frozen final digest mismatch');
+  return report;
+}
+export function readReportOperation(relay, record, actor) {
+  const report = record.report;
+  requireThat(actor === report.recipient, 'Frozen report is available only to its exact recipient');
+  requireFrozenReport(record);
+  const acknowledgement = {
+    eventId: report.final.eventId,
+    digest: report.final.digest,
+    associationDigest: associationDigest(report),
+  };
+  return relay.response(actor, 'none', relay.command('acknowledge', {
+    assignment: record.id, actor,
+    'event-id': acknowledgement.eventId,
+    digest: acknowledgement.digest,
+    'association-digest': acknowledgement.associationDigest,
+  }), {
+    status: 'REPORT_AVAILABLE',
+    report: frozenEnvelope(report),
+    acknowledgement,
+  });
+}
 export function reportOperation(relay, control, record, operation, actor, input = {}) {
   const report = record.report;
   const command = (op, args = {}) => relay.command(op, { assignment: record.id, actor, ...args });
@@ -26,7 +66,7 @@ export function reportOperation(relay, control, record, operation, actor, input 
     const final = { eventId: input.eventId, text: input.text, digest: digest(input.text) };
     if (report.final) requireThat(same(report.final, final), 'Final event or bytes conflict');
     else report.final = final;
-    return save(response('CAPTURED', relay.command('prepare-receipt', {
+    return save(response('CAPTURED', relay.command('read-report', {
       assignment: record.id, actor: report.recipient,
     }), { envelope: { ...report.association, ...final } }));
   }
@@ -61,28 +101,49 @@ export function reportOperation(relay, control, record, operation, actor, input 
     requireThat(actor === report.recipient && report.final && report.association, 'Exact recipient and captured final required');
     const created = !report.nativeReceipt;
     if (created) report.nativeReceipt = { id: randomUUID(), status: 'awaiting-observation', cursor: null };
-    const value = response('RECEIPT_OBSERVATION_PREPARED', 'Run this exact read-only wait once, then record its unmodified tool result.', {
+    const value = response('NOTIFICATION_PREPARED', 'This native wait is optional notification only. Read the frozen report directly for receipt.', {
       nativeAction: receiptAction(),
       recordCommand: command('record-native-result', { 'action-id': report.nativeReceipt.id, result: '<exact-tool-result.json>' }),
     });
     return created ? save(value) : value;
   }
   if (operation === 'observe-receipt') {
-    requireThat(actor === report.recipient && report.nativeReceipt && input.receiptId === report.nativeReceipt.id, 'Native receipt identity mismatch');
-    requireThat(['received', 'pending'].includes(input.status), 'Native receipt observation status required');
+    requireThat(actor === report.recipient && report.nativeReceipt && input.receiptId === report.nativeReceipt.id, 'Native notification identity mismatch');
+    requireThat(['received', 'pending'].includes(input.status), 'Native notification observation status required');
     if (input.status === 'received') {
       requireThat(input.taskId === report.sender && input.eventId === report.final.eventId && input.textDigest === report.final.digest, 'Native receipt does not match frozen sender, event and bytes');
       requireThat(!record.taskHostId || input.hostId === record.taskHostId, 'Native receipt host mismatch');
-      report.nativeReceipt = { ...report.nativeReceipt, status: 'received', cursor: input.cursor, nativeResultDigest: input.nativeResultDigest };
-      report.receipt = { recipient: actor, eventId: report.final.eventId, digest: report.final.digest, transport: 'wait_threads', cursor: input.cursor };
-      return save(response(record.decision ? 'RECEIVED_WITH_DECISION' : 'RECEIVED', record.decision ? command('retire') : command('accept')));
+      report.nativeReceipt = { ...report.nativeReceipt, status: 'notified', cursor: input.cursor, nativeResultDigest: input.nativeResultDigest };
+      return save(response('NOTIFIED', relay.command('read-report', { assignment: record.id, actor: report.recipient })));
     }
-    requireThat(report.nativeReceipt.status !== 'received', 'Native receipt cannot regress');
+    requireThat(report.nativeReceipt.status !== 'notified', 'Native notification cannot regress');
     report.nativeReceipt = { ...report.nativeReceipt, status: 'pending', cursor: input.cursor, nativeResultDigest: input.nativeResultDigest };
-    return save(response('RECEIPT_PENDING', 'Repeat only this read-only observation; no creation, send or archive action is retried.', {
+    return save(response('NOTIFICATION_PENDING', relay.command('read-report', { assignment: record.id, actor: report.recipient }), {
       nativeAction: receiptAction(),
       recordCommand: command('record-native-result', { 'action-id': report.nativeReceipt.id, result: '<exact-tool-result.json>' }),
     }));
+  }
+  if (operation === 'acknowledge') {
+    requireThat(actor === report.recipient, 'Exact recipient required for acknowledgement');
+    requireFrozenReport(record);
+    requireThat(input.eventId === report.final.eventId && input.digest === report.final.digest,
+      'Acknowledgement event or final digest mismatch');
+    const exactAssociationDigest = associationDigest(report);
+    requireThat(input.associationDigest === exactAssociationDigest,
+      'Acknowledgement result association mismatch');
+    const receipt = {
+      recipient: actor,
+      eventId: report.final.eventId,
+      digest: report.final.digest,
+      transport: 'shared-storage',
+      associationDigest: exactAssociationDigest,
+    };
+    if (report.receipt) {
+      requireThat(same(report.receipt, receipt), 'A different receipt transport or proof is already recorded');
+      return response('ALREADY_ACKNOWLEDGED', record.decision ? command('retire') : command('accept'));
+    }
+    report.receipt = receipt;
+    return save(response('ACKNOWLEDGED', command('accept')));
   }
   if (operation === 'observe-report') {
     requireThat(actor === report.sender && report.submission && input.submissionId === report.submission.id, 'Submission identity mismatch');
@@ -97,7 +158,9 @@ export function reportOperation(relay, control, record, operation, actor, input 
     const exactEnvelope = input.envelope && same(input.envelope, expected);
     const exactDelivery = input.deliveryKey === report.submission.id;
     requireThat(exactEnvelope || exactDelivery, 'Receipt must match the exact delivered envelope or delivery key');
-    report.receipt = { recipient: actor, eventId: report.final.eventId, digest: report.final.digest, deliveryKey: report.submission.id };
+    const receipt = { recipient: actor, eventId: report.final.eventId, digest: report.final.digest, deliveryKey: report.submission.id };
+    if (report.receipt) requireThat(same(report.receipt, receipt), 'A different receipt transport or proof is already recorded');
+    else report.receipt = receipt;
     if (input.decision) decide(record, input.decision);
     return save(response(record.decision ? 'RECEIVED_WITH_DECISION' : 'RECEIVED', record.decision
       ? command('retire') : command('accept')));

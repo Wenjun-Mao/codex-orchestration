@@ -26,11 +26,16 @@ test('connected CLI: preparation → local work → executor → verification �
   for (const [id, sender, recipient] of [[child.assignment, 'executor', 'coordinator'], [p.assignment, 'coordinator', 'director']]) {
     const status = cli(repo, 'status', { assignment: id });
     const event = { sender, correlation: status.report.correlation, eventId: 'fixture-' + id, text: 'Fixture final bytes\nwith exact newline\n' };
-    const capture = cli(repo, 'capture', { assignment: id, actor: sender, event: jsonFile(event) });
-    const submit = cli(repo, 'submit', { assignment: id, actor: sender });
-    cli(repo, 'observe-report', { assignment: id, actor: sender, observation: jsonFile({ submissionId: submit.request.id, status: 'queued' }) });
+    cli(repo, 'capture', { assignment: id, actor: sender, event: jsonFile(event) });
     assert.equal(cli(repo, 'status', { assignment: id }).report.receipt, null);
-    cli(repo, 'receive', { assignment: id, actor: recipient, envelope: jsonFile(capture.envelope) });
+    const read = cli(repo, 'read-report', { assignment: id, actor: recipient });
+    assert.equal(cli(repo, 'status', { assignment: id }).report.receipt, null);
+    cli(repo, 'acknowledge', {
+      assignment: id, actor: recipient,
+      'event-id': read.acknowledgement.eventId,
+      digest: read.acknowledgement.digest,
+      'association-digest': read.acknowledgement.associationDigest,
+    });
     cli(repo, 'accept', { assignment: id, actor: recipient });
     const archive = cli(repo, 'retire', { assignment: id, actor: recipient });
     assert.deepEqual(archive.nativeAction.args, { threadId: sender, archived: true });

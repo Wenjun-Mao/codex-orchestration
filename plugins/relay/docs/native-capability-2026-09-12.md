@@ -57,21 +57,22 @@ Relay now stages only these native boundaries:
 2. After source release, a plugin-bundled `Stop` command captures the exact bound
    task, turn, and final bytes. It ignores unbound tasks and unsealed results and
    never reads a transcript, sends a message, continues a turn, or calls private IPC.
-3. The exact recipient obtains a read-only `wait_threads` action. Receipt is recorded
-   only when thread, host, error-free completed turn, and a matching-ID same-turn
-   `final_answer` message's exact text bytes equal the hook capture.
-   Nonterminal pending snapshots can repeat this read observation with their cursor;
-   a completed mismatch is reread without advancing it.
-4. An optional `send_message_to_thread` action keeps queue acknowledgement separate
-   from recipient receipt. It persists an attempt before exposing the request.
+3. The exact recipient reads the immutable captured report from shared Relay state.
+   The read is non-mutating and returns the result association and exact final plus
+   a command whose event, final digest and association digest are rechecked before
+   recording `shared-storage` acknowledgement.
+4. `wait_threads` can provide optional completion notification but does not retrieve
+   or prove receipt. The older sender-only message action remains a compatibility
+   path; it is not prepared through sender reactivation or actor impersonation.
 5. `set_thread_archived` is prepared once. A background acknowledgement remains
    ambiguous until an exact `list_archived_threads` result affirmatively contains
    the task. No Git resource is deleted.
 
 Adapter tests use the observed native result shape and injected Stop events in
 disposable repositories. The saved genuine result proves the completed-result
-parser boundary; it does not complete Stop capture, delegation, archival, successor,
-coexistence, or release qualification.
+parser boundary. The repaired canary has genuine executor delegation and Stop
+capture; shared-storage acknowledgement, verification, archival, successor,
+coexistence, and release qualification remain incomplete.
 
 ## Exact blocker
 
@@ -79,7 +80,7 @@ The director owns staging the corrected exact commit into the already managed
 candidate and resuming the paused journey in
 [native-disposable-journey.md](native-disposable-journey.md). This source correction
 does not install, enable, trust, or restart anything. Full qualification still
-requires authentic Stop capture, executor delegation and receipt, child-first
-archival, successor admission, and separate-repository Flow coexistence. Starting a
+requires shared-storage receipt, verification, child-first archival, successor
+admission, and separate-repository Flow coexistence. Starting a
 second App Server client or using the running app's private control socket remains
 outside the approved adapter shape.

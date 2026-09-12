@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { Store, requireThat } from './store.mjs';
 import { repository, git, clean, snapshot, inspectResult, runChecks, validateScope, validateChecks, inScope, refuseFlow } from './source.mjs';
-import { reportOperation } from './reports.mjs';
+import { readReportOperation, reportOperation } from './reports.mjs';
 import { normalizeNativeResult } from './native.mjs';
 
 const quote = value => "'" + String(value).replaceAll("'", "'\\''") + "'";
@@ -52,7 +52,7 @@ export class Relay {
     if (!record.outcome) return response(record.task ?? record.creator, 'Wait for the current executor to transfer its exact result; do not edit the retained checkout.', 'DELEGATED');
     if (!record.task) return response(record.creator, this.command('record-native-result', { ...args, actor: record.creator, 'action-id': record.creation.id, result: '<exact-tool-result.json>' }), 'ORPHAN_IDENTITY_PENDING');
     if (!record.report.final) return response(record.task, `Emit the genuine native final for correlation ${record.report.correlation}; capture must use the frozen result association.`, 'CAPTURE_PENDING');
-    if (!record.report.receipt) return response(record.recipient, this.command('prepare-receipt', { ...args, actor: record.recipient }), 'RECEIPT_PENDING');
+    if (!record.report.receipt) return response(record.recipient, this.command('read-report', { ...args, actor: record.recipient }), 'RECEIPT_PENDING');
     if (!record.decision) return response(record.recipient, this.command('accept', { ...args, actor: record.recipient }), 'DECISION_PENDING');
     if (!record.archive) return response(record.recipient, this.command('retire', { ...args, actor: record.recipient }), 'RETIREMENT_PENDING');
     if (record.archive.status !== 'archived') return response(record.recipient, this.command('record-native-result', { ...args, actor: record.recipient, 'action-id': record.archive.id, result: '<exact-tool-result.json>' }), 'ARCHIVE_PENDING');
@@ -321,6 +321,10 @@ export class Relay {
   }
   report(operation, id, actor, input) {
     return this.store.locked(control => reportOperation(this, control, this.record(control, id), operation, actor, input));
+  }
+  readReport(id, actor) {
+    const control = this.store.control();
+    return readReportOperation(this, this.record(control, id), actor);
   }
   status(id) {
     const control = this.store.control();

@@ -3,6 +3,49 @@ import assert from 'node:assert/strict';
 import { Relay } from '../lib/relay.mjs';
 import { fixture, deliver } from './helpers.mjs';
 
+test('exact recipient reads and explicitly acknowledges the frozen shared-storage report', () => {
+  const f = fixture(); const { prepared, ready } = f.start();
+  f.commit('src/value.txt', 'shared report'); f.relay.finish(ready.ticket, 'coordinator');
+  assert.throws(() => f.relay.readReport(prepared.assignment, 'director'), /captured final/);
+  const report = f.relay.status(prepared.assignment).report;
+  const captured = f.relay.report('capture', prepared.assignment, 'coordinator', {
+    sender: 'coordinator', correlation: report.correlation,
+    eventId: 'shared-event', text: 'exact shared bytes',
+  });
+  assert.throws(() => f.relay.readReport(prepared.assignment, 'foreign'), /exact recipient/);
+  const beforeRead = f.relay.store.control().assignments[prepared.assignment];
+  const read = f.relay.readReport(prepared.assignment, 'director');
+  assert.equal(read.status, 'REPORT_AVAILABLE');
+  assert.deepEqual(read.report, captured.envelope);
+  assert.match(read.nextAction, / acknowledge /);
+  assert.equal(f.relay.store.control().assignments[prepared.assignment], beforeRead);
+  assert.equal(f.relay.status(prepared.assignment).report.receipt, null);
+  assert.equal(f.relay.status(prepared.assignment).decision, null);
+  f.start('successor');
+  assert.deepEqual(f.relay.readReport(prepared.assignment, 'director').report, captured.envelope);
+
+  for (const mismatch of [
+    { ...read.acknowledgement, eventId: 'stale-event' },
+    { ...read.acknowledgement, digest: 'wrong-digest' },
+    { ...read.acknowledgement, associationDigest: 'wrong-association' },
+  ]) assert.throws(() => f.relay.report('acknowledge', prepared.assignment, 'director', mismatch), /mismatch/);
+  assert.throws(() => f.relay.report('acknowledge', prepared.assignment, 'foreign', read.acknowledgement), /recipient/);
+
+  const acknowledged = f.relay.report('acknowledge', prepared.assignment, 'director', read.acknowledgement);
+  assert.equal(acknowledged.status, 'ACKNOWLEDGED');
+  const stored = f.relay.status(prepared.assignment).report.receipt;
+  assert.equal(stored.transport, 'shared-storage');
+  assert.equal(stored.eventId, 'shared-event');
+  assert.equal(stored.associationDigest, read.acknowledgement.associationDigest);
+  assert.equal(f.relay.status(prepared.assignment).decision, null);
+  const committedFact = f.relay.store.control().assignments[prepared.assignment];
+  assert.equal(f.relay.report('acknowledge', prepared.assignment, 'director', read.acknowledgement).status, 'ALREADY_ACKNOWLEDGED');
+  assert.equal(f.relay.store.control().assignments[prepared.assignment], committedFact);
+  assert.throws(() => f.relay.report('retire', prepared.assignment, 'director'), /decision/);
+  f.relay.report('accept', prepared.assignment, 'director');
+  assert.equal(f.relay.report('retire', prepared.assignment, 'director').status, 'ARCHIVE_PREPARED_ONCE');
+});
+
 test('frozen final conflicts, foreign association and exact receipt remain independent from queued/accepted', () => {
   const f = fixture(); const { prepared, ready } = f.start();
   assert.throws(() => f.relay.report('capture', prepared.assignment, 'coordinator', {}), /Frozen/);

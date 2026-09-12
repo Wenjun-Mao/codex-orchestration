@@ -6,8 +6,9 @@
 - Atomic current source permission, direct verification transfer and explicit recovery.
 - Frozen reporting with exact receipt/decision and task-only archival observations.
 - Coordinator retirement preserves the recipient until every sequential child's report and archival are complete.
-- Staged purpose-built App result normalization, exact Stop capture, direct wait receipt, and affirmative archive observation.
+- Staged purpose-built App result normalization, exact Stop capture, optional wait notification, and affirmative archive observation.
 - Read-only hook discovery leaves fresh, unrelated, and Flow-only repositories unmodified.
 - Native receipt normalization requires an exact same-turn `final_answer` message object.
+- Exact recipients can read and explicitly acknowledge frozen reports through shared storage; native wait is optional notification.
 - Disposable Git/CLI, crash, scope/drift, reporting and packed isolation tests.
-- Native installation/trust, connected delivery, startup measurement, coexistence and pilot remain gates.
+- Corrected candidate installation, repaired connected completion, coexistence and pilot remain gates.
