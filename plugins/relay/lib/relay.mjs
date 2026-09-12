@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { Store, requireThat } from './store.mjs';
 import { repository, git, clean, snapshot, inspectResult, runChecks, validateScope, validateChecks, inScope, refuseFlow } from './source.mjs';
 import { reportOperation } from './reports.mjs';
+import { normalizeNativeResult } from './native.mjs';
 
 const quote = value => "'" + String(value).replaceAll("'", "'\\''") + "'";
 export class Relay {
@@ -36,7 +37,7 @@ export class Relay {
     if (p.mode === 'reserved') {
       return this.response(record.task ?? record.creator, 'none', record.task
         ? this.command('start', { ticket, actor: record.task })
-        : this.command('record-native', { assignment: record.id, actor: record.creator, observation: '<exact-creation-observation.json>' }),
+        : this.command('record-native-result', { assignment: record.id, actor: record.creator, 'action-id': record.creation.id, result: '<exact-tool-result.json>' }),
       { status: record.task ? 'BOUND' : 'BINDING_PENDING', assignment: record.id, ticket });
     }
     const next = p.mode === 'write' ? this.command('finish', { ticket, actor: p.actor })
@@ -49,13 +50,12 @@ export class Relay {
     const args = { assignment: record.id };
     const response = (actor, next, status) => this.response(actor, 'none', next, { status, assignment: record.id });
     if (!record.outcome) return response(record.task ?? record.creator, 'Wait for the current executor to transfer its exact result; do not edit the retained checkout.', 'DELEGATED');
-    if (!record.task) return response(record.creator, this.command('record-native', { ...args, actor: record.creator, observation: '<exact-creation-observation.json>' }), 'ORPHAN_IDENTITY_PENDING');
+    if (!record.task) return response(record.creator, this.command('record-native-result', { ...args, actor: record.creator, 'action-id': record.creation.id, result: '<exact-tool-result.json>' }), 'ORPHAN_IDENTITY_PENDING');
     if (!record.report.final) return response(record.task, `Emit the genuine native final for correlation ${record.report.correlation}; capture must use the frozen result association.`, 'CAPTURE_PENDING');
-    if (!record.report.submission) return response(record.task, this.command('submit', { ...args, actor: record.task }), 'SUBMISSION_PENDING');
-    if (!record.report.receipt) return response(record.recipient, this.command('receive', { ...args, actor: record.recipient, envelope: '<actually-received-envelope.json>' }), 'RECEIPT_PENDING');
+    if (!record.report.receipt) return response(record.recipient, this.command('prepare-receipt', { ...args, actor: record.recipient }), 'RECEIPT_PENDING');
     if (!record.decision) return response(record.recipient, this.command('accept', { ...args, actor: record.recipient }), 'DECISION_PENDING');
     if (!record.archive) return response(record.recipient, this.command('retire', { ...args, actor: record.recipient }), 'RETIREMENT_PENDING');
-    if (record.archive.status !== 'archived') return response(record.recipient, this.command('record-native', { ...args, actor: record.recipient, observation: '<exact-archive-observation.json>' }), 'ARCHIVE_PENDING');
+    if (record.archive.status !== 'archived') return response(record.recipient, this.command('record-native-result', { ...args, actor: record.recipient, 'action-id': record.archive.id, result: '<exact-tool-result.json>' }), 'ARCHIVE_PENDING');
     return response(record.recipient, 'Task retired; prepare the next approved assignment when needed.', 'RETIRED');
   }
   specification(spec) {
@@ -71,7 +71,8 @@ export class Relay {
       branch: baseline.branch, baseline: baseline.head, scope: spec.scope, checks: spec.checks,
       outcomeIntent: spec.outcome, plan: spec.plan, acceptance: spec.acceptance,
       projectId: spec.projectId, selector: spec.selector, recipient: parent ? creator : spec.recipient,
-      task: null, enabled: false, decision: null, outcome: null,
+      recipientHostId: parent ? null : (spec.recipientHostId ?? null),
+      task: null, taskHostId: null, enabled: false, decision: null, outcome: null,
       creation: { id: randomUUID(), status: 'awaiting-observation', provisional: null },
       report: { correlation: randomUUID(), sender: null, recipient: parent ? creator : spec.recipient, association: null, final: null, submission: null, receipt: null },
     };
@@ -80,8 +81,9 @@ export class Relay {
     const p = this.permissionResponse(control, record);
     const start = this.command('start', { ticket: p.ticket, actor: '<actual-native-task-id>' });
     const prompt = `Deliver: ${record.outcomeIntent}\nApproved plan: ${record.plan}\nScope: ${record.scope.join(', ')}\nAcceptance: ${record.acceptance}\nRole: ${record.role}; model ${record.selector.model}; thinking ${record.selector.thinking}.\nStart: ${start}\nNo writes before READY. Only the current ticket permits work; stop all source-changing tools before handoff/finish. Checks are read-only. Preserve failures. Emit your real final after source release; do not synthesize native events. Source-stage adapter qualification is still pending.`;
-    return { ...p, nativeAction: { id: record.creation.id, kind: 'create', args: { target: { type: 'project', projectId: record.projectId, environment: { type: 'local' } }, model: record.selector.model, thinking: record.selector.thinking, prompt } },
-      nextAction: 'Invoke this exact prepared native creation once, then record its actual observation using the returned command.', recordCommand: p.nextAction };
+    return { ...p, nativeAction: { id: record.creation.id, kind: 'create', tool: 'mcp__codex_app__create_thread', args: { target: { type: 'project', projectId: record.projectId, environment: { type: 'local' } }, model: record.selector.model, thinking: record.selector.thinking, prompt } },
+      nextAction: 'Invoke this exact prepared native creation once, then record its unmodified tool result using the returned command.',
+      recordCommand: this.command('record-native-result', { assignment: record.id, actor: record.creator, 'action-id': record.creation.id, result: '<exact-tool-result.json>' }) };
   }
   prepare(spec, actor) {
     return this.store.locked(control => {
@@ -113,6 +115,7 @@ export class Relay {
         requireThat(typeof observation.taskId === 'string' && observation.taskId.length > 0, 'Exact ready task identity required');
         requireThat(!record.creation.provisional || observation.clientThreadId === record.creation.provisional, 'Ready observation must correlate the exact provisional creation');
         record.task = observation.taskId;
+        record.taskHostId = observation.hostId ?? null;
         record.report.sender = record.task;
         control.tasks ??= {};
         requireThat(!control.tasks[record.task] || control.tasks[record.task] === record.id, 'Native task already bound to another assignment');
@@ -129,6 +132,35 @@ export class Relay {
       return this.permissionResponse(control, record);
     });
   }
+  recordNativeResult(id, actor, actionId, result) {
+    const control = this.store.control();
+    const record = this.record(control, id);
+    if (actionId === record.creation.id) {
+      return this.recordNative(id, actor, normalizeNativeResult({ kind: 'create', actionId, result }));
+    }
+    if (actionId === record.report.submission?.id) {
+      return this.report('observe-report', id, actor, normalizeNativeResult({
+        kind: 'report', actionId, result,
+        expectedThreadId: record.report.recipient,
+      }));
+    }
+    if (actionId === record.report.nativeReceipt?.id) {
+      return this.report('observe-receipt', id, actor, normalizeNativeResult({
+        kind: 'receipt', actionId, result,
+        expectedThreadId: record.task,
+        expectedHostId: record.taskHostId,
+        expectedEventId: record.report.final?.eventId,
+        expectedText: record.report.final?.text,
+      }));
+    }
+    if (actionId === record.archive?.id) {
+      return this.recordNative(id, actor, normalizeNativeResult({
+        kind: 'archive', actionId, result,
+        expectedThreadId: record.task,
+      }));
+    }
+    throw new Error('Native result does not match a prepared assignment action');
+  }
   start(ticket, actor) {
     return this.store.locked(control => {
       const id = ticket.split(':')[0];
@@ -136,7 +168,7 @@ export class Relay {
       requireThat(control.permission?.assignment === id && ['reserved', 'write'].includes(control.permission.mode), 'Reservation revoked or transferred; late start rejected');
       requireThat(record.checkout === this.repo.checkout, 'Wrong retained checkout');
       requireThat(ticket === `${id}:${control.permission.generation}` || (ticket === record.admissionTicket && control.permission.generation === record.startGeneration), 'Stale admission ticket');
-      if (!record.task) return this.response(record.creator, 'none', this.command('record-native', { assignment: id, actor: record.creator, observation: '<exact-creation-observation.json>' }), { status: 'BINDING_PENDING' });
+      if (!record.task) return this.response(record.creator, 'none', this.command('record-native-result', { assignment: id, actor: record.creator, 'action-id': record.creation.id, result: '<exact-tool-result.json>' }), { status: 'BINDING_PENDING' });
       requireThat(actor === record.task, 'Start actor differs from exact native binding');
       if (control.permission.mode === 'write') {
         git(this.repo.checkout, 'merge-base', '--is-ancestor', control.permission.checkpoint, 'HEAD');
@@ -163,6 +195,7 @@ export class Relay {
       const checkpoint = inspectResult(this.repo.checkout, parent.baseline, parent.scope, parent.branch);
       runChecks(this.repo.checkout, checkpoint, parent.checks, parent.branch);
       const child = this.newRecord(spec, base, actor, parent.id);
+      child.recipientHostId = parent.taskHostId;
       parent.children = [...(parent.children ?? []), child.id];
       parent.child = child.id;
       child.admissionTicket = this.transfer(control, child.id, null, 'reserved', base.head);
@@ -172,7 +205,12 @@ export class Relay {
   }
   seal(record, result) {
     record.result = result;
-    record.report.association = { assignment: record.id, sender: record.task, recipient: record.recipient, correlation: record.report.correlation, result };
+    record.report.association = {
+      assignment: record.id,
+      sender: record.task, senderHostId: record.taskHostId,
+      recipient: record.recipient, recipientHostId: record.recipientHostId,
+      correlation: record.report.correlation, result,
+    };
   }
   finish(ticket, actor) {
     return this.store.locked(control => {

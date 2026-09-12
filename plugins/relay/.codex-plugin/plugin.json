@@ -1,7 +1,7 @@
 {
   "name": "relay",
   "version": "0.1.0",
-  "description": "Serial retained-checkout coordination; source candidate with native qualification pending",
+  "description": "Serial retained-checkout coordination with a staged native adapter; installation and qualification pending",
   "author": {
     "name": "Wenjun Mao"
   },
@@ -9,7 +9,7 @@
   "interface": {
     "displayName": "Relay",
     "shortDescription": "Coordinate serial source delivery.",
-    "longDescription": "Serial retained-checkout coordination; source candidate with native qualification pending",
+    "longDescription": "Serial retained-checkout coordination with a staged native adapter; installation and qualification pending",
     "developerName": "Wenjun Mao",
     "category": "Productivity",
     "capabilities": [],

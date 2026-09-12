@@ -2,9 +2,11 @@
 
 Relay owns one retained checkout with one current source permission, sequential
 executors, direct verification, frozen reporting, and task-only retirement.
-This 0.1.0 candidate implements the **source contract only**. It has no installed
-hook, private native IPC, or qualified native transport. Injected events are test
-inputs, not proof that a real task was created, delivered a final, or archived.
+This 0.1.0 candidate implements the source contract and a minimal native adapter.
+The adapter is staged in the package but has not been installed, enabled, trusted,
+or exercised by real Relay tasks. It uses no private IPC. Injected tool results and
+hook events remain source tests, not proof that a real task was created, delivered
+a final, or archived.
 
 Run the public CLI with Node 20.11 or later:
 
@@ -29,6 +31,7 @@ The director supplies genuine work choices in a JSON file:
   "branch": "main",
   "projectId": "selected-existing-native-project",
   "recipient": "exact-director-task-id",
+  "recipientHostId": "exact-director-host-id",
   "selector": { "model": "explicitly-selected-model", "thinking": "low" },
   "scope": ["src/", "test/parser.test.mjs"],
   "checks": [["node", "--test", "test/parser.test.mjs"]],
@@ -44,7 +47,8 @@ to the retained checkout; Relay does not manage native project registration.
 `relay prepare --repo CHECKOUT --actor DIRECTOR --spec FILE` captures the clean
 selected branch and generates an assignment, ticket, one native creation request,
 and a brief containing the startup command. There is no implicit branch change or
-worktree creation. `record-native` binds the actual creation result; `start` is the
+worktree creation. `record-native-result` mechanically binds the unmodified
+`create_thread` result; `start` is the
 single coordinator admission command. These are three ordinary protocol calls;
 that count is an interface property, not a measured native startup budget.
 
@@ -80,29 +84,38 @@ place; inspect and repair under current write permission, or explicitly recover.
 ## Reporting and task retirement
 
 Reporting setup precedes write enablement. Release freezes sender, recipient,
-result revision and final correlation. A qualified future native adapter must
-supply actual final event bytes to `capture`; the source-stage event shape is
-`{sender, correlation, eventId, text}`. The CLI rejects conflicting bytes/events.
-`capture` produces the exact report envelope. `submit` durably records an attempt
-before returning one request. Retrying returns an observation action, never a
-second send request. `observe-report` takes `{submissionId, status}` where status
-is `queued` or `ambiguous`. Queue acceptance never implies receipt.
+result revision and final correlation. The packaged `Stop` hook supplies
+`session_id`, `turn_id`, and exact `last_assistant_message` bytes after source
+release. It ignores other repositories, unbound tasks, continued stops, and
+unsealed results. The hook reads no transcript file and never submits, steers, or
+continues the task. Conflicting event IDs or bytes are rejected.
 
-The recipient supplies the actually received envelope to `receive`, optionally
-with `--decision accepted|rejected`. Receipt alone is supported; `accept` and
-`reject` are independent semantic decisions. Executor verification may already
-have recorded its product decision; receipt must agree with that immutable decision.
-`retire` generates one exact task archive request after required capture, receipt
-and decision. A coordinator task also remains available until every sequential
+The exact recipient uses `prepare-receipt` to generate a read-only `wait_threads`
+action for the frozen sender. `record-native-result` accepts receipt only when the
+returned thread/host, completed turn ID, and final text exactly match the hook
+capture. A nonterminal pending snapshot can repeat only this read observation using
+its cursor. A completed mismatch is reread without advancing the cursor so a
+temporarily absent final remains available. Neither case repeats creation, send,
+or archive actions. Receipt alone is supported;
+`accept` and `reject` are independent semantic decisions.
+
+The optional message path remains available through `submit`. It persists one
+attempt, then generates an exact `send_message_to_thread` request containing the
+data-only final and a unique recipient receipt command. Retrying produces no second
+send request. Queue acknowledgement remains distinct from exact receipt.
+
+`retire` generates one exact `set_thread_archived` request after required capture,
+receipt and decision. A coordinator task also remains available until every sequential
 child whose frozen recipient is that coordinator has an exact receipt and an
 affirmatively reconciled task archive. Receipt alone and an ambiguous archive
 observation are insufficient because only that coordinator owns the child-retirement
 duty. The gate returns the first unresolved child action and does not block
 independent source admission. Relay does not assume reports or archive duties can
 reach an archived recipient; qualifying that native behavior remains outside this
-source candidate. Record
-`{kind:"archive", actionId, taskId, status:"archived"}` only
-from affirmative observation. An ambiguous outcome remains pending with no retry.
+source candidate. `record-native-result` treats a background archive response as
+ambiguous unless it affirmatively names the task as archived. Use the generated
+`list_archived_threads` observation action to establish that fact. An ambiguous
+outcome remains pending with no retry.
 No operation deletes source, switches branches, or requires historical HEAD replay.
 
 Pending capture blocks that sender's archive. Current ownership blocks another
@@ -153,10 +166,14 @@ is the exact packed file allowlist. Pack verification creates/unpacks an archive
 outside this repository, checks every static runtime import stays within Relay or
 Node built-ins, and runs the connected CLI/real-Git journeys against the relocated
 package with Flow unavailable. Test harnesses are not shipped. The native source
-adapter interface is public `record-native`, `capture`, `submit`, `observe-report`
-and `receive`; fixtures invoke those same operations. There is no synthetic hook.
+adapter interface uses `record-native-result`, the packaged Stop hook,
+`prepare-receipt`, optional `submit`, and task retirement. Low-level injected
+operations remain available for deterministic source tests only.
 
-See [source contracts](docs/decisions/0001-source-contract.md) and
+See [source contracts](docs/decisions/0001-source-contract.md), the
+[native adapter decision](docs/decisions/0002-native-adapter.md), the
+[current host capability record](docs/native-capability-2026-09-12.md), the
+[director-owned disposable journey](docs/native-disposable-journey.md), and
 [remaining acceptance gates](docs/acceptance.md). Startup tokens/elapsed time,
 actual native identity correlation, authentic final capture, recipient delivery,
 archive observation, separate-repository Flow coexistence, installation and the

@@ -3,27 +3,31 @@ import { readFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 import { Relay } from '../lib/relay.mjs';
 
-const help = `Relay source-stage CLI (native adapters are not installed or qualified)
+const help = `Relay native-adapter candidate (installation and qualification pending)
 
 Genuine work choices go in a spec file:
   {"outcome":"...","plan":"approved plan path","acceptance":"...",
    "branch":"main","projectId":"saved-project-id","recipient":"director-task",
+   "recipientHostId":"director-host",
    "selector":{"model":"selected-model","thinking":"selected-effort"},
    "scope":["src/"],"checks":[["node","--test"]],"dependencies":[]}
 Checks are argv arrays. Scope is exact paths or directory/ prefixes.
 
 relay prepare --repo PATH --actor TASK --spec FILE
   Generates assignment/ticket, native create arguments and startup brief.
+relay record-native-result --repo PATH --assignment ID --actor TASK --action-id ID --result FILE
+  Normalize one unmodified purpose-built App tool result. Never retries native actions.
 relay record-native --repo PATH --assignment ID --actor TASK --observation FILE
-  Exact prepared creation/archive observation. Never retries native actions.
+  Low-level injected observation for deterministic source tests only.
 relay start --repo PATH --ticket GENERATED --actor ACTUAL_TASK
 relay handoff --repo PATH --ticket GENERATED --actor TASK --spec FILE
 relay finish --repo PATH --ticket GENERATED --actor TASK
 relay verify --repo PATH --ticket GENERATED --actor TASK --decision continue|finish|reject
 relay capture --repo PATH --assignment ID --actor TASK --event FILE
 relay submit --repo PATH --assignment ID --actor TASK
+relay prepare-receipt --repo PATH --assignment ID --actor RECIPIENT
 relay observe-report --repo PATH --assignment ID --actor TASK --observation FILE
-relay receive --repo PATH --assignment ID --actor TASK --envelope FILE [--decision accepted|rejected]
+relay receive --repo PATH --assignment ID --actor TASK --delivery-key KEY [--decision accepted|rejected]
 relay accept|reject|retire --repo PATH --assignment ID --actor TASK
 relay recover --repo PATH --ticket GENERATED --actor CREATOR --resolution FILE
 relay status --repo PATH [--assignment ID]
@@ -40,7 +44,8 @@ let instance;
 try {
   const { values, positionals } = parseArgs({ allowPositionals: true, options: {
     repo: { type: 'string' }, actor: { type: 'string' }, spec: { type: 'string' }, ticket: { type: 'string' }, assignment: { type: 'string' },
-    observation: { type: 'string' }, event: { type: 'string' }, envelope: { type: 'string' }, decision: { type: 'string' }, resolution: { type: 'string' }, token: { type: 'string' },
+    observation: { type: 'string' }, event: { type: 'string' }, envelope: { type: 'string' }, result: { type: 'string' }, decision: { type: 'string' }, resolution: { type: 'string' }, token: { type: 'string' },
+    'action-id': { type: 'string' }, 'delivery-key': { type: 'string' },
     'commands-stopped': { type: 'boolean' }, help: { type: 'boolean' },
   }});
   context = values;
@@ -52,6 +57,7 @@ try {
     const file = key => JSON.parse(readFileSync(values[key], 'utf8'));
     let result;
     if (operation === 'prepare') result = relay.prepare(file('spec'), values.actor);
+    else if (operation === 'record-native-result') result = relay.recordNativeResult(values.assignment, values.actor, values['action-id'], file('result'));
     else if (operation === 'record-native') result = relay.recordNative(values.assignment, values.actor, file('observation'));
     else if (operation === 'start') result = relay.start(values.ticket, values.actor);
     else if (operation === 'handoff') result = relay.handoff(values.ticket, values.actor, file('spec'));
@@ -66,7 +72,10 @@ try {
       relay.store.recoverLock({ token: values.token, commandsStopped: values['commands-stopped'] });
       result = relay.response(values.actor ?? 'recovering operator', 'none', 'Inspect the current assignment; command-lock recovery grants no source permission.', { status: 'LOCK_RECOVERED' });
     } else result = relay.report(operation, values.assignment, values.actor,
-      operation === 'capture' ? file('event') : operation === 'observe-report' ? file('observation') : operation === 'receive' ? { envelope: file('envelope'), decision: values.decision } : {});
+      operation === 'capture' ? file('event') : operation === 'observe-report' ? file('observation') : operation === 'receive' ? {
+        envelope: values.envelope ? file('envelope') : null,
+        deliveryKey: values['delivery-key'], decision: values.decision,
+      } : {});
     process.stdout.write(JSON.stringify(result, null, 2) + '\n');
   }
 } catch (error) {

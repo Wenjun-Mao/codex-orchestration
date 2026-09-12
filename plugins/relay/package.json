@@ -17,6 +17,8 @@
   "files": [
     ".codex-plugin/plugin.json",
     "bin/relay.mjs",
+    "bin/relay-final-hook.mjs",
+    "hooks/",
     "lib/",
     "skills/",
     "docs/",

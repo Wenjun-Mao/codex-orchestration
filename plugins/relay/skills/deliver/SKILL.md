@@ -23,13 +23,16 @@ the exact revision; do not supply PASS claims. A rejected or interrupted writer
 requires stopped writers and explicit source disposition. Preserve rejected and
 dirty work. Never use task cancellation or lock recovery as write permission.
 
-After source release, emit the genuine final. Frozen result association remains
-valid as successors advance. Queue acknowledgement, exact recipient receipt and
-product acceptance are different facts. Archive only the exact prepared task,
-then record affirmative observation; never delete its checkout or retry an
-uncertain archive/submission.
+After source release, emit the genuine final. The trusted packaged Stop hook captures
+its exact task, turn and bytes against the frozen association. The recipient uses
+the generated `prepare-receipt` wait action and records its unmodified result; do
+not reactivate the sender or copy final text into a claimed receipt. Queue
+acknowledgement, exact recipient receipt and product acceptance are different facts.
+Archive only the exact prepared task, then use the generated archived-list
+observation to record affirmation; never delete its checkout or retry an uncertain
+archive/submission.
 
-This source candidate has no qualified native final/queue/archive adapter or hook.
-Use injected observations only in disposable source tests; do not call them real
-native delivery. For public command inputs or the current native boundary, read
+This candidate's native adapter and hook remain uninstalled and unqualified. Use
+injected observations only in source tests; do not call them real native delivery.
+For public command inputs or the current native boundary, read
 [the package README](../../README.md). Do not install this candidate implicitly.
