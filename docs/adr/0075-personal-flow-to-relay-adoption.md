@@ -15,22 +15,28 @@ The project director performs these minimum steps:
 2. Confirm a clean checkout and wanted work preserved on the approved baseline
    (normally `main`). Resolve dirty or unmerged wanted work first.
 3. Merge wanted, verified work into `main`; pause on conflicts or unclear inclusion.
-   Remove obsolete clean development worktrees and their merged local branches
+4. Archive the exact finished executor and coordinator tasks through the native
+   App tool, executors first. Preserve the director and active/unrelated tasks.
+   Identify targets before deleting their registry; already archived tasks need
+   no repeat call. Confirm archival from the result or native observation, not by
+   repairing old Flow journals. Preserve wanted work before host archival can
+   reclaim a task worktree.
+5. Remove obsolete clean development worktrees and their merged local branches
    after confirming their commits are preserved. Keep the retained checkout,
    `main`, unrelated worktrees and wanted unmerged work. Remote branch deletion
    requires separately scoped intent; never apply a broad wildcard sweep.
-4. Resolve the Git common directory and verify its exact `codex-flow` target is a
+6. Resolve the Git common directory and verify its exact `codex-flow` target is a
    real directory, not a symlink. Delete only that directory. Preserve source,
    retained refs/worktrees, existing backups, `.git/relay`, and shared host registries.
    Do not create a new backup unless requested.
-5. Verify target absence, clean preserved source and only the intended merge/ref/
+7. Verify intended task archival, target absence, clean preserved source and only the intended merge/ref/
    worktree changes. Report what was removed, never normal Flow success.
-6. Prepare the next approved Relay assignment normally. Source availability alone
+8. Prepare the next approved Relay assignment normally. Source availability alone
    is not admission proof; normal Relay preparation still enforces its guards.
 
 No additional per-step confirmation is needed for this bounded default. Pause for
 unclear ownership, active writers, unpreserved work, or broader deletion. Task
-archival is separate housekeeping, not a requirement to repair Flow journals.
+archival is included in cheap unplug, without requiring Flow journal repair.
 Never restart an old writer after disposal.
 
 ## Why and consequences

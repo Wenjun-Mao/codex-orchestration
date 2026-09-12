@@ -23,10 +23,13 @@ the next assignment. No unattended subagents or director wait loop as the defaul
   idle-director resumption until observed. Supported Stop continuation is a candidate
   to inspect, not approval to create an unbounded reporting loop.
 - Cheap unplug is a separate user-directed operator reset, not ordinary completion:
-  stop writers, merge wanted verified work into main, remove obsolete clean merged
+  stop writers, merge wanted verified work into main, archive exact finished
+  executors then coordinators through the native App tool, remove obsolete clean merged
   local branches/worktrees, delete exact obsolete plugin state, then start fresh.
   No Flow-era audit/acceptance, mandatory backup or journal repair. Retain source,
-  main/current checkout, unrelated/wanted work and existing backups. Verify actual
+  director task, main/current checkout, active/unrelated tasks, wanted work and
+  existing backups. Identify finished task targets before registry disposal; do
+  not replay already completed archival or repair old journals for it. Verify actual
   Git/filesystem boundaries. Extend to Relay state only with explicit reset intent;
   never confuse pending protocol status with lost product work.
 - Keep scope bounded: no concurrent/cross-host delivery, Flow rewrite, framework,
