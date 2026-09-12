@@ -50,6 +50,23 @@ the next assignment. No unattended subagents or director wait loop as the defaul
 
 ## Execution authority and escalation
 
+### Feasibility checkpoint (2026-09-12)
+
+Attended Terra-high read-only review completed and collected. Official Stop hooks
+support `decision:block` continuation; the App tool exposes sending to an exact
+task. Candidate: freeze the genuine report first, issue a single persisted advisory
+action to the sender's continuation, then notify the frozen recipient to read its
+report. Hook code must not call native tools itself. Do not reuse legacy `submit`,
+which embeds full report bytes and receipt instructions. Continued Stop must not
+recapture the final or create another notification loop. Crash/ambiguous sends must
+not blindly retry or count as receipt. Recipient archival needs a fresh exact
+sender-idle observation, since the notification may arrive before the sender stops.
+
+This is source-level feasibility, not live-host qualification or authorization to
+weaken capture/receipt contracts. Test this bounded path before widening the skill
+surface or introducing any transport fallback. The current installed behavior is
+unchanged. The review does not justify claims of guaranteed notification on crash.
+
 Director owns scope, notification decision and acceptance. Start with an attended
 bounded read-only feasibility review while recording this plan; no Flow activation
 for developing Relay. Source implementation can proceed under the approved
