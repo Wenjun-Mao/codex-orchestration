@@ -13,6 +13,8 @@ records acceptance/rejection and completes child-first retirement.
 The hook is the primary automatic path, not a second sender trying to determine
 whether the worker forgot. Explicit human/agent discussion remains possible but
 does not substitute for receipt or trigger another automatic completion send.
+The accepted boundary is [ADR 0076](../adr/0076-relay-collaboration-and-completion.md):
+direct messages for collaboration; hook-owned reporting for completion.
 
 ## Diagnosis and scope
 
@@ -74,6 +76,10 @@ Keep installed 0.2.1 working until a replacement is qualified.
 2. **Small implementation.** Use one isolated adapter and existing report records.
    Replace new-assignment continuation instructions, preserve retrieval and review,
    and amend decision 0003 with the chosen transport and rejected alternatives.
+   Remove redundant completion-send instructions from worker briefs/skills. Keep
+   truthful final-response and direct mid-work question/blocker guidance. Verify
+   the supported answer/resume mechanism; do not prescribe a completion-wait tool
+   as a generic message mailbox.
    No source ownership, integration or unplug redesign.
 3. **Focused regression and package checks.** Exercise genuine event parsing,
    capture-before-send, concurrent duplicate events, wrong recipient/host,
@@ -90,6 +96,8 @@ Keep installed 0.2.1 working until a replacement is qualified.
    Record task/turn identities and any setup intervention; do not relabel a repaired
    sequence as uninterrupted success. Keep useful work tiny and reuse the test
    project, not a new project per attempt.
+   Include question → manager answer → worker resume → finish in the journey:
+   an intermediate stop must not emit a completion notice or trigger cleanup.
 5. **Release and cleanup.** Review the exact diff, package and install only at a
    quiescent boundary; archive finished test tasks and remove disposable merged
    resources. Do not replace the runtime controlling an active self-hosted run.
