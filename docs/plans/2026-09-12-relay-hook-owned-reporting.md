@@ -1,7 +1,9 @@
 # Relay — hook-owned completion reporting
 
-Status: Draft. The user agreed to the architectural direction; this implementation
-plan awaits approval. Planning only: no dispatch, runtime change or installation.
+Status: Approved by the user's “go” on 2026-09-12. The user subsequently approved
+carrying forward the bounded experimental-route probe without routine approval
+pauses. No runtime change or installation has occurred. See the
+[feasibility note](../field-tests/2026-09-12-relay-hook-transport-feasibility.md).
 
 ## Outcome
 
