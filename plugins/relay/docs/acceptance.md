@@ -14,8 +14,8 @@ been enabled, trusted, or qualified by a native Relay task.
 | KI-05 | Frozen result/event/bytes, no resend after ambiguity, queue/receipt/acceptance distinct; staged Stop capture and exact `wait_threads` receipt comparison | Enabled/trusted authentic final capture and exact native recipient receipt required for closure |
 | KI-06 | Exact `set_thread_archived` intent, archived-list observation, child-recipient duty gate through affirmative archival, no Git deletion or old-HEAD checks | Affirmative native archival with retained source |
 | KI-07 | Generated briefs/tickets/native requests; focused tests; no runtime reads required by interface | Fresh-agent total token/call/time measurement, including director preparation |
-| KI-08 | Explicit 20-file package allowlist, only Node and Relay imports, and 13 passing relocated CLI/Git/native fixture tests; packaged hook shares that closure | Shared installation remains unqualified |
-| KI-09 | Reporting before enablement, direct verifier transfer, stale ticket and interrupted-transfer tests; staged exact task/host result normalization | Native identity/report/archive and separate-repository Flow coexistence |
+| KI-08 | Explicit 20-file package allowlist, only Node and Relay imports, and 14 passing relocated CLI/Git/native fixture tests; packaged hook shares that closure | Shared installation remains unqualified |
+| KI-09 | Reporting before enablement, direct verifier transfer, stale ticket and interrupted-transfer tests; staged exact task/host result normalization; non-mutating Stop discovery in fresh and Flow-only repositories | Native identity/report/archive and separate-repository Flow coexistence |
 
 Suggested umbrella update: record these as source-verified candidate coverage at
 the delivered commit, retaining unchecked native/release closure gates. Do not mark

@@ -21,7 +21,9 @@ export class Store {
   constructor(root, fault = () => {}) {
     this.root = root;
     this.fault = fault;
-    mkdirSync(join(root, 'facts'), { recursive: true });
+  }
+  initialize() {
+    mkdirSync(join(this.root, 'facts'), { recursive: true });
   }
   control() {
     const path = join(this.root, 'control.json');

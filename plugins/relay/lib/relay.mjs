@@ -86,10 +86,15 @@ export class Relay {
       recordCommand: this.command('record-native-result', { assignment: record.id, actor: record.creator, 'action-id': record.creation.id, result: '<exact-tool-result.json>' }) };
   }
   prepare(spec, actor) {
+    // Read-only discovery, status, and hook capture never initialize repository
+    // state. Only an explicit preparation with a valid request contract may
+    // create the Relay namespace.
+    refuseFlow(this.repo.common);
+    this.specification(spec);
+    requireThat(actor && spec.recipient, 'Exact creator and report recipient required');
+    this.store.initialize();
     return this.store.locked(control => {
       refuseFlow(this.repo.common);
-      this.specification(spec);
-      requireThat(actor && spec.recipient, 'Exact creator and report recipient required');
       requireThat(!control.permission, 'Source already reserved; no competing preparation');
       const base = clean(this.repo.checkout, spec.branch, control.approved?.head);
       if (control.approved) requireThat(control.approved.checkout === this.repo.checkout && control.approved.branch === spec.branch, 'Selected checkout or branch differs from approved retained source');

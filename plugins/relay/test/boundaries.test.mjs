@@ -73,7 +73,8 @@ test('executor release crash has old writer or exact verifier, never an availabl
 });
 
 test('locks never auto-reclaim and recovery requires exact identity plus externally stopped commands', () => {
-  const f = fixture(); const path = join(f.relay.store.root, 'transition.lock');
+  const f = fixture(); f.relay.prepare(f.spec, 'director');
+  const path = join(f.relay.store.root, 'transition.lock');
   writeFileSync(path, JSON.stringify({ token: 'abandoned-token', pid: 99999999 }));
   assert.throws(() => f.relay.prepare(f.spec, 'director'), /lock exists/);
   assert.throws(() => f.relay.prepare(f.spec, 'director'), /lock exists/);
@@ -138,6 +139,7 @@ test('dirty recovery preserves source and source approval is distinct from resul
 test('Flow namespace refuses source admission without changing Flow files', () => {
   const f = fixture(); mkdirSync(join(f.relay.repo.common, 'codex-flow'));
   assert.throws(() => f.relay.prepare(f.spec, 'director'), /Flow state/);
+  assert.equal(existsSync(join(f.relay.repo.common, 'relay')), false);
   assert.equal(f.relay.store.control().permission, null);
 });
 

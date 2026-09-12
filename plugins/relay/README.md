@@ -88,7 +88,10 @@ result revision and final correlation. The packaged `Stop` hook supplies
 `session_id`, `turn_id`, and exact `last_assistant_message` bytes after source
 release. It ignores other repositories, unbound tasks, continued stops, and
 unsealed results. The hook reads no transcript file and never submits, steers, or
-continues the task. Conflicting event IDs or bytes are rejected.
+continues the task. Read-only hook discovery never creates `.git/relay`; only an
+explicit `prepare` with a valid request contract initializes that namespace after
+the Flow exclusion check.
+Conflicting event IDs or bytes are rejected.
 
 The exact recipient uses `prepare-receipt` to generate a read-only `wait_threads`
 action for the frozen sender. `record-native-result` accepts receipt only when the

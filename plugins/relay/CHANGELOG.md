@@ -7,5 +7,6 @@
 - Frozen reporting with exact receipt/decision and task-only archival observations.
 - Coordinator retirement preserves the recipient until every sequential child's report and archival are complete.
 - Staged purpose-built App result normalization, exact Stop capture, direct wait receipt, and affirmative archive observation.
+- Read-only hook discovery leaves fresh, unrelated, and Flow-only repositories unmodified.
 - Disposable Git/CLI, crash, scope/drift, reporting and packed isolation tests.
 - Native installation/trust, connected delivery, startup measurement, coexistence and pilot remain gates.
