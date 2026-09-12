@@ -1,5 +1,13 @@
 # Relay
 
+Development candidate: the new `relay:direct` entrypoint and one-shot advisory
+notification are source-tested work in progress, not installed 0.1.0 behavior.
+See [notification decision](docs/decisions/0003-director-notification.md).
+Start new directed work with `relay:direct`; prepared workers use `relay:deliver`.
+For explicitly requested resets, its [cheap unplug guidance](skills/direct/references/cheap-unplug.md)
+includes finished-task archival, wanted-work integration and obsolete local
+branch/worktree cleanup, without historical Flow journal repair.
+
 Relay owns one retained checkout with one current source permission, sequential
 executors, direct verification, frozen reporting, and task-only retirement.
 Release candidate `f627eef` was packaged and installed as
@@ -123,8 +131,12 @@ Reporting setup precedes write enablement. Release freezes sender, recipient,
 result revision and final correlation. The packaged `Stop` hook supplies
 `session_id`, `turn_id`, and exact `last_assistant_message` bytes after source
 release. It ignores other repositories, unbound tasks, continued stops, and
-unsealed results. The hook reads no transcript file and never submits, steers, or
-continues the task. Read-only hook discovery never creates `.git/relay`; only an
+unsealed results. The hook reads no transcript file and never calls native tools.
+For newly prepared notification-enabled assignments it issues one advisory-only
+Stop continuation after capturing the final; repeated events do not reissue it.
+The sender sends the generated hint once, records its result and stops. The director
+can return idle after binding and resume on that hint to retrieve the frozen report.
+Read-only hook discovery never creates `.git/relay`; only an
 explicit `prepare` with a valid request contract initializes that namespace after
 the Flow exclusion check.
 Conflicting event IDs or bytes are rejected.
@@ -163,7 +175,11 @@ recipient until its duties completed and then archiving only its exact task.
 ambiguous unless it affirmatively names the task as archived. Use the generated
 `list_archived_threads` observation action to establish that fact. An ambiguous
 outcome remains pending with no retry.
-No operation deletes source, switches branches, or requires historical HEAD replay.
+Notification-enabled senders additionally require a fresh exact native idle
+observation before the archive action is prepared. Ambiguous/lost notifications
+never cause a blind resend; shared report retrieval remains available when the
+director resumes. This does not guarantee wake-up across crashes.
+No ordinary lifecycle operation deletes source, switches branches, or requires historical HEAD replay.
 
 Pending capture blocks that sender's archive. Current ownership blocks another
 writer. Unaccepted work blocks explicitly dependent assignments. Independent work

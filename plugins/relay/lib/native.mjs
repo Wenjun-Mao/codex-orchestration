@@ -16,13 +16,19 @@ function parsedObjects(result) {
   return objects;
 }
 
-function archivedThreadIds(value) {
+// App responses may omit hostId. In that case the exact generated request owns
+// routing; an explicit contradictory host in the response is never acceptable.
+function hostMatches(value, expectedHostId) {
+  return !expectedHostId || value?.hostId == null || value.hostId === expectedHostId;
+}
+function archivedThreadIds(value, expectedHostId) {
   const ids = new Set();
+  if (!hostMatches(value, expectedHostId)) return ids;
   if (value?.archived === true && typeof value.threadId === 'string') ids.add(value.threadId);
   for (const key of ['threads', 'archivedThreads', 'items']) {
     for (const item of Array.isArray(value?.[key]) ? value[key] : []) {
       const id = item?.threadId ?? item?.id;
-      if (typeof id === 'string') ids.add(id);
+      if (typeof id === 'string' && hostMatches(item, expectedHostId)) ids.add(id);
     }
   }
   return ids;
@@ -63,7 +69,8 @@ export function normalizeNativeResult({
   }
 
   if (kind === 'report') {
-    const queued = objects.some(value => value.threadId === expectedThreadId);
+    const queued = objects.some(value => value.threadId === expectedThreadId)
+      && objects.every(value => hostMatches(value, expectedHostId));
     return {
       submissionId: actionId,
       status: queued && result.isError !== true ? 'queued' : 'ambiguous',
@@ -73,12 +80,28 @@ export function normalizeNativeResult({
 
   if (kind === 'archive') {
     requireThat(typeof expectedThreadId === 'string' && expectedThreadId.length > 0, 'Exact archived task id required');
-    const archived = objects.some(value => archivedThreadIds(value).has(expectedThreadId));
+    const noConflict = objects.every(value => hostMatches(value, expectedHostId)
+      && ['threads', 'archivedThreads', 'items'].every(key =>
+        (Array.isArray(value?.[key]) ? value[key] : []).every(item =>
+          (item?.threadId ?? item?.id) !== expectedThreadId || hostMatches(item, expectedHostId))));
+    const archived = noConflict && objects.some(value => archivedThreadIds(value, expectedHostId).has(expectedThreadId));
     return {
       kind: 'archive', actionId, taskId: expectedThreadId,
       status: archived && result.isError !== true ? 'archived' : 'ambiguous',
       nativeResultDigest: resultDigest,
     };
+  }
+
+  if (kind === 'sender-idle') {
+    requireThat(typeof expectedThreadId === 'string' && expectedThreadId.length > 0, 'Exact sender task required');
+    const polls = objects.flatMap(value => Array.isArray(value?.polls) ? value.polls : []);
+    const idle = result.isError !== true && polls.length > 0 && polls.every(poll =>
+      poll?.schemaVersion === 1 && poll.thread?.id === expectedThreadId
+      && (!expectedHostId || poll.thread.hostId === expectedHostId)
+      && ['idle', 'notLoaded'].includes(poll.thread.status?.type)
+      && ['completed', 'interrupted', 'failed'].includes(poll.latestTurn?.status)
+      && typeof poll.latestTurn.id === 'string' && poll.latestTurn.id.length > 0);
+    return { actionId, taskId: expectedThreadId, status: idle ? 'idle' : 'pending', nativeResultDigest: resultDigest };
   }
 
   if (kind === 'receipt') {

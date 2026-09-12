@@ -26,12 +26,16 @@ requires stopped writers and explicit source disposition. Preserve rejected and
 dirty work. Never use task cancellation or lock recovery as write permission.
 
 After source release, emit the genuine final. The trusted packaged Stop hook captures
-its exact task, turn and bytes against the frozen association. The exact recipient
+its exact task, turn and bytes against the frozen association. For notification-enabled
+assignments it may continue this sender once with a generated advisory-only native
+action. Follow that action once, record its result, then stop. No source writes,
+report recapture or send retries in this continuation. The exact recipient
 uses the generated `read-report` command to retrieve those frozen shared-storage
 facts, then runs its generated `acknowledge` command. Reading, acknowledgement and
 product acceptance are separate. Native wait is optional notification and does not
 prove receipt. Do not reactivate or impersonate the sender, copy final text into a
 claimed receipt, or expand the sender-only message fallback.
+Follow any generated sender-idle observation before preparing archival.
 Archive only the exact prepared task, then use the generated archived-list
 observation to record affirmation; never delete its checkout or retry an uncertain
 archive/submission.

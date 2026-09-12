@@ -77,7 +77,7 @@ export class Relay {
       recipientHostId: parent ? null : (spec.recipientHostId ?? null),
       task: null, taskHostId: null, enabled: false, decision: null, outcome: null,
       creation: { id: randomUUID(), status: 'awaiting-observation', provisional: null },
-      report: { correlation: randomUUID(), sender: null, recipient: parent ? creator : spec.recipient, association: null, final: null, submission: null, receipt: null },
+      report: { notificationMode: 'advisory-once', correlation: randomUUID(), sender: null, recipient: parent ? creator : spec.recipient, association: null, final: null, submission: null, receipt: null },
     };
   }
   creationResponse(control, record) {
@@ -149,7 +149,19 @@ export class Relay {
     if (actionId === record.report.submission?.id) {
       return this.report('observe-report', id, actor, normalizeNativeResult({
         kind: 'report', actionId, result,
-        expectedThreadId: record.report.recipient,
+        expectedThreadId: record.report.recipient, expectedHostId: record.recipientHostId,
+      }));
+    }
+    if (actionId === record.report.advisory?.id) {
+      return this.report('observe-advisory', id, actor, normalizeNativeResult({
+        kind: 'report', actionId, result, expectedThreadId: record.report.recipient,
+        expectedHostId: record.recipientHostId,
+      }));
+    }
+    if (actionId === record.idleCheck?.id) {
+      return this.report('observe-idle', id, actor, normalizeNativeResult({
+        kind: 'sender-idle', actionId, result,
+        expectedThreadId: record.task, expectedHostId: record.taskHostId,
       }));
     }
     if (actionId === record.report.nativeReceipt?.id) {
@@ -164,7 +176,7 @@ export class Relay {
     if (actionId === record.archive?.id) {
       return this.recordNative(id, actor, normalizeNativeResult({
         kind: 'archive', actionId, result,
-        expectedThreadId: record.task,
+        expectedThreadId: record.task, expectedHostId: record.taskHostId,
       }));
     }
     throw new Error('Native result does not match a prepared assignment action');

@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.0-rc.1 — Director experience (unreleased candidate)
+
+- Add a lean director entrypoint and user-directed cheap unplug guidance, including
+  finished-task archival and preserved-work branch/worktree cleanup.
+- New assignments can issue one native advisory through a post-capture Stop
+  continuation. Advisory is not receipt or acceptance; uncertain sends never retry.
+- Require fresh sender-idle observation before advisory-sender archival. Existing
+  assignments without notification mode retain capture-only behavior.
+- Native idle-director wakeup remains a qualification gate. No installed upgrade
+  or guaranteed crash recovery is claimed by source tests.
+
 ## 0.1.0 — Same-host serial source coordination
 
 - Independent Relay package and generated public serial workflow.

@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 import { Relay } from '../lib/relay.mjs';
 
-const help = `Relay 0.1.0 — same-host serial source coordination
+const help = `Relay 0.2.0-rc.1 — same-host serial source coordination
 
 Genuine work choices go in a spec file:
   {"outcome":"...","plan":"approved plan path","acceptance":"...",

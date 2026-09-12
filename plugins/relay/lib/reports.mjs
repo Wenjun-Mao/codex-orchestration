@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { requireThat } from './store.mjs';
 import { digest, same } from './source.mjs';
+import { prepareAdvisory, idleObservation } from './notification.mjs';
 
 // Observations enter only through explicit injected adapters/events in this source stage.
 // No current HEAD lookup belongs here: reports remain bound after successors advance.
@@ -66,12 +67,34 @@ export function reportOperation(relay, control, record, operation, actor, input 
     const final = { eventId: input.eventId, text: input.text, digest: digest(input.text) };
     if (report.final) requireThat(same(report.final, final), 'Final event or bytes conflict');
     else report.final = final;
+    const hookOutput = input.notify === true ? prepareAdvisory(relay, record) : null;
     return save(response('CAPTURED', relay.command('read-report', {
       assignment: record.id, actor: report.recipient,
-    }), { envelope: { ...report.association, ...final } }));
+    }), { envelope: { ...report.association, ...final }, ...(hookOutput ? { hookOutput } : {}) }));
+  }
+  if (operation === 'end-advisory') {
+    requireThat(actor === report.sender && report.final && report.advisory, 'Exact captured sender advisory required');
+    requireThat(typeof input.eventId === 'string' && input.eventId.length > 0, 'Continuation event required');
+    requireThat(!report.advisory.endedEventId || report.advisory.endedEventId === input.eventId, 'Continuation event conflicts');
+    report.advisory.endedEventId = input.eventId;
+    return save(response('ADVISORY_ENDED', 'Stop; the recipient owns result review.'));
+  }
+  if (operation === 'observe-advisory') {
+    requireThat(actor === report.sender && report.advisory?.id === input.submissionId, 'Exact sender advisory action required');
+    requireThat(['queued', 'ambiguous'].includes(input.status), 'Advisory observation required');
+    if (report.advisory.status !== 'queued') report.advisory.status = input.status;
+    return save(response('ADVISORY_OBSERVED', 'End this notification-only continuation; do not repeat the send.'));
+  }
+  if (operation === 'observe-idle') {
+    requireThat(actor === report.recipient && record.idleCheck?.id === input.actionId, 'Exact recipient idle action required');
+    requireThat(input.taskId === record.task, 'Wrong sender observation');
+    if (input.status !== 'idle') return save(idleObservation(relay, record));
+    // Consume the observation by preparing archive now, never a reusable permit.
+    return reportOperation(relay, control, record, 'retire', actor, { idleAction: input.actionId });
   }
   if (operation === 'submit') {
     requireThat(actor === report.sender && report.final, 'Captured final and exact sender required');
+    requireThat(!report.advisory, 'Advisory already attempted; legacy submission cannot resend it');
     if (report.submission) return response(report.submission.status, command('record-native-result', { 'action-id': report.submission.id, result: '<exact-tool-result.json>' }));
     report.submission = { id: randomUUID(), status: 'ambiguous' };
     const deliveryKey = report.submission.id;
@@ -190,13 +213,16 @@ export function reportOperation(relay, control, record, operation, actor, input 
       });
     }
     if (record.archive) return response(record.archive.status, command('record-native-result', { 'action-id': record.archive.id, result: '<exact-tool-result.json>' }));
+    if (report.advisory && (!record.idleCheck || input.idleAction !== record.idleCheck.id)) {
+      return save(idleObservation(relay, record));
+    }
     record.archive = { id: randomUUID(), task: record.task, status: 'awaiting-observation' };
     const nativeArgs = { threadId: record.task, archived: true };
     if (record.taskHostId) nativeArgs.hostId = record.taskHostId;
     return save(response('ARCHIVE_PREPARED_ONCE', 'Archive this exact task once, then record affirmative observation; preserve its checkout.', {
       nativeAction: { id: record.archive.id, kind: 'archive', tool: 'mcp__codex_app__set_thread_archived', args: nativeArgs },
       recordCommand: command('record-native-result', { 'action-id': record.archive.id, result: '<exact-tool-result.json>' }),
-      observationAction: { kind: 'archive-observation', tool: 'mcp__codex_app__list_archived_threads', args: {} },
+      observationAction: { kind: 'archive-observation', tool: 'mcp__codex_app__list_archived_threads', args: record.taskHostId ? { hostId: record.taskHostId } : {} },
     }));
   }
   if (operation === 'recordArchive') {

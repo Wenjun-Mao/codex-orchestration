@@ -27,7 +27,8 @@ for (const file of files.filter(path => path.endsWith('.mjs'))) {
 }
 assert.equal(existsSync(join(target, 'lib')), false, 'Flow must not be staged alongside Relay');
 const help = run(process.execPath, [join(unpacked, 'bin/relay.mjs'), '--help'], target);
-assert.match(help, /Relay 0\.1\.0 — same-host serial source coordination/);
+const version = JSON.parse(readFileSync(join(unpacked, 'package.json'), 'utf8')).version;
+assert.ok(help.includes(`Relay ${version} — same-host serial source coordination`));
 assert.match(help, /start --repo PATH --ticket GENERATED --actor-env CODEX_THREAD_ID/);
 assert.doesNotMatch(help, /See README/);
 const deliverySkill = readFileSync(join(unpacked, 'skills/deliver/SKILL.md'), 'utf8');
@@ -35,7 +36,7 @@ assert.match(deliverySkill, /host-provided `CODEX_THREAD_ID`/);
 assert.doesNotMatch(deliverySkill, /\]\(\.\.\/\.\.\/README\.md\)/);
 // Copy connected and reporting harnesses; their imports resolve to the relocated package.
 mkdirSync(join(unpacked, 'test'));
-for (const file of ['helpers.mjs', 'journey.test.mjs', 'native.test.mjs', 'reports.test.mjs']) cpSync(join(source, 'test', file), join(unpacked, 'test', file), { recursive: false });
-const output = run(process.execPath, ['--test', join(unpacked, 'test/journey.test.mjs'), join(unpacked, 'test/native.test.mjs'), join(unpacked, 'test/reports.test.mjs')], target);
+for (const file of ['helpers.mjs', 'journey.test.mjs', 'native.test.mjs', 'reports.test.mjs', 'notification.test.mjs']) cpSync(join(source, 'test', file), join(unpacked, 'test', file), { recursive: false });
+const output = run(process.execPath, ['--test', join(unpacked, 'test/journey.test.mjs'), join(unpacked, 'test/native.test.mjs'), join(unpacked, 'test/reports.test.mjs'), join(unpacked, 'test/notification.test.mjs')], target);
 process.stdout.write(output);
 process.stdout.write(JSON.stringify({ package: join(target, pack.filename), fileCount: files.length, packedBytes: pack.size, unpackedBytes: pack.unpackedSize, elapsedMs: Math.round(performance.now() - started), nativeQualification: 'not exercised; fixture observations only' }, null, 2) + '\n');

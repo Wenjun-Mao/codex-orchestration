@@ -92,7 +92,7 @@ test('Stop adapter captures the genuine released final identity and exact bytes 
   assert.equal(captureStopEvent({ ...event, stop_hook_active: true }).reason, 'unsupported-stop-event');
 });
 
-test('hook executable emits valid inert Stop JSON while persisting the exact final', () => {
+test('hook executable requests one advisory continuation while preserving exact final', () => {
   const f = fixture(); const { prepared, ready } = f.start();
   f.relay.finish(ready.ticket, 'coordinator');
   const event = {
@@ -102,7 +102,9 @@ test('hook executable emits valid inert Stop JSON while persisting the exact fin
   const hook = fileURLToPath(new URL('../bin/relay-final-hook.mjs', import.meta.url));
   const run = spawnSync(process.execPath, [hook], { input: JSON.stringify(event), encoding: 'utf8' });
   assert.equal(run.status, 0, run.stderr);
-  assert.deepEqual(JSON.parse(run.stdout), {});
+  assert.equal(JSON.parse(run.stdout).decision, 'block');
+  const repeated = spawnSync(process.execPath, [hook], { input: JSON.stringify(event), encoding: 'utf8' });
+  assert.deepEqual(JSON.parse(repeated.stdout), {});
   assert.equal(f.relay.status(prepared.assignment).report.final.eventId, 'turn-cli');
 });
 

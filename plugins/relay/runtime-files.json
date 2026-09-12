@@ -7,16 +7,20 @@
   "docs/acceptance.md",
   "docs/decisions/0001-source-contract.md",
   "docs/decisions/0002-native-adapter.md",
+  "docs/decisions/0003-director-notification.md",
   "docs/native-capability-2026-09-12.md",
   "docs/native-disposable-journey.md",
   "hooks/hooks.json",
   "lib/final-hook.mjs",
   "lib/native.mjs",
+  "lib/notification.mjs",
   "lib/relay.mjs",
   "lib/reports.mjs",
   "lib/source.mjs",
   "lib/store.mjs",
   "package.json",
   "runtime-files.json",
-  "skills/deliver/SKILL.md"
+  "skills/deliver/SKILL.md",
+  "skills/direct/SKILL.md",
+  "skills/direct/references/cheap-unplug.md"
 ]
