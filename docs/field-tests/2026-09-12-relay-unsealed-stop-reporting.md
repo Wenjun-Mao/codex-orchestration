@@ -55,3 +55,12 @@ records, source and missed old event were not changed or replayed. Updating does
 not retroactively persist an old verification error or send an old Stop report.
 No npm publication. Desktop reload/trust pickup and new-behavior live observation
 remain unverified; automated fixtures are not represented as native delivery.
+
+Post-restart: the user confirmed restart with no pending approval. The refreshed
+skill catalog resolves to `0.3.1+codex.20260912213530`; a fresh native `hooks/list`
+returned the same installed version's global Relay Stop hook enabled and trusted,
+without warnings/errors. Its hash remains
+`sha256:45a4d50f32eed08aed8b3c7f6f9b295979d35deed338f2fe8f80895e0c3fc678`,
+unchanged from 0.3.0. No new trust action is needed. App CLI remains
+`0.154.0-alpha.6.2`. This verifies reload/trust, not a new native delivery event;
+no old worker event was replayed.
