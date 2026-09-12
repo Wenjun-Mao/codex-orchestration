@@ -5,7 +5,8 @@ test qualified idle-director wakeup, frozen report review and exact worker archi
 Post-retirement successor preparation passed; this was not a fresh successor delivery.
 Notifications are not crash-proof and do not replace explicit result acceptance.
 See [notification decision](docs/decisions/0003-director-notification.md).
-Start new directed work with `relay:direct`; prepared workers use `relay:deliver`.
+Use `relay:plan` to draft or revise a saved plan. Start approved directed work with
+`relay:direct`; prepared workers use `relay:deliver`.
 For explicitly requested resets, its [cheap unplug guidance](skills/direct/references/cheap-unplug.md)
 includes finished-task archival, wanted-work integration and obsolete local
 branch/worktree cleanup, without historical Flow journal repair.

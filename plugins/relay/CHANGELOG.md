@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.1 — Planning entrypoint
+
+- Add `relay:plan`, adapted from Flow's concise planning guidance, with Relay's
+  actual plan-reference semantics and handoff to `relay:direct`.
+- Planning remains document-only and does not authorize implementation. No runtime,
+  hook, reporting, ownership or cleanup behavior changed.
+
 ## 0.2.0 — Available director and cheap unplug
 
 - Add a lean director entrypoint and user-directed cheap unplug guidance, including
