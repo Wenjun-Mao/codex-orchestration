@@ -184,6 +184,28 @@ Flow reporting, and a passing startup budget or explicit budget revision.
 The three-call target passes; the conservative token ceiling does not. No broad
 redesign or additional transport layer follows from this checkpoint alone.
 
+### Existing Flow report coexistence observation
+
+Read-only Codex Usage records show genuine Flow captures/queue acceptance at
+07:23, 07:45 and 12:34 UTC on 2026-09-12, while Relay was installed. Its director
+`01a02aa7-b98f-7091-8327-89c59c7624d1` independently confirmed the exact latest
+sender `01a0943b-207f-7053-a092-59f7dde30440` and final digest
+`c934b1602d4ad27faa1ef9c4c6e80a50377ace3125ba5a663035c829be6fa991`
+in its destination conversation, not inferred from queue acceptance. Preserved
+Flow record `report-record-v1-4112b594471be8bcae3614e38fcb92a222b925fc54f7aab1c3b1bc7b709de276`
+matches. It reports no remaining pending final after normal assignment retirement.
+No sender reactivation, cleanup or product mutation was requested for this check.
+
+This satisfies the bounded separate-repository coexistence question using real
+pending-to-received Flow reporting after Relay installation. It is not synchronized
+transport stress testing, same-repository dual control, or a global delivery claim.
+Relay's hook definition, wrapper, final-hook module and reports module are unchanged
+between the earlier installed package and f627eef; source byte comparisons passed.
+Exact local evidence: `.git/codex-release-evidence/relay/f627eef-native/coexistence.md`.
+The token target remains a disclosed non-safety efficiency miss under the user's
+subsequent stable-delivery authorization; native provisional-ID output remains
+unobserved with regression coverage, not falsely promoted to live proof.
+
 Pilot candidate, not dispatched: `pdf_extract`, a saved project with clean `main`
 and neither `.git/codex-flow` nor `.git/relay` at this inspection. Proposed scope:
 one source-backed README developer-verification section describing existing focused

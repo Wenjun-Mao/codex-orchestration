@@ -1,5 +1,35 @@
 # Relay: lean serial-first successor
 
+## Continuation authorization — 2026-09-12
+
+The user now asks the director to keep driving Relay until stable and usable,
+without routine confirmation; critical choices, blockers and required App restarts
+remain escalation boundaries. This supersedes the earlier checkpoint-only limits
+below for normal remaining qualification, one bounded pilot, final package/release
+integration and completed-task cleanup. It does not authorize changes to active
+product work, trust bypasses, Flow migration/naming changes or broadened architecture.
+
+Proceed from `f627eef` and the recorded successful native startup/early-binding
+journeys. Retain the 6,106 proxy-token result as a disclosed 106-token miss of the
+provisional target, not PASS. Treat it as non-safety efficiency follow-up; do not
+add machinery or hold useful testing solely to shave measurement overhead.
+Actual provisional native identity remains unobserved with deterministic regression
+coverage; preserve that limit rather than forcing the host to fabricate it.
+
+Confirm existing Flow reporting coexistence through read-only preserved records
+and actual recipient history where available, without disturbing product tasks.
+Then pilot a single README developer-verification section in clean `pdf_extract`
+main: describe existing focused test commands; no dependencies, runtime, rendering,
+assets, external services or product release. Use explicit Terra-high, retained
+local checkout, public Relay preparation/receipt/acceptance/task-only archival,
+and a read-only verification successor. No upstream product push is needed.
+Recheck no current writer and no Flow namespace before admission.
+
+Release one exact validated Relay package after the pilot; retain rollback source
+and review/merge only approved Relay and umbrella changes. No legacy Flow moves.
+The implementation coordinator remains source-only; the director owns native pilot
+tasks, final acceptance, install/reload boundary and task retirement.
+
 Status: **Approved for bounded implementation and disposable native qualification,
 including the 2026-09-12 shared-storage receipt amendment below**.
 Following both Pro reviews, the user approved proceeding with the amendments and
