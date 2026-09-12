@@ -14,13 +14,18 @@ The project director performs these minimum steps:
 1. Confirm old source writers are stopped. Deleting a registry does not stop them.
 2. Confirm a clean checkout and wanted work preserved on the approved baseline
    (normally `main`). Resolve dirty or unmerged wanted work first.
-3. Resolve the Git common directory and verify its exact `codex-flow` target is a
+3. Merge wanted, verified work into `main`; pause on conflicts or unclear inclusion.
+   Remove obsolete clean development worktrees and their merged local branches
+   after confirming their commits are preserved. Keep the retained checkout,
+   `main`, unrelated worktrees and wanted unmerged work. Remote branch deletion
+   requires separately scoped intent; never apply a broad wildcard sweep.
+4. Resolve the Git common directory and verify its exact `codex-flow` target is a
    real directory, not a symlink. Delete only that directory. Preserve source,
-   refs, worktrees, existing backups, `.git/relay`, and shared host registries.
+   retained refs/worktrees, existing backups, `.git/relay`, and shared host registries.
    Do not create a new backup unless requested.
-4. Verify target absence and unchanged HEAD, refs, worktree inventory and source
-   status. Report operator disposal, never normal Flow success.
-5. Prepare the next approved Relay assignment normally. Source availability alone
+5. Verify target absence, clean preserved source and only the intended merge/ref/
+   worktree changes. Report what was removed, never normal Flow success.
+6. Prepare the next approved Relay assignment normally. Source availability alone
    is not admission proof; normal Relay preparation still enforces its guards.
 
 No additional per-step confirmation is needed for this bounded default. Pause for
