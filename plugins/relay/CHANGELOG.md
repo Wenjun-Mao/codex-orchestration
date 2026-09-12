@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.2
+
+- Send worker final text unchanged from the Stop hook, without report persistence,
+  status decorations, retrieval/acknowledgement commands, or worker continuations.
+- Keep product verification and task retirement independent of message delivery.
+- Remove the old report/receipt implementation and its superseded tests.
+- Require workers to await the actual finish result before describing it.
+
+
 ## 0.3.1 — Stop reporting independent of acceptance
 
 - Notify the manager of unsealed worker Stops with exact text and separate system

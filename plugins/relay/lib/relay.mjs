@@ -2,9 +2,8 @@ import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { Store, requireThat } from './store.mjs';
 import { repository, git, clean, snapshot, inspectResult, runChecks, validateScope, validateChecks, inScope, refuseFlow } from './source.mjs';
-import { readReportOperation, reportOperation } from './reports.mjs';
+import { reportOperation } from './reports.mjs';
 import { normalizeNativeResult } from './native.mjs';
-import { readStopReport } from './stop-reports.mjs';
 
 const quote = value => "'" + String(value).replaceAll("'", "'\\''") + "'";
 export class Relay {
@@ -66,8 +65,6 @@ export class Relay {
     const response = (actor, next, status) => this.response(actor, 'none', next, { status, assignment: record.id });
     if (!record.outcome) return response(record.task ?? record.creator, 'Wait for the current executor to transfer its exact result; do not edit the retained checkout.', 'DELEGATED');
     if (!record.task) return response(record.creator, this.command('record-native-result', { ...args, actor: record.creator, 'action-id': record.creation.id, result: '<exact-tool-result.json>' }), 'ORPHAN_IDENTITY_PENDING');
-    if (!record.report.final) return response(record.task, `Emit the genuine native final for correlation ${record.report.correlation}; capture must use the frozen result association.`, 'CAPTURE_PENDING');
-    if (!record.report.receipt) return response(record.recipient, this.command('read-report', { ...args, actor: record.recipient }), 'RECEIPT_PENDING');
     if (!record.decision) return response(record.recipient, this.command('accept', { ...args, actor: record.recipient }), 'DECISION_PENDING');
     if (!record.archive) return response(record.recipient, this.command('retire', { ...args, actor: record.recipient }), 'RETIREMENT_PENDING');
     if (record.archive.status !== 'archived') return response(record.recipient, this.command('record-native-result', { ...args, actor: record.recipient, 'action-id': record.archive.id, result: '<exact-tool-result.json>' }), 'ARCHIVE_PENDING');
@@ -89,7 +86,7 @@ export class Relay {
       recipientHostId: parent ? null : (spec.recipientHostId ?? null),
       task: null, taskHostId: null, enabled: false, decision: null, outcome: null,
       creation: { id: randomUUID(), status: 'awaiting-observation', provisional: null },
-      report: { notificationMode: 'hook-queue-once', correlation: randomUUID(), sender: null, recipient: parent ? creator : spec.recipient, association: null, final: null, submission: null, receipt: null },
+      report: { correlation: randomUUID(), sender: null, recipient: parent ? creator : spec.recipient, association: null },
     };
   }
   creationResponse(control, record) {
@@ -159,31 +156,10 @@ export class Relay {
     if (actionId === record.creation.id) {
       return this.recordNative(id, actor, normalizeNativeResult({ kind: 'create', actionId, result }));
     }
-    if (actionId === record.report.submission?.id) {
-      return this.report('observe-report', id, actor, normalizeNativeResult({
-        kind: 'report', actionId, result,
-        expectedThreadId: record.report.recipient, expectedHostId: record.recipientHostId,
-      }));
-    }
-    if (actionId === record.report.advisory?.id) {
-      return this.report('observe-advisory', id, actor, normalizeNativeResult({
-        kind: 'report', actionId, result, expectedThreadId: record.report.recipient,
-        expectedHostId: record.recipientHostId,
-      }));
-    }
     if (actionId === record.idleCheck?.id) {
       return this.report('observe-idle', id, actor, normalizeNativeResult({
         kind: 'sender-idle', actionId, result,
         expectedThreadId: record.task, expectedHostId: record.taskHostId,
-      }));
-    }
-    if (actionId === record.report.nativeReceipt?.id) {
-      return this.report('observe-receipt', id, actor, normalizeNativeResult({
-        kind: 'receipt', actionId, result,
-        expectedThreadId: record.task,
-        expectedHostId: record.taskHostId,
-        expectedEventId: record.report.final?.eventId,
-        expectedText: record.report.final?.text,
       }));
     }
     if (actionId === record.archive?.id) {
@@ -267,7 +243,7 @@ export class Relay {
         control.approved = { checkout: record.checkout, branch: record.branch, head: result.revision };
         this.transfer(control, null);
         this.store.commit(control, [record]);
-        return this.response(actor, 'none', 'Emit the genuine native final; the qualified capture adapter must correlate the frozen report.', { status: 'SOURCE_RELEASED', report: record.report.association });
+        return this.response(actor, 'none', 'Emit your final. The Stop hook sends it unchanged to your manager.', { status: 'SOURCE_RELEASED', report: record.report.association });
       }
     });
   }
@@ -350,11 +326,6 @@ export class Relay {
   }
   report(operation, id, actor, input) {
     return this.store.locked(control => reportOperation(this, control, this.record(control, id), operation, actor, input));
-  }
-  readReport(id, actor, eventId) {
-    const control = this.store.control();
-    const record = this.record(control, id);
-    return eventId ? readStopReport(this, record, actor, eventId) : readReportOperation(this, record, actor);
   }
   status(id) {
     const control = this.store.control();

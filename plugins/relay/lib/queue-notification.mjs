@@ -10,11 +10,11 @@ const binary = '/Applications/ChatGPT.app/Contents/Resources/codex';
 const uuid = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/;
 
 export async function submitQueueNotification(request, {
-  spawnProcess = spawn, deadlineMs = 6000, cleanupMs = 500, outputLimit = 65536,
+  spawnProcess = spawn, deadlineMs = 6000, cleanupMs = 500, outputLimit = Math.max(65536, Buffer.byteLength(typeof request.text === 'string' ? request.text : '') * 6 + 65536),
 } = {}) {
   const uncertain = reason => ({ status: 'ambiguous', reason });
   if (!uuid.test(request.id) || !uuid.test(request.recipient)
-    || typeof request.text !== 'string' || Buffer.byteLength(request.text) > 32768) return uncertain('invalid-queue-request');
+    || typeof request.text !== 'string') return uncertain('invalid-queue-request');
   // Missing host echoes are allowed by the existing same-host assignment
   // contract; an explicit remote identity is never routed through local IPC.
   if ([request.hostId, request.senderHostId].some(host => host != null && host !== 'local')) return uncertain('unsupported-host');

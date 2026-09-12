@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
 import { fixture, deliver, cli, startCli, jsonFile } from './helpers.mjs';
 
-test('connected CLI: preparation → local work → executor → verification → real fixture bytes → receipt/archive → useful successor', () => {
+test('connected CLI: preparation → local work → executor → verification → real fixture bytes → review/archive → useful successor', () => {
   const { repo, spec, commit, git } = fixture();
   const p = cli(repo, 'prepare', { actor: 'director', spec: jsonFile(spec) });
   assert.equal(p.permittedSourceActivity, 'none');
@@ -24,18 +24,6 @@ test('connected CLI: preparation → local work → executor → verification �
   assert.equal(reserved.checkpoint, revision);
   cli(repo, 'verify', { ticket: reserved.ticket, actor: 'coordinator', decision: 'finish' });
   for (const [id, sender, recipient] of [[child.assignment, 'executor', 'coordinator'], [p.assignment, 'coordinator', 'director']]) {
-    const status = cli(repo, 'status', { assignment: id });
-    const event = { sender, correlation: status.report.correlation, eventId: 'fixture-' + id, text: 'Fixture final bytes\nwith exact newline\n' };
-    cli(repo, 'capture', { assignment: id, actor: sender, event: jsonFile(event) });
-    assert.equal(cli(repo, 'status', { assignment: id }).report.receipt, null);
-    const read = cli(repo, 'read-report', { assignment: id, actor: recipient });
-    assert.equal(cli(repo, 'status', { assignment: id }).report.receipt, null);
-    cli(repo, 'acknowledge', {
-      assignment: id, actor: recipient,
-      'event-id': read.acknowledgement.eventId,
-      digest: read.acknowledgement.digest,
-      'association-digest': read.acknowledgement.associationDigest,
-    });
     cli(repo, 'accept', { assignment: id, actor: recipient });
     const idle = cli(repo, 'retire', { assignment: id, actor: recipient });
     assert.equal(idle.status, 'SENDER_IDLE_REQUIRED');
@@ -58,7 +46,7 @@ test('connected CLI: preparation → local work → executor → verification �
   assert.equal(existsSync(repo), true);
 });
 
-test('accumulated solo history: accepted, revoked provisional, failed rejected commit, independent successor, delayed old report', () => {
+test('accumulated solo history: accepted, revoked provisional, failed rejected commit, independent successor, retained source result', () => {
   const f = fixture();
   const first = f.start();
   f.commit('src/value.txt', 'first'); f.relay.finish(first.ready.ticket, 'coordinator');
@@ -77,7 +65,7 @@ test('accumulated solo history: accepted, revoked provisional, failed rejected c
   const next = f.start('next');
   f.commit('src/value.txt', 'later useful work'); f.relay.finish(next.ready.ticket, 'next');
   deliver(f.relay, failed.prepared.assignment, 'failed', 'director', 'rejected');
-  assert.equal(f.relay.status(first.prepared.assignment).report.final.digest, completed.captured.envelope.digest);
+  assert.equal(f.relay.status(first.prepared.assignment).decision, 'accepted');
   assert.equal(f.relay.status(abandoned.assignment).outcome, 'revoked');
   assert.equal(f.git('show', 'HEAD:outside.txt'), 'retained violation');
 });

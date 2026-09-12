@@ -25,31 +25,21 @@ the exact revision; do not supply PASS claims. A rejected or interrupted writer
 requires stopped writers and explicit source disposition. Preserve rejected and
 dirty work. Never use task cancellation or lock recovery as write permission.
 
-For a mid-work question or blocker, message the exact manager directly. Do not seal
-a result merely to ask a question. Stop dependent work until the answer arrives;
-`wait_threads` observes completion/attention, not an arbitrary reply mailbox. An
-unsealed turn ending sends a status notice, not a completion report; resume only
-on actual input. Inspect the actual finish response before claiming release.
+For a mid-work question or blocker, message the exact manager directly. Stop
+dependent work until the answer arrives; `wait_threads` is not a reply mailbox.
 
-After source release, emit the genuine final and become idle. The trusted packaged
-Stop hook captures its exact task, turn and bytes, then notifies the manager once.
-Do not send a separate completion message or arrange your own reporting retry.
-If finish fails, the hook still reports the stopped turn with separate recorded
-verification status. That notice does not release source permission or certify
-your final's claims. Preserve the failure and stop dependent work.
-Only older assignments frozen in continuation mode may issue a generated one-shot
-notification action; follow that exact action without source work or resend.
-The exact recipient
-uses the generated `read-report` command to retrieve those frozen shared-storage
-facts, then runs its generated `acknowledge` command. Reading, acknowledgement and
-product acceptance are separate. Native wait is optional notification and does not
-prove receipt. Do not reactivate or impersonate the sender, copy final text into a
-claimed receipt, or expand the sender-only message fallback.
-Follow any generated sender-idle observation before preparing archival.
-Archive only the exact prepared task, then use the generated archived-list
-observation to record affirmation; never delete its checkout or retry an uncertain
-archive/submission.
+Await the actual `finish` process result before describing it. A yielded/running
+command is not a completed command; collect its exit status and output. On failure,
+preserve it and stop dependent work. Do not claim source release without success.
 
-Installation, pilot approval, and release remain director-owned. Use injected
-observations only in source tests; label shared-storage receipt accurately rather
-than calling it native message delivery. Do not install Relay implicitly.
+Emit your final and become idle. The Stop hook sends that text unchanged to your
+manager, regardless of verification success. Do not send a duplicate completion
+message. There is no report-storage, retrieval, acknowledgement, or continuation
+step. Messaging does not change source permission.
+
+For a child you manage, review its source result before acceptance and use the
+generated fresh sender-idle observation before archival. Archive only the exact
+prepared task; preserve its checkout and do not retry uncertain archive calls.
+
+Installation, pilot approval, and release remain director-owned. Do not install
+Relay implicitly. Injected native observations are for source tests only.

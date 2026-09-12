@@ -1,16 +1,14 @@
+import { createHash } from 'node:crypto';
 import { Relay } from './relay.mjs';
 import { submitQueueNotification } from './queue-notification.mjs';
 
-export function captureStopEvent(event, { notify = false } = {}) {
-  if (
-    event?.hook_event_name !== 'Stop'
-    || (event.stop_hook_active === true && !notify)
-    || typeof event.session_id !== 'string' || event.session_id.length === 0
-    || typeof event.turn_id !== 'string' || event.turn_id.length === 0
-    || typeof event.last_assistant_message !== 'string' || event.last_assistant_message.length === 0
-    || typeof event.cwd !== 'string' || event.cwd.length === 0
-  ) return { status: 'ignored', reason: 'unsupported-stop-event' };
-
+// Routing only: no result checks, message storage, or lifecycle writes.
+export function captureStopEvent(event) {
+  if (event?.hook_event_name !== 'Stop' || event.stop_hook_active === true
+    || !['session_id', 'turn_id', 'cwd', 'last_assistant_message'].every(key =>
+      typeof event[key] === 'string' && event[key].length > 0)) {
+    return { status: 'ignored', reason: 'unsupported-stop-event' };
+  }
   let relay;
   try { relay = new Relay(event.cwd); }
   catch { return { status: 'ignored', reason: 'relay-repository-unavailable' }; }
@@ -18,42 +16,23 @@ export function captureStopEvent(event, { notify = false } = {}) {
   const assignment = control.tasks?.[event.session_id];
   if (!assignment) return { status: 'ignored', reason: 'relay-sender-unbound' };
   const record = relay.record(control, assignment);
-  if (event.stop_hook_active !== true && record.report.notificationMode === 'hook-queue-once'
-    && (!record.report.association || record.report.stops?.some(item => item.eventId === event.turn_id))) {
-    return { ...relay.report('capture-stop', assignment, event.session_id,
-      { eventId: event.turn_id, text: event.last_assistant_message }), unsealed: true };
+  if (record.task !== event.session_id || !record.recipient || record.archive?.status === 'archived') {
+    return { status: 'ignored', reason: 'relay-route-inactive' };
   }
-  if (!record.report.association) return { status: 'ignored', reason: 'source-result-unsealed' };
-  if (event.stop_hook_active === true) {
-    if (!record.report.advisory) return { status: 'ignored', reason: 'no-advisory-continuation' };
-    relay.report('end-advisory', assignment, event.session_id, { eventId: event.turn_id });
-    return { status: 'advisory-ended' };
-  }
-  const captured = relay.report('capture', assignment, event.session_id, {
-    sender: event.session_id,
-    correlation: record.report.correlation,
-    eventId: event.turn_id,
-    text: event.last_assistant_message,
-    notify,
-  });
-  return {
-    status: 'captured', assignment,
-    eventId: event.turn_id, digest: captured.envelope.digest,
-    ...(captured.hookOutput ? { hookOutput: captured.hookOutput } : {}),
-    ...(captured.notification ? { notification: captured.notification } : {}),
-  };
+  // A stable native client-message ID needs no local delivery journal.
+  const hex = createHash('sha256').update(JSON.stringify([assignment, event.session_id, event.turn_id])).digest('hex');
+  const id = `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-8${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
+  return { status: 'ready', notification: {
+    id, recipient: record.recipient, hostId: record.recipientHostId,
+    senderHostId: record.taskHostId, text: event.last_assistant_message,
+  } };
 }
 
 export async function processStopEvent(event, { submit = submitQueueNotification } = {}) {
-  const captured = captureStopEvent(event, { notify: true });
+  const captured = captureStopEvent(event);
   if (!captured.notification) return captured;
-  // capture's transaction has committed and released its lock. An awakened
-  // recipient can now read/accept without competing with a long host call.
-  let outcome;
-  try { outcome = await submit(captured.notification); }
-  catch { outcome = { status: 'ambiguous', reason: 'transport-error' }; }
-  const relay = new Relay(event.cwd);
-  relay.report(captured.unsealed ? 'observe-stop-notification' : 'observe-hook-notification', captured.assignment, event.session_id,
-    { id: captured.notification.id, eventId: captured.eventId, ...outcome });
-  return { ...captured, notificationOutcome: outcome };
+  let notificationOutcome;
+  try { notificationOutcome = await submit(captured.notification); }
+  catch { notificationOutcome = { status: 'ambiguous', reason: 'transport-error' }; }
+  return { status: notificationOutcome.status, notificationOutcome };
 }

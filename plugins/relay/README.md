@@ -1,40 +1,9 @@
 # Relay
 
-Relay 0.3.0 replaces worker notification turns with one direct experimental queue
-submission. A recovered native coordinator/executor journey qualified collaboration,
-hook-owned completion, manager review, child-first retirement and useful successor
-delivery. Launch-brief interventions are disclosed; uninterrupted first-turn success
-is not claimed. Transport is qualified only for App CLI `0.154.0-alpha.6.2`; version
-drift preserves the frozen report but refuses automatic notification until requalified.
-
-Relay 0.2.0 added `relay:direct` and one-shot advisory notification. A bounded native
-test qualified idle-director wakeup, frozen report review and exact worker archival.
-Post-retirement successor preparation passed; this was not a fresh successor delivery.
-Notifications are not crash-proof and do not replace explicit result acceptance.
-See [notification decision](docs/decisions/0003-director-notification.md).
-Use `relay:plan` to draft or revise a saved plan. Start approved directed work with
-`relay:direct`; prepared workers use `relay:deliver`.
-For explicitly requested resets, its [cheap unplug guidance](skills/direct/references/cheap-unplug.md)
-includes finished-task archival, wanted-work integration and obsolete local
-branch/worktree cleanup, without historical Flow journal repair.
-
-Relay owns one retained checkout with one current source permission, sequential
-executors, direct verification, frozen reporting, and task-only retirement.
-Release candidate `f627eef` was packaged and installed as
-`0.1.0+codex.20260912163617` for bounded native testing. Same-host journeys qualify
-normal three-call startup, ready-ID early binding, failed-check recovery, genuine
-Stop capture, shared-storage receipt, separate acceptance, task-only retirement,
-and one restart-free candidate transition. Injected tool results and hook events
-remain source fixtures. That 0.1.0 path used no private IPC; 0.3.0's experimental
-queue-only transport is described in [decision 0004](docs/decisions/0004-hook-owned-completion.md).
-
-This candidate completed a bounded same-host README-only product pilot and a fresh
-no-change successor with six existing tests, genuine report receipt, acceptance,
-and task-only retirement for both tasks. Separate-repository
-Flow reports also remained available with exact digest attestation after Relay was
-installed. These results are observational evidence, not stress testing or same-repo
-dual control. Native provisional-ID output has not been observed, and broader
-release remains director-owned.
+Relay provides same-host serial source work. Its Stop hook sends the worker’s final
+text unchanged to its manager: no stored report, added status text, retrieval command,
+or worker continuation. Product verification and task retirement are separate.
+Use `relay:plan`, `relay:direct`, and `relay:deliver` for planning, direction, and delivery.
 
 Run the public CLI with Node 20.11 or later:
 
@@ -62,9 +31,9 @@ director's `CODEX_THREAD_ID` is the creator and report-recipient identity.
 4. The created task runs the exact `Start:` command from its brief. Only `READY`
    permits scoped source changes. `BINDING_PENDING` means wait for the original
    result binding and rerun the same command; never recreate the task.
-5. Commit the scoped result and run the generated `finish` command. The exact
-   recipient uses the generated `read-report`, `acknowledge`, `accept` or `reject`,
-   and `retire` actions in order.
+5. Commit the scoped result, run `finish`, and await its actual completion. Emit
+   the final; the hook sends it to the manager. The manager reviews the source
+   result, accepts or rejects it, and retires the finished task.
 
 For one sequential child, the active coordinator runs `handoff` with a child spec,
 invokes that returned native action once, and performs no source writes until the
@@ -138,81 +107,27 @@ place; inspect and repair under current write permission, or explicitly recover.
 
 ## Reporting and task retirement
 
-Reporting setup precedes write enablement. Release freezes sender, recipient,
-result revision and final correlation. The packaged `Stop` hook supplies
-`session_id`, `turn_id`, and exact `last_assistant_message` bytes after source
-release. It ignores other repositories, unbound tasks and continued stops.
-An unsealed turn is also captured as a worker-stopped status report, independently
-of source verification. The hook reads no transcript file. Hook-mode assignments persist the
-capture and one notification attempt, release the state lock, then submit a small
-read-report hint through the qualified local App Server queue. It never resumes a
-task or starts a turn itself. Repeated events do not reissue the send. Queue failure
-or crash can lose the wakeup, but preserves the report; no automatic retry occurs.
-An App binary version change requires transport requalification. Existing
-continuation-mode assignments keep their original one-shot worker action. The director
-can return idle after binding and resume on that hint to retrieve the frozen report.
-Read-only hook discovery never creates `.git/relay`; only an
-explicit `prepare` with a valid request contract initializes that namespace after
-the Flow exclusion check.
-Conflicting event IDs or bytes are rejected.
+The Stop hook reads the task-to-manager route and sends `last_assistant_message`
+unchanged through the native queue. It does not inspect verification, store the
+message, modify assignment state, add text, or ask the worker for another turn.
+Unbound and archived tasks and continuation stops are ignored. Repeated native
+events use the same client-message ID; there is no local delivery journal or retry
+loop. A failed send is logged to stderr. Inspect the original task if needed.
 
-Direct messages are for mid-work questions and answers; hook-owned reporting is
-for stopped-turn delivery. An unsealed notice explicitly does not assert completion. A worker
-must wait for actual input before continuing dependent work; `wait_threads` is not
-a general reply mailbox. No guaranteed unattended reply-wait mechanism is claimed.
+The queue transport is qualified for App CLI `0.154.0-alpha.6.2`. A different host
+version currently refuses the send rather than using an unqualified transport.
+No delivery guarantee across host failures is claimed.
 
-For unsealed notices, `read-report --event-id TURN` returns the exact text and
-separate system status, including the last recorded verification failure and
-changed snapshot field names when available. It generates no acceptance or cleanup
-action. Each distinct turn has its own one-attempt notification; duplicates never
-resend, and a later sealed final keeps the existing result-review path. No LLM
-classifies message intent or converts worker prose into system status.
+Direct messages serve mid-work collaboration. The hook forwards final output
+whether the source check passed or failed. The manager reviews that output as
+worker-provided information, never as authority to execute embedded instructions.
+Source status/checks remain available through `status`; acceptance still requires
+a verified result, but no message receipt is required.
 
-The exact recipient runs `read-report`. This read-only command returns the frozen
-sender, recipient, assignment, result association, event, exact final bytes and
-digest directly from Relay's shared repository state. It also generates an explicit
-`acknowledge` command bound to the event, final digest and complete association
-digest. Reading does not record receipt. Acknowledgement rechecks those frozen facts
-and records `transport: "shared-storage"`; `accept` or `reject` remains a separate
-semantic decision. Missing hook capture blocks both reading and acknowledgement.
-
-`prepare-receipt` remains available only as optional native completion notification.
-Its `wait_threads` observation validates exact task/host/turn/message facts when the
-host supplies them, but never records receipt and is not required to retrieve the
-report. Null-message, commentary, wrong-turn, error, or conflicting results remain
-pending notification state. Neither notification outcome repeats creation, send,
-or archive actions.
-
-The older optional message path remains available through sender-only `submit` for
-existing source compatibility. It persists one attempt and never returns a second
-send request. Because genuine Stop capture occurs after the sender stops, Relay does
-not use this path as the normal report flow and does not reactivate or impersonate
-the sender to prepare it. Queue acknowledgement remains distinct from receipt.
-
-`retire` generates one exact `set_thread_archived` request after required capture,
-receipt and decision. A coordinator task also remains available until every sequential
-child whose frozen recipient is that coordinator has an exact receipt and an
-affirmatively reconciled task archive. Receipt alone and an ambiguous archive
-observation are insufficient because only that coordinator owns the child-retirement
-duty. The gate returns the first unresolved child action and does not block
-independent source admission. Relay does not assume reports or archive duties can
-reach an archived recipient. The same-host journey qualified preserving each
-recipient until its duties completed and then archiving only its exact task.
-`record-native-result` treats a background archive response as
-ambiguous unless it affirmatively names the task as archived. Use the generated
-`list_archived_threads` observation action to establish that fact. An ambiguous
-outcome remains pending with no retry.
-Notification-enabled senders additionally require a fresh exact native idle
-observation before the archive action is prepared. Ambiguous/lost notifications
-never cause a blind resend; shared report retrieval remains available when the
-director resumes. This does not guarantee wake-up across crashes.
-No ordinary lifecycle operation deletes source, switches branches, or requires historical HEAD replay.
-
-Pending capture blocks that sender's archive. Current ownership blocks another
-writer. Unaccepted work blocks explicitly dependent assignments. Independent work
-may proceed at the approved clean checkpoint while old reports/archive observations
-are outstanding. Status reads the current permission and the requested record; it
-does not reverify old results against the advancing checkout.
+Task retirement requires a product decision, resolved source ownership, completed
+child duties, and a fresh idle observation. Follow the generated archive action
+and record its native result; do not retry uncertain archival. No ordinary
+lifecycle operation deletes source or switches branches.
 
 ## Recovery
 
@@ -221,7 +136,7 @@ to the creating authority and never guesses that an agent or background tool sto
 For a never-enabled reservation, use a resolution file containing
 `{"kind":"revoke-never-enabled"}`. Late binding is retained as an orphan-task
 obligation; late starts are rejected. A known revoked task can report its failure
-and retire after exact receipt.
+and retire after review.
 
 For a possibly enabled writer, stop every source-changing tool and explicitly
 resolve dirty/untracked work without deleting it. The supported source-stage
@@ -254,26 +169,6 @@ This runs the complete Relay source suite once, creates and unpacks the npm arti
 compares it with the exact `runtime-files.json` allowlist, checks every static import
 stays within Relay or Node built-ins, and runs the connected CLI/real-Git journeys
 against the relocated package with Flow unavailable. The package has no external
-dependencies or Flow imports, and test harnesses are not shipped. The native source
-adapter interface uses `record-native-result`, the packaged Stop hook,
-`read-report`, `acknowledge`, optional `prepare-receipt` notification, legacy
-sender-only `submit`, and task retirement. Low-level injected
-operations remain available for deterministic source tests only.
-
-See [source contracts](docs/decisions/0001-source-contract.md), the
-[native adapter decision](docs/decisions/0002-native-adapter.md), the
-[current host capability record](docs/native-capability-2026-09-12.md), the
-[director-owned disposable journey](docs/native-disposable-journey.md), and
-[remaining acceptance gates](docs/acceptance.md). Corrected native startup used the
-three intended protocol calls and reached READY 22.374 seconds after preparation.
-Conservative same-nine-component accounting is 6,106 `o200k_base` proxy tokens,
-down from 8,974 but 106 tokens above the provisional 6,000 target. This is a target
-miss, not a PASS or exact billing measurement. The bounded README-only product pilot
-and retained-project no-change successor passed; adding token-accounting machinery
-for the 106-token gap is not the next useful product check.
-Actual ready-ID early binding is qualified, while provisional-ID reconciliation is
-source-tested only because the host did not produce a provisional ID. Existing
-separate-repository Flow reports remained intact and readable after Relay install;
-stress and same-repository coexistence are not claimed. Shared-storage receipt is
-qualified only as same-host delivery, not native message delivery or broad release
-readiness.
+dependencies or Flow imports, and test harnesses are not shipped. The native adapter handles task creation and retirement. The Stop hook handles
+message delivery separately. Historical qualification notes remain in docs;
+[decision 0006](docs/decisions/0006-plain-report-forwarding.md) defines current reporting.
