@@ -333,6 +333,25 @@ current [refresh contract](../lib/compat/refresh.mjs) enforces exact replacement
 coverage and semantic equivalence. No journal edits, replacement tasks, product
 acceptance or destructive cleanup were performed for this diagnosis.
 
+### KI-13 — Director availability lacks a connected completion workflow
+
+**Evidence: source-confirmed experience gap; Plotloom's director stayed attached
+through native waiting.** Relay 0.1.0 supplies only `deliver`; its Stop hook freezes
+the result but emits no director notification. Shared-storage receipt works only
+when the recipient runs its commands. Tested lifecycle primitives therefore do not
+establish unattended director follow-through or automatic cleanup after idle.
+
+**Category / cause:** notification and director-entrypoint gap, not loss of report
+bytes. **Fix location:** one lean director workflow with supported advisory wakeup,
+unchanged explicit receipt/acceptance, and safe task retirement after sender stop.
+
+- [ ] **Relay:** qualify dispatch → idle director → completion wakeup → frozen
+  report review → exact task cleanup → useful successor. No daemon/private IPC or
+  hidden wait loop; no unattended subagents. Do not claim this is already supported.
+- [ ] **Flow:** not reassessed; no legacy notification changes authorized.
+
+Implementation kickoff: [approved connected plan](plans/2026-09-12-relay-director-experience.md).
+
 ### KI-12 — Existing Flow projects lack a clear Relay adoption entrypoint
 
 **Update 2026-09-12:** personal-project adoption guidance is now accepted in
