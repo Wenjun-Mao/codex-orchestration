@@ -29,3 +29,15 @@ Plotloom's director reported a clean completed boundary at `5ff6ad6`, accepted a
 retired assignment, archived coordinator, and no current dependence on installed
 0.1.0. This is readiness information, not evidence of candidate installation. No
 Plotloom files or installed plugin bytes were changed for this checkpoint.
+
+## Subsequent native-test setup
+
+The user explicitly authorized the disposable test director and worker. After
+Plotloom confirmed its completed boundary, its director agreed not to start a new
+Relay assignment during qualification. Managed installation succeeded as
+`0.2.0-rc.1+codex.20260912181722`; all 24 distribution/cache files match. Artifact
+SHA-256: `a3d2765d0cbcf4a23277ce90fd45d50bcd478a088b8339ee78defe15549230b1`.
+The previous distribution remains at
+`/Users/wjmao/plugins/relay.before-020rc1-fb9a795` for rollback at a safe boundary.
+No installed-cache edits or Plotloom source/state edits occurred. This installation
+does not establish loaded-hook or live notification success.
