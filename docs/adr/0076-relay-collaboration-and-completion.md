@@ -4,6 +4,12 @@ Status: implemented for Relay 0.3.0, 2026-09-12. The recovered RC1 native journe
 qualified the connected lifecycle; see Relay decision 0004 and its release evidence.
 Existing 0.2.1 assignments retain the worker continuation from decision 0003.
 
+2026-09-12 amendment: Relay decision 0005 decouples stopped-turn communication
+from source acceptance. Unsealed Stops also notify with separate deterministic
+status, never completion/cleanup authority. This corrects the suppression boundary
+below; the original rationale is retained as history. Source candidate 0.3.1-rc.1
+is tested but not yet installed or natively qualified.
+
 ## Decision
 
 Use **direct messages for collaboration; hook-owned reporting for completion**.

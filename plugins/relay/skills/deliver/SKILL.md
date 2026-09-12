@@ -28,11 +28,15 @@ dirty work. Never use task cancellation or lock recovery as write permission.
 For a mid-work question or blocker, message the exact manager directly. Do not seal
 a result merely to ask a question. Stop dependent work until the answer arrives;
 `wait_threads` observes completion/attention, not an arbitrary reply mailbox. An
-unsealed turn ending is not a completion report; resume only on actual input.
+unsealed turn ending sends a status notice, not a completion report; resume only
+on actual input. Inspect the actual finish response before claiming release.
 
 After source release, emit the genuine final and become idle. The trusted packaged
 Stop hook captures its exact task, turn and bytes, then notifies the manager once.
 Do not send a separate completion message or arrange your own reporting retry.
+If finish fails, the hook still reports the stopped turn with separate recorded
+verification status. That notice does not release source permission or certify
+your final's claims. Preserve the failure and stop dependent work.
 Only older assignments frozen in continuation mode may issue a generated one-shot
 notification action; follow that exact action without source work or resend.
 The exact recipient

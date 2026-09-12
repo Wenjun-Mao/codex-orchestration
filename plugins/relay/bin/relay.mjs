@@ -28,7 +28,7 @@ relay handoff --repo PATH --ticket GENERATED --actor TASK --spec FILE
 relay finish --repo PATH --ticket GENERATED --actor TASK
 relay verify --repo PATH --ticket GENERATED --actor TASK --decision continue|finish|reject
 relay capture --repo PATH --assignment ID --actor TASK --event FILE
-relay read-report --repo PATH --assignment ID --actor RECIPIENT
+relay read-report --repo PATH --assignment ID --actor RECIPIENT [--event-id STOP_TURN]
 relay acknowledge --repo PATH --assignment ID --actor RECIPIENT --event-id ID --digest SHA256 --association-digest SHA256
 relay submit --repo PATH --assignment ID --actor TASK
 relay prepare-receipt --repo PATH --assignment ID --actor RECIPIENT  # optional native notification
@@ -79,7 +79,7 @@ try {
     else if (operation === 'finish') result = relay.finish(values.ticket, values.actor);
     else if (operation === 'verify') result = relay.verify(values.ticket, values.actor, values.decision);
     else if (operation === 'recover') result = relay.recover(values.ticket, values.actor, file('resolution'));
-    else if (operation === 'read-report') result = relay.readReport(values.assignment, values.actor);
+    else if (operation === 'read-report') result = relay.readReport(values.assignment, values.actor, values['event-id']);
     else if (operation === 'status') result = relay.status(values.assignment);
     else if (operation === 'inspect-lock') {
       const lock = JSON.parse(readFileSync(relay.store.root + '/transition.lock', 'utf8'));

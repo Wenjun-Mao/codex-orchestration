@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.1-rc.1 — Stop reporting independent of acceptance (candidate)
+
+- Notify the manager of unsealed worker Stops with exact text and separate system
+  status, without granting source release, acceptance or cleanup.
+- Persist finite verification failure details; identify changed snapshot fields
+  without leaking command output. No LLM classification or reporting continuation.
+- One attempt per distinct unsealed turn; later sealed completion remains separate.
+- Role-prefixed task naming is not changed by this reporting correction.
+
 ## 0.3.0 — Hook-owned completion
 
 - New assignments use one direct hook-owned queue notification, without a worker

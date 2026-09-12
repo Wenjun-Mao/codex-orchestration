@@ -141,8 +141,9 @@ place; inspect and repair under current write permission, or explicitly recover.
 Reporting setup precedes write enablement. Release freezes sender, recipient,
 result revision and final correlation. The packaged `Stop` hook supplies
 `session_id`, `turn_id`, and exact `last_assistant_message` bytes after source
-release. It ignores other repositories, unbound tasks, continued stops, and
-unsealed results. The hook reads no transcript file. New assignments persist the
+release. It ignores other repositories, unbound tasks and continued stops.
+An unsealed turn is also captured as a worker-stopped status report, independently
+of source verification. The hook reads no transcript file. Hook-mode assignments persist the
 capture and one notification attempt, release the state lock, then submit a small
 read-report hint through the qualified local App Server queue. It never resumes a
 task or starts a turn itself. Repeated events do not reissue the send. Queue failure
@@ -156,9 +157,16 @@ the Flow exclusion check.
 Conflicting event IDs or bytes are rejected.
 
 Direct messages are for mid-work questions and answers; hook-owned reporting is
-for sealed completion. Ending an unsealed turn does not notify completion. A worker
+for stopped-turn delivery. An unsealed notice explicitly does not assert completion. A worker
 must wait for actual input before continuing dependent work; `wait_threads` is not
 a general reply mailbox. No guaranteed unattended reply-wait mechanism is claimed.
+
+For unsealed notices, `read-report --event-id TURN` returns the exact text and
+separate system status, including the last recorded verification failure and
+changed snapshot field names when available. It generates no acceptance or cleanup
+action. Each distinct turn has its own one-attempt notification; duplicates never
+resend, and a later sealed final keeps the existing result-review path. No LLM
+classifies message intent or converts worker prose into system status.
 
 The exact recipient runs `read-report`. This read-only command returns the frozen
 sender, recipient, assignment, result association, event, exact final bytes and

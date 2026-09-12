@@ -18,6 +18,11 @@ export function captureStopEvent(event, { notify = false } = {}) {
   const assignment = control.tasks?.[event.session_id];
   if (!assignment) return { status: 'ignored', reason: 'relay-sender-unbound' };
   const record = relay.record(control, assignment);
+  if (event.stop_hook_active !== true && record.report.notificationMode === 'hook-queue-once'
+    && (!record.report.association || record.report.stops?.some(item => item.eventId === event.turn_id))) {
+    return { ...relay.report('capture-stop', assignment, event.session_id,
+      { eventId: event.turn_id, text: event.last_assistant_message }), unsealed: true };
+  }
   if (!record.report.association) return { status: 'ignored', reason: 'source-result-unsealed' };
   if (event.stop_hook_active === true) {
     if (!record.report.advisory) return { status: 'ignored', reason: 'no-advisory-continuation' };
@@ -48,7 +53,7 @@ export async function processStopEvent(event, { submit = submitQueueNotification
   try { outcome = await submit(captured.notification); }
   catch { outcome = { status: 'ambiguous', reason: 'transport-error' }; }
   const relay = new Relay(event.cwd);
-  relay.report('observe-hook-notification', captured.assignment, event.session_id,
-    { id: captured.notification.id, ...outcome });
+  relay.report(captured.unsealed ? 'observe-stop-notification' : 'observe-hook-notification', captured.assignment, event.session_id,
+    { id: captured.notification.id, eventId: captured.eventId, ...outcome });
   return { ...captured, notificationOutcome: outcome };
 }

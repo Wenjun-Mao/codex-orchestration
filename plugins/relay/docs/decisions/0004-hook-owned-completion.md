@@ -1,6 +1,7 @@
 # 0004 — Direct collaboration, hook-owned completion
 
 Accepted; RC1's connected native lifecycle qualified as a recovered journey.
+Decision 0005 supersedes unsealed-message suppression; acceptance remains separate.
 Supersedes 0003's worker continuation only for newly prepared assignments. Existing
 assignment modes remain frozen. Installed 0.2.1 is unchanged until release.
 

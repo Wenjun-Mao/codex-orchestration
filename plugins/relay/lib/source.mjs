@@ -72,8 +72,16 @@ export function runChecks(repo, result, checks, branch) {
     const run = spawnSync(argv[0], argv.slice(1), { cwd: repo, encoding: 'utf8', timeout: 120000, maxBuffer: 4 * 1024 * 1024 });
     const after = snapshot(repo);
     evidence.push({ argv, exitCode: run.status, signal: run.signal, error: run.error?.message ?? null, stdout: run.stdout ?? '', stderr: run.stderr ?? '' });
-    requireThat(same(before, after), 'Verification changed source, index or refs; evidence invalid, explicit recovery required');
-    requireThat(run.status === 0 && !run.error, `Check failed: ${JSON.stringify(argv)}`);
+    const changedFields = Object.keys(before).filter(key => !same(before[key], after[key]));
+    if (changedFields.length || run.status !== 0 || run.error) {
+      const error = new Error(changedFields.length
+        ? 'Verification changed source, index or refs; evidence invalid, explicit recovery required'
+        : `Check failed: ${JSON.stringify(argv)}`);
+      // Report only finite diagnostic fields, never command output or secrets.
+      error.verification = { status: 'failed', code: changedFields.length ? 'verification-state-changed' : 'check-failed',
+        changedFields, checkIndex: evidence.length - 1, exitCode: run.status };
+      throw error;
+    }
   }
   return { revision: result.revision, checks: evidence };
 }

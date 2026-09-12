@@ -4,6 +4,7 @@ import { Store, requireThat } from './store.mjs';
 import { repository, git, clean, snapshot, inspectResult, runChecks, validateScope, validateChecks, inScope, refuseFlow } from './source.mjs';
 import { readReportOperation, reportOperation } from './reports.mjs';
 import { normalizeNativeResult } from './native.mjs';
+import { readStopReport } from './stop-reports.mjs';
 
 const quote = value => "'" + String(value).replaceAll("'", "'\\''") + "'";
 export class Relay {
@@ -16,6 +17,17 @@ export class Relay {
   }
   startCommand(ticket) {
     return this.command('start', { ticket, 'actor-env': 'CODEX_THREAD_ID' });
+  }
+  checked(control, record, result, checks, branch) {
+    try {
+      const verification = runChecks(this.repo.checkout, result, checks, branch);
+      record.lastVerification = { status: 'passed', revision: result.revision };
+      return verification;
+    } catch (error) {
+      record.lastVerification = { ...(error.verification ?? { status: 'failed', code: 'verification-refused' }), revision: result.revision };
+      this.store.commit(control, [record]);
+      throw error;
+    }
   }
   response(actor, activity, next, extra = {}) { return { actor, permittedSourceActivity: activity, nextAction: next, ...extra }; }
   record(control, id) { return this.store.assignment(control, id); }
@@ -215,7 +227,7 @@ export class Relay {
       requireThat(spec.scope.every(path => inScope(path, parent.scope)), 'Executor scope exceeds coordinator scope');
       const base = clean(this.repo.checkout, parent.branch);
       const checkpoint = inspectResult(this.repo.checkout, parent.baseline, parent.scope, parent.branch);
-      runChecks(this.repo.checkout, checkpoint, parent.checks, parent.branch);
+      this.checked(control, parent, checkpoint, parent.checks, parent.branch);
       const child = this.newRecord(spec, base, actor, parent.id);
       child.recipientHostId = parent.taskHostId;
       parent.children = [...(parent.children ?? []), child.id];
@@ -241,7 +253,7 @@ export class Relay {
       const record = this.current(control, ticket, actor, ['write']);
       {
         const result = { ...inspectResult(this.repo.checkout, record.baseline, record.scope, record.branch), producer: actor, contributors: record.contributors ?? [] };
-        if (record.role === 'coordinator') result.verification = runChecks(this.repo.checkout, result, record.checks, record.branch);
+        if (record.role === 'coordinator') result.verification = this.checked(control, record, result, record.checks, record.branch);
         this.seal(record, result);
         record.finishedTicket = ticket;
         record.outcome = record.role === 'coordinator' ? 'verified' : 'awaiting-verification';
@@ -274,9 +286,9 @@ export class Relay {
       }
       requireThat(!child.decision || child.decision === 'accepted', 'Recipient already rejected this result; use verification reject and explicit recovery');
       inspectResult(this.repo.checkout, child.baseline, child.scope, child.branch);
-      child.verification = runChecks(this.repo.checkout, child.result, child.checks, child.branch);
+      child.verification = this.checked(control, parent, child.result, child.checks, child.branch);
       const aggregate = { ...inspectResult(this.repo.checkout, parent.baseline, parent.scope, parent.branch), producer: parent.task, contributors: [...(parent.contributors ?? []), child.task] };
-      if (decision === 'finish') aggregate.verification = runChecks(this.repo.checkout, aggregate, parent.checks, parent.branch);
+      if (decision === 'finish') aggregate.verification = this.checked(control, parent, aggregate, parent.checks, parent.branch);
       child.decision = 'accepted'; child.outcome = 'verified';
       parent.contributors = aggregate.contributors;
       delete parent.verifying;
@@ -339,9 +351,10 @@ export class Relay {
   report(operation, id, actor, input) {
     return this.store.locked(control => reportOperation(this, control, this.record(control, id), operation, actor, input));
   }
-  readReport(id, actor) {
+  readReport(id, actor, eventId) {
     const control = this.store.control();
-    return readReportOperation(this, this.record(control, id), actor);
+    const record = this.record(control, id);
+    return eventId ? readStopReport(this, record, actor, eventId) : readReportOperation(this, record, actor);
   }
   status(id) {
     const control = this.store.control();

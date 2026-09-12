@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { requireThat } from './store.mjs';
 import { digest, same } from './source.mjs';
 import { prepareAdvisory, prepareHookNotification, idleObservation } from './notification.mjs';
+import { stopReportOperation } from './stop-reports.mjs';
 
 // Observations enter only through explicit injected adapters/events in this source stage.
 // No current HEAD lookup belongs here: reports remain bound after successors advance.
@@ -46,6 +47,7 @@ export function readReportOperation(relay, record, actor) {
   });
 }
 export function reportOperation(relay, control, record, operation, actor, input = {}) {
+  if (operation === 'capture-stop' || operation === 'observe-stop-notification') return stopReportOperation(relay, control, record, operation, actor, input);
   const report = record.report;
   const command = (op, args = {}) => relay.command(op, { assignment: record.id, actor, ...args });
   const response = (status, next, extra = {}) => relay.response(actor, 'none', next, { status, ...extra });
