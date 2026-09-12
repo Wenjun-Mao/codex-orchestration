@@ -2,14 +2,20 @@
 
 Relay owns one retained checkout with one current source permission, sequential
 executors, direct verification, frozen reporting, and task-only retirement.
-This 0.1.0 candidate implements the source contract and a minimal native adapter.
-Source `0cae260` was installed as personal package
-`0.1.0+codex.20260912061058` and exercised in one disposable same-host repository.
-The recovered mixed serial journey and a later fresh one-turn useful successor
-qualify genuine Stop capture, shared-storage receipt, separate acceptance, and
-task-only retirement within that boundary. Injected tool results and hook events
-remain source fixtures and are not counted as live evidence. Relay uses no private
-IPC.
+Release candidate `f627eef` was packaged and installed as
+`0.1.0+codex.20260912163617` for bounded native testing. Same-host journeys qualify
+normal three-call startup, ready-ID early binding, failed-check recovery, genuine
+Stop capture, shared-storage receipt, separate acceptance, task-only retirement,
+and one restart-free candidate transition. Injected tool results and hook events
+remain source fixtures. Relay uses no private IPC.
+
+This candidate completed a bounded same-host README-only product pilot and a fresh
+no-change successor with six existing tests, genuine report receipt, acceptance,
+and task-only retirement for both tasks. Separate-repository
+Flow reports also remained available with exact digest attestation after Relay was
+installed. These results are observational evidence, not stress testing or same-repo
+dual control. Native provisional-ID output has not been observed, and broader
+release remains director-owned.
 
 Run the public CLI with Node 20.11 or later:
 
@@ -21,6 +27,29 @@ Generated commands contain the absolute Node and Relay entrypoint paths, so they
 run without installation or command substitution by the agent. The package's bin
 name is `relay`; examples below abbreviate the entrypoint with that name. Tests
 use disposable repositories and leave them for inspection.
+
+## Same-host quick start
+
+Prerequisites are Node 20.11 or later, an enabled and reviewed Relay plugin, a saved
+Codex project mapped to the retained checkout, and a clean selected branch. The
+director's `CODEX_THREAD_ID` is the creator and report-recipient identity.
+
+1. Write the work choices to a spec file using the shape below. Scope and acceptance
+   must describe one reviewable source result.
+2. Run `node /absolute/path/to/relay/bin/relay.mjs prepare --repo CHECKOUT
+   --actor "$CODEX_THREAD_ID" --spec FILE`.
+3. Invoke the returned `nativeAction` exactly once. Save its unmodified result to a
+   JSON file and run the returned `recordCommand` with that file path.
+4. The created task runs the exact `Start:` command from its brief. Only `READY`
+   permits scoped source changes. `BINDING_PENDING` means wait for the original
+   result binding and rerun the same command; never recreate the task.
+5. Commit the scoped result and run the generated `finish` command. The exact
+   recipient uses the generated `read-report`, `acknowledge`, `accept` or `reject`,
+   and `retire` actions in order.
+
+For one sequential child, the active coordinator runs `handoff` with a child spec,
+invokes that returned native action once, and performs no source writes until the
+child finishes and Relay transfers the exact verification reservation back.
 
 ## Prepare and work
 
@@ -56,8 +85,8 @@ reads the invoking task identity supplied by the Codex host. Missing, conflictin
 or incorrectly bound identity is refused; Relay never substitutes the assignment's
 stored owner. Direct authenticated callers and deterministic fixtures may still
 pass an explicit actor. `start` is the single coordinator admission command. These
-are three ordinary protocol calls;
-that count is an interface property, not a measured native startup budget.
+are three ordinary protocol calls. The corrected native replay exercised that
+sequence without an identity lookup or rejected start.
 
 A ready observation file contains `actionId` from the generated native action,
 `status: "ready"` and the actual `taskId`. A provisional observation contains
@@ -175,15 +204,14 @@ admission pending separately authorized adoption; this is deliberately conservat
 
 ```sh
 cd /absolute/path/to/plugins/relay
-npm test
-npm run pack:check
+npm run release:check
 ```
 
-The package has no external dependencies and no Flow imports. `runtime-files.json`
-is the exact packed file allowlist. Pack verification creates/unpacks an archive
-outside this repository, checks every static runtime import stays within Relay or
-Node built-ins, and runs the connected CLI/real-Git journeys against the relocated
-package with Flow unavailable. Test harnesses are not shipped. The native source
+This runs the complete Relay source suite once, creates and unpacks the npm artifact,
+compares it with the exact `runtime-files.json` allowlist, checks every static import
+stays within Relay or Node built-ins, and runs the connected CLI/real-Git journeys
+against the relocated package with Flow unavailable. The package has no external
+dependencies or Flow imports, and test harnesses are not shipped. The native source
 adapter interface uses `record-native-result`, the packaged Stop hook,
 `read-report`, `acknowledge`, optional `prepare-receipt` notification, legacy
 sender-only `submit`, and task retirement. Low-level injected
@@ -193,13 +221,16 @@ See [source contracts](docs/decisions/0001-source-contract.md), the
 [native adapter decision](docs/decisions/0002-native-adapter.md), the
 [current host capability record](docs/native-capability-2026-09-12.md), the
 [director-owned disposable journey](docs/native-disposable-journey.md), and
-[remaining acceptance gates](docs/acceptance.md). The corrected source interface's
-declared startup content projects to 3,819 `o200k_base` proxy tokens, down from the
-recorded 8,974; a fresh native replay is still required before a startup-budget
-PASS. Correct-ID provisional/early-start behavior, separate-repository Flow
-coexistence, restart-free upgrade behavior, and the controlled product pilot remain
-unqualified. The earlier successor's first wrong-actor `start` was rejected before
-writes and self-corrected through public `status`; that run is not a three-call
-budget pass. Its 52.364-second native turn is not an end-to-end latency measurement.
-Shared-storage receipt is qualified only as same-host delivery, not native message
-delivery or broad release readiness.
+[remaining acceptance gates](docs/acceptance.md). Corrected native startup used the
+three intended protocol calls and reached READY 22.374 seconds after preparation.
+Conservative same-nine-component accounting is 6,106 `o200k_base` proxy tokens,
+down from 8,974 but 106 tokens above the provisional 6,000 target. This is a target
+miss, not a PASS or exact billing measurement. The bounded README-only product pilot
+and retained-project no-change successor passed; adding token-accounting machinery
+for the 106-token gap is not the next useful product check.
+Actual ready-ID early binding is qualified, while provisional-ID reconciliation is
+source-tested only because the host did not produce a provisional ID. Existing
+separate-repository Flow reports remained intact and readable after Relay install;
+stress and same-repository coexistence are not claimed. Shared-storage receipt is
+qualified only as same-host delivery, not native message delivery or broad release
+readiness.

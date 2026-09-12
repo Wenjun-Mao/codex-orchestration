@@ -1,8 +1,8 @@
 # Director-owned native disposable journey
 
-Status: completed as a recovered mixed journey plus a fresh useful successor turn.
-This is bounded same-host evidence, not uninterrupted first-attempt success, a full
-startup-budget measurement, or product-pilot approval.
+Status: completed as a recovered mixed journey, useful successors, failed-check
+recovery, and a corrected stable-candidate replay. This is bounded same-host
+evidence, not product-pilot or broad release approval.
 
 ## Completed evidence
 
@@ -23,6 +23,20 @@ capture, shared read/acknowledgement, separate acceptance, and one affirmative t
 archive then completed without source repair, sender reactivation, injected event,
 installation, or archive replay. The 52.364-second native turn does not establish
 end-to-end startup latency, token use, or a three-call budget pass.
+
+Corrected source `f627eef` was later installed as
+`0.1.0+codex.20260912163617`. A fresh Terra-high task used the generated environment
+identity and reached READY through the intended three protocol calls, with no actor
+lookup, rejected start, worker README/runtime read, or mechanical JSON. It committed
+one scoped change, passed its check, and completed genuine capture, shared receipt,
+acceptance, and archive without another restart. Prepare-to-READY was 22.374 seconds.
+
+A separate task ran the same environment-ID start before result binding, received
+`BINDING_PENDING` with no source activity, and reached READY after the original
+ready result was bound. It completed a no-change finish and retired normally. The
+host did not produce a provisional native ID, so that reconciliation path remains
+source-tested only. Conservative startup accounting is 6,106 proxy tokens: 106
+above the provisional 6,000 ceiling and therefore not a PASS.
 
 ## Original prerequisites and owners
 
@@ -88,6 +102,19 @@ The retained main checkout finished clean at `12f83a3`, Relay reported
 digests, actions, and raw responses remain in director-owned release evidence;
 source fixtures remain a separate evidence class.
 
-Still unqualified: native failure/recovery, provisional or early start,
-separate-repository Flow coexistence, end-to-end startup token/call/time budget,
-restart-free candidate upgrades, product-project pilot, release, and broad rollout.
+A later README-only `pdf_extract` pilot completed six existing tests, genuine report
+receipt, acceptance, one task-only archive, and public retirement without runtime,
+dependency, rendering, or push changes. Existing reports in a separate Flow
+repository also remained readable after Relay installation with exact recipient
+digest attestation. That is observational coexistence, not stress testing or
+same-repository dual control.
+
+A fresh dependent no-change successor reused the retained product project at clean
+`main` revision `7e0568e2c5501967363a904cf9243e62b8a362f8`, reran the six tests,
+changed no source, commit, or ref, and completed genuine receipt, acceptance, one
+exact archive, and public retirement.
+
+Still unqualified: observed provisional-ID reconciliation, a passing or explicitly
+revised startup-token target, Flow coexistence stress/same-repository coverage,
+release, and broad rollout. The corrected replay qualifies the normal three-call
+path, ready-ID early binding, and one restart-free candidate transition only.

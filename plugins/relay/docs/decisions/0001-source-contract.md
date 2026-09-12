@@ -1,6 +1,7 @@
 # 0001 — One source permission, immutable supporting facts
 
-Accepted for the bounded source candidate; native qualification remains separate.
+Accepted for the stable same-host 0.1.0 contract; native evidence remains separately
+scoped and recorded.
 
 The failure to prevent is an ownership gap between an executor release and its
 coordinator's verification reservation, or a delayed report reinterpreting an old

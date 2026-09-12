@@ -2,14 +2,15 @@
   "name": "relay",
   "version": "0.1.0",
   "private": true,
-  "description": "Independent serial source coordination; native qualification pending",
+  "description": "Same-host serial source coordination for Codex tasks",
   "type": "module",
   "bin": {
     "relay": "bin/relay.mjs"
   },
   "scripts": {
     "test": "node --test --test-concurrency=1 test/*.test.mjs",
-    "pack:check": "node scripts/pack-check.mjs"
+    "pack:check": "node scripts/pack-check.mjs",
+    "release:check": "npm test && npm run pack:check"
   },
   "engines": {
     "node": ">=20.11"

@@ -48,10 +48,13 @@ they authenticate association and identity, not hostile agents.
 The packaged hook uses default `hooks/hooks.json` discovery. The package does not
 add a manifest hook override, config layer, installer, daemon, marketplace entry,
 or runtime dependency. Official host behavior requires plugin enablement and trust,
-so source tests cannot promote themselves to native evidence. The director-owned
-disposable journey used the exact installed candidate and separately recorded a
-recovered mixed serial run plus a fresh useful successor. That qualifies same-host
-shared receipt and task-only retirement. The successor self-corrected a rejected
-wrong-actor start before writing, so three-call startup is not qualified. Native
-failure/early-start, Flow coexistence, startup budget, restart-free upgrades, and a
-product pilot remain open.
+so source tests cannot promote themselves to native evidence. Director-owned
+disposable journeys used the exact installed candidates and qualify same-host
+failed-check recovery, normal three-call startup, ready-ID early binding, shared
+receipt, task-only retirement, and one restart-free candidate transition. The host
+did not return a provisional native ID, so that reconciliation path remains
+source-tested only. Existing reports in a separate Flow repository remained readable
+after Relay installation with exact recipient digest attestation; stress testing and
+same-repository dual control remain open. Conservative startup accounting is 6,106
+proxy tokens, 106 above the provisional target; this is an explicit limit, not a
+PASS or a reason to add another accounting layer.

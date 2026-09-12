@@ -1,18 +1,20 @@
 # Native capability checkpoint — 2026-09-12
 
-Status: recovered mixed same-host journey and fresh useful successor completed;
-remaining native, coexistence, startup-budget, pilot, and release gates are below.
+Status: stable 0.1.0 release candidate completed a bounded same-host pilot;
+remaining provisional-ID, startup-budget, coexistence limits, and broader release
+gates are below.
 
 ## Current host
 
 - macOS `26.6.2` build `25G83`, arm64.
-- ChatGPT `26.903.71938`, bundle build `8576`.
+- ChatGPT `26.908.40834`, bundle build `8881`.
 - Bundled executable: `/Applications/ChatGPT.app/Contents/Resources/codex`.
-- `codex-cli 0.153.4`.
+- `codex-cli 0.154.0-alpha.6.2`.
 - `codex features list` reports `hooks` as stable and enabled. The older
   `plugin_hooks` feature is removed and disabled.
-- `codex app-server generate-json-schema` completed against that exact binary in
-  `/tmp/relay-app-server-schema.9VK69y`. Its stable schema includes
+- The earlier `codex-cli 0.153.4` checkpoint ran
+  `codex app-server generate-json-schema` in
+  `/tmp/relay-app-server-schema.9VK69y`. That stable schema includes
   `thread/start`, `item/completed`, `turn/completed`, `thread/archive`, and
   `thread/archived`. No experimental schema was requested.
 
@@ -75,42 +77,73 @@ and child completion plus a fresh useful successor, including genuine Stop captu
 same-host shared receipt, separate acceptance, and exact task archival. The
 successor self-corrected one rejected wrong-actor start before any write.
 
+## Corrected startup replay
+
+Source `f627eef` was packaged and installed as
+`0.1.0+codex.20260912163617`; all 20 source/cache files matched apart from the
+distribution version suffix. The package artifact SHA-256 was
+`198ed3b1b1e96b295d8bd274b089ec4efc13954900b3982c898611362379c3e8`.
+
+A fresh Terra-high task used the generated `--actor-env CODEX_THREAD_ID` command.
+Preparation, creation-result binding, and start were the intended three protocol
+calls. The task performed no identity lookup, worker README read, runtime-source
+inspection, rejected start, or mechanical JSON authoring before READY. It reached
+READY 22.374 seconds after preparation, committed one scoped change, passed its
+check, and completed genuine Stop capture, shared receipt, separate acceptance, and
+one affirmative archive without another restart.
+
+A separate native task ran the same generated command before its ready result was
+bound. Relay returned `BINDING_PENDING` with no source activity. After the original
+result was recorded, the same task and command reached READY under the exact native
+ID and completed a no-change finish, genuine report, acceptance, and retirement.
+The host returned ready IDs in both cases, so provisional-ID reconciliation remains
+source-regression evidence rather than an observed native path.
+
+## Product pilot and Flow observation
+
+The `pdf_extract` pilot changed only its README on clean `main`, producing commit
+`7e0568e2c5501967363a904cf9243e62b8a362f8`. Six existing tests passed with two
+pre-existing `/run/secrets` warnings. No runtime, dependency, rendering, or push
+operation occurred. Genuine final capture, recipient acknowledgement, acceptance,
+one task-only archive, and public `RETIRED` status completed.
+
+A fresh dependent no-change successor then verified the same README command and six
+tests on retained clean `main` at `7e0568e2c5501967363a904cf9243e62b8a362f8`.
+It changed no source, commit, or ref and completed genuine final capture, recipient
+acknowledgement, acceptance, one exact archive, and public retirement. Neither pilot
+task needed an executor, extra branch, worktree, injected report, retry, or restart.
+
+Existing reports in a separate Flow repository remained available after Relay was
+installed. The recipient director attested exact digest
+`c934b1602d4ad27faa1ef9c4c6e80a50377ace3125ba5a663035c829be6fa991` without
+resuming a product task. Relay's hook/report module bytes were unchanged by the
+startup correction. This is bounded observational coexistence, not stress testing
+or same-repository dual control.
+
 ## Startup correction accounting
 
-The recorded canary evidence under `.git/relay-native-evidence/` declared nine
-content components and an `o200k_base` proxy. Re-running its
-`measure-startup.mjs`, then tokenizing the emitted component text with
-`tiktoken 0.11.0`, reproduced the 8,974-token baseline exactly. The corrected
-projection is produced by `scripts/measure-startup-correction.py`; it retains every
-component. It replaces only generated start commands, counts the scoped delivery
-skill for the director, and counts the worker reading that same skill and invoking
-the generated start directly. It removes the worker's full README and status reads
-because the corrected public contract no longer directs or requires them.
+The original canary evidence under `.git/relay-native-evidence/` declared nine
+content components and an `o200k_base` proxy. Its 8,974-token baseline is retained.
+The earlier source-only projection was 3,819 tokens, but that figure assumes
+skill-only director instructions and is not the native result.
 
-| Declared component | Before | Corrected projection |
-| --- | ---: | ---: |
-| Director spec | 315 | 315 |
-| Prepare response | 844 | 844 |
-| Native creation result | 64 | 64 |
-| Binding response | 257 | 240 |
-| Worker brief | 361 | 362 |
-| Director public instructions | 2,699 | 485 |
-| Native creation request | 426 | 426 |
-| Worker tool requests through READY | 510 | 270 |
-| Worker tool outputs through READY | 3,498 | 813 |
-| **Total** | **8,974** | **3,819** |
+The conservative corrected accounting keeps the same nine categories and the
+director's full skill/README read. It totals **6,106 proxy tokens**, down 2,868
+(32.0%) from the baseline. The worker's requests and outputs fell from 4,008 to
+1,065 tokens. The provisional 6,000-token ceiling is therefore missed by **106
+tokens (1.8%)**. This is a target miss, not a PASS or exact billing measurement.
 
-The reduction is 5,155 proxy tokens (57.4%). This is reproducible source-content
-accounting against the same recorded inputs and boundaries. It excludes ambient
-host framing and does not measure elapsed time or qualify a native startup PASS.
+The accounting excludes ambient history and host framing, and the intent and host
+differ from the baseline. The bounded product pilot and retained-project successor
+passed. The 106-token gap does not justify additional token-accounting machinery.
 
 ## Exact blocker
 
-Failure/recovery has bounded native evidence. Correct-ID provisional/early-start and
-separate-repository pending-Flow reporting coexistence remain open. The corrected
-source interface projects below the startup token ceiling, but fresh end-to-end
-native calls, tokens, and elapsed time remain unqualified; the prior wrong-actor run
-cannot establish a three-call claim. Restart-free upgrades, product pilot, release,
-and broader rollout are also unqualified. Starting a second App Server client or
-using the running app's private control socket remains outside the approved adapter
-shape.
+Failure/recovery, the normal three-call path, exact ready-ID early binding, and one
+restart-free candidate transition have bounded native evidence. Native provisional-ID
+reconciliation remains open. Separate-repository Flow reporting has bounded
+observational evidence, while stress and same-repository dual control remain open.
+The startup token target misses by 106. Final acceptance, release, and broader
+rollout remain director-owned.
+Starting a second App Server client or using the running app's private control
+socket remains outside the approved adapter shape.

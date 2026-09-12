@@ -1,6 +1,6 @@
 ---
 name: deliver
-description: Carry out an already prepared Relay serial source assignment using its generated public commands. Native adapter qualification and installation are separate gates.
+description: Carry out an already prepared same-host Relay serial source assignment using its generated public commands.
 ---
 
 Run the prepared brief's exact startup command unchanged. It reads this Codex task's
@@ -36,7 +36,6 @@ Archive only the exact prepared task, then use the generated archived-list
 observation to record affirmation; never delete its checkout or retry an uncertain
 archive/submission.
 
-Installation and native qualification remain director-owned boundaries. Use
-injected observations only in source tests; label shared-storage receipt accurately
-rather than calling it native message delivery. Do not install this candidate
-implicitly.
+Installation, pilot approval, and release remain director-owned. Use injected
+observations only in source tests; label shared-storage receipt accurately rather
+than calling it native message delivery. Do not install Relay implicitly.

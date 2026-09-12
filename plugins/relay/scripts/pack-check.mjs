@@ -27,7 +27,7 @@ for (const file of files.filter(path => path.endsWith('.mjs'))) {
 }
 assert.equal(existsSync(join(target, 'lib')), false, 'Flow must not be staged alongside Relay');
 const help = run(process.execPath, [join(unpacked, 'bin/relay.mjs'), '--help'], target);
-assert.match(help, /Relay native-adapter candidate/);
+assert.match(help, /Relay 0\.1\.0 — same-host serial source coordination/);
 assert.match(help, /start --repo PATH --ticket GENERATED --actor-env CODEX_THREAD_ID/);
 assert.doesNotMatch(help, /See README/);
 const deliverySkill = readFileSync(join(unpacked, 'skills/deliver/SKILL.md'), 'utf8');
