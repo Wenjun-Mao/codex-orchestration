@@ -9,6 +9,14 @@ with independent repair. Startup measurement misses the lightness targets.
 See the [qualification checkpoint](field-tests/2026-09-12-relay-native-qualification.md)
 for proven boundaries and remaining gates; installation is not broad acceptance.
 
+Latest release qualification: source `937ee45` passes 30/30 source and 15/15
+packed tests; `f627eef` has a complete bounded real-project pilot and accepted
+no-change successor ([pilot evidence](field-tests/2026-09-12-relay-product-pilot.md)).
+Existing Flow reporting after Relay installation has recipient-side attestation.
+The dated original source checkpoint below is historical, not current release
+status. Open Relay boxes describe their specific remaining proof/efficiency limits;
+they do not mean all implementation is absent. Flow fixes remain separately scoped.
+
 ## Relay source checkpoint — 2026-09-12
 
 Accepted source slice: `71f75b22f09180016e723edb57e5e8ca8ddb108a`, branch
@@ -99,8 +107,10 @@ the lock pathname, not proven incident causation. **Fix location / closure:** lo
 primitive/recovery contract; deterministic contention must never admit two owners.
 
 - [ ] **Flow — open:** no fix made; a protective change needs separate scope.
-- [ ] **Relay — prevention required:** do not copy automatic reclamation; verify
-  transition exclusion and explicit quiescent lock recovery.
+- [x] **Relay — source prevention verified (2026-09-12):** no automatic stale-lock
+  reclamation. The 30-test release suite covers transition exclusion, process-exit
+  recovery and exact explicit quiescent lock recovery. Cooperative source ownership
+  still requires genuinely stopped external writers; it is not an OS sandbox.
 
 Evidence: [core.mjs](../lib/core.mjs)::withProcessLock and
 [review synthesis](plans/2026-09-12-relay-design-review-synthesis.md).
@@ -138,8 +148,10 @@ boundary; advancing retained HEAD and delayed old observations must coexist with
 legitimate successors. Different legacy predicates may require different fixes.
 
 - [ ] **Flow — partially addressed:** residual cases remain; no broad reset authorized.
-- [ ] **Relay — prevention required:** current permission controls admission;
-  historical outcomes do not require replay against old live HEAD or absent paths.
+- [x] **Relay — retained-checkout boundary verified (2026-09-12):** current
+  permission controls admission. Accumulated-history source tests and native
+  accepted/rejected/independent-successor journeys plus the product successor pass
+  without namespace deletion or rechecking historical results against old live HEAD.
   The supplementary failed-check journey admitted an independent repair on the
   preserved baseline and retired both tasks without replay or namespace removal.
   This does not close every accumulated-history counterexample.
@@ -165,8 +177,10 @@ exact receipt through the real native path without restoring source permission.
 
 - [ ] **Flow — limitation retained:** existing safeguards do not make queue
   acknowledgement independent delivery proof.
-- [ ] **Relay — prevention required:** capture-pending, queued, received and accepted
-  facts remain distinct; delayed/duplicate/conflicting events cannot regain ownership.
+- [x] **Relay — same-host boundary verified (2026-09-12):** capture, shared receipt
+  and acceptance remain distinct. Frozen/conflicting association source regressions
+  and real Stop/read/acknowledge/accept/retire journeys pass. No cross-host or native
+  message-delivery claim; same-host receipt is accurately labelled shared storage.
 
 Evidence: [native adapter](../lib/codex-app-report-adapter.mjs) and
 [reporting gates](plans/2026-09-12-relay-design-assessment.md). Require real final
@@ -192,8 +206,10 @@ archival while successor source advances, with neither source deletion nor stran
 child reporting/archive duties.
 
 - [ ] **Flow — intentionally retained/deferred:** no serial archival redesign planned.
-- [ ] **Relay — prevention required:** exact task-only archival; delayed observation
-  must not delete source or require an obsolete HEAD. No guessed archive retries.
+- [x] **Relay — task-only boundary verified (2026-09-12):** source tests cover
+  delayed/ambiguous observations without replay; native child-first, failed/rejected
+  and product-pilot retirement preserve the retained checkout. Exact native task
+  archive is distinct from Git-resource deletion, which Relay does not perform.
   Native success and failed/rejected recovery tasks now retire with affirmative
   task-only archive results while the single retained checkout survives. Ambiguous
   host outcomes remain separately covered by source tests, not this live journey.
@@ -250,8 +266,9 @@ not mean all staged code executes. **Fix location / closure:** Relay package bou
 run the relocated packed public CLI and eventual hook with Flow unavailable.
 
 - [ ] **Flow — intentional architecture:** no extraction change planned.
-- [ ] **Relay — prevention required:** independent package/runtime manifest;
-  relocated packed CLI/hook tests must run with Flow unavailable.
+- [x] **Relay — package boundary verified (2026-09-12):** exact 20-file Relay-only
+  allowlist, no legacy runtime imports; 15/15 relocated packed-artifact tests pass
+  without Flow staged alongside. Genuine native hook capture also passed.
 
 Evidence: [dependency assessment](plans/2026-09-12-relay-design-assessment.md).
 Small entrypoints alone do not prove a small or independent artifact.
