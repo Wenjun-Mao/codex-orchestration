@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.2.0-rc.1 — Director experience (unreleased candidate)
+## 0.2.0 — Available director and cheap unplug
 
 - Add a lean director entrypoint and user-directed cheap unplug guidance, including
   finished-task archival and preserved-work branch/worktree cleanup.
@@ -8,8 +8,10 @@
   continuation. Advisory is not receipt or acceptance; uncertain sends never retry.
 - Require fresh sender-idle observation before advisory-sender archival. Existing
   assignments without notification mode retain capture-only behavior.
-- Native idle-director wakeup remains a qualification gate. No installed upgrade
-  or guaranteed crash recovery is claimed by source tests.
+- A real same-host idle director was awakened, read/acknowledged and accepted the
+  captured result, then archived the worker after a fresh idle observation.
+  Post-retirement successor preparation passed; no new successor worker was run.
+  Guaranteed crash recovery is not claimed.
 
 ## 0.1.0 — Same-host serial source coordination
 

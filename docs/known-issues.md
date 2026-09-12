@@ -345,9 +345,11 @@ establish unattended director follow-through or automatic cleanup after idle.
 bytes. **Fix location:** one lean director workflow with supported advisory wakeup,
 unchanged explicit receipt/acceptance, and safe task retirement after sender stop.
 
-- [ ] **Relay:** qualify dispatch → idle director → completion wakeup → frozen
-  report review → exact task cleanup → useful successor. No daemon/private IPC or
-  hidden wait loop; no unattended subagents. Do not claim this is already supported.
+- [x] **Relay 0.2:** genuine idle wakeup → frozen report review → exact worker
+  cleanup qualified; post-retirement successor preparation also passed. No daemon,
+  private IPC or hidden wait loop. [Boundaries and evidence](field-tests/2026-09-12-relay-0.2.0-native-wakeup.md).
+- [ ] **Follow-through:** observe the next useful product delivery under the new
+  director experience; the RC1 live test was no-change, not a product implementation.
 - [ ] **Flow:** not reassessed; no legacy notification changes authorized.
 
 Implementation kickoff: [approved connected plan](plans/2026-09-12-relay-director-experience.md).

@@ -1,7 +1,9 @@
 # Relay
 
-Development candidate: the new `relay:direct` entrypoint and one-shot advisory
-notification are source-tested work in progress, not installed 0.1.0 behavior.
+Relay 0.2.0 adds `relay:direct` and one-shot advisory notification. A bounded native
+test qualified idle-director wakeup, frozen report review and exact worker archival.
+Post-retirement successor preparation passed; this was not a fresh successor delivery.
+Notifications are not crash-proof and do not replace explicit result acceptance.
 See [notification decision](docs/decisions/0003-director-notification.md).
 Start new directed work with `relay:direct`; prepared workers use `relay:deliver`.
 For explicitly requested resets, its [cheap unplug guidance](skills/direct/references/cheap-unplug.md)

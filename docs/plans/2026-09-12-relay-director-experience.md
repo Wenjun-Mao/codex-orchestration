@@ -4,6 +4,14 @@ Status: Approved for notification feasibility and bounded implementation by the
 user's 2026-09-12 kickoff. Notification transport remains a feasibility gate, not
 a promised capability. Current installed Relay and Plotloom are excluded from edits.
 
+Update: the user subsequently authorized managed installation and two disposable
+native test tasks. The bounded idle-wakeup/review/archive gate passed; successor
+preparation passed without launching another task. See the
+[native qualification record](../field-tests/2026-09-12-relay-0.2.0-native-wakeup.md).
+Stable promotion changes metadata/documentation only, preserving tested runtime
+bytes. A useful product delivery remains the next adoption observation, not a
+claim made from the no-change canary. Plotloom source/state stay out of scope.
+
 ## Outcome
 
 One connected experience: prepare a useful assignment, dispatch, return the

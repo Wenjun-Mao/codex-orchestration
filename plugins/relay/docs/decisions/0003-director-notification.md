@@ -1,7 +1,8 @@
 # 0003 — One advisory after genuine capture
 
-Source candidate, 2026-09-12. Native qualification pending; installed 0.1.0 remains
-unchanged. This amends 0002's capture-only hook policy for newly prepared assignments.
+Accepted, 2026-09-12. A same-host RC1 test qualified genuine idle-director wakeup,
+shared report review and sender-idle-gated archival. This amends 0002's capture-only
+hook policy for newly prepared assignments. Crash-proof delivery is not promised.
 
 ## Problem and decision
 
