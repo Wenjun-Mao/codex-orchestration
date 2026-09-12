@@ -1,5 +1,11 @@
 # Relay: lean serial-first successor
 
+**Outcome: Relay 0.1.0 accepted for initial same-host serial use.** The connected
+implementation, bounded native gates, real-project pilot/successor, installed
+stable smoke and task cleanup completed. See the
+[release record](../field-tests/2026-09-12-relay-0.1.0-release.md) for exact evidence
+and limits. Earlier checkpoint-only restrictions below are retained as history.
+
 ## Continuation authorization — 2026-09-12
 
 The user now asks the director to keep driving Relay until stable and usable,
