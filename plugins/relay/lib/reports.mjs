@@ -58,7 +58,7 @@ export function reportOperation(relay, control, record, operation, actor, input 
     const childIds = [...new Set([...(record.children ?? []), ...(record.child ? [record.child] : [])])];
     const unresolved = childIds
       .map(id => relay.record(control, id))
-      .filter(child => child.report.recipient === record.task && !child.report.receipt);
+      .filter(child => child.report.recipient === record.task && child.archive?.status !== 'archived');
     if (unresolved.length) {
       const pending = relay.reportingResponse(unresolved[0]);
       return relay.response(pending.actor, 'none', pending.nextAction, {

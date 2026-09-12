@@ -77,7 +77,7 @@ test('recipient rejection cannot be overwritten by later verification; recovery 
   assert.equal(f.relay.status(child.assignment).decision, 'rejected');
 });
 
-test('coordinator retirement waits for every child report receipt while unrelated source work proceeds', () => {
+test('coordinator retirement waits for every child retirement duty while unrelated source work proceeds', () => {
   const f = fixture(); const { prepared, ready } = f.start();
   const children = [];
   let coordinatorTicket = ready.ticket;
@@ -129,13 +129,52 @@ test('coordinator retirement waits for every child report receipt while unrelate
   };
 
   resolveReceipt(children[0], 'executor-one');
+  const receiptIsInsufficient = f.relay.report('retire', prepared.assignment, 'director');
+  assert.equal(receiptIsInsufficient.status, 'RECIPIENT_OBLIGATION_PENDING');
+  assert.equal(receiptIsInsufficient.actor, 'coordinator');
+  assert.deepEqual(receiptIsInsufficient.blockedAssignments, children.map(child => child.assignment));
+  assert.match(receiptIsInsufficient.nextAction, / retire /);
+
+  const firstArchive = f.relay.report('retire', children[0].assignment, 'coordinator');
+  f.relay.recordNative(children[0].assignment, 'coordinator', {
+    kind: 'archive', actionId: firstArchive.nativeAction.id,
+    taskId: 'executor-one', status: 'ambiguous',
+  });
+  const ambiguityIsInsufficient = f.relay.report('retire', prepared.assignment, 'director');
+  assert.equal(ambiguityIsInsufficient.status, 'RECIPIENT_OBLIGATION_PENDING');
+  assert.equal(ambiguityIsInsufficient.actor, 'coordinator');
+  assert.deepEqual(ambiguityIsInsufficient.blockedAssignments, children.map(child => child.assignment));
+  assert.match(ambiguityIsInsufficient.nextAction, /record-native/);
+
+  f.relay.recordNative(children[0].assignment, 'coordinator', {
+    kind: 'archive', actionId: firstArchive.nativeAction.id,
+    taskId: 'executor-one', status: 'archived',
+  });
   const blockedBySecond = f.relay.report('retire', prepared.assignment, 'director');
   assert.equal(blockedBySecond.status, 'RECIPIENT_OBLIGATION_PENDING');
   assert.equal(blockedBySecond.actor, 'executor-two');
   assert.deepEqual(blockedBySecond.blockedAssignments, [children[1].assignment]);
 
   resolveReceipt(children[1], 'executor-two');
+  const secondReceiptIsInsufficient = f.relay.report('retire', prepared.assignment, 'director');
+  assert.equal(secondReceiptIsInsufficient.status, 'RECIPIENT_OBLIGATION_PENDING');
+  assert.equal(secondReceiptIsInsufficient.actor, 'coordinator');
+  assert.deepEqual(secondReceiptIsInsufficient.blockedAssignments, [children[1].assignment]);
+
+  const secondArchive = f.relay.report('retire', children[1].assignment, 'coordinator');
+  const secondArchiveReplay = f.relay.report('retire', children[1].assignment, 'coordinator');
+  assert.equal(secondArchive.status, 'ARCHIVE_PREPARED_ONCE');
+  assert.equal(secondArchiveReplay.nativeAction, undefined);
+  assert.equal(f.relay.status(children[1].assignment).archive.id, secondArchive.nativeAction.id);
+  f.relay.recordNative(children[1].assignment, 'coordinator', {
+    kind: 'archive', actionId: secondArchive.nativeAction.id,
+    taskId: 'executor-two', status: 'archived',
+  });
+
   const eligible = f.relay.report('retire', prepared.assignment, 'director');
+  const eligibleReplay = f.relay.report('retire', prepared.assignment, 'director');
   assert.equal(eligible.status, 'ARCHIVE_PREPARED_ONCE');
   assert.equal(eligible.nativeAction.args.threadId, 'coordinator');
+  assert.equal(eligibleReplay.nativeAction, undefined);
+  assert.equal(f.relay.status(prepared.assignment).archive.id, eligible.nativeAction.id);
 });

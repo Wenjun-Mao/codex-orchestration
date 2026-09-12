@@ -63,7 +63,9 @@ cover these review-derived contract corrections.
 
 A coordinator assignment retains the ordered IDs of every sequential executor it
 created. Task retirement checks only those child assignments whose frozen report
-recipient is the task being retired. Any missing exact receipt preserves that
-recipient and returns the next action for the first unresolved child. This is an
-assignment-local archival obligation: it never restores source permission or blocks
-an unrelated successor from using the approved clean checkpoint.
+recipient is the task being retired. That recipient remains available until each
+child's required reporting and task retirement are affirmatively complete; receipt
+alone or an ambiguous archive outcome is insufficient. Relay returns the next
+action for the first unresolved child and never assigns the duty to another actor.
+This assignment-local archival obligation never restores source permission or
+blocks an unrelated successor from using the approved clean checkpoint.
