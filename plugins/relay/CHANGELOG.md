@@ -11,4 +11,4 @@
 - Native receipt normalization requires an exact same-turn `final_answer` message object.
 - Exact recipients can read and explicitly acknowledge frozen reports through shared storage; native wait is optional notification.
 - Disposable Git/CLI, crash, scope/drift, reporting and packed isolation tests.
-- Corrected candidate installation, repaired connected completion, coexistence and pilot remain gates.
+- A recovered mixed live journey and fresh useful successor qualify same-host shared receipt and task-only retirement; failure, early-start, coexistence, startup-budget and pilot gates remain.

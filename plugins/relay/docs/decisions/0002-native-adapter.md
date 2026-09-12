@@ -1,7 +1,7 @@
 # 0002 — Purpose-built native actions with exact observations
 
-Accepted for the staged adapter candidate; native installation and proof remain
-pending.
+Accepted and qualified for the bounded same-host shared-storage journey described
+below; broader native and release gates remain pending.
 
 The source contract previously accepted injected identity, final, delivery, and
 archive observations. That was deterministic but left agents to translate native
@@ -39,5 +39,10 @@ they authenticate association and identity, not hostile agents.
 The packaged hook uses default `hooks/hooks.json` discovery. The package does not
 add a manifest hook override, config layer, installer, daemon, marketplace entry,
 or runtime dependency. Official host behavior requires plugin enablement and trust,
-so source tests cannot promote the adapter to native evidence. The next gate is one
-director-owned disposable journey against the exact enabled/trusted commit.
+so source tests cannot promote themselves to native evidence. The director-owned
+disposable journey used the exact installed candidate and separately recorded a
+recovered mixed serial run plus a fresh useful successor. That qualifies same-host
+shared receipt and task-only retirement. The successor self-corrected a rejected
+wrong-actor start before writing, so three-call startup is not qualified. Native
+failure/early-start, Flow coexistence, startup budget, restart-free upgrades, and a
+product pilot remain open.

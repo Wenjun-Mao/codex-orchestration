@@ -1,18 +1,37 @@
 # Director-owned native disposable journey
 
-Status: director-owned canary reached executor commit `c7d352a` and authentic Stop
-capture, then paused with the coordinator holding exact verification permission.
-Resume only after the director stages the corrected shared-storage candidate. This
-repaired journey remains the native proof and startup measurement.
+Status: completed as a recovered mixed journey plus a fresh useful successor turn.
+This is bounded same-host evidence, not uninterrupted first-attempt success, a full
+startup-budget measurement, or product-pilot approval.
 
-## Prerequisites and owners
+## Completed evidence
+
+Candidate source `0cae260` was installed as personal package
+`0.1.0+codex.20260912061058`. The recovered initial assignment retained coordinator
+commit `2a5420f` and executor commit `c7d352a`, then completed genuine Stop capture,
+exact-recipient shared-storage acknowledgement, separate acceptance, child-first
+retirement, and affirmative coordinator archival. Parser and receipt corrections,
+restart, and report-only continuations were required. Capture succeeding after the
+confirmed restart does not prove why the earlier hook was missing.
+
+Dependent successor `ebe1f334-dfc6-4a78-b473-62d2dd3f7fed` created one Terra-high
+task in the retained main checkout. Its first pre-write `start` used the director ID
+and was rejected; the task self-corrected through public `status` and its own ID
+without external intervention or source change. Commit `12f83a3` added the exact
+useful checklist item and passed the focused check with a clean tree. Genuine Stop
+capture, shared read/acknowledgement, separate acceptance, and one affirmative task
+archive then completed without source repair, sender reactivation, injected event,
+installation, or archive replay. The 52.364-second native turn does not establish
+end-to-end startup latency, token use, or a three-call budget pass.
+
+## Original prerequisites and owners
 
 The director task `01a04b13-a1ef-7731-a63b-819b7f8cb150` owns dispatch, acceptance,
 the disposable repository, saved-project selection, coordinator creation, final
 coordinator receipt, child-first archive ordering, and successor creation. The
 implementation coordinator must not create this canary.
 
-Before dispatch the director must provide:
+Before dispatch the director provided:
 
 - one new disposable Git repository on `main`, with a clean baseline, no
   `codex-flow` state, and a small `product/` file plus a read-only focused check;
@@ -26,7 +45,7 @@ reconciliation. The executor owns only its recorded source generation and genuin
 final. The successor receives new source permission from the director. No actor may
 archive a task whose remaining report/archive duties require that task.
 
-## One connected run
+## Qualified sequence
 
 1. Director writes the coordinator spec with the saved project ID, director task
    and host as recipient, approved scope `product/`, focused argv check, and selected
@@ -64,10 +83,11 @@ archive a task whose remaining report/archive duties require that task.
    finishes, reports, and is archived without replaying historical HEAD or deleting
    source. Pending unrelated reporting must not block its source admission.
 
-Capture task IDs/hosts, assignment IDs/generations, commit revisions, every exact
-native action/result, hook event task/turn/digest, wait cursor and matched bytes,
-receipt/decision, archive action ID and affirmative observation, checkout/ref state,
-and per-stage elapsed time. Report local protocol time separately from native
-provisioning/model latency. The provisional 6,000 plugin-visible-token ceiling and
-three ordinary startup protocol calls remain targets until this fresh run measures
-them. Do not claim source fixtures or repaired attempts as uninterrupted native proof.
+The retained main checkout finished clean at `12f83a3`, Relay reported
+`SOURCE_AVAILABLE`, and no checkout or branch was deleted. Exact live identities,
+digests, actions, and raw responses remain in director-owned release evidence;
+source fixtures remain a separate evidence class.
+
+Still unqualified: native failure/recovery, provisional or early start,
+separate-repository Flow coexistence, end-to-end startup token/call/time budget,
+restart-free candidate upgrades, product-project pilot, release, and broad rollout.

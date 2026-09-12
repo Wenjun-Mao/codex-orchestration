@@ -1,34 +1,31 @@
 # Source coverage and remaining gates
 
-Source tests exercise the public connected journey in disposable Git repositories
-using injected native observations. None is an actual App task or idle-final test.
-The package now stages a Stop hook and purpose-built App result adapter; neither has
-been enabled, trusted, or qualified by a native Relay task.
+Source tests exercise public journeys in disposable Git repositories using injected
+native observations. Separately, installed source `0cae260` completed a recovered
+mixed same-host serial journey and one fresh useful successor turn. Live evidence
+qualifies only the exact boundaries named below; fixtures are not native evidence.
 
 | Umbrella issue | Source evidence | Remaining closure boundary |
 | --- | --- | --- |
 | KI-01 | Failed scope work stays blocking; explicit stopped-writer disposition preserves rejected commits and permits an independent successor | Native failure/recovery journey |
 | KI-02 | Existing locks refuse all callers; exact externally quiescent recovery; interrupted ownership facts remain inert | Operational quiescence remains a cooperative precondition |
-| KI-03 | Never-enabled revocation rejects late starts; late exact identity remains reportable | Native provisional/early-start qualification |
-| KI-04 | Accepted, revoked and failed history coexists with advancing successor source | Real retained-checkout successor journey |
-| KI-05 | Frozen result/event/bytes, exact-recipient read-only retrieval, explicit association-bound shared-storage acknowledgement, and separate acceptance; native wait remains optional notification | Enabled/trusted authentic final capture and live shared-storage receipt required for closure |
-| KI-06 | Exact `set_thread_archived` intent, archived-list observation, child-recipient duty gate through affirmative archival, no Git deletion or old-HEAD checks | Affirmative native archival with retained source |
+| KI-03 | Never-enabled revocation rejects late starts; late exact identity remains reportable; live successor rejected one wrong-actor pre-write start and self-corrected through status | Native provisional/early-start qualification remains |
+| KI-04 | Source fixtures cover mixed history; a fresh dependent successor used the accepted retained revision, committed useful scoped work, and retired without source deletion | Failure-path successor qualification remains |
+| KI-05 | Exact frozen read/ack/accept separation is source-tested; recovered coordinator/child and fresh successor completed genuine same-host Stop capture plus `shared-storage` receipt | Cross-host or native-message delivery is not claimed; product pilot remains |
+| KI-06 | Child-first source gates plus live exact child, coordinator, and successor task-only archival; retained checkout/branch remained | Failure-path native retirement and product pilot remain |
 | KI-07 | Generated briefs/tickets/native requests; focused tests; no runtime reads required by interface | Fresh-agent total token/call/time measurement, including director preparation |
-| KI-08 | Explicit 20-file package allowlist, only Node and Relay imports, and 15 passing relocated CLI/Git/native fixture tests; packaged hook shares that closure | Corrected shared installation remains unqualified |
-| KI-09 | Reporting before enablement, direct verifier transfer, stale ticket and interrupted-transfer tests; staged exact task/host result normalization; non-mutating Stop discovery in fresh and Flow-only repositories | Native identity/report/archive and separate-repository Flow coexistence |
+| KI-08 | Explicit 20-file package allowlist, only Node and Relay imports, 15 passing relocated fixture tests, and corrected personal-package use in the disposable repository | Restart-free upgrades and broader rollout remain unqualified |
+| KI-09 | Source ordering/coexistence guards plus live same-host task identity, frozen reporting, receipt, and archive observations | Separate-repository Flow coexistence remains unqualified |
 
-Suggested umbrella update: record these as source-verified candidate coverage at
-the delivered commit, retaining unchecked native/release closure gates. Do not mark
-Flow fixed. No director-checkout files are edited by this source package.
+The recovered mixed journey retained coordinator/child commits but required parser
+and receipt corrections, restart, and report-only continuation; it is not an
+uninterrupted success. Capture working after restart does not establish why the
+pre-reload hook was missing. The fresh successor required no source repair,
+installation, sender reactivation, injected event, archive replay, or external
+intervention, but its self-corrected wrong-actor start remains material friction.
 
-Before installation, run the approved native solo/delegated/failed/successor
-journeys in a disposable repository with genuine final events and recipients.
-Qualify the exact saved-project mapping and native observation adapters at that
-boundary. Ambiguous creation, submission and archive operations must be observed,
-not repeated. Delivery or archive reconciliation by an already archived recipient
-is not assumed or qualified; the source gate preserves recipients through each
-required child archive observation. Verify foreign-hook
-harmlessness and old pending reporting across
-separate Flow/Relay repositories before shared installation. Then seek authorization
-for installation and one controlled real-project pilot. No startup budget result is
-claimed by fixture timing.
+Remaining native gates are failure/recovery, provisional or early start,
+separate-repository Flow coexistence, and an end-to-end startup token/call/time
+measurement. A controlled product-project pilot, release, broader rollout, and
+restart-free upgrade claim remain outside this evidence. Do not mark Flow fixed or
+describe same-host shared storage as native message delivery.

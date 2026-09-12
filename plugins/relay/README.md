@@ -3,10 +3,13 @@
 Relay owns one retained checkout with one current source permission, sequential
 executors, direct verification, frozen reporting, and task-only retirement.
 This 0.1.0 candidate implements the source contract and a minimal native adapter.
-The adapter is staged in the package but has not been installed, enabled, trusted,
-or exercised by real Relay tasks. It uses no private IPC. Injected tool results and
-hook events remain source tests, not proof that a real task was created, delivered
-a final, or archived.
+Source `0cae260` was installed as personal package
+`0.1.0+codex.20260912061058` and exercised in one disposable same-host repository.
+The recovered mixed serial journey and a later fresh one-turn useful successor
+qualify genuine Stop capture, shared-storage receipt, separate acceptance, and
+task-only retirement within that boundary. Injected tool results and hook events
+remain source fixtures and are not counted as live evidence. Relay uses no private
+IPC.
 
 Run the public CLI with Node 20.11 or later:
 
@@ -121,8 +124,9 @@ affirmatively reconciled task archive. Receipt alone and an ambiguous archive
 observation are insufficient because only that coordinator owns the child-retirement
 duty. The gate returns the first unresolved child action and does not block
 independent source admission. Relay does not assume reports or archive duties can
-reach an archived recipient; qualifying that native behavior remains outside this
-source candidate. `record-native-result` treats a background archive response as
+reach an archived recipient. The same-host journey qualified preserving each
+recipient until its duties completed and then archiving only its exact task.
+`record-native-result` treats a background archive response as
 ambiguous unless it affirmatively names the task as archived. Use the generated
 `list_archived_threads` observation action to establish that fact. An ambiguous
 outcome remains pending with no retry.
@@ -186,7 +190,10 @@ See [source contracts](docs/decisions/0001-source-contract.md), the
 [current host capability record](docs/native-capability-2026-09-12.md), the
 [director-owned disposable journey](docs/native-disposable-journey.md), and
 [remaining acceptance gates](docs/acceptance.md). Startup tokens/elapsed time,
-actual native identity correlation, authentic final capture, recipient delivery,
-archive observation, separate-repository Flow coexistence, installation and the
-controlled pilot remain unmeasured/unqualified. Source completion is not release
-readiness. This package must not control its own initial development.
+native failure and provisional/early-start recovery, separate-repository Flow
+coexistence, restart-free upgrade behavior, and the controlled product pilot remain
+unmeasured or unqualified. The successor's first wrong-actor `start` was rejected
+before writes and self-corrected through public `status`; this is startup friction,
+not a three-call budget pass. Its 52.364-second native turn is not an end-to-end
+latency or token-budget measurement. Shared-storage receipt is qualified only as
+same-host delivery, not native message delivery or broad release readiness.

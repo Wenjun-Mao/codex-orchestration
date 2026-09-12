@@ -1,7 +1,7 @@
 # Native capability checkpoint — 2026-09-12
 
-Status: source adapter corrected against one genuine completed native snapshot;
-the connected disposable journey and release qualification remain incomplete.
+Status: recovered mixed same-host journey and fresh useful successor completed;
+remaining native, coexistence, startup-budget, pilot, and release gates are below.
 
 ## Current host
 
@@ -44,8 +44,9 @@ The director-owned canary later captured a genuine completed snapshot for task
 `01a0940c-4b40-7130-8f26-0dc4984127e3`. It established `schemaVersion: 1`, a
 completed turn with `error: null`, `latestAssistantMessageId`, and a structured
 `latestAssistantMessage` containing matching `id`, `turnId`, a `final_answer`
-phase, and `text`. A read-only replay of that saved result passes the
-corrected normalizer. The canary remains paused before executor creation.
+phase, and `text`. A read-only replay of that saved result passes the corrected
+normalizer. Later executor wait/read calls returned completed turns with null message
+content, motivating the approved shared-storage receipt contract.
 
 ## Minimum adapter
 
@@ -69,18 +70,17 @@ Relay now stages only these native boundaries:
    the task. No Git resource is deleted.
 
 Adapter tests use the observed native result shape and injected Stop events in
-disposable repositories. The saved genuine result proves the completed-result
-parser boundary. The repaired canary has genuine executor delegation and Stop
-capture; shared-storage acknowledgement, verification, archival, successor,
-coexistence, and release qualification remain incomplete.
+disposable repositories. Live evidence separately establishes recovered coordinator
+and child completion plus a fresh useful successor, including genuine Stop capture,
+same-host shared receipt, separate acceptance, and exact task archival. The
+successor self-corrected one rejected wrong-actor start before any write.
 
 ## Exact blocker
 
-The director owns staging the corrected exact commit into the already managed
-candidate and resuming the paused journey in
-[native-disposable-journey.md](native-disposable-journey.md). This source correction
-does not install, enable, trust, or restart anything. Full qualification still
-requires shared-storage receipt, verification, child-first archival, successor
-admission, and separate-repository Flow coexistence. Starting a
-second App Server client or using the running app's private control socket remains
-outside the approved adapter shape.
+The remaining native gates are failure/recovery, provisional or early start, and
+separate-repository Flow coexistence. End-to-end startup tokens, calls and elapsed
+time remain unmeasured; the observed 52.364-second successor turn is narrower and
+the wrong-actor retry prevents a three-call startup claim. Restart-free upgrades,
+product pilot, release and broader rollout are also unqualified. Starting a second
+App Server client or using the running app's private control socket remains outside
+the approved adapter shape.
