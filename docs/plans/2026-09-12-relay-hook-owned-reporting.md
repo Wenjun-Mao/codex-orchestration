@@ -35,6 +35,11 @@ Out of scope: daemon, polling service, generic event bus, cross-host delivery,
 guaranteed exactly-once delivery, Flow fixes, or changes to product repositories.
 Keep installed 0.2.1 working until a replacement is qualified.
 
+Expected change surface: Relay's final-hook and notification adapter, only the
+report-record changes needed for capture/send outcomes, worker/director guidance,
+and focused tests. The CLI, source-permission engine and manager acceptance remain
+unchanged unless feasibility reveals a concrete need that the director reviews.
+
 ## Decisions and invariants
 
 - Preserve existing exact sender/assignment/result association, final bytes and
@@ -73,6 +78,9 @@ Keep installed 0.2.1 working until a replacement is qualified.
    response alone is not proof of wakeup. If only private/experimental behavior is
    available, present its exact dependency and maintenance risk for approval before
    adopting it; do not quietly reverse the previous no-private-transport boundary.
+   Deliver one short proceed/block decision with the smallest concrete adapter
+   shape. After this feasibility checkpoint, attempt the connected outcome rather
+   than accumulating standalone probes or new evidence machinery.
 2. **Small implementation.** Use one isolated adapter and existing report records.
    Replace new-assignment continuation instructions, preserve retrieval and review,
    and amend decision 0003 with the chosen transport and rejected alternatives.
@@ -98,10 +106,15 @@ Keep installed 0.2.1 working until a replacement is qualified.
    project, not a new project per attempt.
    Include question → manager answer → worker resume → finish in the journey:
    an intermediate stop must not emit a completion notice or trigger cleanup.
+   If the host offers no dependable reply wait, report that limitation; do not
+   simulate waiting with a polling loop or claim unattended resumption. A sealed
+   unsuccessful result is still a report, never automatic acceptance.
 5. **Release and cleanup.** Review the exact diff, package and install only at a
    quiescent boundary; archive finished test tasks and remove disposable merged
    resources. Do not replace the runtime controlling an active self-hosted run.
    Update known-issue status only to the level actually demonstrated.
+   The release gate requires the connected native journey above, not merely a
+   source-test pass or another successor preparation that is never executed.
 
 ## Execution authority and escalation
 
