@@ -53,17 +53,84 @@ confirmed interface friction; it is not proof of an authorization bypass.
 
 The earlier summary saying the successor needed no repair meant no code change,
 restart or director intervention. It must not be read as uninterrupted admission
-or a startup-budget PASS. The 6,000 plugin-visible-token ceiling and complete
-director-plus-worker latency remain unmeasured; cumulative API tokens and fixture
-test timings are not substitutes.
+or a startup-budget PASS. The supplementary measurement below supersedes the
+earlier unmeasured status; cumulative API tokens and fixture timings are not
+substitutes.
+
+## Supplementary failure/recovery journey
+
+Same installed candidate, two real Terra-high tasks; no runtime changes or reload:
+
+- Failure assignment `1c0e9a9d-cdda-4a52-9b7b-2b9856a1f51b`, task
+  `01a0945e-21ef-7d72-9713-c05b59780744`: director withheld creation binding.
+  Early start returned `BINDING_PENDING`, and no source was written. Disclosure:
+  this attempt used `/root` as actor, so it does not independently qualify a
+  correct-native-ID early start or a provisional creation response. The same task
+  resumed with the exact bound ID, committed one intentional duplicate checklist
+  item at `0b934f9b059eba004588dad53333f7e97bc41c70`, and failed its check.
+- Competing preparation was refused while source remained reserved. After checking
+  the clean committed tree, expected check failure and stopped writers, director
+  used public `recover` to preserve that revision as an independent baseline.
+  Outcome remained **failed/rejected**, not accepted. A planned report-only turn
+  produced genuine Stop capture `01a09460-50fe-72b2-90f2-f5a3b61ee8ad`.
+  Director read/acknowledged it and retired the exact task with one affirmative
+  native archive. Public status confirms `RETIRED`, failed/rejected.
+- An explicit dependency on that rejected assignment was refused. Independent
+  repair assignment `6dcd06db-5f91-4d60-a0f3-25e6da6c8356`, task
+  `01a09461-d65b-72e0-be4f-a4245bac9b2c`, then removed only the duplicate at
+  `6a8825fe1ac0fb8d939ed3ee168e0c86b3d50359`. Check passed; genuine capture
+  `01a09461-d7c6-74d2-9ee1-50f354c5b918` was read, acknowledged and accepted.
+  One native archive completed retirement. Public status confirms verified/accepted.
+
+Director independently checked exact scope, clean tree, four-item check and byte
+equality with the earlier successful checklist. Failed history remains as the
+repair's parent. The single retained `main` checkout was not deleted. Both new
+tasks are archived. No historical state was rewritten and no hook was injected.
+This verifies failed-check recovery, not every scope-violation or crash case.
+
+Minor interface finding: acknowledgement of the failed report suggested `accept`
+despite its already rejected disposition. Director did not follow that generic
+suggestion; public retirement succeeded. Together with repeated retirement's stale
+result suggestion, this is next-action text friction, not a demonstrated bypass.
+
+## Measured startup and coexistence limits
+
+The independent repair used **four protocol calls**, versus target three: prepare,
+creation binding, worker status for native identity, then correct start. One native
+creation is separate. No rejected admission, internal-module read or handwritten
+mechanical JSON was needed by that worker.
+
+Declared startup-content accounting measured **8,974 `o200k_base` proxy tokens**,
+versus the provisional 6,000 ceiling. It includes director intent/preparation,
+generated native request, creation/binding outputs, worker brief, one skill/README
+read per actor, and worker tool requests/outputs through READY. It excludes ambient
+history, unrelated diagnostics, product source and unmeasured host framing. This is
+not exact host billing or a full cumulative-context claim. Removing the director's
+document read gives a warm-director variant of 6,275, still above target. Public
+instruction volume and the identity lookup are confirmed costs; they motivate a
+bounded startup-interface correction, not relaxed identity checks or a new engine.
+
+Prepare-to-READY was 35.948s; native-turn-to-READY was 18.162s. The former includes
+director scheduling/native/model latency, excludes authoring the intent, and is
+not pure CLI execution time. Accounting inputs, read-only script and result are
+preserved under `.git/relay-native-evidence/startup-measurement*` and
+`measure-startup.mjs` in the disposable repository.
+
+While genuine Relay captures ran with both plugins installed, the umbrella Flow
+namespace remained byte-identical: 429 regular files, digest
+`2be60f13f6b2056f42f8a533966e0fd7c6eac25efaed77cc08839bdaccd5118e`
+before and after (sorted relative paths + NUL + file bytes). This is bounded
+non-interference evidence, **not** proof of simultaneous pending Flow report
+delivery. No Flow installation, journal or product-project mutation occurred.
 
 ## What remains and proposed pilot
 
-Remaining qualification: bounded native failure/recovery; provisional/early-start
-behavior; separate-repository coexistence with pending Flow reporting; complete
-startup-budget measurement. Source tests cover corresponding rules but do not
-close these native gates. Do not open a broad redesign or more transport layers
-from this checkpoint alone.
+Remaining qualification: correct-ID early/provisional binding coverage,
+separate-repository coexistence with pending Flow reporting, and a passing startup
+budget after a bounded interface correction. Failure/recovery now has the limited
+native proof above. Measurement is complete for its declared slice and fails the
+lightness targets; do not label the whole candidate qualified. No broad redesign
+or additional transport layer follows from this checkpoint alone.
 
 Pilot candidate, not dispatched: `pdf_extract`, a saved project with clean `main`
 and neither `.git/codex-flow` nor `.git/relay` at this inspection. Proposed scope:

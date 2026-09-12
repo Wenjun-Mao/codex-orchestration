@@ -4,8 +4,9 @@ Last reviewed: 2026-09-12. Umbrella working checklist, not a complete bug invent
 or a new audit. Includes confirmed defects, observed usability limitations and
 explicitly labelled design risks. Relay has an accepted source-only candidate;
 native qualification and pilot remain open. The installed candidate has completed
-a recovered mixed native journey and a one-turn successor with self-corrected
-admission. See the [qualification checkpoint](field-tests/2026-09-12-relay-native-qualification.md)
+a recovered mixed native journey, useful successors and a failed-check recovery
+with independent repair. Startup measurement misses the lightness targets.
+See the [qualification checkpoint](field-tests/2026-09-12-relay-native-qualification.md)
 for proven boundaries and remaining gates; installation is not broad acceptance.
 
 ## Relay source checkpoint — 2026-09-12
@@ -28,9 +29,10 @@ only that parent owns. The regression covers ambiguous archive observations,
 multiple children, no-repeat actions and useful independent successor work.
 This is source evidence with injected native observations, not real App archival.
 
-All overall closure boxes stay open pending their applicable native/operational
-gates. In particular, no actual hook/transport, startup-budget result or Flow/Relay
-coexistence proof is claimed. Flow dispositions are unchanged.
+The preceding source checkpoint is historical; later per-issue notes distinguish
+actual native evidence from remaining gates. Startup has a measured non-pass;
+Flow namespace non-interference is verified, simultaneous pending Flow delivery
+is not. Flow dispositions are unchanged.
 
 ## How to use
 
@@ -76,6 +78,10 @@ and permits an authorized successor without rewriting the failed claim.
 - [ ] **Flow — open:** no narrow supported task-level retirement/reissue established.
 - [ ] **Relay — prevention required:** distinguish failed source disposition from
   acceptance; require explicit quiescence and resolution before successor ownership.
+  Native failed-check journey (2026-09-12, installed `0.1.0+codex.20260912061058`)
+  retained ownership until explicit recovery, preserved failed/rejected history,
+  refused an accepted-result dependency and completed independent repair/retirement.
+  This is bounded recovery proof, not a live scope-violation or crash qualification.
 
 Evidence: `coordinator-work.mjs` permits only started/completed;
 `workflow-journal.mjs::assertHistoricalStartedTasksUnchanged`; the 2026-09-12
@@ -134,6 +140,9 @@ legitimate successors. Different legacy predicates may require different fixes.
 - [ ] **Flow — partially addressed:** residual cases remain; no broad reset authorized.
 - [ ] **Relay — prevention required:** current permission controls admission;
   historical outcomes do not require replay against old live HEAD or absent paths.
+  The supplementary failed-check journey admitted an independent repair on the
+  preserved baseline and retired both tasks without replay or namespace removal.
+  This does not close every accumulated-history counterexample.
 
 Evidence: [assessment](plans/2026-09-12-relay-design-assessment.md) and
 [consultation synthesis](plans/2026-09-12-serial-architecture-consultation-synthesis.md).
@@ -168,7 +177,7 @@ correction (`c08dec4`, installed candidate). Genuine Stop capture subsequently
 succeeded, but public wait/read APIs returned a completed turn without message
 content. This host observation is not evidence of message loss. The distinct
 post-Stop submission ordering defect is KI-11. Shared-storage receipt is now an
-approved amendment, not an implemented or accepted fix.
+implemented and natively verified for the bounded same-host path under KI-11.
 
 ### KI-06 — Task retirement is coupled to Git-resource reclamation
 
@@ -185,6 +194,9 @@ child reporting/archive duties.
 - [ ] **Flow — intentionally retained/deferred:** no serial archival redesign planned.
 - [ ] **Relay — prevention required:** exact task-only archival; delayed observation
   must not delete source or require an obsolete HEAD. No guessed archive retries.
+  Native success and failed/rejected recovery tasks now retire with affirmative
+  task-only archive results while the single retained checkout survives. Ambiguous
+  host outcomes remain separately covered by source tests, not this live journey.
 
 Evidence: [archive lifecycle](../lib/archive-lifecycle.mjs),
 [native feasibility limits](field-tests/2026-09-11-serial-native-feasibility.md).
@@ -209,7 +221,13 @@ including director preparation, rather than claiming savings from shorter output
   Fresh successor used public instructions only, but its actor placeholder led to
   a rejected director-ID start, status lookup and corrected start: five total
   admission protocol calls instead of three. No source write occurred before READY.
-  Token ceiling and complete startup latency remain unmeasured.
+  A subsequent clean admission used four calls (status lookup still required).
+  Declared director/worker startup content measured 8,974 `o200k_base` proxy tokens
+  against 6,000, or 6,275 excluding the director's document read. Prepare-to-READY
+  was 35.948s including scheduling/model/native latency, excluding intent authoring.
+  Measurement is not exact billing; its declared slice already fails the target.
+  Root causes to address: actor-placeholder lookup and broad public-document reads,
+  at the generated startup interface rather than through weaker identity checks.
 
 Evidence: [startup note](field-tests/2026-09-12-coordinator-startup-overhead.md) and
 [plan acceptance](plans/2026-09-11-serial-first-delivery.md). Targets are not results.
@@ -247,6 +265,10 @@ behavior on the host. Idle or dead lock process does not establish writer quiesc
 - [ ] **Flow — no new blanket defect claim:** existing behavior is not re-audited here.
 - [ ] **Relay — prevention required:** one ownership commit point, exact verification
   reservation, no provisional write permission, explicit interrupted-start recovery.
+  Live pre-binding start was write-disabled, but supplied `/root` as actor; native
+  creation returned a ready ID, not provisional identity. Do not count it as full
+  correct-ID early/provisional qualification. Genuine Relay hooks left the existing
+  429-file Flow namespace byte-identical; pending Flow report delivery was not tested.
 
 Evidence: [review synthesis](plans/2026-09-12-relay-design-review-synthesis.md).
 Verify crash boundaries locally, then qualify actual native identity/report/archive
