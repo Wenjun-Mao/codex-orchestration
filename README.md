@@ -1,5 +1,21 @@
 # Codex Orchestration
 
+This umbrella repository contains two independently versioned plugins:
+
+- **[Relay](plugins/relay/README.md)** — the serial-first path: one retained checkout,
+  optional sequential executors, verified results, report receipt and task archival.
+  Start with Relay's [same-host quick start](plugins/relay/README.md#same-host-quick-start).
+- **Flow** — the existing root package, still installed and invoked as
+  `codex-orchestration`. Existing Flow projects keep their current workflow.
+  Its folder/name migration is deferred; do not run both plugins against the same
+  repository's source ownership.
+
+Relay releases use `relay/vVERSION` tags and their own package checks. Existing
+`vVERSION` tags and the instructions below belong to Flow. Neither package is
+published to npm.
+
+## Existing Flow plugin
+
 Codex Orchestration is a repository-governance plugin for coordinating several
 independent, user-visible Codex tasks as one accountable workflow. Codex App
 still creates and runs tasks; this package binds their intent, dependencies,
