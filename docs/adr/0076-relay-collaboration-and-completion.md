@@ -1,7 +1,8 @@
 # ADR 0076 — Direct collaboration, hook-owned completion
 
-Status: accepted design direction, 2026-09-12; not implemented. Applies to Relay.
-Installed 0.2.1 still uses the worker continuation described in Relay decision 0003.
+Status: implemented for Relay 0.3.0, 2026-09-12. The recovered RC1 native journey
+qualified the connected lifecycle; see Relay decision 0004 and its release evidence.
+Existing 0.2.1 assignments retain the worker continuation from decision 0003.
 
 ## Decision
 
@@ -32,10 +33,10 @@ Hook delivery for both cases would require classifying questions, progress and f
 results, expanding a completion hook into a general messaging framework. The split
 keeps intentional collaboration flexible and automatic completion deterministic.
 
-This supersedes decision 0003's worker-continuation choice as the target design,
-not as a claim that shipped behavior has changed. Transport feasibility, explicit
-acceptance of any private/experimental dependency, compatibility and connected
-native qualification remain gates in the [draft implementation plan](../plans/2026-09-12-relay-hook-owned-reporting.md).
+This supersedes decision 0003's worker-continuation choice for new assignments.
+Experimental queue transport was explicitly accepted and qualified; compatibility
+and connected native evidence are recorded under the
+[implementation plan](../plans/2026-09-12-relay-hook-owned-reporting.md).
 Do not modify the installed path before its replacement is verified.
 
 ## Deferred decision-record audit

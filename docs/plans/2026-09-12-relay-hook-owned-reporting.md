@@ -2,7 +2,8 @@
 
 Status: Approved by the user's “go” on 2026-09-12. The user subsequently approved
 carrying forward the bounded experimental-route probe without routine approval
-pauses. No runtime change or installation has occurred. See the
+pauses. Implementation and the recovered RC1 connected canary are complete;
+global installation/release remains pending. See the
 [feasibility note](../field-tests/2026-09-12-relay-hook-transport-feasibility.md).
 
 ## Outcome

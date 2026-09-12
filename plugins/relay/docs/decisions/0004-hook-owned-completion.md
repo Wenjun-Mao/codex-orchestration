@@ -1,6 +1,6 @@
 # 0004 — Direct collaboration, hook-owned completion
 
-Accepted for implementation; full native lifecycle qualification pending.
+Accepted; RC1's connected native lifecycle qualified as a recovered journey.
 Supersedes 0003's worker continuation only for newly prepared assignments. Existing
 assignment modes remain frozen. Installed 0.2.1 is unchanged until release.
 
@@ -47,3 +47,9 @@ Regressions cover capture/send ordering, duplicates/crashes, manager review race
 exact routing, continued/unsealed Stops, old-mode compatibility and retirement.
 Release still requires genuine Stop → queue → manager review and useful successor
 delivery, including collaboration. Transport-only success is insufficient.
+
+Generated worker briefs name `relay:deliver` at their own package-relative resolved
+path for both roles. The RC1 executor selected Flow's similarly named executor
+workflow when the brief omitted that reference. Bind routing at generation rather
+than relying on callers to remember a separate skill hint. The generated startup
+command remains unchanged and must be passed verbatim, not reconstructed.

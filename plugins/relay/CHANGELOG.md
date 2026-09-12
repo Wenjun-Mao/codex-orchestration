@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.3.0-rc.1 — Hook-owned completion (candidate)
+## 0.3.0 — Hook-owned completion
 
 - New assignments use one direct hook-owned queue notification, without a worker
   continuation. Existing assignment modes retain their original behavior.
@@ -8,8 +8,11 @@
   retry. Fresh idle observation, shared receipt and child-first acceptance remain.
 - Keep direct messages for mid-work collaboration. Add bounded queue transport
   and regression coverage for failure, duplicate and manager-review races.
-- Experimental transport qualified on App CLI 0.154.0-alpha.6.2; complete native
-  Relay lifecycle acceptance remains pending. Not a stable release.
+- Experimental transport qualified on App CLI 0.154.0-alpha.6.2. A recovered native
+  coordinator/executor journey completed question/reply, hook-owned reports,
+  explicit review, child-first retirement and useful successor delivery.
+- Generated coordinator/executor briefs explicitly select their own package's
+  Relay delivery skill. Preserve generated commands verbatim.
 
 ## 0.2.1 — Planning entrypoint
 

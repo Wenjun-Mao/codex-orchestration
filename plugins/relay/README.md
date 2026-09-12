@@ -1,8 +1,11 @@
 # Relay
 
-The unreleased hook-owned reporting change replaces worker notification turns with
-one direct experimental queue submission. Its transport-only probe passed; full
-Relay lifecycle qualification is still pending. Installed 0.2.1 remains unchanged.
+Relay 0.3.0 replaces worker notification turns with one direct experimental queue
+submission. A recovered native coordinator/executor journey qualified collaboration,
+hook-owned completion, manager review, child-first retirement and useful successor
+delivery. Launch-brief interventions are disclosed; uninterrupted first-turn success
+is not claimed. Transport is qualified only for App CLI `0.154.0-alpha.6.2`; version
+drift preserves the frozen report but refuses automatic notification until requalified.
 
 Relay 0.2.0 added `relay:direct` and one-shot advisory notification. A bounded native
 test qualified idle-director wakeup, frozen report review and exact worker archival.
@@ -22,7 +25,8 @@ Release candidate `f627eef` was packaged and installed as
 normal three-call startup, ready-ID early binding, failed-check recovery, genuine
 Stop capture, shared-storage receipt, separate acceptance, task-only retirement,
 and one restart-free candidate transition. Injected tool results and hook events
-remain source fixtures. Relay uses no private IPC.
+remain source fixtures. That 0.1.0 path used no private IPC; 0.3.0's experimental
+queue-only transport is described in [decision 0004](docs/decisions/0004-hook-owned-completion.md).
 
 This candidate completed a bounded same-host README-only product pilot and a fresh
 no-change successor with six existing tests, genuine report receipt, acceptance,

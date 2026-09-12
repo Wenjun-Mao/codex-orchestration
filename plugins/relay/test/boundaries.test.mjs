@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { writeFileSync, readFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { Relay } from '../lib/relay.mjs';
 import { inScope, validateScope, validateChecks } from '../lib/source.mjs';
 import { Store } from '../lib/store.mjs';
@@ -20,6 +21,8 @@ test('ownership exclusion, provisional correlation, and stale resume after conti
   assert.throws(() => f.relay.prepare(f.spec, 'director'), /reserved/);
   assert.throws(() => f.relay.start(prepared.ticket, 'foreign'), /actor/);
   const child = f.relay.handoff(ready.ticket, 'coordinator', f.spec);
+  assert.ok(child.nativeAction.args.prompt.includes(`Use Relay's relay:deliver skill from this exact package: ${fileURLToPath(new URL('../skills/deliver/SKILL.md', import.meta.url))}`));
+  assert.ok(child.nativeAction.args.prompt.includes(`Start: ${f.relay.startCommand(child.ticket)}`));
   assert.throws(() => f.relay.finish(ready.ticket, 'coordinator'), /permission/);
   f.relay.recordNative(child.assignment, 'coordinator', { actionId: child.nativeAction.id, status: 'provisional', clientThreadId: 'client-one' });
   assert.equal(f.relay.start(child.ticket, 'executor').status, 'BINDING_PENDING');
@@ -42,6 +45,8 @@ test('generated startup uses host identity and fails closed when it is missing, 
   const f = fixture();
   const prepared = f.relay.prepare(f.spec, 'director');
   assert.match(prepared.nativeAction.args.prompt, /--actor-env 'CODEX_THREAD_ID'/);
+  assert.ok(prepared.nativeAction.args.prompt.includes(`Use Relay's relay:deliver skill from this exact package: ${fileURLToPath(new URL('../skills/deliver/SKILL.md', import.meta.url))}`));
+  assert.ok(prepared.nativeAction.args.prompt.includes(`Start: ${f.relay.startCommand(prepared.ticket)}`));
   assert.doesNotMatch(prepared.nativeAction.args.prompt, /actual-native-task-id/);
 
   const missing = cliProcess(f.repo, 'start', {

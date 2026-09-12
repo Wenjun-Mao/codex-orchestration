@@ -352,6 +352,11 @@ unchanged explicit receipt/acceptance, and safe task retirement after sender sto
   private IPC or hidden wait loop. [Boundaries and evidence](field-tests/2026-09-12-relay-0.2.0-native-wakeup.md).
 - [ ] **Follow-through:** observe the next useful product delivery under the new
   director experience; the RC1 live test was no-change, not a product implementation.
+- [x] **Relay 0.3 connected canary:** recovered coordinator/executor delivery,
+  direct question/reply, hook-owned idle wakeup, child-first retirement and useful
+  successor completed. One notification attempt per final; no worker reporting
+  continuation. This is a tiny native canary, not broad product-pilot evidence.
+  [Interventions and evidence](field-tests/2026-09-12-relay-0.3.0-rc1-hook-candidate.md).
 - [ ] **Flow:** not reassessed; no legacy notification changes authorized.
 
 Implementation kickoff: [approved connected plan](plans/2026-09-12-relay-director-experience.md).
