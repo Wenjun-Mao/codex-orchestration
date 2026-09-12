@@ -16,6 +16,11 @@ published to npm.
 
 ## Existing Flow plugin
 
+For the maintainer's projects moving to Relay, use the
+[approved lean adoption procedure](docs/adr/0075-personal-flow-to-relay-adoption.md).
+It replaces historical Flow repair with scoped operator disposal after minimal
+source/writer checks; it does not migrate or delete product work.
+
 Codex Orchestration is a repository-governance plugin for coordinating several
 independent, user-visible Codex tasks as one accountable workflow. Codex App
 still creates and runs tasks; this package binds their intent, dependencies,

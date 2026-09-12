@@ -335,6 +335,18 @@ acceptance or destructive cleanup were performed for this diagnosis.
 
 ### KI-12 — Existing Flow projects lack a clear Relay adoption entrypoint
 
+**Update 2026-09-12:** personal-project adoption guidance is now accepted in
+[ADR 0075](adr/0075-personal-flow-to-relay-adoption.md). Plotloom's supported Flow
+retirement was blocked by its missing original coordinator checkout. The user
+authorized exact namespace deletion instead; source/refs/worktrees were unchanged,
+and Relay returned `SOURCE_AVAILABLE`. The user then selected this as the default
+for their projects: minimal writer/source checks, no mandatory new backup or
+lifecycle repair. This supersedes the pending supported-retirement proposal below.
+Installed-plugin adoption UX and a full post-reset Relay assignment remain separate
+from the verified operator reset.
+
+- [x] **Personal adoption guidance — recorded and linked from the umbrella README.**
+
 **Evidence: source-confirmed admission restriction; Plotloom readiness failure
 reported by its director (2026-09-12).** Relay `lib/source.mjs:refuseFlow`
 rejects any Git-common-directory `codex-flow` namespace, including historical
