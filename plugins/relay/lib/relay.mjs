@@ -163,6 +163,7 @@ export class Relay {
       const checkpoint = inspectResult(this.repo.checkout, parent.baseline, parent.scope, parent.branch);
       runChecks(this.repo.checkout, checkpoint, parent.checks, parent.branch);
       const child = this.newRecord(spec, base, actor, parent.id);
+      parent.children = [...(parent.children ?? []), child.id];
       parent.child = child.id;
       child.admissionTicket = this.transfer(control, child.id, null, 'reserved', base.head);
       this.store.commit(control, [parent, child]);

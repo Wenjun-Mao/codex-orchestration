@@ -76,3 +76,66 @@ test('recipient rejection cannot be overwritten by later verification; recovery 
   assert.deepEqual(result.contributors, ['executor']);
   assert.equal(f.relay.status(child.assignment).decision, 'rejected');
 });
+
+test('coordinator retirement waits for every child report receipt while unrelated source work proceeds', () => {
+  const f = fixture(); const { prepared, ready } = f.start();
+  const children = [];
+  let coordinatorTicket = ready.ticket;
+  for (const [task, value, decision] of [['executor-one', 'first child', 'continue'], ['executor-two', 'second child', 'finish']]) {
+    const child = f.relay.handoff(coordinatorTicket, 'coordinator', f.spec);
+    children.push(child);
+    f.bind(child, task, 'coordinator');
+    const executor = f.relay.start(child.ticket, task);
+    f.commit(`src/${task}.txt`, value);
+    f.relay.finish(executor.ticket, task);
+    const verification = f.relay.status(prepared.assignment);
+    const verified = f.relay.verify(verification.ticket, 'coordinator', decision);
+    coordinatorTicket = verified.ticket;
+  }
+
+  const parentReport = f.relay.status(prepared.assignment).report;
+  const parentCapture = f.relay.report('capture', prepared.assignment, 'coordinator', {
+    sender: 'coordinator', correlation: parentReport.correlation,
+    eventId: 'parent-final', text: 'parent final',
+  });
+  f.relay.report('submit', prepared.assignment, 'coordinator');
+  f.relay.report('receive', prepared.assignment, 'director', {
+    envelope: parentCapture.envelope, decision: 'accepted',
+  });
+
+  const blockedByBoth = f.relay.report('retire', prepared.assignment, 'director');
+  assert.equal(blockedByBoth.status, 'RECIPIENT_OBLIGATION_PENDING');
+  assert.equal(blockedByBoth.actor, 'executor-one');
+  assert.equal(blockedByBoth.recipientToPreserve, 'coordinator');
+  assert.deepEqual(blockedByBoth.blockedAssignments, children.map(child => child.assignment));
+  assert.match(blockedByBoth.nextAction, /genuine native final/);
+
+  const successor = f.start('independent-successor');
+  f.commit('src/successor.txt', 'source work while old child reports are pending');
+  f.relay.finish(successor.ready.ticket, 'independent-successor');
+  assert.equal(f.relay.store.control().permission, null);
+
+  const resolveReceipt = (child, sender) => {
+    const report = f.relay.status(child.assignment).report;
+    const captured = f.relay.report('capture', child.assignment, sender, {
+      sender, correlation: report.correlation,
+      eventId: `final-${sender}`, text: `final from ${sender}`,
+    });
+    const submission = f.relay.report('submit', child.assignment, sender);
+    f.relay.report('observe-report', child.assignment, sender, {
+      submissionId: submission.request.id, status: 'queued',
+    });
+    f.relay.report('receive', child.assignment, 'coordinator', { envelope: captured.envelope });
+  };
+
+  resolveReceipt(children[0], 'executor-one');
+  const blockedBySecond = f.relay.report('retire', prepared.assignment, 'director');
+  assert.equal(blockedBySecond.status, 'RECIPIENT_OBLIGATION_PENDING');
+  assert.equal(blockedBySecond.actor, 'executor-two');
+  assert.deepEqual(blockedBySecond.blockedAssignments, [children[1].assignment]);
+
+  resolveReceipt(children[1], 'executor-two');
+  const eligible = f.relay.report('retire', prepared.assignment, 'director');
+  assert.equal(eligible.status, 'ARCHIVE_PREPARED_ONCE');
+  assert.equal(eligible.nativeAction.args.threadId, 'coordinator');
+});

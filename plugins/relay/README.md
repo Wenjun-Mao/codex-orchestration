@@ -93,7 +93,12 @@ with `--decision accepted|rejected`. Receipt alone is supported; `accept` and
 `reject` are independent semantic decisions. Executor verification may already
 have recorded its product decision; receipt must agree with that immutable decision.
 `retire` generates one exact task archive request after required capture, receipt
-and decision. Record `{kind:"archive", actionId, taskId, status:"archived"}` only
+and decision. A coordinator task also remains available until every sequential
+child whose frozen recipient is that coordinator has an exact receipt. The gate
+returns the first unresolved child action and does not block independent source
+admission. Relay does not assume reports can reach an archived recipient; qualifying
+that native behavior remains outside this source candidate. Record
+`{kind:"archive", actionId, taskId, status:"archived"}` only
 from affirmative observation. An ambiguous outcome remains pending with no retry.
 No operation deletes source, switches branches, or requires historical HEAD replay.
 

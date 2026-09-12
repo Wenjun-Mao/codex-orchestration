@@ -55,6 +55,18 @@ export function reportOperation(relay, control, record, operation, actor, input 
     requireThat(record.outcome && record.outcome !== 'awaiting-verification', 'Task source outcome is unresolved');
     requireThat(report.final && report.receipt && record.decision, 'Sender archival waits for final capture, exact receipt and decision');
     requireThat(record.outcome !== 'verified' || record.decision === 'accepted' || record.decision === 'rejected', 'Missing product decision');
+    const childIds = [...new Set([...(record.children ?? []), ...(record.child ? [record.child] : [])])];
+    const unresolved = childIds
+      .map(id => relay.record(control, id))
+      .filter(child => child.report.recipient === record.task && !child.report.receipt);
+    if (unresolved.length) {
+      const pending = relay.reportingResponse(unresolved[0]);
+      return relay.response(pending.actor, 'none', pending.nextAction, {
+        status: 'RECIPIENT_OBLIGATION_PENDING',
+        recipientToPreserve: record.task,
+        blockedAssignments: unresolved.map(child => child.id),
+      });
+    }
     if (record.archive) return response(record.archive.status, command('record-native', { observation: '<exact-archive-observation.json>' }));
     record.archive = { id: randomUUID(), task: record.task, status: 'awaiting-observation' };
     return save(response('ARCHIVE_PREPARED_ONCE', 'Archive this exact task once, then record affirmative observation; preserve its checkout.', {

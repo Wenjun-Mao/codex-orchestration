@@ -60,3 +60,10 @@ both the permission record and public response. Failed aggregate recovery record
 a source disposition with the resolving actor and known contributors; it does not
 claim the coordinator produced the executor's rejected commits. Dedicated regressions
 cover these review-derived contract corrections.
+
+A coordinator assignment retains the ordered IDs of every sequential executor it
+created. Task retirement checks only those child assignments whose frozen report
+recipient is the task being retired. Any missing exact receipt preserves that
+recipient and returns the next action for the first unresolved child. This is an
+assignment-local archival obligation: it never restores source permission or blocks
+an unrelated successor from using the approved clean checkpoint.
