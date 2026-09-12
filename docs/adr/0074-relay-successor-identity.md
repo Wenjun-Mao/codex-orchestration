@@ -1,6 +1,7 @@
 # ADR 0074: Relay successor identity
 
-Status: Accepted naming decision; successor implementation remains separately gated.
+Status: Accepted naming and staged package-layout decision; execution authority
+is defined by the current Relay plan, not this ADR.
 
 ## Decision
 
@@ -18,6 +19,21 @@ Name the successor **Relay**. Use one consistent identity:
 The name expresses handoffs between agents without implying concurrent writers
 or a solo-only workflow. Relay is not "Flow Lite" and does not promise feature
 parity with legacy Flow.
+
+## Staged package ownership
+
+Relay begins in its final location, `plugins/relay`. Each plugin owns its manifests,
+README, changelog, runtime, skills, tests and product docs, and has independent
+packaging and versioning. Root docs hold umbrella decisions and cross-plugin plans.
+Sharing a repository does not imply a shared runtime or synchronized releases.
+
+Flow temporarily remains at the repository root because its current packaging,
+validation and release paths assume that location. After Relay is stable and
+usable, relocate Flow to `plugins/flow` alongside the deferred naming cleanup,
+with explicit compatibility checks. The eventual root README introduces the two
+plugins. Do not preemptively move historical docs, alter installed sources or add
+a workspace framework for symmetry. This staging avoids coupling Relay delivery
+to a legacy package migration.
 
 ## Consequences
 

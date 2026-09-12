@@ -1,9 +1,10 @@
 # Relay: lean serial-first successor
 
-Status: **Approved for checkpoint 1 assessment**. The user approved the successor
-direction, no feature-parity commitment, Relay naming, and the bounded assessment
-stage. The resulting minimal contract and implementation remain gated on review
-and approval. This remains the single successor plan,
+Status: **Approved for targeted amendments and the bounded source implementation**.
+Following both Pro reviews, the user approved proceeding with the amendments and
+connected slice. The [amended contract](2026-09-12-relay-design-assessment.md)
+incorporates the [review synthesis](2026-09-12-relay-design-review-synthesis.md).
+Native acceptance, installation and pilot remain later gates. This is the single successor plan,
 replacing the earlier Flow-adaptation proposal at this path. Completed native
 probe evidence remains valid within its recorded limits.
 
@@ -58,6 +59,22 @@ fixes only. Park local 0.9.14-rc.1; it is not a prerequisite release. Defer expa
 preserve-and-reset work and Flow's naming cleanup until Relay is stable and usable.
 Do not advertise rarely exercised legacy features as a proven advanced fallback.
 
+## Approved repository layout
+
+Create Relay directly in `plugins/relay`, with its own package/plugin manifests,
+README, changelog, runtime, skills, tests and product documentation. Keep Flow's
+existing root package and files in place during Relay development. Root `docs/`
+holds umbrella decisions and cross-plugin plans; do not move historical Flow
+documents merely to make the tree symmetrical.
+
+After Relay is stable and usable, move Flow to `plugins/flow` together with the
+separately scoped legacy naming cleanup. The eventual root README introduces both
+plugins, and each plugin owns its build, validation, packaging and versioning.
+That later migration must verify path, release-tooling and installation
+compatibility before changing legacy sources. No shared runtime library,
+synchronized releases or new workspace framework is required by this layout.
+See [ADR 0074](../adr/0074-relay-successor-identity.md).
+
 ## Consequential constraints
 
 1. **Minimum authoritative facts.** Design from the journey before choosing modules.
@@ -92,9 +109,9 @@ Do not advertise rarely exercised legacy features as a proven advanced fallback.
 7. **Independent extraction and package.** Justify each reused primitive's semantic
    fit, transitive imports and packaged contents. Exclude Flow's lifecycle and
    compatibility engines; do not introduce a shared evolving framework for both
-   products. Reuse needs relevant tests. Prefer independently packaged
-   `plugins/relay` in the umbrella repository; confirm layout at checkpoint 1
-   without renaming or repackaging legacy Flow.
+   products. Reuse needs relevant tests. Use independently packaged
+   `plugins/relay` under the approved staged layout, without moving, renaming or
+   repackaging legacy Flow during Relay development.
 8. **Reporting is separate from source ownership.** Bind exact sender/recipient;
    preserve pending finals after writer release. Queue acceptance is not delivery.
    Late/duplicate/foreign-hook events cannot reauthorize work or redirect reports
@@ -105,6 +122,12 @@ Do not advertise rarely exercised legacy features as a proven advanced fallback.
    Distinct plugin names/state directories do not prove mutual exclusion.
    No dual control of one repository. Same-App coexistence across separate
    repositories requires a native test before shared installation.
+10. **Explicit transition and recovery rules.** The current control record is the
+    single ownership commit point. Persist supporting result/report facts first;
+    transfer executor ownership directly to exact coordinator verification.
+    Distinguish never-write-enabled revocation from possibly-active-writer recovery.
+    Do not transplant Flow's automatic stale-lock reclamation. A recovered command
+    lock is not evidence that a source writer is quiescent.
 
 ## Checkpoints
 
@@ -142,6 +165,10 @@ At the gate, approve the minimum contract/build scope, revise a specific dispute
 boundary, or stop. If extraction reproduces Flow, reconsider the design before
 implementation rather than build generic infrastructure to rescue it.
 
+Checkpoint 1 is complete. The two reviews support the direction with targeted
+amendments, now incorporated in the assessment. Do not repeat a broad audit.
+The next deliverable is the connected source implementation below.
+
 ### 2. One connected source implementation
 
 Implement local work → sequential executor → verification → final reporting →
@@ -170,6 +197,10 @@ package, without unnecessary intermediate publishing.
 
 ## Acceptance evidence
 
+Track known failure families in the umbrella [issue checklist](../known-issues.md).
+Update each plugin's status with verified closure evidence; plan coverage alone
+does not close an issue, and Relay fixes do not imply legacy Flow fixes.
+
 - A fresh coordinator starts from the brief/public interface without internal
   code searches or handwritten protocol boilerplate. Measure context, calls and
   elapsed time against checkpoint-1 budgets. Disclose manual recovery; do not
@@ -195,14 +226,21 @@ package, without unnecessary intermediate publishing.
 
 ## Execution authority and escalation
 
-Current authorization: checkpoint 1 source/dependency assessment, planning and
-decision documents, with bounded read-only native support collected by the
-director. This assessment uses ordinary read-only source inspection, not a new
-Flow execution run or a claim of Flow-managed delivery. No implementation,
-installation, migration, Plotloom changes or cleanup is authorized. Subsequent
-authorization permits the assessment packet and its source anchor to be pushed
-on a review branch; it does not authorize a release or merge to main.
+Current authorization: amended design and checkpoint 2 source implementation,
+including an independently packaged `plugins/relay` and focused local tests.
+No installation, migration, Plotloom changes or cleanup is authorized. Prior
+publication permission covered the review packet; it does not authorize a release
+or merge to main. Keep the parked Flow repair source and installed package unchanged.
 The completed probe and incident-specific exception do not authorize the build.
+
+Delivery selection for checkpoint 2: the user explicitly requested the dedicated
+Relay implementation task. Use a source-only Codex task in its own development
+worktree, with direct reporting to this director; do not activate Flow/Relay runs
+to control the build or claim authenticated hook delivery. This isolates initial
+development, not Relay's eventual serial user workflow. The task reads the approved
+documents from the director checkout, owns `plugins/relay`, and returns its source
+result and actual verification. Native canary tasks and installed hook behavior
+remain outside this source-only assignment.
 
 The director owns intent, synthesis and acceptance. Delegate the approved bounded
 assessment, then after the design gate appoint one delivery owner for the approved connected

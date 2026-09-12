@@ -1,7 +1,8 @@
 # Relay checkpoint 1: extraction and minimal contract
 
-Status: bounded source assessment complete; proposed design pending external
-review and approval, not implementation authority. Companion decision material for the
+Status: bounded assessment complete; targeted review amendments approved for
+the connected source implementation. Native behavior remains unverified.
+Companion contract material for the
 [single Relay plan](2026-09-11-serial-first-delivery.md), not another execution plan.
 
 Scope: source-only assessment. No Flow activation, native task creation, install,
@@ -17,8 +18,9 @@ of Flow's lifecycle engine. Reuse leaf mechanisms where they fit; replacement of
 the agent-facing interface and lifecycle is deliberate. Do not build parity or a
 common evolving framework to preserve the legacy product.
 
-The next decision is approval or targeted revision of this minimum design after
-two complementary reviews, not immediate implementation or another general audit.
+The two complementary reviews are complete; see the
+[synthesis](2026-09-12-relay-design-review-synthesis.md). The user approved the
+targeted amendments and connected source slice. This is not deployment approval.
 
 ## Source dependency assessment
 
@@ -35,6 +37,15 @@ is a source dependency cut, not proof that the extracted design works on the hos
 | Rewrite report authority and packaging | [report-routes.mjs](../../lib/report-routes.mjs)::registerCoordinatorReportRoute requires an active run and builds assignment/iteration authority; [report-records.mjs](../../lib/report-records.mjs) imports routes; [report-hook.mjs](../../lib/report-hook.mjs) stages pinned reporting authority | One Relay-owned reporting obligation and explicit minimal runtime manifest, not old route/run/iteration projections |
 | Rewrite task-only archival | [archive-lifecycle.mjs](../../lib/archive-lifecycle.mjs)::resolvedTaskArchiveAuthority and reconcileTaskArchive couple task archival to launch/disposition and worktree postconditions | Observe exact task archival without requiring deletion or freezing the retained source checkout |
 | Omit legacy orchestration engine | Run lifecycle, assignment authority, iteration registry, task launch, integration, disposition, cleanup and refresh engines | Reference their failure lessons; do not transplant their state machines or compatibility obligations |
+
+Correction after review: `core.mjs::withProcessLock` is **not safe to copy
+unchanged**. Its automatic stale-lock reclamation can rename a replacement live
+lock after inspecting an earlier stale lock. Source inspection confirms that race
+sequence; no executed reproduction or causal link to a product incident is claimed.
+Relay initially refuses an existing transition lock. Explicit recovery requires
+stopping competing operations and identifying the abandoned lock; rereading a token
+before rename does not make reclamation atomic. A different tested primitive may
+replace this approach only if it remains smaller and satisfies the same contract.
 
 The decisive packaging leak is
 [report-runtime.mjs](../../lib/adapters/codex-app/report-runtime.mjs)::runtimeSourceFiles:
@@ -78,8 +89,9 @@ finish at different times. They need clear owners, not duplicated completion cla
 1. Director prepares intent, scope, acceptance and explicit staffing choices.
    Code generates identities, native-action arguments and the first prompt.
 2. The exact created coordinator starts against the chosen clean checkpoint.
-   One start operation establishes or resumes its source permission and reporting
-   setup. An interrupted start reconciles existing facts; it does not create a
+   One start operation establishes or resumes its reservation. Required reporting
+   bindings/setup must be persisted before source permission becomes write-enabled.
+   An interrupted start reconciles existing facts; it does not create a
    competing assignment. Any provisional identity join is monotonic and must be
    qualified against the actual native surface, not assumed from the ready probe.
 3. A coordinator may work locally or prepare a sequential executor handoff.
@@ -99,22 +111,74 @@ finish at different times. They need clear owners, not duplicated completion cla
    fabricated success; dirty/rejected work cannot silently unblock a new writer.
 
 Every supported write-enabling start/resume checks the current permission and
-generation. A lock protects transitions; it does not physically prevent arbitrary
-shell/editor writes. The owner must account for background tools before transfer,
-and validation detects unexplained source drift. No leases or automatic takeover
-unless a real unmet requirement justifies them.
+generation. Persist supporting immutable result/report facts before atomically
+replacing the current control record: that replacement is the single ownership
+commit point. An interrupted operation reconciles its same intent; orphan supporting
+facts never grant permission. Executor finish replaces executor permission directly
+with the named coordinator's reservation to verify the exact result revision.
+Notification does not grant that permission. Never expose an available slot in between.
+
+A short command lock protects transitions, not model/host waiting time, and does
+not physically prevent arbitrary shell/editor writes. Prohibit detached
+source-changing tools across handoffs. Unknown surviving writers require explicit
+recovery, not automatic takeover. Verification checks must not modify tracked
+source, index or refs; run fixers as work and verify again. Endpoint comparisons
+detect drift, not every transient write; do not add filesystem surveillance.
+
+Recovery has two release predicates. A reservation that was never write-enabled
+may be irrevocably revoked, rejecting every late start while retaining unresolved
+native-task facts. A possibly write-enabled owner remains blocking until quiescence
+and explicit disposition of the actual source, including untracked and rejected
+committed work. A clean rejected commit is not automatically an approved baseline.
+Recovering a command lock alone proves neither predicate.
 
 History is evidence, not a second permission system. Prefer a versioned Relay
 record contract over a namespace per package release. Upgrades occur at settled
-assignment boundaries; unsupported record versions stop explicitly. Do not add
+assignment boundaries; unsupported records stop only operations that need them.
+Unrelated settled history does not block admission. An upgrade unable to service
+pending obligations waits for them to drain; ordinary successors need not wait.
+Do not add
 live migration or make future admission replay every old runtime and live checkout.
-The retention and compatibility details need review before implementation.
+Admission reads current authority, the requested assignment and its relevant
+dependencies, not a replay of all historical runtimes or live checkouts.
+
+## Reporting and operation-specific gates
+
+Reporting facts belong to the assignment, not a parallel authority hierarchy.
+A minimal sender-index pointer may locate them; a checkout path cannot identify
+the sender. Before source release, seal result association, sender, recipient and
+finishing-event correlation. Final bytes may remain capture-pending until the real
+native final. A late hook reads this frozen association, never current HEAD or the
+newest assignment. Exact event correlation remains a native qualification gate.
+
+Same event/same bytes is idempotent; same event/different bytes conflicts. Persist
+attempt-before-send. An ambiguous submission waits for exact observation or explicit
+reconciliation; do not resend automatically. Queued, recipient-confirmed and
+accepted remain distinct facts. One recipient operation may record receipt and its
+separate accept/reject decision together; receipt without acceptance is supported.
+The hook transports the final; it does not certify successful source work.
+
+| Pending fact | Blocks | Does not automatically block |
+| --- | --- | --- |
+| Ownership, verification or unresolved possible writer | Another source owner | Read-only reporting/observation |
+| Dirty/rejected source without disposition | Ordinary source admission | Sole-owner explicit recovery |
+| Final capture | Archiving the surface needed for capture | Independent work after safe source release |
+| Uncertain report delivery | Claiming delivery or discarding required evidence/capability | Unrelated safe source work |
+| Result acceptance | Work depending on that accepted result; ordinary success archival | Explicit independent work at a safe approved baseline |
+| Unobserved archive | Claiming archival or forgetting the operation | Successor work after task-only archival is qualified |
+
+Failed/cancelled retirement does not require successful acceptance. Archive only
+the exact eligible quiescent task after permission retirement and the required
+task-specific reporting decisions. Absence from a list is not affirmative archive
+evidence. Observe ambiguous host outcomes without replay; never require historical
+HEAD or checkout disappearance. Until post-archive reporting is qualified, delay
+the sender's archival rather than all successor source work.
 
 ## Public interface and provisional startup budget
 
 Design the public workflow around intent: prepare, start/resume, hand off,
 verify/finish, accept/retire, and recover an exact stopped assignment. These are
-operations, not a finalized CLI spelling. A coordinator should not separately
+public operations whose option syntax is finalized during implementation. A coordinator should not separately
 discover run, workflow, runtime-context, report-route and locator request schemas.
 
 The prepared first prompt should contain: outcome and scope, approved plan link,
@@ -123,10 +187,45 @@ that affect work. Generated authority belongs in referenced machine data, not a
 large human-authored prompt. Native actions remain visible, scoped tool calls.
 Ambiguity returns one precise pending action rather than a repair scavenger hunt.
 
+### Complete public journey
+
+Names below define the intended public operations, not an already implemented CLI.
+Generated commands carry exact handles; the agent does not author hashes or schema
+bindings. Implement help/examples alongside the operations, not afterward.
+
+| Actor / operation | Genuine input or observation | Required outcome / next action |
+| --- | --- | --- |
+| Director: `prepare` | Outcome, scope, checks/acceptance, selected checkout/branch, saved native project, coordinator selector and exact recipient | Capture clean baseline; reserve assignment; generate native creation arguments and first brief with exact `start` command. If project missing, name that prerequisite without creating project-management machinery. |
+| Director: native creation, then `record-native` | Actual creation result for the prepared action | Bind exact ready identity or retain provisional/ambiguous intent. Return exact observation/resume action; never repeat uncertain creation. |
+| Coordinator: `start` | Generated assignment handle; actual actor identity | Check current generation, source and reporting readiness. Return READY with owner/checkpoint/scope and generated next command, or NOT READY with actor, allowed activity and one exact next action. Early/provisional identity gets no writes. |
+| Coordinator: `handoff` | Bounded subtask, permitted scope, checks, executor selector | Reserve exact clean checkpoint, suspend coordinator editing, generate one native creation/identity-binding path and executor brief. |
+| Executor: `start`, work, `finish` | Generated handle; actual product work | Derive result/producer/scope; preserve final-report obligation; transfer directly to coordinator verification reservation. Do not self-accept the result. |
+| Coordinator: `verify` | Semantic review plus continue/finish/reject decision | Run recorded checks against exact reserved subject, compare source before/after, bind evidence. Continue gets a new work checkpoint; reject retains explicit recovery; finish releases verified source with capture pending. |
+| Solo coordinator: `finish` | Completed work and selected checks | Use the same verifier in one public operation; no synthetic integration or extra ceremonial verify call. A failed check does not produce success. |
+| Sender: actual native final | Real final event and bytes | Capture once against frozen assignment/result; record submission and observation separately. Do not synthesize idle evidence. |
+| Director: `receive` / `accept` or `reject` | Exact received report and independent review decision | Record receipt without forcing acceptance; permit combined receipt/decision. Return the next eligible task-only archive action, not a task-list reconstruction request. |
+| Owning actor: native archive then `record-native` | Exact prepared host action result and archive observation | Retain ambiguity or conclude task archival without Git deletion. Return outstanding task-specific obligation or retired status. |
+| Authorized owner: `recover` | Generated exact stopped assignment/action handle and actual source-resolution decision | Apply the never-enabled or possibly-enabled predicate. Preserve failure and uncertain native actions. Return safe checkpoint or exact blocking action; never a generic start-over instruction. |
+| Director: next `prepare` | New approved intent and any explicit accepted-result dependency | Read current checkpoint/permission, not historical live HEAD. Allow independent work despite unrelated pending reporting/archive facts. |
+
+Normal admission consists of prepare (handoff for an executor), record-native and
+start. Native creation is separately counted. A child racing identity recording
+gets binding-pending; the creating owner records the result and sends the returned
+resume action. Count this extra exchange when it occurs; do not hide it in budget
+claims or add an unattended wait mechanism. Unknown identity stays pending until a
+bounded exact observation is available; generic provisional reconciliation is deferred.
+
+An interrupted `start` retries the same handle. If only reserved, output remains
+write-disabled until bindings/setup finish. If permission could already have been
+enabled, recovery treats it as a possible writer, even if READY output was lost.
+No public command asks the model to manufacture passing checks, source snapshots,
+producer identities or a new assignment to evade an interrupted operation.
+
 Proposed budgets for reviewers to challenge:
 
 - One ordinary coordinator startup command; no more than three protocol command
-  invocations on successful cold start, including required preflight. Count native
+  invocations on successful cold start, counting preparation, native-result binding
+  and start (preflight included). Count native
   creation separately and report both counts; do not hide setup in child agents.
 - At most 6,000 newly introduced plugin-specific model-visible tokens from brief,
   instructions, generated requests and tool outputs through source-ready status.
@@ -142,12 +241,20 @@ user's unverified >100K context estimate. Budget overruns require explaining the
 necessary information or simplifying the interface, not merely shrinking output
 while keeping equivalent hidden work.
 
+Measurement begins when approved intent is ready and preparation starts; include
+director/coordinator or coordinator/executor windows and their total. Count repeat
+reads and any helper work, not just the new worker's prompt. Use the required native
+acceptance journeys rather than a separate benchmark program. Save actual visible
+spans; state tokenizer/version, or report bytes with a labelled estimate. Two runs
+provide raw values, not a reliable percentile or percentage-saving claim.
+
 ## Smallest useful acceptance set
 
 Use existing test tools, not a new testing framework:
 
 - Pure tests for ownership/transition eligibility, stale generation, routing and
-  scope comparison where no actual Git/host state is required.
+  scope comparison where no actual Git/host state is required. Include deterministic
+  lock contention/recovery and interrupted ownership commit-point cases.
 - Connected real-Git/CLI tests for solo and sequential executor results, failed
   startup, interrupted transfer, dirty/rejected work and verification subject drift.
 - One accumulated-history test: completed assignments, a safely retired no-work
@@ -157,7 +264,9 @@ Use existing test tools, not a new testing framework:
   Include delayed/duplicate final delivery and ambiguous host response observation;
   never treat synthetic hook invocation as native idle-final evidence.
 - Inspect the built package's dependency closure, not only imports of its entrypoint.
-  Benchmark focused checks and the final acceptance run independently.
+  Unpack outside this repository and run CLI/hook tests with Flow unavailable;
+  check dynamic loading and runtime staging too. Benchmark focused checks and the
+  final acceptance run independently. Do not transplant the legacy full suite.
 
 ## Review questions and boundaries
 
