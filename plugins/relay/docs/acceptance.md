@@ -13,7 +13,7 @@ qualifies only the exact boundaries named below; fixtures are not native evidenc
 | KI-04 | Source fixtures cover mixed history; a fresh dependent successor used the accepted retained revision, committed useful scoped work, and retired without source deletion | Failure-path successor qualification remains |
 | KI-05 | Exact frozen read/ack/accept separation is source-tested; recovered coordinator/child and fresh successor completed genuine same-host Stop capture plus `shared-storage` receipt | Cross-host or native-message delivery is not claimed; product pilot remains |
 | KI-06 | Child-first source gates plus live exact child, coordinator, and successor task-only archival; retained checkout/branch remained | Failure-path native retirement and product pilot remain |
-| KI-07 | Generated briefs/tickets/native requests; focused tests; no runtime reads required by interface | Fresh-agent total token/call/time measurement, including director preparation |
+| KI-07 | Generated startup uses host `CODEX_THREAD_ID`; missing/conflicting/wrong identity fails closed; correct early/ready paths, scoped public instructions, and 8,974 → 3,819 proxy-token source accounting are tested or recorded | Fresh native three-call replay with correct-ID provisional/early binding, total content, and elapsed time |
 | KI-08 | Explicit 20-file package allowlist, only Node and Relay imports, 15 passing relocated fixture tests, and corrected personal-package use in the disposable repository | Restart-free upgrades and broader rollout remain unqualified |
 | KI-09 | Source ordering/coexistence guards plus live same-host task identity, frozen reporting, receipt, and archive observations | Separate-repository Flow coexistence remains unqualified |
 

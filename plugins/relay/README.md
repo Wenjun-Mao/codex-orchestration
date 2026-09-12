@@ -51,8 +51,12 @@ to the retained checkout; Relay does not manage native project registration.
 selected branch and generates an assignment, ticket, one native creation request,
 and a brief containing the startup command. There is no implicit branch change or
 worktree creation. `record-native-result` mechanically binds the unmodified
-`create_thread` result; `start` is the
-single coordinator admission command. These are three ordinary protocol calls;
+`create_thread` result. The generated `start --actor-env CODEX_THREAD_ID` command
+reads the invoking task identity supplied by the Codex host. Missing, conflicting,
+or incorrectly bound identity is refused; Relay never substitutes the assignment's
+stored owner. Direct authenticated callers and deterministic fixtures may still
+pass an explicit actor. `start` is the single coordinator admission command. These
+are three ordinary protocol calls;
 that count is an interface property, not a measured native startup budget.
 
 A ready observation file contains `actionId` from the generated native action,
@@ -61,8 +65,8 @@ A ready observation file contains `actionId` from the generated native action,
 carry that same `clientThreadId`. An ambiguous observation retains the original
 action. These fields are **adapter observations**, not identities for an agent to
 invent. A child that starts before binding is write-disabled; the creator records
-the exact observation and supplies the returned resume command. Do not resend a
-creation because an identity or output is delayed.
+the exact observation, then the child reruns the unchanged startup command already
+in its brief. Do not resend a creation because an identity or output is delayed.
 
 READY contains the exact current ticket, scope and next command. Work locally,
 commit, then `finish`. Or call `handoff` with another genuine spec (the same project,
@@ -189,11 +193,13 @@ See [source contracts](docs/decisions/0001-source-contract.md), the
 [native adapter decision](docs/decisions/0002-native-adapter.md), the
 [current host capability record](docs/native-capability-2026-09-12.md), the
 [director-owned disposable journey](docs/native-disposable-journey.md), and
-[remaining acceptance gates](docs/acceptance.md). Startup tokens/elapsed time,
-native failure and provisional/early-start recovery, separate-repository Flow
+[remaining acceptance gates](docs/acceptance.md). The corrected source interface's
+declared startup content projects to 3,819 `o200k_base` proxy tokens, down from the
+recorded 8,974; a fresh native replay is still required before a startup-budget
+PASS. Correct-ID provisional/early-start behavior, separate-repository Flow
 coexistence, restart-free upgrade behavior, and the controlled product pilot remain
-unmeasured or unqualified. The successor's first wrong-actor `start` was rejected
-before writes and self-corrected through public `status`; this is startup friction,
-not a three-call budget pass. Its 52.364-second native turn is not an end-to-end
-latency or token-budget measurement. Shared-storage receipt is qualified only as
-same-host delivery, not native message delivery or broad release readiness.
+unqualified. The earlier successor's first wrong-actor `start` was rejected before
+writes and self-corrected through public `status`; that run is not a three-call
+budget pass. Its 52.364-second native turn is not an end-to-end latency measurement.
+Shared-storage receipt is qualified only as same-host delivery, not native message
+delivery or broad release readiness.

@@ -10,5 +10,6 @@
 - Read-only hook discovery leaves fresh, unrelated, and Flow-only repositories unmodified.
 - Native receipt normalization requires an exact same-turn `final_answer` message object.
 - Exact recipients can read and explicitly acknowledge frozen reports through shared storage; native wait is optional notification.
+- Generated startup uses the host's `CODEX_THREAD_ID`, refuses missing or conflicting identity, and needs no actor lookup or broad README read.
 - Disposable Git/CLI, crash, scope/drift, reporting and packed isolation tests.
 - A recovered mixed live journey and fresh useful successor qualify same-host shared receipt and task-only retirement; failure, early-start, coexistence, startup-budget and pilot gates remain.

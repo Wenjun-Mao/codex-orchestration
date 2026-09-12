@@ -3,14 +3,16 @@ name: deliver
 description: Carry out an already prepared Relay serial source assignment using its generated public commands. Native adapter qualification and installation are separate gates.
 ---
 
-Use the exact startup command in the prepared brief with the actual task identity.
-The returned actor, permitted source activity and next action govern this step.
-Do not reconstruct mechanical identities or read runtime implementation to start.
+Run the prepared brief's exact startup command unchanged. It reads this Codex task's
+host-provided `CODEX_THREAD_ID`; do not discover, copy, or guess an assignment owner.
+A missing or conflicting runtime identity is refused. The response's actor,
+permitted source activity, and next action govern the step. No README or runtime
+implementation read is needed to start.
 
 Only READY permits source changes within the recorded scope. A provisional native
-identity permits no writes. Preserve the same assignment when binding or output
-is delayed; the creating owner records the exact native result and returns the
-resume command. Never repeat an uncertain creation.
+identity permits no writes. If startup returns BINDING_PENDING, preserve the same
+assignment and wait: the creating owner records the exact native result, then the
+worker reruns its unchanged startup command. Never repeat an uncertain creation.
 
 Do local work in the selected retained checkout. Commit the result before finish.
 For a sequential executor, supply genuine subtask/scope/check/model choices to
@@ -36,6 +38,5 @@ archive/submission.
 
 Installation and native qualification remain director-owned boundaries. Use
 injected observations only in source tests; label shared-storage receipt accurately
-rather than calling it native message delivery.
-For public command inputs or the current native boundary, read
-[the package README](../../README.md). Do not install this candidate implicitly.
+rather than calling it native message delivery. Do not install this candidate
+implicitly.

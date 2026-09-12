@@ -14,6 +14,9 @@ export class Relay {
   command(operation, args = {}) {
     return `${quote(process.execPath)} ${quote(fileURLToPath(new URL('../bin/relay.mjs', import.meta.url)))} ${operation} --repo ${quote(this.repo.checkout)}` + Object.entries(args).map(([key, value]) => ` --${key} ${quote(value)}`).join('');
   }
+  startCommand(ticket) {
+    return this.command('start', { ticket, 'actor-env': 'CODEX_THREAD_ID' });
+  }
   response(actor, activity, next, extra = {}) { return { actor, permittedSourceActivity: activity, nextAction: next, ...extra }; }
   record(control, id) { return this.store.assignment(control, id); }
   current(control, ticket, actor, modes) {
@@ -36,7 +39,7 @@ export class Relay {
     const ticket = `${record.id}:${p.generation}`;
     if (p.mode === 'reserved') {
       return this.response(record.task ?? record.creator, 'none', record.task
-        ? this.command('start', { ticket, actor: record.task })
+        ? this.startCommand(ticket)
         : this.command('record-native-result', { assignment: record.id, actor: record.creator, 'action-id': record.creation.id, result: '<exact-tool-result.json>' }),
       { status: record.task ? 'BOUND' : 'BINDING_PENDING', assignment: record.id, ticket });
     }
@@ -79,7 +82,7 @@ export class Relay {
   }
   creationResponse(control, record) {
     const p = this.permissionResponse(control, record);
-    const start = this.command('start', { ticket: p.ticket, actor: '<actual-native-task-id>' });
+    const start = this.startCommand(p.ticket);
     const prompt = `Deliver: ${record.outcomeIntent}\nApproved plan: ${record.plan}\nScope: ${record.scope.join(', ')}\nAcceptance: ${record.acceptance}\nRole: ${record.role}; model ${record.selector.model}; thinking ${record.selector.thinking}.\nStart: ${start}\nNo writes before READY. Only the current ticket permits work; stop all source-changing tools before handoff/finish. Checks are read-only. Preserve failures. Emit your real final after source release; do not synthesize native events. Source-stage adapter qualification is still pending.`;
     return { ...p, nativeAction: { id: record.creation.id, kind: 'create', tool: 'mcp__codex_app__create_thread', args: { target: { type: 'project', projectId: record.projectId, environment: { type: 'local' } }, model: record.selector.model, thinking: record.selector.thinking, prompt } },
       nextAction: 'Invoke this exact prepared native creation once, then record its unmodified tool result using the returned command.',
@@ -168,6 +171,7 @@ export class Relay {
   }
   start(ticket, actor) {
     return this.store.locked(control => {
+      requireThat(typeof actor === 'string' && actor.length > 0, 'Exact start actor required');
       const id = ticket.split(':')[0];
       const record = this.record(control, id);
       requireThat(control.permission?.assignment === id && ['reserved', 'write'].includes(control.permission.mode), 'Reservation revoked or transferred; late start rejected');

@@ -19,7 +19,10 @@ relay record-native-result --repo PATH --assignment ID --actor TASK --action-id 
   Normalize one unmodified purpose-built App tool result. Never retries native actions.
 relay record-native --repo PATH --assignment ID --actor TASK --observation FILE
   Low-level injected observation for deterministic source tests only.
-relay start --repo PATH --ticket GENERATED --actor ACTUAL_TASK
+relay start --repo PATH --ticket GENERATED --actor-env CODEX_THREAD_ID
+  Generated startup reads the invoking Codex task identity from that environment
+  variable. Missing or conflicting --actor identity is refused before admission.
+  Explicit --actor TASK remains available for authenticated fixtures and API use.
 relay handoff --repo PATH --ticket GENERATED --actor TASK --spec FILE
 relay finish --repo PATH --ticket GENERATED --actor TASK
 relay verify --repo PATH --ticket GENERATED --actor TASK --decision continue|finish|reject
@@ -39,13 +42,13 @@ relay recover-lock --repo PATH --token EXACT --commands-stopped
 Public responses name the actor, permitted source activity and one next action.
 READY is cooperative permission, not filesystem enforcement. Stop all writers
 before handoff or recovery. Final capture and native observations require exact
-external evidence; fixture files prove only the source contract. See README.md.
+external evidence; fixture files prove only the source contract.
 `;
 let context = {};
 let instance;
 try {
   const { values, positionals } = parseArgs({ allowPositionals: true, options: {
-    repo: { type: 'string' }, actor: { type: 'string' }, spec: { type: 'string' }, ticket: { type: 'string' }, assignment: { type: 'string' },
+    repo: { type: 'string' }, actor: { type: 'string' }, 'actor-env': { type: 'string' }, spec: { type: 'string' }, ticket: { type: 'string' }, assignment: { type: 'string' },
     observation: { type: 'string' }, event: { type: 'string' }, envelope: { type: 'string' }, result: { type: 'string' }, decision: { type: 'string' }, resolution: { type: 'string' }, token: { type: 'string' },
     'action-id': { type: 'string' }, 'delivery-key': { type: 'string' }, 'event-id': { type: 'string' },
     digest: { type: 'string' }, 'association-digest': { type: 'string' },
@@ -62,7 +65,15 @@ try {
     if (operation === 'prepare') result = relay.prepare(file('spec'), values.actor);
     else if (operation === 'record-native-result') result = relay.recordNativeResult(values.assignment, values.actor, values['action-id'], file('result'));
     else if (operation === 'record-native') result = relay.recordNative(values.assignment, values.actor, file('observation'));
-    else if (operation === 'start') result = relay.start(values.ticket, values.actor);
+    else if (operation === 'start') {
+      const identityVariable = values['actor-env'];
+      const environmentActor = identityVariable ? process.env[identityVariable] : undefined;
+      if (identityVariable && !environmentActor) throw new Error(`Runtime identity environment variable ${identityVariable} is missing`);
+      if (values.actor && environmentActor && values.actor !== environmentActor) throw new Error('Explicit start actor conflicts with runtime identity');
+      const actor = environmentActor ?? values.actor;
+      context.actor = actor;
+      result = relay.start(values.ticket, actor);
+    }
     else if (operation === 'handoff') result = relay.handoff(values.ticket, values.actor, file('spec'));
     else if (operation === 'finish') result = relay.finish(values.ticket, values.actor);
     else if (operation === 'verify') result = relay.verify(values.ticket, values.actor, values.decision);

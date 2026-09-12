@@ -75,12 +75,42 @@ and child completion plus a fresh useful successor, including genuine Stop captu
 same-host shared receipt, separate acceptance, and exact task archival. The
 successor self-corrected one rejected wrong-actor start before any write.
 
+## Startup correction accounting
+
+The recorded canary evidence under `.git/relay-native-evidence/` declared nine
+content components and an `o200k_base` proxy. Re-running its
+`measure-startup.mjs`, then tokenizing the emitted component text with
+`tiktoken 0.11.0`, reproduced the 8,974-token baseline exactly. The corrected
+projection is produced by `scripts/measure-startup-correction.py`; it retains every
+component. It replaces only generated start commands, counts the scoped delivery
+skill for the director, and counts the worker reading that same skill and invoking
+the generated start directly. It removes the worker's full README and status reads
+because the corrected public contract no longer directs or requires them.
+
+| Declared component | Before | Corrected projection |
+| --- | ---: | ---: |
+| Director spec | 315 | 315 |
+| Prepare response | 844 | 844 |
+| Native creation result | 64 | 64 |
+| Binding response | 257 | 240 |
+| Worker brief | 361 | 362 |
+| Director public instructions | 2,699 | 485 |
+| Native creation request | 426 | 426 |
+| Worker tool requests through READY | 510 | 270 |
+| Worker tool outputs through READY | 3,498 | 813 |
+| **Total** | **8,974** | **3,819** |
+
+The reduction is 5,155 proxy tokens (57.4%). This is reproducible source-content
+accounting against the same recorded inputs and boundaries. It excludes ambient
+host framing and does not measure elapsed time or qualify a native startup PASS.
+
 ## Exact blocker
 
-The remaining native gates are failure/recovery, provisional or early start, and
-separate-repository Flow coexistence. End-to-end startup tokens, calls and elapsed
-time remain unmeasured; the observed 52.364-second successor turn is narrower and
-the wrong-actor retry prevents a three-call startup claim. Restart-free upgrades,
-product pilot, release and broader rollout are also unqualified. Starting a second
-App Server client or using the running app's private control socket remains outside
-the approved adapter shape.
+Failure/recovery has bounded native evidence. Correct-ID provisional/early-start and
+separate-repository pending-Flow reporting coexistence remain open. The corrected
+source interface projects below the startup token ceiling, but fresh end-to-end
+native calls, tokens, and elapsed time remain unqualified; the prior wrong-actor run
+cannot establish a three-call claim. Restart-free upgrades, product pilot, release,
+and broader rollout are also unqualified. Starting a second App Server client or
+using the running app's private control socket remains outside the approved adapter
+shape.

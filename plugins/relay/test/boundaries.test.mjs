@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { Relay } from '../lib/relay.mjs';
 import { inScope, validateScope, validateChecks } from '../lib/source.mjs';
 import { Store } from '../lib/store.mjs';
-import { fixture } from './helpers.mjs';
+import { fixture, cliPath, cliProcess } from './helpers.mjs';
 
 test('literal scope and checks reject ambiguous contracts', () => {
   assert.equal(inScope('src/a', ['src/']), true);
@@ -36,6 +36,56 @@ test('ownership exclusion, provisional correlation, and stale resume after conti
   assert.throws(() => f.relay.finish(ready.ticket, 'coordinator'), /permission/);
   f.commit('src/value.txt', 'coordinator continuation');
   f.relay.finish(continued.ticket, 'coordinator');
+});
+
+test('generated startup uses host identity and fails closed when it is missing, conflicting, or wrong', () => {
+  const f = fixture();
+  const prepared = f.relay.prepare(f.spec, 'director');
+  assert.match(prepared.nativeAction.args.prompt, /--actor-env 'CODEX_THREAD_ID'/);
+  assert.doesNotMatch(prepared.nativeAction.args.prompt, /actual-native-task-id/);
+
+  const missing = cliProcess(f.repo, 'start', {
+    ticket: prepared.ticket,
+    'actor-env': 'CODEX_THREAD_ID',
+  }, cliPath, { CODEX_THREAD_ID: null });
+  assert.equal(missing.status, 1);
+  assert.match(JSON.parse(missing.stderr).reason, /environment variable CODEX_THREAD_ID is missing/);
+  assert.equal(f.relay.store.control().permission.mode, 'reserved');
+
+  assert.equal(f.relay.start(prepared.ticket, 'coordinator').status, 'BINDING_PENDING');
+  const bound = f.bind(prepared, 'coordinator');
+  assert.match(bound.nextAction, /--actor-env 'CODEX_THREAD_ID'/);
+  assert.doesNotMatch(bound.nextAction, /--actor 'coordinator'/);
+
+  const conflict = cliProcess(f.repo, 'start', {
+    ticket: prepared.ticket,
+    actor: 'coordinator',
+    'actor-env': 'CODEX_THREAD_ID',
+  }, cliPath, { CODEX_THREAD_ID: 'foreign-task' });
+  assert.equal(conflict.status, 1);
+  assert.match(JSON.parse(conflict.stderr).reason, /conflicts with runtime identity/);
+
+  const wrong = cliProcess(f.repo, 'start', {
+    ticket: prepared.ticket,
+    'actor-env': 'CODEX_THREAD_ID',
+  }, cliPath, { CODEX_THREAD_ID: 'foreign-task' });
+  assert.equal(wrong.status, 1);
+  assert.match(JSON.parse(wrong.stderr).reason, /differs from exact native binding/);
+  assert.equal(f.relay.store.control().permission.mode, 'reserved');
+
+  const correct = cliProcess(f.repo, 'start', {
+    ticket: prepared.ticket,
+    'actor-env': 'CODEX_THREAD_ID',
+  }, cliPath, { CODEX_THREAD_ID: 'coordinator' });
+  assert.equal(correct.status, 0);
+  assert.equal(JSON.parse(correct.stdout).status, 'READY');
+});
+
+test('start requires explicit caller identity before native binding', () => {
+  const f = fixture();
+  const prepared = f.relay.prepare(f.spec, 'director');
+  assert.throws(() => f.relay.start(prepared.ticket), /Exact start actor required/);
+  assert.equal(f.relay.store.control().permission.mode, 'reserved');
 });
 
 test('start reporting facts survive crash before and after the only ownership commit', () => {

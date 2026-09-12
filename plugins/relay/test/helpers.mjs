@@ -27,11 +27,19 @@ export function deliver(relay, id, sender, recipient, decision = 'accepted') {
   return { captured, read, archive };
 }
 export const cliPath = fileURLToPath(new URL('../bin/relay.mjs', import.meta.url));
-export function cli(repo, operation, args = {}, path = cliPath) {
+export function cliProcess(repo, operation, args = {}, path = cliPath, environment = {}) {
   const argv = [path, operation, '--repo', repo, ...Object.entries(args).flatMap(([k, v]) => [`--${k}`, String(v)])];
-  const run = spawnSync(process.execPath, argv, { encoding: 'utf8' });
+  const env = { ...process.env, ...environment };
+  for (const [key, value] of Object.entries(environment)) if (value === null) delete env[key];
+  return spawnSync(process.execPath, argv, { encoding: 'utf8', env });
+}
+export function cli(repo, operation, args = {}, path = cliPath, environment = {}) {
+  const run = cliProcess(repo, operation, args, path, environment);
   if (run.status !== 0) throw new Error(run.stderr);
   return JSON.parse(run.stdout);
+}
+export function startCli(repo, ticket, task, path = cliPath) {
+  return cli(repo, 'start', { ticket, 'actor-env': 'CODEX_THREAD_ID' }, path, { CODEX_THREAD_ID: task });
 }
 export function jsonFile(value) {
   const root = mkdtempSync(join(tmpdir(), 'relay-observation-'));

@@ -28,6 +28,11 @@ for (const file of files.filter(path => path.endsWith('.mjs'))) {
 assert.equal(existsSync(join(target, 'lib')), false, 'Flow must not be staged alongside Relay');
 const help = run(process.execPath, [join(unpacked, 'bin/relay.mjs'), '--help'], target);
 assert.match(help, /Relay native-adapter candidate/);
+assert.match(help, /start --repo PATH --ticket GENERATED --actor-env CODEX_THREAD_ID/);
+assert.doesNotMatch(help, /See README/);
+const deliverySkill = readFileSync(join(unpacked, 'skills/deliver/SKILL.md'), 'utf8');
+assert.match(deliverySkill, /host-provided `CODEX_THREAD_ID`/);
+assert.doesNotMatch(deliverySkill, /\]\(\.\.\/\.\.\/README\.md\)/);
 // Copy connected and reporting harnesses; their imports resolve to the relocated package.
 mkdirSync(join(unpacked, 'test'));
 for (const file of ['helpers.mjs', 'journey.test.mjs', 'native.test.mjs', 'reports.test.mjs']) cpSync(join(source, 'test', file), join(unpacked, 'test', file), { recursive: false });

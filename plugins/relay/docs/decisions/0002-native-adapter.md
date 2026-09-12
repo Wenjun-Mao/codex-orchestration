@@ -30,6 +30,15 @@ the `.git/relay` namespace. The Stop hook therefore leaves fresh, unrelated, and
 Flow-only repositories outside Relay state. Only an explicit `prepare` with a valid
 request contract, after the Flow exclusion check, initializes Relay storage.
 
+Generated startup reads the invoking task identity from the host-provided
+`CODEX_THREAD_ID` environment variable. Relay never substitutes the assignment's
+stored owner for the caller: missing or conflicting runtime identity is refused,
+and admission still compares the supplied identity with the exact observed native
+binding. The explicit actor API remains available for deterministic fixtures and
+other already-authenticated callers. The generated brief and delivery skill contain
+the complete pre-READY procedure, so startup requires no status lookup, broad README
+read, or runtime-source inspection.
+
 Task archive is prepared once through `set_thread_archived`; only an affirmative
 exact result or archived-task listing completes it. Background acknowledgement or
 unknown output stays ambiguous. Existing child-first obligations preserve a parent

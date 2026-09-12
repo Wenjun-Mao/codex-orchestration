@@ -1,21 +1,21 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
-import { fixture, deliver, cli, jsonFile } from './helpers.mjs';
+import { fixture, deliver, cli, startCli, jsonFile } from './helpers.mjs';
 
 test('connected CLI: preparation → local work → executor → verification → real fixture bytes → receipt/archive → useful successor', () => {
   const { repo, spec, commit, git } = fixture();
   const p = cli(repo, 'prepare', { actor: 'director', spec: jsonFile(spec) });
   assert.equal(p.permittedSourceActivity, 'none');
-  const early = cli(repo, 'start', { ticket: p.ticket, actor: 'coordinator' });
+  const early = startCli(repo, p.ticket, 'coordinator');
   assert.equal(early.status, 'BINDING_PENDING');
   cli(repo, 'record-native', { assignment: p.assignment, actor: 'director', observation: jsonFile({ actionId: p.nativeAction.id, status: 'ready', taskId: 'coordinator' }) });
-  const ready = cli(repo, 'start', { ticket: p.ticket, actor: 'coordinator' });
+  const ready = startCli(repo, p.ticket, 'coordinator');
   assert.equal(ready.status, 'READY');
   commit('src/value.txt', 'coordinator local work');
   const child = cli(repo, 'handoff', { ticket: ready.ticket, actor: 'coordinator', spec: jsonFile(spec) });
   cli(repo, 'record-native', { assignment: child.assignment, actor: 'coordinator', observation: jsonFile({ actionId: child.nativeAction.id, status: 'ready', taskId: 'executor' }) });
-  const executor = cli(repo, 'start', { ticket: child.ticket, actor: 'executor' });
+  const executor = startCli(repo, child.ticket, 'executor');
   const revision = commit('src/child.txt', 'executor product work');
   const released = cli(repo, 'finish', { ticket: executor.ticket, actor: 'executor' });
   assert.equal(released.status, 'TRANSFERRED_TO_VERIFICATION');
@@ -43,7 +43,7 @@ test('connected CLI: preparation → local work → executor → verification �
   }
   const successor = cli(repo, 'prepare', { actor: 'director', spec: jsonFile({ ...spec, dependencies: [p.assignment] }) });
   cli(repo, 'record-native', { assignment: successor.assignment, actor: 'director', observation: jsonFile({ actionId: successor.nativeAction.id, status: 'ready', taskId: 'successor' }) });
-  const sr = cli(repo, 'start', { ticket: successor.ticket, actor: 'successor' });
+  const sr = startCli(repo, successor.ticket, 'successor');
   const newer = commit('src/value.txt', 'useful successor update');
   cli(repo, 'finish', { ticket: sr.ticket, actor: 'successor' });
   assert.notEqual(newer, revision);
