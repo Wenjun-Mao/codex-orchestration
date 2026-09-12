@@ -125,12 +125,64 @@ delivery. No Flow installation, journal or product-project mutation occurred.
 
 ## What remains and proposed pilot
 
-Remaining qualification: correct-ID early/provisional binding coverage,
-separate-repository coexistence with pending Flow reporting, and a passing startup
-budget after a bounded interface correction. Failure/recovery now has the limited
-native proof above. Measurement is complete for its declared slice and fails the
-lightness targets; do not label the whole candidate qualified. No broad redesign
-or additional transport layer follows from this checkpoint alone.
+### Corrected startup replay on updated App
+
+Source `f627eef9adcf1257113b40b5ae1c1aac8e0fbb62` was packaged and managed-installed
+as `0.1.0+codex.20260912163617`. All 20 source/cache files match apart from the
+permitted distribution plugin-version suffix. Artifact SHA-256:
+`198ed3b1b1e96b295d8bd274b089ec4efc13954900b3982c898611362379c3e8`.
+Prior distribution remains recoverable at `/Users/wjmao/plugins/relay.before-f627eef`.
+No source release/tag/push or Flow installation occurred.
+
+App changed to **26.908.40834, build 8881**, bundled CLI **0.154.0-alpha.6.2**.
+The supported installation subcommand is now `plugin add`. This update is a changed
+test condition, not an attributed cause of improved runtime behavior.
+
+Fresh Terra-high task `01a0967a-f578-7eb2-bc52-9c2d2707fe79`, assignment
+`d269571e-c370-446a-969d-9497dfea1b88`, used the exact generated environment-identity
+startup without lookup or rejection. Native preparation/binding/start took **three
+protocol calls** plus one native creation. It read the corrected skill, no full
+README or runtime modules before READY, and authored no mechanical protocol JSON.
+READY arrived 22.374s after director preparation and 12.640s after native turn start.
+These intervals include scheduling/model/native latency, not only CLI execution.
+
+It committed exactly one checklist append at
+`7a612961554f35e2d72f84c083ef2c2721fe0636`. Director checked scope, clean tree and
+the five-item test. Genuine Stop capture `01a0967a-f6e9-74f3-9043-bd5654dc571b`
+was read and acknowledged, independently accepted, and followed by one affirmative
+native archive and public RETIRED result. No additional App restart, report-only
+recovery, hook injection, trust bypass or sender reactivation was needed.
+This establishes this one restart-free transition, not all upgrade cases.
+
+Conservative accounting retains the same nine component categories, including a
+full director skill/README read: **6,106 proxy tokens**, down from 8,974 (32.0%).
+The 6,000 ceiling is still missed by 106 (1.8%). The earlier source projection of
+3,819 assumed skill-only director instructions; it is not this native result.
+Do not suppress required director preparation context to claim a PASS. The bound
+worker's requests/outputs total 1,065 tokens versus 4,008 before. Accounting
+excludes ambient/history and is not exact billing; the intent and host also differ.
+Inputs, archived transcript-based read-only measurement and outputs are in the
+disposable repository's `.git/relay-native-evidence/*f627eef*`. No transcript was
+used as report or lifecycle evidence.
+
+Separate early-start task `01a0967d-27a3-7090-b5c1-321b9dfd4b60`, assignment
+`1549930e-b7d2-45fa-8255-d6edbf203a73`, ran the generated `--actor-env CODEX_THREAD_ID`
+command before director binding and received BINDING_PENDING with no source
+activity. After the original ready native result was recorded, that same command
+reached READY under the exact native task identity. A no-change finish verified
+the five-item checklist at `7a612961554f35e2d72f84c083ef2c2721fe0636`.
+Genuine final `01a0967e-1a0e-7591-ba91-af6d5df8ed7a` was read/acknowledged and
+accepted; one native archive plus public reconciliation returned RETIRED.
+No alternate actor, duplicate creation, source edit or report injection occurred.
+Creation returned a ready ID, so actual provisional-ID reconciliation remains
+fixture-only. This controlled two-turn test is separate from ordinary call counting.
+
+Both new tasks are archived, the retained checkout is clean, and the 429-file
+Flow digest is unchanged from the value above. Remaining qualification: native
+provisional-ID reconciliation when the host produces it, simultaneous pending
+Flow reporting, and a passing startup budget or explicit budget revision.
+The three-call target passes; the conservative token ceiling does not. No broad
+redesign or additional transport layer follows from this checkpoint alone.
 
 Pilot candidate, not dispatched: `pdf_extract`, a saved project with clean `main`
 and neither `.git/codex-flow` nor `.git/relay` at this inspection. Proposed scope:

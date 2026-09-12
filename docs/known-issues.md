@@ -228,6 +228,13 @@ including director preparation, rather than claiming savings from shorter output
   Measurement is not exact billing; its declared slice already fails the target.
   Root causes to address: actor-placeholder lookup and broad public-document reads,
   at the generated startup interface rather than through weaker identity checks.
+  Correction `f627eef`, installed `0.1.0+codex.20260912163617`, now has native
+  three-call startup proof on App 26.908.40834/8881: one generated environment-ID
+  start, no worker lookup/README/internal reads. Conservative whole-startup proxy
+  is 6,106 (32.0% lower), still 106 above target. The 3,819 source projection counted
+  skill-only director instructions and must not replace this measured boundary.
+  Prepare-to-READY: 22.374s including host/model scheduling; no additional restart.
+  Identity friction is corrected in this journey; the token gate stays open.
 
 Evidence: [startup note](field-tests/2026-09-12-coordinator-startup-overhead.md) and
 [plan acceptance](plans/2026-09-11-serial-first-delivery.md). Targets are not results.
@@ -269,6 +276,11 @@ behavior on the host. Idle or dead lock process does not establish writer quiesc
   creation returned a ready ID, not provisional identity. Do not count it as full
   correct-ID early/provisional qualification. Genuine Relay hooks left the existing
   429-file Flow namespace byte-identical; pending Flow report delivery was not tested.
+  Follow-up `f627eef` native early-start used the generated environment identity,
+  remained write-disabled before binding, then resumed the same task/command and
+  completed no-change receipt/acceptance/retirement. This closes the earlier `/root`
+  probe limitation. Native creation still returned a ready rather than provisional
+  ID; do not relabel source provisional fixtures as live host evidence.
 
 Evidence: [review synthesis](plans/2026-09-12-relay-design-review-synthesis.md).
 Verify crash boundaries locally, then qualify actual native identity/report/archive
