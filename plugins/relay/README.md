@@ -95,8 +95,11 @@ Conflicting event IDs or bytes are rejected.
 
 The exact recipient uses `prepare-receipt` to generate a read-only `wait_threads`
 action for the frozen sender. `record-native-result` accepts receipt only when the
-returned thread/host, completed turn ID, and final text exactly match the hook
-capture. A nonterminal pending snapshot can repeat only this read observation using
+returned thread/host, completed turn ID, and structured assistant message match the
+hook capture. The completed turn must have no error, and the message ID, turn ID,
+`final_answer` phase, and exact text bytes must agree; commentary, wrong-turn,
+error, or conflicting results remain pending. A
+nonterminal pending snapshot can repeat only this read observation using
 its cursor. A completed mismatch is reread without advancing the cursor so a
 temporarily absent final remains available. Neither case repeats creation, send,
 or archive actions. Receipt alone is supported;

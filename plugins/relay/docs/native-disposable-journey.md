@@ -1,8 +1,9 @@
 # Director-owned native disposable journey
 
-Status: prepared but not dispatchable until the exact candidate is enabled/trusted
-and the director supplies the genuine model/effort selections. This journey is the
-native proof and startup measurement; do not run a separate feasibility probe.
+Status: director-owned canary started and paused after coordinator READY and commit
+`2a5420f`, before executor creation. Resume only after the director stages the
+corrected exact candidate. This journey remains the native proof and startup
+measurement; do not run a separate feasibility probe.
 
 ## Prerequisites and owners
 
@@ -70,4 +71,3 @@ and per-stage elapsed time. Report local protocol time separately from native
 provisioning/model latency. The provisional 6,000 plugin-visible-token ceiling and
 three ordinary startup protocol calls remain targets until this fresh run measures
 them. Do not claim source fixtures or repaired attempts as uninterrupted native proof.
-

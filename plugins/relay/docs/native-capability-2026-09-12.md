@@ -1,7 +1,7 @@
 # Native capability checkpoint — 2026-09-12
 
-Status: source adapter implemented; genuine native proof blocked at the authorized
-installation/trust boundary. This is not installation or release evidence.
+Status: source adapter corrected against one genuine completed native snapshot;
+the connected disposable journey and release qualification remain incomplete.
 
 ## Current host
 
@@ -35,8 +35,17 @@ The current Codex task surface exposes purpose-built `create_thread`,
 `wait_threads`, `send_message_to_thread`, `set_thread_archived`, and
 `list_archived_threads` actions. A read-only `wait_threads` snapshot of the director
 confirmed the current result shape: exact wake thread/turn/host plus per-thread
-cursor, status, latest completed turn, and latest assistant message when available.
+cursor, status, latest completed turn, and a structured latest assistant message
+with message ID, turn ID, phase, and text when available.
 That observation did not create, modify, archive, or resume a task.
+
+The director-owned canary later captured a genuine completed snapshot for task
+`01a0940c-49d3-73c1-909d-bd00decda2c8`, turn
+`01a0940c-4b40-7130-8f26-0dc4984127e3`. It established `schemaVersion: 1`, a
+completed turn with `error: null`, `latestAssistantMessageId`, and a structured
+`latestAssistantMessage` containing matching `id`, `turnId`, a `final_answer`
+phase, and `text`. A read-only replay of that saved result passes the
+corrected normalizer. The canary remains paused before executor creation.
 
 ## Minimum adapter
 
@@ -49,7 +58,8 @@ Relay now stages only these native boundaries:
    task, turn, and final bytes. It ignores unbound tasks and unsealed results and
    never reads a transcript, sends a message, continues a turn, or calls private IPC.
 3. The exact recipient obtains a read-only `wait_threads` action. Receipt is recorded
-   only when thread, host, completed turn, and final bytes equal the hook capture.
+   only when thread, host, error-free completed turn, and a matching-ID same-turn
+   `final_answer` message's exact text bytes equal the hook capture.
    Nonterminal pending snapshots can repeat this read observation with their cursor;
    a completed mismatch is reread without advancing it.
 4. An optional `send_message_to_thread` action keeps queue acknowledgement separate
@@ -58,22 +68,18 @@ Relay now stages only these native boundaries:
    ambiguous until an exact `list_archived_threads` result affirmatively contains
    the task. No Git resource is deleted.
 
-All adapter tests use representative unmodified tool-result envelopes and injected
-Stop events in disposable repositories. They prove parsing and lifecycle behavior,
-not that this host delivered those events to an enabled Relay plugin.
+Adapter tests use the observed native result shape and injected Stop events in
+disposable repositories. The saved genuine result proves the completed-result
+parser boundary; it does not complete Stop capture, delegation, archival, successor,
+coexistence, or release qualification.
 
 ## Exact blocker
 
-Authentic final capture requires Codex to load `hooks/hooks.json`. Official behavior
-requires the Relay plugin to be installed or otherwise enabled and its exact hook
-definition reviewed and trusted. Both operations are outside the current authority;
-shared installation also requires the planned separate-repository Flow coexistence
-qualification. A project-local hook would still change configuration and require
-trust, so it is not an authorized workaround. Starting a second App Server client
-or using the running app's private control socket is also outside the approved
-adapter shape.
-
-The minimum next authorization is: stage the exact packed Relay commit for one
-disposable saved project, review and trust only its packaged Stop hook, and dispatch
-the director-owned journey in [native-disposable-journey.md](native-disposable-journey.md).
-No restart requirement is claimed by this checkpoint because it was not established.
+The director owns staging the corrected exact commit into the already managed
+candidate and resuming the paused journey in
+[native-disposable-journey.md](native-disposable-journey.md). This source correction
+does not install, enable, trust, or restart anything. Full qualification still
+requires authentic Stop capture, executor delegation and receipt, child-first
+archival, successor admission, and separate-repository Flow coexistence. Starting a
+second App Server client or using the running app's private control socket remains
+outside the approved adapter shape.

@@ -28,6 +28,14 @@ function archivedThreadIds(value) {
   return ids;
 }
 
+function pendingReceipt(actionId, taskId, polls, nativeResultDigest) {
+  // An up-to-date wait cursor can suppress a final that the caller has already
+  // observed. Keep completed or conflicting observations rereadable.
+  const cursor = polls.some(poll => poll?.latestTurn?.status === 'completed')
+    ? null : (polls.find(poll => typeof poll?.cursor === 'string')?.cursor ?? null);
+  return { receiptId: actionId, status: 'pending', taskId, cursor, nativeResultDigest };
+}
+
 export function normalizeNativeResult({
   kind, actionId, result, expectedThreadId = null,
   expectedHostId = null, expectedEventId = null, expectedText = null,
@@ -74,30 +82,44 @@ export function normalizeNativeResult({
   }
 
   if (kind === 'receipt') {
-    for (const value of objects) {
-      for (const poll of Array.isArray(value?.polls) ? value.polls : []) {
-        if (poll?.thread?.id !== expectedThreadId) continue;
-        const exactHost = !expectedHostId || poll.thread.hostId === expectedHostId;
-        const exactTurn = poll?.latestTurn?.status === 'completed' && poll.latestTurn.id === expectedEventId;
-        const exactText = poll.latestAssistantMessage === expectedText;
-        if (exactHost && exactTurn && exactText) return {
-          receiptId: actionId, status: 'received',
-          taskId: expectedThreadId, hostId: poll.thread.hostId ?? null,
-          eventId: poll.latestTurn.id, cursor: poll.cursor ?? null,
-          textDigest: digest(poll.latestAssistantMessage),
-          nativeResultDigest: resultDigest,
-        };
-        // An up-to-date wait cursor can suppress a final that the caller has
-        // already observed. Keep a completed mismatch rereadable.
-        const cursor = poll?.latestTurn?.status === 'completed' ? null : (poll.cursor ?? null);
-        return {
-          receiptId: actionId, status: 'pending',
-          taskId: expectedThreadId, cursor,
-          nativeResultDigest: resultDigest,
-        };
-      }
+    const polls = objects.flatMap(value => Array.isArray(value?.polls) ? value.polls : [])
+      .filter(poll => poll?.thread?.id === expectedThreadId);
+    const observations = polls.map(poll => {
+      const message = poll.latestAssistantMessage;
+      const exactHost = !expectedHostId || poll.thread.hostId === expectedHostId;
+      const exactTurn = poll.schemaVersion === 1 && poll?.latestTurn?.status === 'completed'
+        && poll.latestTurn.id === expectedEventId && poll.latestTurn.error === null;
+      const exactMessage = message && typeof message === 'object' && !Array.isArray(message)
+        && typeof message.id === 'string' && message.id.length > 0
+        && poll.latestAssistantMessageId === message.id
+        && message.turnId === expectedEventId && message.turnId === poll.latestTurn?.id
+        && message.phase === 'final_answer'
+        && typeof message.text === 'string' && message.text === expectedText;
+      return { poll, message, exact: exactHost && exactTurn && exactMessage };
+    });
+    const signatures = new Set(observations.map(({ poll, message }) => JSON.stringify({
+      hostId: poll.thread.hostId ?? null,
+      turnId: poll.latestTurn?.id ?? null,
+      turnStatus: poll.latestTurn?.status ?? null,
+      turnError: poll.latestTurn?.error ?? null,
+      latestAssistantMessageId: poll.latestAssistantMessageId ?? null,
+      messageId: message?.id ?? null,
+      messageTurnId: message?.turnId ?? null,
+      messagePhase: message?.phase ?? null,
+      messageText: message?.text ?? null,
+    })));
+    if (result.isError === true || observations.length === 0
+      || observations.some(observation => !observation.exact) || signatures.size !== 1) {
+      return pendingReceipt(actionId, expectedThreadId, polls, resultDigest);
     }
-    return { receiptId: actionId, status: 'pending', taskId: expectedThreadId, cursor: null, nativeResultDigest: resultDigest };
+    const { poll, message } = observations[0];
+    return {
+      receiptId: actionId, status: 'received',
+      taskId: expectedThreadId, hostId: poll.thread.hostId ?? null,
+      eventId: poll.latestTurn.id, cursor: poll.cursor ?? null,
+      textDigest: digest(message.text),
+      nativeResultDigest: resultDigest,
+    };
   }
 
   throw new Error(`Unsupported native action kind: ${kind}`);

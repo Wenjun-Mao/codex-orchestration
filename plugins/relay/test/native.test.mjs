@@ -153,13 +153,41 @@ test('recipient confirms exact final through purpose-built wait result without s
     targets: [{ threadId: 'coordinator', hostId: 'coordinator-host' }], timeoutMs: 0,
   });
   const pending = f.relay.recordNativeResult(prepared.assignment, 'director', receipt.nativeAction.id,
-    result({ polls: [{ cursor: 'cursor-1', thread: { id: 'coordinator', hostId: 'coordinator-host' }, latestTurn: { id: 'turn-wait', status: 'completed' }, latestAssistantMessage: null }] }));
+    result({ polls: [{ schemaVersion: 1, cursor: 'cursor-1', thread: { id: 'coordinator', hostId: 'coordinator-host' }, latestTurn: { id: 'turn-wait', status: 'completed', error: null }, latestAssistantMessageId: null, latestAssistantMessage: null }] }));
   assert.equal(pending.status, 'RECEIPT_PENDING');
   assert.equal(pending.nativeAction.args.targets[0].afterCursor, undefined);
   assert.equal(f.relay.status(prepared.assignment).report.receipt, null);
 
+  const message = (overrides = {}) => ({
+    id: 'msg-final', turnId: 'turn-wait', phase: 'final_answer', text: finalText, ...overrides,
+  });
+  const poll = (latestAssistantMessage, overrides = {}) => ({
+    schemaVersion: 1, cursor: 'cursor-2', revision: 2, changed: true,
+    thread: { id: 'coordinator', hostId: 'coordinator-host', status: { type: 'idle' } },
+    latestTurn: { id: 'turn-wait', status: 'completed', error: null },
+    latestAssistantMessageId: latestAssistantMessage?.id ?? null,
+    latestAssistantMessage,
+    ...overrides,
+  });
+  for (const rejected of [
+    result({ polls: [poll(finalText)] }),
+    result({ polls: [poll(message({ phase: 'commentary' }))] }),
+    result({ polls: [poll(message({ turnId: 'wrong-turn' }))] }),
+    result({ polls: [poll(message(), { latestAssistantMessageId: 'msg-conflict' })] }),
+    result({ polls: [poll(message(), { latestTurn: { id: 'turn-wait', status: 'completed', error: { message: 'native failure' } } })] }),
+    { ...result({ polls: [poll(message())] }), isError: true },
+    { content: [
+      { type: 'text', text: JSON.stringify({ polls: [poll(message())] }) },
+      { type: 'text', text: JSON.stringify({ polls: [poll(message({ id: 'msg-conflict', phase: 'commentary' }))] }) },
+    ], isError: false },
+  ]) {
+    const refused = f.relay.recordNativeResult(prepared.assignment, 'director', receipt.nativeAction.id, rejected);
+    assert.equal(refused.status, 'RECEIPT_PENDING');
+    assert.equal(refused.nativeAction.args.targets[0].afterCursor, undefined);
+  }
+
   const received = f.relay.recordNativeResult(prepared.assignment, 'director', receipt.nativeAction.id,
-    result({ polls: [{ cursor: 'cursor-2', thread: { id: 'coordinator', hostId: 'coordinator-host' }, latestTurn: { id: 'turn-wait', status: 'completed' }, latestAssistantMessage: finalText }] }));
+    result({ polls: [poll(message())] }));
   assert.equal(received.status, 'RECEIVED');
   f.relay.report('accept', prepared.assignment, 'director');
   const stored = f.relay.status(prepared.assignment).report.receipt;
