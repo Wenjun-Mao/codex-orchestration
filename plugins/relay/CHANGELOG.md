@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.0-rc.1 — Hook-owned completion (candidate)
+
+- New assignments use one direct hook-owned queue notification, without a worker
+  continuation. Existing assignment modes retain their original behavior.
+- Capture precedes notification outside the storage lock; ambiguous sends never
+  retry. Fresh idle observation, shared receipt and child-first acceptance remain.
+- Keep direct messages for mid-work collaboration. Add bounded queue transport
+  and regression coverage for failure, duplicate and manager-review races.
+- Experimental transport qualified on App CLI 0.154.0-alpha.6.2; complete native
+  Relay lifecycle acceptance remains pending. Not a stable release.
+
 ## 0.2.1 — Planning entrypoint
 
 - Add `relay:plan`, adapted from Flow's concise planning guidance, with Relay's

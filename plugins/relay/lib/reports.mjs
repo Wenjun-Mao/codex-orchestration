@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { requireThat } from './store.mjs';
 import { digest, same } from './source.mjs';
-import { prepareAdvisory, idleObservation } from './notification.mjs';
+import { prepareAdvisory, prepareHookNotification, idleObservation } from './notification.mjs';
 
 // Observations enter only through explicit injected adapters/events in this source stage.
 // No current HEAD lookup belongs here: reports remain bound after successors advance.
@@ -68,9 +68,19 @@ export function reportOperation(relay, control, record, operation, actor, input 
     if (report.final) requireThat(same(report.final, final), 'Final event or bytes conflict');
     else report.final = final;
     const hookOutput = input.notify === true ? prepareAdvisory(relay, record) : null;
+    const notification = input.notify === true ? prepareHookNotification(relay, record) : null;
     return save(response('CAPTURED', relay.command('read-report', {
       assignment: record.id, actor: report.recipient,
-    }), { envelope: { ...report.association, ...final }, ...(hookOutput ? { hookOutput } : {}) }));
+    }), { envelope: { ...report.association, ...final }, ...(hookOutput ? { hookOutput } : {}), ...(notification ? { notification } : {}) }));
+  }
+  if (operation === 'observe-hook-notification') {
+    requireThat(actor === report.sender && report.notificationMode === 'hook-queue-once'
+      && report.notification?.id === input.id, 'Exact hook notification attempt required');
+    requireThat(['queued', 'ambiguous'].includes(input.status) && typeof input.reason === 'string'
+      && input.reason.length <= 200, 'Bounded hook notification outcome required');
+    requireThat(!report.notification.observed, 'Hook notification outcome already recorded');
+    report.notification = { ...report.notification, status: input.status, reason: input.reason, observed: true };
+    return save(response('NOTIFICATION_OBSERVED', 'Stop; the recipient owns report review.'));
   }
   if (operation === 'end-advisory') {
     requireThat(actor === report.sender && report.final && report.advisory, 'Exact captured sender advisory required');
@@ -94,7 +104,7 @@ export function reportOperation(relay, control, record, operation, actor, input 
   }
   if (operation === 'submit') {
     requireThat(actor === report.sender && report.final, 'Captured final and exact sender required');
-    requireThat(!report.advisory, 'Advisory already attempted; legacy submission cannot resend it');
+    requireThat(!report.advisory && report.notificationMode !== 'hook-queue-once', 'Hook-owned reporting cannot resend through legacy submission');
     if (report.submission) return response(report.submission.status, command('record-native-result', { 'action-id': report.submission.id, result: '<exact-tool-result.json>' }));
     report.submission = { id: randomUUID(), status: 'ambiguous' };
     const deliveryKey = report.submission.id;
@@ -213,7 +223,7 @@ export function reportOperation(relay, control, record, operation, actor, input 
       });
     }
     if (record.archive) return response(record.archive.status, command('record-native-result', { 'action-id': record.archive.id, result: '<exact-tool-result.json>' }));
-    if (report.advisory && (!record.idleCheck || input.idleAction !== record.idleCheck.id)) {
+    if ((report.advisory || report.notificationMode === 'hook-queue-once') && (!record.idleCheck || input.idleAction !== record.idleCheck.id)) {
       return save(idleObservation(relay, record));
     }
     record.archive = { id: randomUUID(), task: record.task, status: 'awaiting-observation' };

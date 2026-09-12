@@ -22,11 +22,29 @@ export function deliver(relay, id, sender, recipient, decision = 'accepted') {
   const read = relay.readReport(id, recipient);
   relay.report('acknowledge', id, recipient, read.acknowledgement);
   relay.report(decision === 'accepted' ? 'accept' : 'reject', id, recipient);
-  const archive = relay.report('retire', id, recipient);
+  let archive = relay.report('retire', id, recipient);
+  if (archive.status === 'SENDER_IDLE_REQUIRED') archive = relay.recordNativeResult(id, recipient, archive.nativeAction.id, {
+    content: [{ type: 'text', text: JSON.stringify({ polls: [{
+      schemaVersion: 1, thread: { id: sender, status: { type: 'idle' } },
+      latestTurn: { id: 'event-' + id, status: 'completed', error: null },
+    }] }) }], isError: false,
+  });
   relay.recordNative(id, recipient, { kind: 'archive', actionId: archive.nativeAction.id, taskId: sender, status: 'archived' });
   return { captured, read, archive };
 }
 export const cliPath = fileURLToPath(new URL('../bin/relay.mjs', import.meta.url));
+// Construct historical records for compatibility tests without changing the
+// production default. New-mode tests use fixture() directly.
+export function legacyFixture() {
+  const f = fixture();
+  const create = f.relay.newRecord.bind(f.relay);
+  f.relay.newRecord = (...args) => {
+    const record = create(...args);
+    record.report.notificationMode = 'advisory-once';
+    return record;
+  };
+  return f;
+}
 export function cliProcess(repo, operation, args = {}, path = cliPath, environment = {}) {
   const argv = [path, operation, '--repo', repo, ...Object.entries(args).flatMap(([k, v]) => [`--${k}`, String(v)])];
   const env = { ...process.env, ...environment };

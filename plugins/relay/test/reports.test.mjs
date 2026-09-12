@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Relay } from '../lib/relay.mjs';
-import { fixture, deliver } from './helpers.mjs';
+import { legacyFixture as fixture, deliver } from './helpers.mjs';
 
 test('exact recipient reads and explicitly acknowledges the frozen shared-storage report', () => {
   const f = fixture(); const { prepared, ready } = f.start();

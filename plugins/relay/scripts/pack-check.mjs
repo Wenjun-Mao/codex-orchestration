@@ -36,7 +36,7 @@ assert.match(deliverySkill, /host-provided `CODEX_THREAD_ID`/);
 assert.doesNotMatch(deliverySkill, /\]\(\.\.\/\.\.\/README\.md\)/);
 // Copy connected and reporting harnesses; their imports resolve to the relocated package.
 mkdirSync(join(unpacked, 'test'));
-for (const file of ['helpers.mjs', 'journey.test.mjs', 'native.test.mjs', 'reports.test.mjs', 'notification.test.mjs']) cpSync(join(source, 'test', file), join(unpacked, 'test', file), { recursive: false });
-const output = run(process.execPath, ['--test', join(unpacked, 'test/journey.test.mjs'), join(unpacked, 'test/native.test.mjs'), join(unpacked, 'test/reports.test.mjs'), join(unpacked, 'test/notification.test.mjs')], target);
+for (const file of ['helpers.mjs', 'journey.test.mjs', 'native.test.mjs', 'reports.test.mjs', 'notification.test.mjs', 'hook-queue.test.mjs']) cpSync(join(source, 'test', file), join(unpacked, 'test', file), { recursive: false });
+const output = run(process.execPath, ['--test', join(unpacked, 'test/journey.test.mjs'), join(unpacked, 'test/native.test.mjs'), join(unpacked, 'test/reports.test.mjs'), join(unpacked, 'test/notification.test.mjs'), join(unpacked, 'test/hook-queue.test.mjs')], target);
 process.stdout.write(output);
 process.stdout.write(JSON.stringify({ package: join(target, pack.filename), fileCount: files.length, packedBytes: pack.size, unpackedBytes: pack.unpackedSize, elapsedMs: Math.round(performance.now() - started), nativeQualification: 'not exercised; fixture observations only' }, null, 2) + '\n');

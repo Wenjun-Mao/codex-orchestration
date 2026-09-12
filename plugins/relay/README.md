@@ -1,6 +1,10 @@
 # Relay
 
-Relay 0.2.0 adds `relay:direct` and one-shot advisory notification. A bounded native
+The unreleased hook-owned reporting change replaces worker notification turns with
+one direct experimental queue submission. Its transport-only probe passed; full
+Relay lifecycle qualification is still pending. Installed 0.2.1 remains unchanged.
+
+Relay 0.2.0 added `relay:direct` and one-shot advisory notification. A bounded native
 test qualified idle-director wakeup, frozen report review and exact worker archival.
 Post-retirement successor preparation passed; this was not a fresh successor delivery.
 Notifications are not crash-proof and do not replace explicit result acceptance.
@@ -134,15 +138,23 @@ Reporting setup precedes write enablement. Release freezes sender, recipient,
 result revision and final correlation. The packaged `Stop` hook supplies
 `session_id`, `turn_id`, and exact `last_assistant_message` bytes after source
 release. It ignores other repositories, unbound tasks, continued stops, and
-unsealed results. The hook reads no transcript file and never calls native tools.
-For newly prepared notification-enabled assignments it issues one advisory-only
-Stop continuation after capturing the final; repeated events do not reissue it.
-The sender sends the generated hint once, records its result and stops. The director
+unsealed results. The hook reads no transcript file. New assignments persist the
+capture and one notification attempt, release the state lock, then submit a small
+read-report hint through the qualified local App Server queue. It never resumes a
+task or starts a turn itself. Repeated events do not reissue the send. Queue failure
+or crash can lose the wakeup, but preserves the report; no automatic retry occurs.
+An App binary version change requires transport requalification. Existing
+continuation-mode assignments keep their original one-shot worker action. The director
 can return idle after binding and resume on that hint to retrieve the frozen report.
 Read-only hook discovery never creates `.git/relay`; only an
 explicit `prepare` with a valid request contract initializes that namespace after
 the Flow exclusion check.
 Conflicting event IDs or bytes are rejected.
+
+Direct messages are for mid-work questions and answers; hook-owned reporting is
+for sealed completion. Ending an unsealed turn does not notify completion. A worker
+must wait for actual input before continuing dependent work; `wait_threads` is not
+a general reply mailbox. No guaranteed unattended reply-wait mechanism is claimed.
 
 The exact recipient runs `read-report`. This read-only command returns the frozen
 sender, recipient, assignment, result association, event, exact final bytes and

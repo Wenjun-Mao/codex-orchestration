@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { captureStopEvent } from '../lib/final-hook.mjs';
 import { normalizeNativeResult } from '../lib/native.mjs';
-import { fixture } from './helpers.mjs';
+import { legacyFixture as fixture } from './helpers.mjs';
 
 const result = value => ({
   content: [{ type: 'text', text: JSON.stringify(value) }],

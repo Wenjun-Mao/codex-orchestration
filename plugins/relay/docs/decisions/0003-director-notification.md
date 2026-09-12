@@ -1,5 +1,8 @@
 # 0003 — One advisory after genuine capture
 
+Superseded for new assignments by [0004](0004-hook-owned-completion.md), currently
+implemented in unreleased source. Retained for existing continuation-mode records.
+
 Accepted, 2026-09-12. A same-host RC1 test qualified genuine idle-director wakeup,
 shared report review and sender-idle-gated archival. This amends 0002's capture-only
 hook policy for newly prepared assignments. Crash-proof delivery is not promised.

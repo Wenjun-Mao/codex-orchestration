@@ -1,5 +1,19 @@
 import { randomUUID } from 'node:crypto';
 
+// Returned only by the transaction that first persists the attempt. Duplicate
+// events can read the report but cannot recreate the external send permission.
+export function prepareHookNotification(relay, record) {
+  const report = record.report;
+  if (report.notificationMode !== 'hook-queue-once' || report.notification) return null;
+  const id = randomUUID();
+  report.notification = { id, status: 'ambiguous', reason: 'attempt-persisted' };
+  return {
+    id, recipient: report.recipient, hostId: record.recipientHostId,
+    senderHostId: record.taskHostId,
+    text: `Relay completion advisory — not receipt or acceptance. A frozen report is available for assignment ${record.id}. Read it using:\n${relay.command('read-report', { assignment: record.id, actor: report.recipient })}\nReview before acceptance. Follow Relay's fresh sender-idle observation before archival.`,
+  };
+}
+
 // Persist the attempt in the capture transaction before continuing the sender.
 // A lost response must not cause another externally visible send.
 export function prepareAdvisory(relay, record) {

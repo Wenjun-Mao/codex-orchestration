@@ -37,7 +37,13 @@ test('connected CLI: preparation → local work → executor → verification �
       'association-digest': read.acknowledgement.associationDigest,
     });
     cli(repo, 'accept', { assignment: id, actor: recipient });
-    const archive = cli(repo, 'retire', { assignment: id, actor: recipient });
+    const idle = cli(repo, 'retire', { assignment: id, actor: recipient });
+    assert.equal(idle.status, 'SENDER_IDLE_REQUIRED');
+    const archive = cli(repo, 'record-native-result', { assignment: id, actor: recipient,
+      'action-id': idle.nativeAction.id, result: jsonFile({ content: [{ type: 'text', text: JSON.stringify({ polls: [{
+        schemaVersion: 1, thread: { id: sender, status: { type: 'idle' } },
+        latestTurn: { id: 'fixture-' + id, status: 'completed', error: null },
+      }] }) }], isError: false }) });
     assert.deepEqual(archive.nativeAction.args, { threadId: sender, archived: true });
     cli(repo, 'record-native', { assignment: id, actor: recipient, observation: jsonFile({ kind: 'archive', actionId: archive.nativeAction.id, taskId: sender, status: 'archived' }) });
   }

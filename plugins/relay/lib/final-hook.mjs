@@ -1,4 +1,5 @@
 import { Relay } from './relay.mjs';
+import { submitQueueNotification } from './queue-notification.mjs';
 
 export function captureStopEvent(event, { notify = false } = {}) {
   if (
@@ -34,5 +35,20 @@ export function captureStopEvent(event, { notify = false } = {}) {
     status: 'captured', assignment,
     eventId: event.turn_id, digest: captured.envelope.digest,
     ...(captured.hookOutput ? { hookOutput: captured.hookOutput } : {}),
+    ...(captured.notification ? { notification: captured.notification } : {}),
   };
+}
+
+export async function processStopEvent(event, { submit = submitQueueNotification } = {}) {
+  const captured = captureStopEvent(event, { notify: true });
+  if (!captured.notification) return captured;
+  // capture's transaction has committed and released its lock. An awakened
+  // recipient can now read/accept without competing with a long host call.
+  let outcome;
+  try { outcome = await submit(captured.notification); }
+  catch { outcome = { status: 'ambiguous', reason: 'transport-error' }; }
+  const relay = new Relay(event.cwd);
+  relay.report('observe-hook-notification', captured.assignment, event.session_id,
+    { id: captured.notification.id, ...outcome });
+  return { ...captured, notificationOutcome: outcome };
 }

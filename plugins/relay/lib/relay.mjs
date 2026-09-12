@@ -77,7 +77,7 @@ export class Relay {
       recipientHostId: parent ? null : (spec.recipientHostId ?? null),
       task: null, taskHostId: null, enabled: false, decision: null, outcome: null,
       creation: { id: randomUUID(), status: 'awaiting-observation', provisional: null },
-      report: { notificationMode: 'advisory-once', correlation: randomUUID(), sender: null, recipient: parent ? creator : spec.recipient, association: null, final: null, submission: null, receipt: null },
+      report: { notificationMode: 'hook-queue-once', correlation: randomUUID(), sender: null, recipient: parent ? creator : spec.recipient, association: null, final: null, submission: null, receipt: null },
     };
   }
   creationResponse(control, record) {

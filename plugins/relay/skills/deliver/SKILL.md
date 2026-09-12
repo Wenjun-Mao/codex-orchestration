@@ -25,11 +25,17 @@ the exact revision; do not supply PASS claims. A rejected or interrupted writer
 requires stopped writers and explicit source disposition. Preserve rejected and
 dirty work. Never use task cancellation or lock recovery as write permission.
 
-After source release, emit the genuine final. The trusted packaged Stop hook captures
-its exact task, turn and bytes against the frozen association. For notification-enabled
-assignments it may continue this sender once with a generated advisory-only native
-action. Follow that action once, record its result, then stop. No source writes,
-report recapture or send retries in this continuation. The exact recipient
+For a mid-work question or blocker, message the exact manager directly. Do not seal
+a result merely to ask a question. Stop dependent work until the answer arrives;
+`wait_threads` observes completion/attention, not an arbitrary reply mailbox. An
+unsealed turn ending is not a completion report; resume only on actual input.
+
+After source release, emit the genuine final and become idle. The trusted packaged
+Stop hook captures its exact task, turn and bytes, then notifies the manager once.
+Do not send a separate completion message or arrange your own reporting retry.
+Only older assignments frozen in continuation mode may issue a generated one-shot
+notification action; follow that exact action without source work or resend.
+The exact recipient
 uses the generated `read-report` command to retrieve those frozen shared-storage
 facts, then runs its generated `acknowledge` command. Reading, acknowledgement and
 product acceptance are separate. Native wait is optional notification and does not
