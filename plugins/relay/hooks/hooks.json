@@ -1,0 +1,17 @@
+{
+  "description": "Capture the exact final response for a source-released Relay task.",
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$PLUGIN_ROOT/bin/relay-final-hook.mjs\"",
+            "timeout": 3,
+            "statusMessage": "Capturing Relay task final"
+          }
+        ]
+      }
+    ]
+  }
+}

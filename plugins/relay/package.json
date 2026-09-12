@@ -1,0 +1,30 @@
+{
+  "name": "relay",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Same-host serial source coordination for Codex tasks",
+  "type": "module",
+  "bin": {
+    "relay": "bin/relay.mjs"
+  },
+  "scripts": {
+    "test": "node --test --test-concurrency=1 test/*.test.mjs",
+    "pack:check": "node scripts/pack-check.mjs",
+    "release:check": "npm test && npm run pack:check"
+  },
+  "engines": {
+    "node": ">=20.11"
+  },
+  "files": [
+    ".codex-plugin/plugin.json",
+    "bin/relay.mjs",
+    "bin/relay-final-hook.mjs",
+    "hooks/",
+    "lib/",
+    "skills/",
+    "docs/",
+    "README.md",
+    "CHANGELOG.md",
+    "runtime-files.json"
+  ]
+}
