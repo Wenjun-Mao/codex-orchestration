@@ -1,244 +1,220 @@
-# Serial-first delivery
+# Relay: lean serial-first successor
 
-Status: Review amendments approved; native feasibility probe authorized. Runtime
-implementation remains gated on the probe and explicit slice-inclusion decision.
-Probe result: [native local-surface feasibility passed](../field-tests/2026-09-11-serial-native-feasibility.md).
-This removes the immediate host feasibility blocker, not the Flow implementation
-and connected acceptance requirements. Implementation has not been dispatched.
-Priority: Before new preserve-and-reset implementation. Version assigned at release,
-not used as an architectural constraint.
+Status: **Approved for checkpoint 1 assessment**. The user approved the successor
+direction, no feature-parity commitment, Relay naming, and the bounded assessment
+stage. The resulting minimal contract and implementation remain gated on review
+and approval. This remains the single successor plan,
+replacing the earlier Flow-adaptation proposal at this path. Completed native
+probe evidence remains valid within its recorded limits.
 
 ## Outcome
 
-Make the user's normal, sequential development pattern the simplest supported
-path: one retained checkout, one source writer at a time, inexpensive delegated
-execution when useful, verified handoff, and finished-task archival without Git
-reclamation. Separate worktrees become an explicit isolation/concurrency choice,
-not a prerequisite for every coordinator and executor.
+Make ordinary sequential development inexpensive to start and dependable to
+finish: one retained checkout, one current source writer, optional cheaper
+sequential executors, verified results, reliable reporting, task-only archival,
+and useful next-assignment admission.
 
-Success means removing unnecessary branch activation, integration, preservation-
-transfer and worktree cleanup from serial delivery, not wrapping those same steps
-in a new mode. Read-only review can still run concurrently.
+**Relay is a lifecycle and agent-interface redesign with selective reuse, not
+Flow with shorter skills or a compatibility wrapper.** Success means fewer
+necessary concepts and operations, not feature parity or a LOC target.
+Codex Orchestration is the umbrella project; Flow and Relay are plugins
+([ADR 0074](../adr/0074-relay-successor-identity.md)).
 
-## Diagnosis and evidence
+## Evidence and uncertainty
 
-The user estimates roughly 98% of their work is sequential. Current source assumes
-more isolation than that normal case needs:
-
-- `lib/core/task-launch.mjs` requires host-worktree execution, a distinct reserved
-  executor branch, and a pristine linked checkout separate from coordinator and
-  primary. Its activation and Git receipt paths enforce those assumptions.
-- `lib/iteration-registry.mjs` registers coordinators as disposable and refuses
-  primary-checkout reclamation. Director/coordinator skills do not explicitly
-  require separate checkouts, creating a dispatch/closeout mismatch.
-- Local coordinator work already has verified baseline/result and write-scope
-  checks, but its record locks do not establish exclusive source ownership across
-  a coordinator and its executors.
-- Linked worktrees share the Git common directory and Flow state. They do not
-  independently isolate lifecycle metadata or recovery.
-
-These observations justify changing execution and resource ownership together.
-They do not prove host support for shared-checkout tasks or enforceable exclusion
-of arbitrary filesystem writers. Those boundaries must be tested explicitly.
+- The [native same-checkout probe](../field-tests/2026-09-11-serial-native-feasibility.md)
+  passed coordinator/executor/successor behavior and retained-source archival.
+  Do not repeat it without a relevant host change. It does not prove Relay's
+  ownership, reporting, recovery, or installed coexistence.
+- The [consultation synthesis](2026-09-12-serial-architecture-consultation-synthesis.md)
+  identifies reporting extraction as the unresolved dependency boundary.
+  Existing reporting imports lifecycle owners and recursively stages `lib`;
+  copying a few entrypoints does not prove a small independent package.
+- [Observed startup overhead](../field-tests/2026-09-12-coordinator-startup-overhead.md)
+  includes repeated reads, implementation/schema searches and a handwritten
+  153-line activation request before registration. The user's >100K context
+  estimate is unverified; the interface failure does not depend on that number.
+- Plotloom's no-work settlement succeeded, but an older completed/cancelled
+  assignment with a retained checkout still blocked the newer reader. Test
+  combined historical journeys, not only isolated repairs.
+- The parked repair suite passed 254/254 in 430.021 seconds. That is a particular
+  candidate measurement, not a universal Flow baseline. Relay must not inherit
+  or duplicate the entire legacy suite.
 
 ## Scope and non-goals
 
-Provide a coherent serial path through preparation, native task creation,
-activation, execution, verification, report delivery, director acceptance, task
-archival and subsequent assignment admission. Include coordinator-only delivery
-and coordinator → serial executor → coordinator handoff in the same retained
-checkout. Keep one coordinator per serial delivery scope.
+Include coordinator-only delivery and coordinator → sequential executor →
+coordinator verification in the same retained checkout. Serial does not mean
+solo. Read-only review may overlap against stable committed evidence or a
+reserved verification checkpoint; a named commit does not freeze working-tree reads.
 
-Deliver two connected slices within this architectural plan: A is retained-primary
-coordination, task-only archival and a useful successor (with existing isolated
-delegation available); B adds shared-checkout executors. Probe both upfront.
-Prefer delivering both together when feasible. A is independently shippable only
-after an explicit scope decision, not silently relabelled as full serial delivery.
-This division does not require intermediate public releases.
+No concurrent writers, isolated-worktree mode, mixed execution modes, cross-host
+support, live journal migration, or same-repository simultaneous Flow/Relay
+control. No dashboard, daemon, general workflow framework, feature-parity program,
+or automated broad reset.
 
-Reuse task identity, reporting, receipts, path checks and verification where their
-semantics remain valid. Keep isolated execution available by explicit selection;
-share common authority/verification logic rather than build two lifecycle engines.
+Flow stays frozen for existing obligations, with narrowly justified protection
+fixes only. Park local 0.9.14-rc.1; it is not a prerequisite release. Defer expanded
+preserve-and-reset work and Flow's naming cleanup until Relay is stable and usable.
+Do not advertise rarely exercised legacy features as a proven advanced fallback.
 
-Exclude live migration of running assignments, automatic reset, new dashboards,
-daemons, broad test-framework rewrites, cross-host execution and arbitrary-agent
-sandboxing. No pilot changes, native task creation, archival or release is
-authorized by writing this plan. Preserve the published package and current runs.
+## Consequential constraints
 
-## Consequential decisions
-
-1. **Checkout and branch are separate choices.** Default to the existing retained
-   primary checkout and its deliberately selected branch. If that is `main`,
-   serial commits may remain on `main`; pushing/publishing remains separately
-   authorized. An explicitly requested delivery branch in that same checkout
-   is compatible. Never silently switch branches or create a worktree to satisfy
-   an old disposable-resource assumption. Dirty entry state stops for preservation
-   and reconciliation; no automatic stash, commit or deletion.
-2. **One admitted writer, with honest enforcement boundaries.** Atomically grant
-   source-write ownership to one exact task/claim for the serial repository scope,
-   including across package namespaces sharing its Git common directory. Reject
-   overlapping starts and stale handoffs. Reuse existing ownership primitives
-   where sufficient; select the minimum durable representation in the ADR.
-   A record lock or instruction alone is not a lifetime write permit. Flow must
-   enforce admission and handoff, but cannot claim to block arbitrary shell edits,
-   editors or already-running commands. Stop relevant background writers and
-   detect source drift before accepting results. Directors must not edit the
-   shared repository while another task owns it, including planning files.
-   Reuse enclosing run/assignment admission and one current-writer reference,
-   with an exact claim and transfer generation. Every write-enabling start/resume
-   checks current permission: historical activation replay cannot resurrect it.
-3. **Explicit serial handoff.** The coordinator releases source ownership only
-   after a verified checkpoint; an executor acquires against that exact baseline.
-   During executor ownership the coordinator may discuss, inspect stable evidence
-   or wait, but not edit, switch Git state or run source-mutating commands. After
-   the executor's durable result, transfer into an exclusive coordinator
-   verification reservation, not a generally available gap. Atomically name the
-   exact intended successor/checkpoint; retries reconcile that same transfer.
-   Verification fixes the subject revision, branch and clean state before and
-   after checks; checks must not change source. A later coordinator edit requires
-   a new current claim. Receipt arrival or idleness alone is not a transfer.
-   Background tool completion must be accounted for before release.
-4. **Direct results, not synthetic integration.** A serial executor's accepted
-   committed result is already in the retained checkout. Validate its identity,
-   baseline, ancestry, write scope and tests without a branch merge, cherry-pick
-   or invented integration record. Preserve no-change and failed/dirty outcomes
-   truthfully. Shared verification should serve both local and delegated work,
-   with execution provenance intact. Read-only checks that need stable source
-   bytes use a named committed revision or wait for a checkpoint.
-   A commit named in prose does not freeze reads from a moving working tree.
-   Preserve per-commit scope checks, including changes later reverted. Introduce
-   genuine direct-result disposition through dependencies, attribution, audit
-   and closeout; never reattribute executor commits as coordinator work.
-5. **Tasks are disposable; the checkout is not.** Record retained resource
-   ownership explicitly. Archive eligible completed tasks and retire their routes
-   without deleting the retained checkout or its branch. Do not infer resource
-   disposal from role or task completion. Existing isolated tasks retain their
-   exact cleanup rules. Real native archive behavior must support this distinction;
-   if it cannot, stop and reconsider the surface rather than weakening preservation.
-   Checkout retention is distinct from existing task-member `retained` and from
-   unresolved execution obligations. Bind it into versioned prepared authority.
-   Update eligibility, archive observation, run/iteration completion and historical
-   successor readers together. Preserve each accepted result revision after later
-   owners advance HEAD; history must not require the retained branch to disappear
-   or remain forever frozen. Resolve required final reporting before route closure;
-   source release does not retire the reporter or prevent its final delivery.
-6. **Failure cannot silently transfer ownership.** Preserve partial edits and
-   evidence. A crash, timeout, final message or archive does not automatically
-   release a writer. Supported recovery must establish the old writer is inactive,
-   reconcile its result or failed state, and revalidate the checkout before a new
-   owner starts. Prefer the smallest explicit owner recovery over leases, timers
-   or another recovery state machine. Do not force successful completion to move on.
-   Unlike isolated work, a rejected direct commit already occupies the selected
-   branch. Block dependents and ordinary continuation until explicitly authorized
-   repair reconciles the source. Releasing failed ownership is not successful
-   dependency acceptance; no automatic rollback, stash or preservation commit.
-7. **Compatibility is bounded.** Existing assignments finish under their pinned
-   contracts; do not reinterpret disposable resources as retained. New serial
-   assignments explicitly declare retained ownership. Inventory existing active
-   writers before admission so new authority cannot overlap old isolated work.
-   Serial-to-isolated switching requires a settled checkpoint and explicit plan
-   choice, not an executor silently switching surfaces mid-assignment.
-   Test old/new admission in both orders, including closed execution with pending
-   assignment and abandoned obligations. Older pinned code cannot be assumed to
-   honor new permits; declare no coexistence where mutual exclusion is unproven.
+1. **Minimum authoritative facts.** Design from the journey before choosing modules.
+   Do not reproduce overlapping assignment/run/iteration/cleanup completion states
+   merely because Flow has them. Keep independently necessary distinctions:
+   writer release, result acceptance and final-report delivery are different facts.
+2. **One current writer, including verification.** Every start/resume/handoff checks
+   current permission. Transfer an exact checkpoint to its intended next owner;
+   avoid an unowned verification gap. Replays reconcile, never resurrect stale
+   ownership. This is cooperative enforcement, not filesystem sandboxing. Account
+   for background writers and source drift. Directors must not edit the shared
+   checkout, including plans, while another task owns it.
+3. **Retain source; retire tasks.** Use the existing checkout and explicitly selected
+   branch, including `main`. No mandatory branch switch, worktree, synthetic merge,
+   preservation transfer or Git reclamation. Archive exact eligible tasks without
+   deleting source. Historical results remain valid after successor commits.
+4. **Direct-result verification.** Share the necessary identity, baseline, committed
+   scope and test checks between local and delegated work, preserving authorship.
+   Check intermediate disallowed commits even if reverted. Bind verification to
+   the exact tested revision; checks that change clean HEAD cannot certify the new
+   revision. No fabricated executor integration or coordinator attribution.
+5. **Honest failure retirement.** Failed/interrupted work can be safely retired
+   without acceptance or satisfying dependencies. Preserve dirty/rejected work,
+   establish quiescence and explicitly reconcile the next writer. No automatic
+   rollback, stash, deletion or restart. Cancellation/archival alone is not source
+   safety or permission to continue.
+6. **Usable startup.** Prepared briefs provide exact public commands; code generates
+   mechanical identities, bindings and request fields. Agents supply genuine work
+   decisions, not rediscover schemas. Normal start/resume requires no implementation
+   reads. Return compact actionable summaries; detailed diagnostics are opt-in.
+   A short wrapper around the old lifecycle does not satisfy this requirement.
+7. **Independent extraction and package.** Justify each reused primitive's semantic
+   fit, transitive imports and packaged contents. Exclude Flow's lifecycle and
+   compatibility engines; do not introduce a shared evolving framework for both
+   products. Reuse needs relevant tests. Prefer independently packaged
+   `plugins/relay` in the umbrella repository; confirm layout at checkpoint 1
+   without renaming or repackaging legacy Flow.
+8. **Reporting is separate from source ownership.** Bind exact sender/recipient;
+   preserve pending finals after writer release. Queue acceptance is not delivery.
+   Late/duplicate/foreign-hook events cannot reauthorize work or redirect reports
+   to successors. Reuse only transport/validation that stands independently of
+   legacy launch, iteration and cleanup machinery.
+9. **Adoption at safe boundaries.** Existing Flow work finishes or undergoes a
+   separately authorized preservation-first cleanup before Relay adoption.
+   Distinct plugin names/state directories do not prove mutual exclusion.
+   No dual control of one repository. Same-App coexistence across separate
+   repositories requires a native test before shared installation.
 
 ## Checkpoints
 
-### 1. Host feasibility and minimal contract
+### 1. Bounded extraction assessment and minimal contract
 
-Use one disposable repository, native local tasks C/E and successor C2. Confirm
-distinct actual task identities at the same canonical checkout, common directory
-and selected branch. C commits a checkpoint, E makes a sequential follow-up, and
-C remains usable after E is archived. Archive C and have C2 continue useful work.
-Record refs, HEAD, worktree inventory and sentinel bytes around each archive;
-make exactly one native call per intended creation/archive. Ambiguity stays pending.
-No candidate installation or Flow activation is needed to test native behavior.
-Native messages/observations prove only native feasibility, not authenticated
-Flow route delivery or a successful Flow lifecycle.
-If the native surface cannot support retained-checkout tasks, return the evidence
-and options before implementing a runtime design around that assumption.
+Produce one concise source-backed decision record: required responsibilities,
+minimal facts/transitions, components to reuse/rewrite/remove, transitive package
+boundary, public startup interface and unresolved host assumptions. Use the existing
+adaptation map as comparison, not a second implementation plan. Ask what Relay
+needs, not how to retain everything Flow does.
 
-Produce one concise ADR mapping the existing stages to keep, remove or change.
-Define the minimum writer ownership/handoff contract, retained resource semantics,
-serial result disposition and compatibility boundary. Identify obsolete serial
-branch/integration/cleanup obligations and their deletion points. Stop for review
-if this requires a second workflow engine or cannot establish reliable admission.
+Walk cold start from the proposed brief. Distinguish code-generated values,
+agent choices and host observations. Agree a measurable budget for plugin-added
+startup context, calls and elapsed time before implementation; separate product
+reading and ambient App context. Zero internal-source reads on successful startup
+is already a firm acceptance requirement.
 
-### 2. One connected serial implementation
+After that concrete draft, request two complementary Pro reviews:
 
-After a recorded probe/inclusion decision, implement slice A end to end and slice
-B when included, without a succession of foundation releases. Full B: prepare → coordinator local work
-→ executor handoff and result → coordinator verification → final reporting and
-acceptance → task-only closeout → fresh serial assignment. Use the same core
-checks for the coordinator-only path. Update generated briefs, schemas, skills
-and CLI boundaries together; do not leave prose permitting what runtime rejects.
+- **Lifecycle/recovery:** challenge unnecessary states and owners; check interrupted
+  transfers, honest failure retirement, reporting and useful successor safety.
+- **Agent interface/lightness:** walk startup and ordinary failure using the public
+  surface alone; challenge schema reconstruction, context/call cost and hidden
+  legacy package dependencies. Do not request feature parity.
 
-Use existing fixtures and focused tests. After one instrument-only checkpoint,
-attempt the primary connected journey; do not accumulate validators without
-exercising delivery. Retain isolated-mode regression coverage and remove obsolete
-serial-path test setup rather than duplicating the full suite.
+Use one self-contained copy/paste prompt per reviewer, GitHub-only access and no
+assumed memory. Publish the approved source/evidence packet before calling prompts
+ready; this draft authorizes neither pushing nor browser/account operation.
+The user subsequently authorized publishing the assessment packet on a review
+branch and preparing the two prompts. Preserve returned reports and distinguish
+hypotheses from verified source facts.
+No further broad audit or duplicated consensus exercise.
 
-### 3. Isolated live proof and rollout
+At the gate, approve the minimum contract/build scope, revise a specific disputed
+boundary, or stop. If extraction reproduces Flow, reconsider the design before
+implementation rather than build generic infrastructure to rescue it.
 
-Run the complete serial journey in a disposable project, including real local
-coordinator/executor tasks, native reporting and task archival. Verify retained
-source, refs and checkout after each archive and then complete a useful successor.
-Keep the outer delivery runtime stable; stage the candidate separately. Coordinate
-any shared install/restart with active projects. Release one useful validated
-package without republishing intermediate versions. Broaden pilots only after
-explicit approval; no automatic conversion of current projects.
+### 2. One connected source implementation
+
+Implement local work → sequential executor → verification → final reporting →
+acceptance → task-only archival → useful successor. Coordinator-only delivery
+uses the same semantics. Build a useful vertical slice early, not several
+foundation releases before exercising delivery.
+
+Add one honest failure/interruption journey and targeted adversarial boundary
+tests. After one supporting-instrument checkpoint, attempt the connected outcome
+next or replan; further instrumentation needs a demonstrated unmet causal question.
+Do not use the unfinished successor to control its own initial development.
+
+### 3. Native proof and controlled pilot
+
+In a disposable repository run the connected solo and delegated journeys with
+real tasks, real idle-final delivery and task archival, then a useful successor.
+Exercise bounded failure recovery. Source and refs must survive; old history must
+not require recreating, freezing or deleting the retained checkout.
+
+Keep the outer delivery process stable and candidate staged separately. Test
+foreign-hook harmlessness and pending old reporting before shared installation.
+Coordinate any install/restart with active projects. After acceptance, authorize
+one real-project pilot at a completed-work boundary; broader rollout follows a
+complete pilot round, not just startup success. Release one useful validated
+package, without unnecessary intermediate publishing.
 
 ## Acceptance evidence
 
-- Both coordinator-only and coordinator/executor serial journeys complete with
-  no additional Git worktree, executor branch, synthetic merge or retained-checkout
-  deletion. Source commits are correctly attributed and verified.
-- Competing writer starts, stale handoffs and old/new namespace overlap are
-  rejected. Crash/dirty-result cases do not silently admit another writer or lose
-  edits. Source drift and background-writer limitations are documented honestly.
-- At least one interruption during ownership transfer is resumed from existing
-  durable facts without two writers or falsely completed work.
-- Stale activation replay cannot regain transferred permission. A check that
-  advances clean HEAD cannot certify the new revision from earlier test results.
-  Dirty/rejected direct work remains preserved and non-unblocking.
-- Exact task identity and reporting remain valid when tasks share a path; path
-  equality is not identity. Test stale/late reports and same-path route/locator
-  discovery so one task cannot consume another's result or retirement authority.
-- Native archival leaves the retained checkout, branch and useful bytes intact;
-  only eligible exact task records/routes retire. Ambiguous archive outcomes are
-  observed, not replayed. Successor admission works after full closeout.
-- The explicit isolated path and pinned historical assignments keep their
-  existing semantics. No mass cleanup, journal rewrite or silent mode conversion.
-- Historical retained results remain valid after successor commits. Delayed final
-  capture is handled before reporter retirement, separately from writer release.
-- If only slice A is approved for delivery, report isolated-executor resource
-  costs honestly; do not claim the no-extra-worktree B acceptance requirement met.
-- Report removed stages/resources and actual user interventions versus the old
-  isolated journey. Report test elapsed time; no arbitrary LOC or speed target
-  and no claim that fewer mechanisms alone proves correctness.
-- Focused checks first; one proportionate final combined suite. Distinguish
-  source tests, native feasibility and full live lifecycle evidence. Do not claim
-  uninterrupted success when a canary required manual repair.
+- A fresh coordinator starts from the brief/public interface without internal
+  code searches or handwritten protocol boilerplate. Measure context, calls and
+  elapsed time against checkpoint-1 budgets. Disclose manual recovery; do not
+  label a repaired canary uninterrupted success.
+- Solo and sequential-executor journeys use no extra worktrees/branches,
+  synthetic integrations or deletion of retained source.
+- Competing writers, stale resumes, interrupted transfers and source-mutating
+  checks cannot silently grant permission or produce accepted results.
+- Combined history containing completed/cancelled assignments and an interrupted
+  unstarted assignment permits legitimate successor work after explicit recovery,
+  without rewriting outcomes or erasing unrelated history. Pending ownership or
+  reporting blocks precisely the operations it governs.
+- Real reports reach the correct owner; acceptance and eligible task archival
+  complete. Observe ambiguous host results without replay. Synthetic hook calls
+  are not genuine idle-final evidence.
+- Package inspection proves the dependency cut; small entrypoint size does not
+  conceal all-of-`lib` staging or legacy runtime imports.
+- Cheap pure checks cover pure rules; a small set of real-Git/CLI journeys covers
+  boundaries that need them. Report timings and duplicate coverage removed.
+  Run affected tests during development and one proportionate final combined suite;
+  rerun for changed risk or missing results, not every metadata/docs adjustment.
+- Source tests, native coexistence and live pilot evidence remain distinct.
 
 ## Execution authority and escalation
 
-The user authorized plan revision and the native probe, including its exact
-disposable local task creation and archival. No Plotloom task, source, installed
-plugin, shared setting, marketplace or restart is in scope. The director runs the
-probe and retains its evidence externally. Runtime implementation is not dispatched
-by this approval. After the gate/inclusion decision, the director prepares one
-assignment for a Sol-high coordinator because this changes interacting ownership
-and lifecycle contracts. Use cheaper workers for bounded independent work when
-useful; collect native subagent results before their owner ends its turn. The
-director owns acceptance and any separate live canary coordinator assignment.
+Current authorization: checkpoint 1 source/dependency assessment, planning and
+decision documents, with bounded read-only native support collected by the
+director. This assessment uses ordinary read-only source inspection, not a new
+Flow execution run or a claim of Flow-managed delivery. No implementation,
+installation, migration, Plotloom changes or cleanup is authorized. Subsequent
+authorization permits the assessment packet and its source anchor to be pushed
+on a review branch; it does not authorize a release or merge to main.
+The completed probe and incident-specific exception do not authorize the build.
 
-Use the currently supported isolated delivery path to implement this change;
-do not depend on the unfinished serial runtime to deliver itself. Escalate for
-unsafe host archival, unprovable write ownership, unavoidable dual lifecycle
-engines, migration of live state, broader recovery semantics or changed acceptance.
+The director owns intent, synthesis and acceptance. Delegate the approved bounded
+assessment, then after the design gate appoint one delivery owner for the approved connected
+build. Use explicit selectors and cheaper workers for bounded work when useful;
+do not default to solo or maximal staffing. Collect native subagent results before
+returning idle. A live canary coordinator has explicit director ownership.
 
-## Deferred work
+Flow's plan skill documents intent, not Relay's runtime architecture. Before
+dispatch, explicitly choose an established delivery path or authorize source-only
+native delegation. Do not force self-development through blocked legacy state.
 
-The preserve-and-reset plan is paused, not discarded. Existing public recovery
-commands remain available under their current limits. Reassess that plan after
-the serial path reveals which failure and cleanup obligations still exist.
+Escalate for additional lifecycle engines, unavoidable legacy dependencies,
+unproven source/report safety, broader compatibility, host behavior that threatens
+retained source, changes to active projects or material scope growth. Keep the
+legacy plugin lane frozen rather than repair it opportunistically during Relay.
