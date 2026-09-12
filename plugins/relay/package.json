@@ -1,0 +1,27 @@
+{
+  "name": "relay",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Independent serial source coordination; native qualification pending",
+  "type": "module",
+  "bin": {
+    "relay": "bin/relay.mjs"
+  },
+  "scripts": {
+    "test": "node --test --test-concurrency=1 test/*.test.mjs",
+    "pack:check": "node scripts/pack-check.mjs"
+  },
+  "engines": {
+    "node": ">=20.11"
+  },
+  "files": [
+    ".codex-plugin/plugin.json",
+    "bin/relay.mjs",
+    "lib/",
+    "skills/",
+    "docs/",
+    "README.md",
+    "CHANGELOG.md",
+    "runtime-files.json"
+  ]
+}

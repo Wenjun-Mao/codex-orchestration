@@ -1,0 +1,15 @@
+[
+  ".codex-plugin/plugin.json",
+  "CHANGELOG.md",
+  "README.md",
+  "bin/relay.mjs",
+  "docs/acceptance.md",
+  "docs/decisions/0001-source-contract.md",
+  "lib/relay.mjs",
+  "lib/reports.mjs",
+  "lib/source.mjs",
+  "lib/store.mjs",
+  "package.json",
+  "runtime-files.json",
+  "skills/deliver/SKILL.md"
+]
