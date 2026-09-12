@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.3.1-rc.1 — Stop reporting independent of acceptance (candidate)
+## 0.3.1 — Stop reporting independent of acceptance
 
 - Notify the manager of unsealed worker Stops with exact text and separate system
   status, without granting source release, acceptance or cleanup.
