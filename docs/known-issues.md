@@ -333,6 +333,32 @@ current [refresh contract](../lib/compat/refresh.mjs) enforces exact replacement
 coverage and semantic equivalence. No journal edits, replacement tasks, product
 acceptance or destructive cleanup were performed for this diagnosis.
 
+### KI-12 — Existing Flow projects lack a clear Relay adoption entrypoint
+
+**Evidence: source-confirmed admission restriction; Plotloom readiness failure
+reported by its director (2026-09-12).** Relay `lib/source.mjs:refuseFlow`
+rejects any Git-common-directory `codex-flow` namespace, including historical
+state. Read-only Relay source availability is not admission readiness.
+
+**Category / cause:** migration usability and readiness-contract gap. The deliberate
+dual-control exclusion has no concise user-facing adoption entrypoint; ordinary
+Flow completion alone does not remove its historical namespace. This is not
+evidence of lost product work or a reason to weaken the exclusion.
+
+- [ ] **Flow — transition eligibility pending:** inspect the repository-scoped
+  `unplug plan`, active writers, report/archive obligations and source preservation;
+  approve exact targets/digest before applying. Preserve records externally and
+  leave unrelated repositories, protected refs and product source untouched.
+- [ ] **Relay — adoption guidance pending:** provide a lean readiness/adoption
+  entrypoint distinguishing source availability from admission readiness, routing
+  existing Flow state to separately authorized preservation-first retirement.
+
+**Fix location / closure:** director-facing readiness/adoption guidance, not a
+registry deletion shortcut or legacy journal importer. Verify one real transition
+preserves source and historical evidence, resolves live obligations, and permits
+normal Relay admission without bypasses. Plotloom is the pending field case;
+neither migration nor a general fix is claimed complete.
+
 ### KI-11 — Post-Stop capture has no non-reactivating sender submission path
 
 **Evidence: source-confirmed Relay ordering gap, exposed during live qualification.**
