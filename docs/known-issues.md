@@ -126,9 +126,11 @@ has durable authority but no eligible unsuccessful-settlement path in installed
 0.9.13. **Fix location / closure:** explicit never-enabled settlement, not a blanket
 fence waiver. Test interruption, late starts and real overlapping successor work.
 
-- [ ] **Flow — implemented, unreleased:** parked `18b1246` / 0.9.14-rc.1 adds narrow
-  settlement. Recorded candidate verification: 254/254; bounded cross-version
-  admission passed. It does not resolve started work or all historical blockers.
+- [ ] **Flow — patch discarded by user decision, 2026-09-12:** unreleased
+  `18b1246` / 0.9.14-rc.1 was not merged; its last branch was deleted. Historical
+  candidate checks were 254/254 with bounded cross-version admission, not an
+  installed fix. No further settlement patch is planned: personal-project resets
+  use the [cheap operator-disposal path](adr/0075-personal-flow-to-relay-adoption.md).
 - [ ] **Relay — prevention required:** revoke never-write-enabled reservations
   without fabricating success; reject late starts and retain orphan-task facts.
 

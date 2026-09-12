@@ -3,6 +3,12 @@
 Status: accepted, 2026-09-12. Scope: the maintainer's own projects when adopting
 Relay; not automatic migration or blanket cleanup of other repositories.
 
+The user reaffirmed this default for future unplug/restart requests and explicitly
+discarded the unreleased Flow settlement patch on 2026-09-12. Repairing that old
+lifecycle is not prerequisite work for a requested clean start. Relay state disposal
+likewise requires reset intent and exact repository scope; ordinary completion is
+not an unplug request.
+
 ## Decision
 
 The user approved operator disposal as the default after Plotloom's successful
