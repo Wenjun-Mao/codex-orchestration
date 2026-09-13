@@ -13,13 +13,14 @@ export async function submitQueueNotification(request, {
   spawnProcess = spawn, deadlineMs = 6000, cleanupMs = 500, outputLimit = Math.max(65536, Buffer.byteLength(typeof request.text === 'string' ? request.text : '') * 6 + 65536),
 } = {}) {
   const uncertain = reason => ({ status: 'ambiguous', reason });
-  if (!uuid.test(request.id) || !uuid.test(request.recipient)
+  if (!uuid.test(request.id) || !uuid.test(request.recipient) || !uuid.test(request.sender)
     || typeof request.text !== 'string') return uncertain('invalid-queue-request');
   // Missing host echoes are allowed by the existing same-host assignment
   // contract; an explicit remote identity is never routed through local IPC.
   if ([request.hostId, request.senderHostId].some(host => host != null && host !== 'local')) return uncertain('unsupported-host');
   return new Promise(resolve => {
-    let child, buffer = '', bytes = 0, sent = false, finishing = false;
+    let child, buffer = '', bytes = 0, sent = false, queuedRequest = false, finishing = false;
+    let messageText;
     let outcome = uncertain('transport-closed'), deadline, killTimer, settleTimer;
     const decoder = new StringDecoder('utf8');
     const finish = result => {
@@ -73,15 +74,22 @@ export async function submitQueueNotification(request, {
           }
           send({ method: 'initialized' });
           sent = true;
+          send({ id: 3, method: 'thread/read', params: { threadId: request.sender, includeTurns: false } });
+        } else if (value.id === 3 && sent && !queuedRequest) {
+          const thread = value.result?.thread;
+          const name = !value.error && thread?.id === request.sender && typeof thread.name === 'string'
+            ? thread.name.replace(/[\r\n\u2028\u2029]+/g, ' ').trim() : '';
+          messageText = `From: ${name || request.sender}\n\n${request.text}`;
+          queuedRequest = true;
           send({ id: 2, method: 'thread/queue/add', params: {
             threadId: request.recipient, clientUserMessageId: request.id,
-            input: [{ type: 'text', text: request.text }],
+            input: [{ type: 'text', text: messageText }],
           } });
-        } else if (value.id === 2 && sent) {
+        } else if (value.id === 2 && queuedRequest) {
           const queued = value.result?.queuedSubmission;
           const exact = !value.error && uuid.test(queued?.id)
             && queued.clientUserMessageId === request.id && queued.input?.length === 1
-            && Array.isArray(queued.input) && queued.input[0]?.type === 'text' && queued.input[0].text === request.text;
+            && Array.isArray(queued.input) && queued.input[0]?.type === 'text' && queued.input[0].text === messageText;
           finish(exact ? { status: 'queued', reason: 'exact-queue-response' } : uncertain('queue-response-unconfirmed'));
         }
       }

@@ -1,7 +1,7 @@
 # Relay
 
 Relay provides same-host serial source work. Its Stop hook sends the worker’s final
-text unchanged to its manager: no stored report, added status text, retrieval command,
+text unchanged to its manager, preceded by `From: <task title>`: no stored report, added status text, retrieval command,
 or worker continuation. Product verification and task retirement are separate.
 Use `relay:plan`, `relay:direct`, and `relay:deliver` for planning, direction, and delivery.
 
@@ -108,8 +108,11 @@ place; inspect and repair under current write permission, or explicitly recover.
 ## Reporting and task retirement
 
 The Stop hook reads the task-to-manager route and sends `last_assistant_message`
-unchanged through the native queue. It does not inspect verification, store the
-message, modify assignment state, add text, or ask the worker for another turn.
+unchanged through the native queue, preceded by `From: <current task title>` and
+a blank line. Title metadata is read without conversation history on the same
+connection; an unavailable title falls back to the task ID. It does not inspect
+verification, store the message, modify assignment state, add status text, or ask
+the worker for another turn.
 Unbound and archived tasks and continuation stops are ignored. Repeated native
 events use the same client-message ID; there is no local delivery journal or retry
 loop. A failed send is logged to stderr. Inspect the original task if needed.

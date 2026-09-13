@@ -25,3 +25,9 @@ upgrade. No crash-proof or exactly-once delivery claim is made.
 Tests: exact Unicode/newline forwarding, zero disk writes, unsealed/failed source,
 old routes, unrelated/archived tasks, native response handling, and independent
 product-review/retirement journeys.
+
+User-approved 0.3.3 amendment: add only `From: <current task title>` and a blank
+line before the unchanged body. Fetch `thread.name` using metadata-only
+`thread/read` on the existing native connection; use the sender ID when no title
+is available. Do not infer a role, store titles/messages, or load conversation
+history. Collapse line breaks in a title so attribution remains one line.

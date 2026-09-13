@@ -23,7 +23,7 @@ export function captureStopEvent(event) {
   const hex = createHash('sha256').update(JSON.stringify([assignment, event.session_id, event.turn_id])).digest('hex');
   const id = `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-8${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
   return { status: 'ready', notification: {
-    id, recipient: record.recipient, hostId: record.recipientHostId,
+    id, sender: event.session_id, recipient: record.recipient, hostId: record.recipientHostId,
     senderHostId: record.taskHostId, text: event.last_assistant_message,
   } };
 }

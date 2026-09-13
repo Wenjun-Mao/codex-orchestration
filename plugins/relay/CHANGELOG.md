@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.3
+
+- Prefix forwarded finals with `From: <current task title>` and a blank line;
+  leave the report body unchanged. Use the task ID if its title is unavailable.
+- Read title metadata through the existing native connection; no report storage.
+
 ## 0.3.2
 
 - Send worker final text unchanged from the Stop hook, without report persistence,
