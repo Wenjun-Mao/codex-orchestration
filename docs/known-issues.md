@@ -14,8 +14,10 @@
 - [x] Source-confirmed instruction mismatch: scratch files were required outside
   the checkout although verification already excludes Git-ignored files. Guidance
   now defaults to `.local/relay/`; regression checks ignored versus ordinary writes.
-- [ ] Installation/live project use of 0.3.4: deferred until a quiet checkpoint.
-  Source and relocated-package proof do not claim live task recovery.
+- [x] Installed 0.3.4 after Plotloom confirmed its Relay lane had no active assignment
+  and was paused; 31 artifact/source/cache files match apart from cachebuster.
+- [ ] Live project use of the new transitions: source and relocated-package proof
+  do not claim live task recovery. Plotloom source/state remain untouched.
 
 See Relay decision `plugins/relay/docs/decisions/0007-bounded-maintenance.md`.
 These corrections do not address lost native creation output or change messaging.

@@ -15,6 +15,9 @@ late-binding refusal, old null idle observation rejection, parent cleanup releas
 forward adoption with preserved cleanup, and ignored scratch verification behavior.
 Native observations in the harness are fixtures; this is not live App recovery proof.
 
-Installation remains deferred pending a quiet project checkpoint. Existing active
-assignment paths and installed 0.3.3 remain unchanged. No source-history migration,
-registry reset, home-directory cleanup, or npm publication is part of this patch.
+Installed `0.3.4+codex.20260915004118` after Plotloom's director confirmed its Relay
+lane was paused with no active assignment. All 31 artifact/source/cache files match
+apart from the allowed manifest cachebuster. Source commit/tag: `14470cf`,
+`relay/v0.3.4`, pushed. User restart/new-task pickup and live transition use remain
+unverified. Plotloom's unrelated dirty files were not changed or adopted.
+No source-history migration, registry reset, home-directory cleanup, or npm publication.
