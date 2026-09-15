@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { requireThat } from './store.mjs';
 import { idleObservation } from './notification.mjs';
+import { taskSettled } from './maintenance.mjs';
 
 // Product review and task retirement are independent of message delivery.
 export function reportOperation(relay, control, record, operation, actor, input = {}) {
@@ -22,6 +23,7 @@ export function reportOperation(relay, control, record, operation, actor, input 
   }
   if (operation === 'retire') {
     requireThat(actor === report.recipient, 'Task retirement belongs to exact recipient');
+    if (record.creation.disposition?.kind === 'not-created') return relay.reportingResponse(record);
     requireThat(control.permission?.assignment !== record.id, 'Current source owner cannot retire');
     // A waiting coordinator still owns a return obligation even while its executor writes.
     requireThat(record.outcome && record.outcome !== 'awaiting-verification', 'Task source outcome is unresolved');
@@ -30,7 +32,7 @@ export function reportOperation(relay, control, record, operation, actor, input 
     const childIds = [...new Set([...(record.children ?? []), ...(record.child ? [record.child] : [])])];
     const unresolved = childIds
       .map(id => relay.record(control, id))
-      .filter(child => child.report.recipient === record.task && child.archive?.status !== 'archived');
+      .filter(child => child.report.recipient === record.task && !taskSettled(child));
     if (unresolved.length) {
       const pending = relay.reportingResponse(unresolved[0]);
       return relay.response(pending.actor, 'none', pending.nextAction, {
@@ -39,6 +41,7 @@ export function reportOperation(relay, control, record, operation, actor, input 
         blockedAssignments: unresolved.map(child => child.id),
       });
     }
+    requireThat(typeof record.task === 'string' && record.task.trim(), 'No native task identity: reconcile actual creation evidence, or use dispose-uncreated after revocation if creation was never invoked');
     if (record.archive) return response(record.archive.status, command('record-native-result', { 'action-id': record.archive.id, result: '<exact-tool-result.json>' }));
     if ((!record.idleCheck || input.idleAction !== record.idleCheck.id)) {
       return save(idleObservation(relay, record));

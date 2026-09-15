@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.4
+
+- Dispose explicitly never-invoked revoked creations without fake archival or null native targets.
+- Adopt explicit clean same-branch forward baselines while idle, preserving cleanup duties.
+- Default scratch requests/results to project-local Git-ignored `.local/relay/`.
+
 ## 0.3.3
 
 - Prefix forwarded finals with `From: <current task title>` and a blank line;

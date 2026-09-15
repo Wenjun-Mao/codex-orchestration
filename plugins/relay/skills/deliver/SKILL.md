@@ -20,6 +20,11 @@ For a sequential executor, supply genuine subtask/scope/check/model choices to
 source-changing tools before handoff or finish, including background tools. The
 coordinator cannot edit during executor ownership or reserved verification.
 
+Keep request/result scratch in the project's Git-ignored `.local/relay/<assignment-id>/`,
+not the home directory. Use the director-established ignore rule; do not change
+tracked ignore files outside scope. Retain active inputs until their last consumer
+and cleanup finish. Durable plans and decisions belong in tracked `docs/`.
+
 Checks must be read-only. The CLI derives scope, ancestry and check evidence at
 the exact revision; do not supply PASS claims. A rejected or interrupted writer
 requires stopped writers and explicit source disposition. Preserve rejected and

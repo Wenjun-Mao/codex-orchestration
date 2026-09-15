@@ -4,6 +4,7 @@ import { Store, requireThat } from './store.mjs';
 import { repository, git, clean, snapshot, inspectResult, runChecks, validateScope, validateChecks, inScope, refuseFlow } from './source.mjs';
 import { reportOperation } from './reports.mjs';
 import { normalizeNativeResult } from './native.mjs';
+import { adoptBaseline, disposeUncreated } from './maintenance.mjs';
 
 const quote = value => "'" + String(value).replaceAll("'", "'\\''") + "'";
 export class Relay {
@@ -63,6 +64,7 @@ export class Relay {
   reportingResponse(record) {
     const args = { assignment: record.id };
     const response = (actor, next, status) => this.response(actor, 'none', next, { status, assignment: record.id });
+    if (record.creation.disposition?.kind === 'not-created') return response(record.creator, 'No native task was created; creation obligation is settled.', 'DISPOSED_UNCREATED');
     if (!record.outcome) return response(record.task ?? record.creator, 'Wait for the current executor to transfer its exact result; do not edit the retained checkout.', 'DELEGATED');
     if (!record.task) return response(record.creator, this.command('record-native-result', { ...args, actor: record.creator, 'action-id': record.creation.id, result: '<exact-tool-result.json>' }), 'ORPHAN_IDENTITY_PENDING');
     if (!record.decision) return response(record.recipient, this.command('accept', { ...args, actor: record.recipient }), 'DECISION_PENDING');
@@ -109,7 +111,9 @@ export class Relay {
     return this.store.locked(control => {
       refuseFlow(this.repo.common);
       requireThat(!control.permission, 'Source already reserved; no competing preparation');
-      const base = clean(this.repo.checkout, spec.branch, control.approved?.head);
+      const base = clean(this.repo.checkout, spec.branch);
+      requireThat(!control.approved || base.head === control.approved.head,
+        'Checkpoint drift; idle forward commits require explicit adopt-baseline before prepare');
       if (control.approved) requireThat(control.approved.checkout === this.repo.checkout && control.approved.branch === spec.branch, 'Selected checkout or branch differs from approved retained source');
       for (const id of spec.dependencies ?? []) requireThat(this.record(control, id).decision === 'accepted', 'Explicit dependency is not accepted');
       const record = this.newRecord(spec, base, actor);
@@ -124,6 +128,7 @@ export class Relay {
       const record = this.record(control, id);
       if (observation.kind === 'archive') return reportOperation(this, control, record, 'recordArchive', actor, observation);
       requireThat(actor === record.creator && observation.actionId === record.creation.id, 'Creation actor/action mismatch');
+      requireThat(!record.creation.disposition, 'Disposed creation cannot bind a native task');
       requireThat(['ready', 'provisional', 'ambiguous'].includes(observation.status), 'Creation observation status required');
       if (record.creation.status === 'ready') {
         requireThat(observation.status === 'ready' && observation.taskId === record.task, 'Native task identity is frozen');
@@ -327,10 +332,12 @@ export class Relay {
   report(operation, id, actor, input) {
     return this.store.locked(control => reportOperation(this, control, this.record(control, id), operation, actor, input));
   }
+  disposeUncreated(id, actor, resolution) { return disposeUncreated(this, id, actor, resolution); }
+  adoptBaseline(actor, resolution) { return adoptBaseline(this, actor, resolution); }
   status(id) {
     const control = this.store.control();
     id ??= control.permission?.assignment;
-    if (!id) return this.response('director', 'none', 'Prepare the next approved assignment with relay prepare.', { status: 'SOURCE_AVAILABLE', checkpoint: control.approved });
+    if (!id) return this.response('director', 'none', 'Source is unreserved, not necessarily admission-ready. Prepare with relay prepare; for clean forward commits on the same checkout/branch use explicit adopt-baseline.', { status: 'SOURCE_AVAILABLE', checkpoint: control.approved });
     const record = this.record(control, id);
     if (!record.outcome && record.child && control.permission?.assignment === record.child) {
       const child = this.record(control, record.child);

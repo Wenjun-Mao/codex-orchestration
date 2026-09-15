@@ -1,6 +1,6 @@
 {
   "name": "relay",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "description": "Same-host serial source coordination with exact task reporting and retirement",
   "author": {
     "name": "Wenjun Mao"

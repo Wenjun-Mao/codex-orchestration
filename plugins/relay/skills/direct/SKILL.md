@@ -6,7 +6,12 @@ description: Prepare and direct Relay serial assignments, review reported result
 Own the outcome and acceptance; delegate implementation. For a new assignment, read
 only the README's [quickstart and spec](../../README.md#same-host-quick-start), write
 the genuine scope/check/model choices, and run `prepare` as this director's
-`CODEX_THREAD_ID`. Save request files outside the source checkout. Use the existing
+`CODEX_THREAD_ID`. Keep request/result scratch in `.local/relay/<assignment-or-preparation-id>/`
+inside the project. Verify it is Git-ignored and contains no tracked files; when
+needed add only `/.local/relay/` to Git's local exclude file before dispatch.
+Keep durable plans in tracked `docs/`. Remove only that scratch directory after
+its final consumer and cleanup finish; retain unresolved inputs and active paths.
+Use the existing
 retained local project; no default branch/worktree creation. Follow host restrictions
 on task creation and model overrides; if creation is unavailable, report that boundary.
 
@@ -38,3 +43,9 @@ when resumed. Relay does not store reports or automatically retry failed sends.
 
 For user-requested adoption or clean start, use [cheap unplug](references/cheap-unplug.md).
 This is separate from normal completion. No implicit plugin installation or upgrade.
+
+For idle forward commits, use `adopt-baseline` with explicit previous/current hashes,
+same branch, stopped writers and reason; it preserves pending cleanup and does not
+accept intervening work. For a revoked creation you know was never invoked, use
+`dispose-uncreated` with its exact action ID and reason. Unknown/ambiguous creation
+is not proof of non-creation. CLI help gives both resolution shapes.

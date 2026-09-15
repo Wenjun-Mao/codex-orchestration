@@ -29,6 +29,12 @@ relay finish --repo PATH --ticket GENERATED --actor TASK
 relay verify --repo PATH --ticket GENERATED --actor TASK --decision continue|finish|reject
 relay accept|reject|retire --repo PATH --assignment ID --actor TASK
 relay recover --repo PATH --ticket GENERATED --actor CREATOR --resolution FILE
+relay dispose-uncreated --repo PATH --assignment ID --actor CREATOR --resolution FILE
+  Resolution: {"actionId":"exact creation action","neverInvoked":true,"reason":"..."}
+  Only revoked never-enabled assignments with no native creation observation.
+relay adopt-baseline --repo PATH --actor DIRECTOR --resolution FILE
+  Resolution: {"previousRevision":"full hash","revision":"full hash","branch":"main",
+    "writersStopped":true,"reason":"..."}; idle, clean, same-branch forward only.
 relay status --repo PATH [--assignment ID]
 relay inspect-lock --repo PATH --actor OPERATOR
 relay recover-lock --repo PATH --token EXACT --commands-stopped
@@ -70,6 +76,8 @@ try {
     else if (operation === 'finish') result = relay.finish(values.ticket, values.actor);
     else if (operation === 'verify') result = relay.verify(values.ticket, values.actor, values.decision);
     else if (operation === 'recover') result = relay.recover(values.ticket, values.actor, file('resolution'));
+    else if (operation === 'dispose-uncreated') result = relay.disposeUncreated(values.assignment, values.actor, file('resolution'));
+    else if (operation === 'adopt-baseline') result = relay.adoptBaseline(values.actor, file('resolution'));
     else if (operation === 'status') result = relay.status(values.assignment);
     else if (operation === 'inspect-lock') {
       const lock = JSON.parse(readFileSync(relay.store.root + '/transition.lock', 'utf8'));

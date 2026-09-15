@@ -18,6 +18,34 @@ use disposable repositories and leave them for inspection.
 
 ## Same-host quick start
 
+Request/result scratch belongs in Git-ignored `.local/relay/<assignment-or-preparation-id>/`.
+Verify no files there are tracked and `git check-ignore` confirms the location.
+If needed, add the narrow `/.local/relay/` rule to Git's local exclude file before
+dispatch. Delete only completed scratch after its last consumer/cleanup; keep
+unresolved inputs and do not move active paths. Plans/decisions stay in tracked `docs/`.
+This does not relocate Relay's authoritative Git-common-directory state.
+
+## Bounded maintenance
+
+`adopt-baseline --actor TASK --resolution FILE` accepts
+`{"previousRevision":"FULL_HASH","revision":"FULL_HASH","branch":"main","writersStopped":true,"reason":"Approved plan commit"}`.
+It requires no source permission, a clean same-checkout/same-branch forward move,
+and explicit old/new revisions. It preserves assignments and cleanup obligations;
+adoption is not verification or acceptance. `SOURCE_AVAILABLE` means unreserved,
+not necessarily admission-ready. Branch switches/rewrites still require a separate reset decision.
+
+`dispose-uncreated --assignment ID --actor CREATOR --resolution FILE` accepts
+`{"actionId":"EXACT_CREATION_ACTION","neverInvoked":true,"reason":"Creation was never called"}`.
+Only a revoked never-enabled assignment with no native creation observation,
+task/provisional identity or archive is eligible. The creator's explicit assertion
+is cooperative evidence, not something Relay can infer from missing records.
+It settles the nonexistent task obligation without fabricating archival or touching
+another assignment's permission. Unknown/ambiguous creation still needs reconciliation.
+
+Both commands take `--repo CHECKOUT`; exact repeats are harmless, conflicts fail.
+
+## Delivery
+
 Prerequisites are Node 20.11 or later, an enabled and reviewed Relay plugin, a saved
 Codex project mapped to the retained checkout, and a clean selected branch. The
 director's `CODEX_THREAD_ID` is the creator and report-recipient identity.

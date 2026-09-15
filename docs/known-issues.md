@@ -1,5 +1,25 @@
 # Known issues — Flow and Relay
 
+## Relay 0.3.4 maintenance correction — 2026-09-14
+
+- [x] Source-confirmed: never-created revoked children could block parent retirement
+  indefinitely, and direct retirement generated null idle targets. Missing native
+  creation disposition, not a transport failure. `dispose-uncreated` now settles
+  only explicitly never-invoked creations, retains old idle history, rejects late
+  binding, and preserves unrelated source permission. Real-Git/CLI regressions pass.
+- [x] Source-confirmed: idle director commits blocked preparation, while recovery
+  required a nonexistent ticket. `adopt-baseline` supports explicit clean same-branch
+  forward changes without discarding assignments or cleanup duties. Connected tests
+  cover adoption, successor finish, and retained parent obligations.
+- [x] Source-confirmed instruction mismatch: scratch files were required outside
+  the checkout although verification already excludes Git-ignored files. Guidance
+  now defaults to `.local/relay/`; regression checks ignored versus ordinary writes.
+- [ ] Installation/live project use of 0.3.4: deferred until a quiet checkpoint.
+  Source and relocated-package proof do not claim live task recovery.
+
+See Relay decision `plugins/relay/docs/decisions/0007-bounded-maintenance.md`.
+These corrections do not address lost native creation output or change messaging.
+
 Last reviewed: 2026-09-12. Umbrella working checklist, not a complete bug inventory
 or a new audit. Includes confirmed defects, observed usability limitations and
 explicitly labelled design risks. Relay has an accepted source-only candidate;
