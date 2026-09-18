@@ -1,5 +1,12 @@
 # Known issues — Flow and Relay
 
+## Relay 0.3.5 App-update compatibility — 2026-09-17
+
+- [x] Confirmed exact CLI-version pin disabled forwarding after an otherwise
+  compatible App update. Replaced with handshake/account and exact queue-response
+  validation. Real send arrived intact on CLI 0.155.0-alpha.9; 37/37 source and
+  22/22 packaged tests pass. See [verification](field-tests/2026-09-17-relay-035-app-update.md).
+
 ## Relay 0.3.4 maintenance correction — 2026-09-14
 
 - [x] Source-confirmed: never-created revoked children could block parent retirement

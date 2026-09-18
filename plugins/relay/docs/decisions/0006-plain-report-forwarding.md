@@ -31,3 +31,12 @@ line before the unchanged body. Fetch `thread.name` using metadata-only
 `thread/read` on the existing native connection; use the sender ID when no title
 is available. Do not infer a role, store titles/messages, or load conversation
 history. Collapse line breaks in a title so attribution remains one line.
+
+User-approved 0.3.5 amendment: assume compatibility across App updates and validate
+the actual handshake/account and queue response, not the exact CLI version. A
+routine update from 0.154 to 0.155 previously disabled forwarding before any queue
+attempt. Release strings are not a capability contract. Reject wrong-account or
+malformed handshakes; unavailable queue methods or mismatched message echoes remain
+unconfirmed sends, without retries. Preserve the deadline and single send. This
+does not guarantee compatibility with future protocol changes or prove recipient
+processing. Regression fixtures cover changed versions and actual protocol failures.

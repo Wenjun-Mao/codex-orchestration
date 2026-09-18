@@ -3,9 +3,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { StringDecoder } from 'node:string_decoder';
 
-// Qualified by the disposable native probe, not a generic App Server client.
-// An App update needs fresh qualification before its queue API is used.
-export const QUEUE_VERSION = '0.154.0-alpha.6.2';
+// Compatibility is determined by the protocol responses, not an App release pin.
 const binary = '/Applications/ChatGPT.app/Contents/Resources/codex';
 const uuid = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/;
 
@@ -69,8 +67,8 @@ export async function submitQueueNotification(request, {
           if (sent) return finish(uncertain('duplicate-initialize-response'));
           if (value.error || value.result?.codexHome !== join(homedir(), '.codex')
             || typeof value.result?.userAgent !== 'string'
-            || !value.result.userAgent.startsWith(`Codex Desktop/${QUEUE_VERSION} (`)) {
-            return finish(uncertain('unqualified-host-version-or-home'));
+            || !value.result.userAgent.startsWith('Codex Desktop/')) {
+            return finish(uncertain('unexpected-host-or-home'));
           }
           send({ method: 'initialized' });
           sent = true;

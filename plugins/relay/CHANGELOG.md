@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.5
+
+- Keep report forwarding working across compatible App updates; validate actual
+  handshake and exact queue responses instead of pinning a CLI release number.
+- Preserve account checks, bounded execution, unchanged message bodies and no retries.
+
 ## 0.3.4
 
 - Dispose explicitly never-invoked revoked creations without fake archival or null native targets.

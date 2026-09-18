@@ -6,7 +6,7 @@ import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
 import { homedir } from 'node:os';
 import { processStopEvent, captureStopEvent } from '../lib/final-hook.mjs';
-import { submitQueueNotification, QUEUE_VERSION } from '../lib/queue-notification.mjs';
+import { submitQueueNotification } from '../lib/queue-notification.mjs';
 import { fixture, cliProcess } from './helpers.mjs';
 
 function released() {
@@ -83,7 +83,7 @@ function directoryBytes(path) {
 const request = { id: '11111111-1111-4111-8111-111111111111', recipient: '22222222-2222-4222-8222-222222222222',
   sender: '33333333-3333-4333-8333-333333333333',
   hostId: 'local', senderHostId: 'local', text: 'Exact final 雪\n'.repeat(5000) };
-function transport({ version = QUEUE_VERSION, queue = 'exact', silent = false, noClose = false, badAgent = false, name = 'Actual task title', readError = false, wrongSender = false } = {}) {
+function transport({ version = '0.154.0-alpha.6.2', queue = 'exact', silent = false, noClose = false, badAgent = false, wrongHome = false, queueError = false, name = 'Actual task title', readError = false, wrongSender = false } = {}) {
   const sent = [], child = new EventEmitter();
   child.stdin = new PassThrough(); child.stdout = new PassThrough(); child.stderr = new PassThrough();
   let closed = false;
@@ -91,21 +91,22 @@ function transport({ version = QUEUE_VERSION, queue = 'exact', silent = false, n
   child.stdin.on('data', bytes => {
     const value = JSON.parse(bytes); sent.push(value);
     if (silent) return;
-    const reply = value.id === 1 ? { id: 1, result: { codexHome: join(homedir(), '.codex'), userAgent: badAgent ? {} : `Codex Desktop/${version} (test)` } }
+    const reply = value.id === 1 ? { id: 1, result: { codexHome: wrongHome ? '/other-account' : join(homedir(), '.codex'), userAgent: badAgent ? {} : `Codex Desktop/${version} (test)` } }
       : value.id === 3 ? (readError ? { id: 3, error: { message: 'unavailable' } } : { id: 3, result: { thread: { id: wrongSender ? 'foreign' : request.sender, name } } })
-      : value.id === 2 ? { id: 2, result: { queuedSubmission: { id: request.id,
-        clientUserMessageId: queue === 'wrong' ? 'wrong' : request.id, input: queue === 'null' ? [null] : value.params.input } } } : null;
+      : value.id === 2 ? (queueError ? { id: 2, error: { code: -32601, message: 'Method not found' } } : { id: 2, result: { queuedSubmission: { id: request.id,
+        clientUserMessageId: queue === 'wrong' ? 'wrong' : request.id, input: queue === 'null' ? [null] : queue === 'changed-text' ? [{ type: 'text', text: 'altered' }] : value.params.input } } }) : null;
     if (reply) setImmediate(() => child.stdout.write(JSON.stringify(reply) + '\n'));
   });
   return { sent, spawnProcess: () => child };
 }
-test('queue adapter bounds process, exact response, host and version; never resumes tasks', async () => {
-  for (const [options, status] of [[{}, 'queued'], [{ version: 'changed' }, 'ambiguous'], [{ queue: 'wrong' }, 'ambiguous'], [{ silent: true }, 'ambiguous'], [{ noClose: true }, 'ambiguous'], [{ badAgent: true }, 'ambiguous'], [{ queue: 'null' }, 'ambiguous']]) {
+test('queue adapter accepts compatible updates and bounds exact response and host; never resumes tasks', async () => {
+  for (const [options, status] of [[{}, 'queued'], [{ version: '0.155.0-alpha.9' }, 'queued'], [{ version: '99.0.0' }, 'queued'], [{ wrongHome: true }, 'ambiguous'], [{ queueError: true }, 'ambiguous'], [{ queue: 'changed-text' }, 'ambiguous'], [{ queue: 'wrong' }, 'ambiguous'], [{ silent: true }, 'ambiguous'], [{ noClose: true }, 'ambiguous'], [{ badAgent: true }, 'ambiguous'], [{ queue: 'null' }, 'ambiguous']]) {
     const f = transport(options);
     const result = await submitQueueNotification(request, { ...f, deadlineMs: 30, cleanupMs: 10 });
     assert.equal(result.status, status);
     assert.ok(f.sent.every(value => ['initialize', 'initialized', 'thread/read', 'thread/queue/add'].includes(value.method)));
     assert.ok(f.sent.filter(value => value.method === 'thread/queue/add').length <= 1);
+    if (options.wrongHome || options.badAgent) assert.equal(f.sent.some(value => value.method === 'thread/queue/add'), false);
   }
   const wrongHost = await submitQueueNotification({ ...request, hostId: 'remote' }, { spawnProcess: () => { throw Error('must not spawn'); } });
   assert.equal(wrongHost.reason, 'unsupported-host');
