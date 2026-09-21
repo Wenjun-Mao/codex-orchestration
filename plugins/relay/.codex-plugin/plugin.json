@@ -1,15 +1,15 @@
 {
   "name": "relay",
-  "version": "0.3.5",
-  "description": "Same-host serial source coordination with exact task reporting and retirement",
+  "version": "0.4.0",
+  "description": "Same-host worker-to-manager report forwarding",
   "author": {
     "name": "Wenjun Mao"
   },
   "skills": "./skills/",
   "interface": {
     "displayName": "Relay",
-    "shortDescription": "Coordinate serial source delivery.",
-    "longDescription": "Same-host serial source coordination with exact task reporting and retirement",
+    "shortDescription": "Forward task reports to managers.",
+    "longDescription": "Same-host worker-to-manager report forwarding",
     "developerName": "Wenjun Mao",
     "category": "Productivity",
     "capabilities": [],

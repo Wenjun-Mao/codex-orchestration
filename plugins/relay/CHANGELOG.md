@@ -1,3 +1,10 @@
+# 0.4.0
+
+- Replace lifecycle controller with register/unregister/status routing.
+- Preserve exact Stop forwarding, sender attribution and bounded native transport.
+- Remove source contracts, verification, acceptance, baseline and retirement commands.
+- Legacy state requires explicit quiet-checkpoint retirement; no automatic migration.
+
 # Changelog
 
 ## 0.3.5

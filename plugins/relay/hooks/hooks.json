@@ -1,5 +1,5 @@
 {
-  "description": "Capture the exact final response for a source-released Relay task.",
+  "description": "Forward registered task finals to their managers.",
   "hooks": {
     "Stop": [
       {

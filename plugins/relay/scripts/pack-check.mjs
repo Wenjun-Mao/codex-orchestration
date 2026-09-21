@@ -28,16 +28,16 @@ for (const file of files.filter(path => path.endsWith('.mjs'))) {
 assert.equal(existsSync(join(target, 'lib')), false, 'Flow must not be staged alongside Relay');
 const help = run(process.execPath, [join(unpacked, 'bin/relay.mjs'), '--help'], target);
 const version = JSON.parse(readFileSync(join(unpacked, 'package.json'), 'utf8')).version;
-assert.ok(help.includes(`Relay ${version} — same-host serial source coordination`));
-assert.match(help, /start --repo PATH --ticket GENERATED --actor-env CODEX_THREAD_ID/);
+assert.ok(help.includes(`Relay ${version} — same-host report forwarding`));
+assert.match(help, /register --repo PATH --worker TASK --manager TASK/);
 assert.doesNotMatch(help, /See README/);
 const deliverySkill = readFileSync(join(unpacked, 'skills/deliver/SKILL.md'), 'utf8');
 assert.match(deliverySkill, /host-provided `CODEX_THREAD_ID`/);
 assert.doesNotMatch(deliverySkill, /\]\(\.\.\/\.\.\/README\.md\)/);
 // Copy connected and reporting harnesses; their imports resolve to the relocated package.
 mkdirSync(join(unpacked, 'test'));
-const suites = ['journey.test.mjs', 'native.test.mjs', 'reports.test.mjs', 'notification.test.mjs', 'hook-queue.test.mjs', 'maintenance.test.mjs'];
-for (const file of ['helpers.mjs', ...suites]) cpSync(join(source, 'test', file), join(unpacked, 'test', file), { recursive: false });
+const suites = ['routes.test.mjs', 'hook-queue.test.mjs'];
+for (const file of suites) cpSync(join(source, 'test', file), join(unpacked, 'test', file), { recursive: false });
 const output = run(process.execPath, ['--test', ...suites.map(file => join(unpacked, 'test', file))], target);
 process.stdout.write(output);
 process.stdout.write(JSON.stringify({ package: join(target, pack.filename), fileCount: files.length, packedBytes: pack.size, unpackedBytes: pack.unpackedSize, elapsedMs: Math.round(performance.now() - started), nativeQualification: 'not exercised; fixture observations only' }, null, 2) + '\n');

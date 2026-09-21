@@ -2,9 +2,10 @@
 
 This umbrella repository contains two independently versioned plugins:
 
-- **[Relay](plugins/relay/README.md)** — the serial-first path: one retained checkout,
-  optional sequential executors, verified results, report receipt and task archival.
-  Start with Relay's [same-host quick start](plugins/relay/README.md#same-host-quick-start).
+- **[Relay](plugins/relay/README.md)** — worker-to-manager report forwarding.
+  Managers coordinate serial work, review results and archive finished tasks;
+  Relay keeps only the reporting relationship. The 0.4 source candidate is not
+  automatically installed into projects still using the 0.3 lifecycle.
 - **Flow** — the existing root package, still installed and invoked as
   `codex-orchestration`. Existing Flow projects keep their current workflow.
   Its folder/name migration is deferred; do not run both plugins against the same

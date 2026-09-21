@@ -1,30 +1,21 @@
 ---
 name: plan
-description: Draft, revise, and save a project plan for Relay delivery without starting implementation.
+description: Draft, revise, and save a practical project implementation plan without starting implementation.
 ---
+# Plan
 
-# Save an Approved Plan
+Read relevant repository instructions and inspect the current source before proposing
+changes. Clarify only choices that materially change the outcome. Keep the plan sized
+to the task: outcome, scope, concrete steps, verification, and important risks.
 
-Use the repository's planning location, or `docs/plans/` if none exists.
-Write one plan containing outcome, scope/non-goals, consequential decisions,
-checkpoints, acceptance evidence, execution authority, and escalation conditions.
-Do not duplicate the coordinator's detailed execution breakdown.
+Save the plan under the repository's existing plans directory (otherwise `docs/plans/`).
+Record durable architectural decisions in the repository's ADR format. Separate
+confirmed facts from assumptions and open questions. Do not introduce orchestration
+contracts, tickets, state journals, or required reporting artifacts.
 
-Mark unsettled work `Draft`. After approval, mark the revision `Approved`.
-Relay stores the plan reference and the supplied assignment scope and acceptance;
-it does not snapshot the plan's contents. Editing the plan does not update an
-already prepared assignment. Keep its approved meaning clear while work is active.
+Default to serial work on the retained checkout. Explain where a bounded independent
+review is useful; do not invent parallel writers. Manager model choice belongs at
+native dispatch, not in subordinate work instructions.
 
-The director owns intent and acceptance. The coordinator may refine technical
-breakdown within that intent. Material changes to scope, acceptance, risk, or
-external authority require a newly approved revision and director review of the
-affected assignment before continuing.
-
-Native Plan mode is optional. This skill may write the planning document in
-ordinary mode but does not authorize implementation. If the current mode
-prohibits writes, persist the approved revision after leaving it and before
-dispatch.
-
-For “Implement the plan”, use `relay:direct` with the saved plan path to prepare
-the assignment and dispatch within the user's authority. Do not replace that
-handoff with local implementation, repeated waits, or a second role-specific plan.
+Planning does not start implementation or create tasks. When approved, use the
+direct skill for reporting registration and ordinary manager review.

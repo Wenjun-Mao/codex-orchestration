@@ -1,50 +1,23 @@
 ---
 name: deliver
-description: Carry out an already prepared same-host Relay serial source assignment using its generated public commands.
+description: Carry out a manager's work brief with Relay forwarding the final response.
 ---
+# Deliver with Relay
 
-Run the prepared brief's exact startup command unchanged. It reads this Codex task's
-host-provided `CODEX_THREAD_ID`; do not discover, copy, or guess an assignment owner.
-A missing or conflicting runtime identity is refused. The response's actor,
-permitted source activity, and next action govern the step. No README or runtime
-implementation read is needed to start.
+Follow the work brief and repository instructions. Relay is messaging, not source
+authorization: coordinate serial writes with your manager, implement the work, and
+run relevant checks. Your native identity is the host-provided `CODEX_THREAD_ID`.
 
-Only READY permits source changes within the recorded scope. A provisional native
-identity permits no writes. If startup returns BINDING_PENDING, preserve the same
-assignment and wait: the creating owner records the exact native result, then the
-worker reruns its unchanged startup command. Never repeat an uncertain creation.
+Ask mid-work questions by direct native message to your manager. Resume work when
+answered; do not invent a wait-for-reply protocol. If you end a turn while paused,
+its final may be forwarded too: describe the situation truthfully.
 
-Do local work in the selected retained checkout. Commit the result before finish.
-For a sequential executor, supply genuine subtask/scope/check/model choices to
-`handoff`; follow its generated native request and binding command. Stop all
-source-changing tools before handoff or finish, including background tools. The
-coordinator cannot edit during executor ownership or reserved verification.
+When finished, state the outcome, verification, and remaining limitations in your
+normal final response. Do not send a duplicate completion message, call `finish`,
+save a report file, or invoke the hook manually. A registered Stop hook forwards
+your actual final unchanged, preceded only by `From: <current task title>`.
 
-Keep request/result scratch in the project's Git-ignored `.local/relay/<assignment-id>/`,
-not the home directory. Use the director-established ignore rule; do not change
-tracked ignore files outside scope. Retain active inputs until their last consumer
-and cleanup finish. Durable plans and decisions belong in tracked `docs/`.
-
-Checks must be read-only. The CLI derives scope, ancestry and check evidence at
-the exact revision; do not supply PASS claims. A rejected or interrupted writer
-requires stopped writers and explicit source disposition. Preserve rejected and
-dirty work. Never use task cancellation or lock recovery as write permission.
-
-For a mid-work question or blocker, message the exact manager directly. Stop
-dependent work until the answer arrives; `wait_threads` is not a reply mailbox.
-
-Await the actual `finish` process result before describing it. A yielded/running
-command is not a completed command; collect its exit status and output. On failure,
-preserve it and stop dependent work. Do not claim source release without success.
-
-Emit your final and become idle. The Stop hook sends that text unchanged to your
-manager, regardless of verification success. Do not send a duplicate completion
-message. There is no report-storage, retrieval, acknowledgement, or continuation
-step. Messaging does not change source permission.
-
-For a child you manage, review its source result before acceptance and use the
-generated fresh sender-idle observation before archival. Archive only the exact
-prepared task; preserve its checkout and do not retry uncertain archive calls.
-
-Installation, pilot approval, and release remain director-owned. Do not install
-Relay implicitly. Injected native observations are for source tests only.
+The manager reviews work and handles native archival and route removal. Do not
+self-archive or remove your route. Relay imposes no checks, Git baseline, contract,
+or acceptance record. Use ignored project-local scratch only when actually needed.
+Native subagents are attended read-only support: collect their results before ending.

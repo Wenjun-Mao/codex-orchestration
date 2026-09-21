@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { Relay } from './relay.mjs';
+import { Routes } from './routes.mjs';
 import { submitQueueNotification } from './queue-notification.mjs';
 
 // Routing only: no result checks, message storage, or lifecycle writes.
@@ -9,22 +9,18 @@ export function captureStopEvent(event) {
       typeof event[key] === 'string' && event[key].length > 0)) {
     return { status: 'ignored', reason: 'unsupported-stop-event' };
   }
-  let relay;
-  try { relay = new Relay(event.cwd); }
+  let routes;
+  try { routes = new Routes(event.cwd); }
   catch { return { status: 'ignored', reason: 'relay-repository-unavailable' }; }
-  const control = relay.store.control();
-  const assignment = control.tasks?.[event.session_id];
-  if (!assignment) return { status: 'ignored', reason: 'relay-sender-unbound' };
-  const record = relay.record(control, assignment);
-  if (record.task !== event.session_id || !record.recipient || record.archive?.status === 'archived') {
-    return { status: 'ignored', reason: 'relay-route-inactive' };
-  }
+  const registry = routes.read();
+  const route = Object.hasOwn(registry.routes, event.session_id) ? registry.routes[event.session_id] : undefined;
+  if (!route) return { status: 'ignored', reason: 'relay-sender-unbound' };
   // A stable native client-message ID needs no local delivery journal.
-  const hex = createHash('sha256').update(JSON.stringify([assignment, event.session_id, event.turn_id])).digest('hex');
+  const hex = createHash('sha256').update(JSON.stringify([route.id, event.session_id, event.turn_id])).digest('hex');
   const id = `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-8${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
   return { status: 'ready', notification: {
-    id, sender: event.session_id, recipient: record.recipient, hostId: record.recipientHostId,
-    senderHostId: record.taskHostId, text: event.last_assistant_message,
+    id, sender: event.session_id, recipient: route.manager, hostId: 'local',
+    senderHostId: 'local', text: event.last_assistant_message,
   } };
 }
 

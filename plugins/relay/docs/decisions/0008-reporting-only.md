@@ -1,0 +1,32 @@
+# 0008 — Reporting-only Relay
+
+Status: accepted; supersedes lifecycle enforcement in decisions 0001–0007.
+
+## Problem
+The worker-to-manager reporting relationship was embedded in a source lifecycle
+controller. Managers already reviewed work, while contracts, baselines, immutable
+records and recovery commands imposed additional setup and failure boundaries.
+The existing hook already forwarded text independently of result verification,
+but still had to load the controller to discover its recipient.
+
+## Decision
+Replace the controller with one atomic worker-to-manager routing registry in the
+Git common directory. Keep the existing bounded native queue transport unchanged.
+Register real task IDs, preserve registration identity on replay, and require the
+expected manager to unregister. Stop finals are messages, not success evidence.
+Models, scope, tests, Git ownership, acceptance and archival remain manager work,
+not registry fields or runtime gates. No report bodies or delivery journals persist.
+
+## Alternatives and consequences
+A lite mode or retained optional verifier would preserve two contracts and their
+maintenance burden. Automatic legacy conversion could strand active old workers.
+Instead, reject old control state and transition explicitly at a quiet checkpoint.
+Reporting does not prevent concurrent edits or guarantee delivery after a transport
+error. Skills require serial coordination and truthful review; ambiguous sends are
+not retried. The native client ID provides stable deduplication identity, not a new
+local exactly-once protocol. In-flight sends may complete after route removal.
+
+## Guardrails
+Test routing replay/conflicts, locks/atomicity, malformed and legacy state, shared
+worktrees, unchanged source, exact forwarding and native response validation.
+Package only routing dependencies. Keep historical decisions outside the runtime.

@@ -1,5 +1,21 @@
 # Known issues — Flow and Relay
 
+## Relay 0.4 reporting-only replacement — 2026-09-20
+
+- [x] Architectural cause confirmed: recipient discovery depended on a source
+  lifecycle controller even though forwarding no longer required successful checks.
+  Replaced that dependency with a worker-to-manager registry; removed controller,
+  assignments, verification/acceptance gates and baseline recovery machinery.
+- [x] Source and relocated-package routing/transport tests pass; old lifecycle
+  regressions are removed with the retired contract, not claimed as passing.
+- [ ] Quiet-checkpoint installation and genuine native Stop delivery remain pending.
+  Installed 0.3.5 and other projects are untouched. This is a source candidate,
+  not a released or migrated installation.
+
+See [decision 0008](../plugins/relay/docs/decisions/0008-reporting-only.md).
+Historical maintenance entries below describe their original released versions,
+not additional requirements in the reporting-only replacement.
+
 ## Relay 0.3.5 App-update compatibility — 2026-09-17
 
 - [x] Confirmed exact CLI-version pin disabled forwarding after an otherwise

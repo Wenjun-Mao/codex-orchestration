@@ -20,7 +20,7 @@ impose destructive defaults on another user without authorization.
    wildcard or shared-host registry deletion. Do not alter the other plugin's state
    unless explicitly in scope. No mandatory new backup or move; keep existing backups.
 6. Verify only intended source/ref/worktree/task changes and target absence, then
-   prepare Relay normally. Source availability alone is not successful admission.
+   register new worker-to-manager routes. Do not resume old lifecycle commands.
 
 No historical Flow audit, refresh, successful acceptance or journal repair is needed
 for operator disposal. Report it as discarded unresolved history, not normal success.
