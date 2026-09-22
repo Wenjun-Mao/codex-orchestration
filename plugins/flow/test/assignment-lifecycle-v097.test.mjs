@@ -83,7 +83,11 @@ function git(root, args) {
 async function frozenRc1Package(t) {
   const root = await mkdtemp(resolve(tmpdir(), "codex-flow-v0911-rc1-package-"));
   const archive = resolve(root, "source.tar");
-  execFileSync("git", [
+  // Historical tags predate the product subdirectory; archive the whole Git root.
+  const repositoryRoot = execFileSync("git", ["rev-parse", "--show-toplevel"], {
+    cwd: packageRoot, encoding: "utf8",
+  }).trim();
+  execFileSync("git", ["-C", repositoryRoot,
     "archive", "--format=tar", `--output=${archive}`, FROZEN_RC1_COMMIT,
   ], { cwd: packageRoot });
   execFileSync("tar", ["-xf", archive, "-C", root]);
@@ -2268,7 +2272,11 @@ test("frozen RC1 cancellation admits and reclaims an exact v0.9.11 successor", a
   const source = await frozenRc1Package(t);
   const successorPackageRoot = await mkdtemp(resolve(tmpdir(), "codex-flow-v0911-stable-package-"));
   const successorArchive = resolve(successorPackageRoot, "source.tar");
-  execFileSync("git", [
+  // Historical tags predate the product subdirectory; archive the whole Git root.
+  const repositoryRoot = execFileSync("git", ["rev-parse", "--show-toplevel"], {
+    cwd: packageRoot, encoding: "utf8",
+  }).trim();
+  execFileSync("git", ["-C", repositoryRoot,
     "archive", "--format=tar", `--output=${successorArchive}`, "v0.9.11",
   ], { cwd: packageRoot });
   execFileSync("tar", ["-xf", successorArchive, "-C", successorPackageRoot]);

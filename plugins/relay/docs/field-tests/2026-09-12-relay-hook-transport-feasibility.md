@@ -62,7 +62,7 @@ hook/report lifecycle. The missing proxy socket is not a blocker for this route.
   Desktop's observed app-server process uses stdio, with no named Unix listener
   observed. No restart or listener reconfiguration was attempted.
 - Flow already has genuine notification evidence, not merely a speculative API:
-  [RC4 native queue gates](2026-09-06-v0.9.3-rc-live-app-acceptance.md#rc4-native-queue-gates)
+  [RC4 native queue gates](../../../flow/docs/field-tests/2026-09-06-v0.9.3-rc-live-app-acceptance.md#rc4-native-queue-gates)
   record hook capture and subsequent recipient turns. The task is narrow
   requalification and selective extraction, not rediscovery of hook reporting.
 - One disposable task creation was requested: `Probe · Relay · Hook queue wakeup`,

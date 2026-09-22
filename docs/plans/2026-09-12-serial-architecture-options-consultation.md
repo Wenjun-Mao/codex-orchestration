@@ -31,9 +31,9 @@ Runtime baseline is v0.9.13, commit
 State the full commit inspected and distinguish proposed from implemented code.
 
 Read:
-- [Current serial plan](2026-09-11-serial-first-delivery.md).
-- [Native feasibility observations](../field-tests/2026-09-11-serial-native-feasibility.md).
-- [Paused recovery plan](2026-09-11-preserve-and-reset-recovery.md), only for boundaries.
+- [Current serial plan](../../plugins/flow/docs/plans/2026-09-11-serial-first-delivery.md).
+- [Native feasibility observations](../../plugins/flow/docs/field-tests/2026-09-11-serial-native-feasibility.md).
+- [Paused recovery plan](../../plugins/flow/docs/plans/2026-09-11-preserve-and-reset-recovery.md), only for boundaries.
 - Relevant source, schemas and tests behind launch, coordinator work, dispositions,
   committed-write scope, assignment/iteration authority, historical settlement,
   report hooks/locators, and plugin packaging.

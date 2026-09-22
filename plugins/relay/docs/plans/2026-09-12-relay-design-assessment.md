@@ -3,7 +3,7 @@
 Status: bounded assessment complete; targeted review amendments approved for
 the connected source implementation. Native behavior remains unverified.
 Companion contract material for the
-[single Relay plan](2026-09-11-serial-first-delivery.md), not another execution plan.
+[single Relay plan](../../../flow/docs/plans/2026-09-11-serial-first-delivery.md), not another execution plan.
 
 Scope: source-only assessment. No Flow activation, native task creation, install,
 product-project access, migration, or new implementation. Source reviewed at
@@ -31,11 +31,11 @@ is a source dependency cut, not proof that the extracted design works on the hos
 
 | Treatment | Source evidence | Relay boundary |
 | --- | --- | --- |
-| Curate small utilities | [core.mjs](../../lib/core.mjs): canonical hashing, guarded JSON, atomic writes and locks; [repository-paths.mjs](../../lib/repository-paths.mjs) | Re-home only needed functions, with tests and Relay ownership; no runtime import of Flow |
-| Rewrite direct verification around useful mechanisms | [git.mjs](../../lib/git.mjs)::discoverGit derives state from package version; [verifications.mjs](../../lib/verifications.mjs)::runCombinedVerification consumes Flow launch/receipt/disposition authority | Exact repository/checkpoint and direct result verification, without integration records or version namespaces |
-| Conditionally extract native queue operation | [codex-app-report-adapter.mjs](../../lib/codex-app-report-adapter.mjs)::submitNativeQueuedReport takes recipient, delivery key and text; imports built-ins and core | Relay must supply its own sender/recipient authority, captured-final identity and durable pending outcome |
-| Rewrite report authority and packaging | [report-routes.mjs](../../lib/report-routes.mjs)::registerCoordinatorReportRoute requires an active run and builds assignment/iteration authority; [report-records.mjs](../../lib/report-records.mjs) imports routes; [report-hook.mjs](../../lib/report-hook.mjs) stages pinned reporting authority | One Relay-owned reporting obligation and explicit minimal runtime manifest, not old route/run/iteration projections |
-| Rewrite task-only archival | [archive-lifecycle.mjs](../../lib/archive-lifecycle.mjs)::resolvedTaskArchiveAuthority and reconcileTaskArchive couple task archival to launch/disposition and worktree postconditions | Observe exact task archival without requiring deletion or freezing the retained source checkout |
+| Curate small utilities | [core.mjs](../../../flow/lib/core.mjs): canonical hashing, guarded JSON, atomic writes and locks; [repository-paths.mjs](../../../flow/lib/repository-paths.mjs) | Re-home only needed functions, with tests and Relay ownership; no runtime import of Flow |
+| Rewrite direct verification around useful mechanisms | [git.mjs](../../../flow/lib/git.mjs)::discoverGit derives state from package version; [verifications.mjs](../../../flow/lib/verifications.mjs)::runCombinedVerification consumes Flow launch/receipt/disposition authority | Exact repository/checkpoint and direct result verification, without integration records or version namespaces |
+| Conditionally extract native queue operation | [codex-app-report-adapter.mjs](../../../flow/lib/codex-app-report-adapter.mjs)::submitNativeQueuedReport takes recipient, delivery key and text; imports built-ins and core | Relay must supply its own sender/recipient authority, captured-final identity and durable pending outcome |
+| Rewrite report authority and packaging | [report-routes.mjs](../../../flow/lib/report-routes.mjs)::registerCoordinatorReportRoute requires an active run and builds assignment/iteration authority; [report-records.mjs](../../../flow/lib/report-records.mjs) imports routes; [report-hook.mjs](../../../flow/lib/report-hook.mjs) stages pinned reporting authority | One Relay-owned reporting obligation and explicit minimal runtime manifest, not old route/run/iteration projections |
+| Rewrite task-only archival | [archive-lifecycle.mjs](../../../flow/lib/archive-lifecycle.mjs)::resolvedTaskArchiveAuthority and reconcileTaskArchive couple task archival to launch/disposition and worktree postconditions | Observe exact task archival without requiring deletion or freezing the retained source checkout |
 | Omit legacy orchestration engine | Run lifecycle, assignment authority, iteration registry, task launch, integration, disposition, cleanup and refresh engines | Reference their failure lessons; do not transplant their state machines or compatibility obligations |
 
 Correction after review: `core.mjs::withProcessLock` is **not safe to copy
@@ -48,7 +48,7 @@ before rename does not make reclamation atomic. A different tested primitive may
 replace this approach only if it remains smaller and satisfies the same contract.
 
 The decisive packaging leak is
-[report-runtime.mjs](../../lib/adapters/codex-app/report-runtime.mjs)::runtimeSourceFiles:
+[report-runtime.mjs](../../../flow/lib/adapters/codex-app/report-runtime.mjs)::runtimeSourceFiles:
 it recursively stages **all of `lib`**, not just reporting imports. Narrowing one
 entrypoint therefore does not produce a small independent package. Relay's built
 artifact must have an explicitly checked Relay-only dependency closure.

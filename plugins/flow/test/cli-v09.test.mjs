@@ -103,7 +103,11 @@ function nativeQueue() {
 async function frozenV0912Package(t) {
   const root = await mkdtemp(resolve(tmpdir(), "codex-flow-v0912-package-"));
   const archive = resolve(root, "source.tar");
-  execFileSync("git", ["archive", "--format=tar", `--output=${archive}`, "v0.9.12"], {
+  // Historical tags predate the product subdirectory; archive the whole Git root.
+  const repositoryRoot = execFileSync("git", ["rev-parse", "--show-toplevel"], {
+    cwd: packageRoot, encoding: "utf8",
+  }).trim();
+  execFileSync("git", ["-C", repositoryRoot, "archive", "--format=tar", `--output=${archive}`, "v0.9.12"], {
     cwd: packageRoot,
   });
   execFileSync("tar", ["-xf", archive, "-C", root]);

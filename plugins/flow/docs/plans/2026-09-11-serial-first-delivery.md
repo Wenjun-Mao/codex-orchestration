@@ -3,7 +3,7 @@
 **Outcome: Relay 0.1.0 accepted for initial same-host serial use.** The connected
 implementation, bounded native gates, real-project pilot/successor, installed
 stable smoke and task cleanup completed. See the
-[release record](../field-tests/2026-09-12-relay-0.1.0-release.md) for exact evidence
+[release record](../../../relay/docs/field-tests/2026-09-12-relay-0.1.0-release.md) for exact evidence
 and limits. Earlier checkpoint-only restrictions below are retained as history.
 
 ## Continuation authorization — 2026-09-12
@@ -39,8 +39,8 @@ tasks, final acceptance, install/reload boundary and task retirement.
 Status: **Approved for bounded implementation and disposable native qualification,
 including the 2026-09-12 shared-storage receipt amendment below**.
 Following both Pro reviews, the user approved proceeding with the amendments and
-connected slice. The [amended contract](2026-09-12-relay-design-assessment.md)
-incorporates the [review synthesis](2026-09-12-relay-design-review-synthesis.md).
+connected slice. The [amended contract](../../../relay/docs/plans/2026-09-12-relay-design-assessment.md)
+incorporates the [review synthesis](../../../relay/docs/plans/2026-09-12-relay-design-review-synthesis.md).
 Candidate installation and disposable task creation were subsequently authorized;
 native acceptance and product pilot remain gates. This is the single successor plan,
 replacing the earlier Flow-adaptation proposal at this path. Completed native
@@ -49,7 +49,7 @@ probe evidence remains valid within its recorded limits.
 Qualification checkpoint (2026-09-12): the installed shared-storage candidate at
 `0cae260` completed the recovered mixed journey and a one-turn dependent successor.
 The latter self-corrected one wrong-actor admission attempt; it is not a cold-start
-budget PASS. [Consolidated evidence and remaining gates](../field-tests/2026-09-12-relay-native-qualification.md)
+budget PASS. [Consolidated evidence and remaining gates](../../../relay/docs/field-tests/2026-09-12-relay-native-qualification.md)
 separate native success from still-unqualified failure/coexistence/startup and pilot
 boundaries. No pilot, release, main merge or product-project change is authorized here.
 
@@ -64,7 +64,7 @@ and useful next-assignment admission.
 Flow with shorter skills or a compatibility wrapper.** Success means fewer
 necessary concepts and operations, not feature parity or a LOC target.
 Codex Orchestration is the umbrella project; Flow and Relay are plugins
-([ADR 0074](../adr/0074-relay-successor-identity.md)).
+([ADR 0074](../../../../docs/adr/0074-relay-successor-identity.md)).
 
 ## Evidence and uncertainty
 
@@ -72,7 +72,7 @@ Codex Orchestration is the umbrella project; Flow and Relay are plugins
   passed coordinator/executor/successor behavior and retained-source archival.
   Do not repeat it without a relevant host change. It does not prove Relay's
   ownership, reporting, recovery, or installed coexistence.
-- The [consultation synthesis](2026-09-12-serial-architecture-consultation-synthesis.md)
+- The [consultation synthesis](../../../../docs/plans/2026-09-12-serial-architecture-consultation-synthesis.md)
   identifies reporting extraction as the unresolved dependency boundary.
   Existing reporting imports lifecycle owners and recursively stages `lib`;
   copying a few entrypoints does not prove a small independent package.
@@ -118,7 +118,7 @@ plugins, and each plugin owns its build, validation, packaging and versioning.
 That later migration must verify path, release-tooling and installation
 compatibility before changing legacy sources. No shared runtime library,
 synchronized releases or new workspace framework is required by this layout.
-See [ADR 0074](../adr/0074-relay-successor-identity.md).
+See [ADR 0074](../../../../docs/adr/0074-relay-successor-identity.md).
 
 ## Consequential constraints
 
@@ -322,7 +322,7 @@ hook-trust or reload requirement remains a user boundary, not permission to bypa
 
 ## Acceptance evidence
 
-Track known failure families in the umbrella [issue checklist](../known-issues.md).
+Track known failure families in the umbrella [issue checklist](../../../../docs/known-issues.md).
 Update each plugin's status with verified closure evidence; plan coverage alone
 does not close an issue, and Relay fixes do not imply legacy Flow fixes.
 

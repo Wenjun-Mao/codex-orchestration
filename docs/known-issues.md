@@ -21,7 +21,7 @@ not additional requirements in the reporting-only replacement.
 - [x] Confirmed exact CLI-version pin disabled forwarding after an otherwise
   compatible App update. Replaced with handshake/account and exact queue-response
   validation. Real send arrived intact on CLI 0.155.0-alpha.9; 37/37 source and
-  22/22 packaged tests pass. See [verification](field-tests/2026-09-17-relay-035-app-update.md).
+  22/22 packaged tests pass. See [verification](../plugins/relay/docs/field-tests/2026-09-17-relay-035-app-update.md).
 
 ## Relay 0.3.4 maintenance correction — 2026-09-14
 
@@ -51,12 +51,12 @@ explicitly labelled design risks. Relay has an accepted source-only candidate;
 native qualification and pilot remain open. The installed candidate has completed
 a recovered mixed native journey, useful successors and a failed-check recovery
 with independent repair. Startup measurement misses the lightness targets.
-See the [qualification checkpoint](field-tests/2026-09-12-relay-native-qualification.md)
+See the [qualification checkpoint](../plugins/relay/docs/field-tests/2026-09-12-relay-native-qualification.md)
 for proven boundaries and remaining gates; installation is not broad acceptance.
 
 Latest release qualification: source `937ee45` passes 30/30 source and 15/15
 packed tests; `f627eef` has a complete bounded real-project pilot and accepted
-no-change successor ([pilot evidence](field-tests/2026-09-12-relay-product-pilot.md)).
+no-change successor ([pilot evidence](../plugins/relay/docs/field-tests/2026-09-12-relay-product-pilot.md)).
 Existing Flow reporting after Relay installation has recipient-side attestation.
 The dated original source checkpoint below is historical, not current release
 status. Open Relay boxes describe their specific remaining proof/efficiency limits;
@@ -139,7 +139,7 @@ and permits an authorized successor without rewriting the failed claim.
 Evidence: `coordinator-work.mjs` permits only started/completed;
 `workflow-journal.mjs::assertHistoricalStartedTasksUnchanged`; the 2026-09-12
 read-only incident check found the offending commit clean and preserved. See
-[recovery contract](plans/2026-09-12-relay-design-assessment.md).
+[recovery contract](../plugins/relay/docs/plans/2026-09-12-relay-design-assessment.md).
 
 ### KI-02 — Automatic stale-lock reclamation can admit two owners
 
@@ -157,8 +157,8 @@ primitive/recovery contract; deterministic contention must never admit two owner
   recovery and exact explicit quiescent lock recovery. Cooperative source ownership
   still requires genuinely stopped external writers; it is not an OS sandbox.
 
-Evidence: [core.mjs](../lib/core.mjs)::withProcessLock and
-[review synthesis](plans/2026-09-12-relay-design-review-synthesis.md).
+Evidence: [core.mjs](../plugins/flow/lib/core.mjs)::withProcessLock and
+[review synthesis](../plugins/relay/docs/plans/2026-09-12-relay-design-review-synthesis.md).
 
 ### KI-03 — Never-started registration residue blocks new work
 
@@ -179,8 +179,9 @@ fence waiver. Test interruption, late starts and real overlapping successor work
 - [ ] **Relay — prevention required:** revoke never-write-enabled reservations
   without fabricating success; reject late starts and retain orphan-task facts.
 
-Evidence: [ADR 0073](adr/0073-unstarted-assignment-settlement.md). The candidate is
-not an installed Flow release or a general clean-start solution.
+Historical evidence: candidate `18b1246` (discarded, including its ADR 0073;
+not part of the current tree). It is not an installed Flow release or a general
+clean-start solution.
 
 ### KI-04 — Historical lifecycle checks obstruct retained-checkout successors
 
@@ -203,7 +204,7 @@ legitimate successors. Different legacy predicates may require different fixes.
   preserved baseline and retired both tasks without replay or namespace removal.
   This does not close every accumulated-history counterexample.
 
-Evidence: [assessment](plans/2026-09-12-relay-design-assessment.md) and
+Evidence: [assessment](../plugins/relay/docs/plans/2026-09-12-relay-design-assessment.md) and
 [consultation synthesis](plans/2026-09-12-serial-architecture-consultation-synthesis.md).
 Close with an accumulated-history journey, not an isolated classifier test.
 
@@ -229,8 +230,8 @@ exact receipt through the real native path without restoring source permission.
   and real Stop/read/acknowledge/accept/retire journeys pass. No cross-host or native
   message-delivery claim; same-host receipt is accurately labelled shared storage.
 
-Evidence: [native adapter](../lib/codex-app-report-adapter.mjs) and
-[reporting gates](plans/2026-09-12-relay-design-assessment.md). Require real final
+Evidence: [native adapter](../plugins/flow/lib/codex-app-report-adapter.mjs) and
+[reporting gates](../plugins/relay/docs/plans/2026-09-12-relay-design-assessment.md). Require real final
 capture and exact recipient receipt in addition to synthetic interruption tests.
 
 2026-09-12 live qualification: structured native final objects required a parser
@@ -261,8 +262,8 @@ child reporting/archive duties.
   task-only archive results while the single retained checkout survives. Ambiguous
   host outcomes remain separately covered by source tests, not this live journey.
 
-Evidence: [archive lifecycle](../lib/archive-lifecycle.mjs),
-[native feasibility limits](field-tests/2026-09-11-serial-native-feasibility.md).
+Evidence: [archive lifecycle](../plugins/flow/lib/archive-lifecycle.mjs),
+[native feasibility limits](../plugins/flow/docs/field-tests/2026-09-11-serial-native-feasibility.md).
 
 ### KI-07 — Startup makes agents reconstruct mechanical protocol inputs
 
@@ -299,8 +300,8 @@ including director preparation, rather than claiming savings from shorter output
   Prepare-to-READY: 22.374s including host/model scheduling; no additional restart.
   Identity friction is corrected in this journey; the token gate stays open.
 
-Evidence: [startup note](field-tests/2026-09-12-coordinator-startup-overhead.md) and
-[plan acceptance](plans/2026-09-11-serial-first-delivery.md). Targets are not results.
+Evidence: [startup note](../plugins/flow/docs/field-tests/2026-09-12-coordinator-startup-overhead.md) and
+[plan acceptance](../plugins/flow/docs/plans/2026-09-11-serial-first-delivery.md). Targets are not results.
 
 ### KI-08 — Reporting extraction can silently retain the legacy engine
 
@@ -317,7 +318,7 @@ run the relocated packed public CLI and eventual hook with Flow unavailable.
   allowlist, no legacy runtime imports; 15/15 relocated packed-artifact tests pass
   without Flow staged alongside. Genuine native hook capture also passed.
 
-Evidence: [dependency assessment](plans/2026-09-12-relay-design-assessment.md).
+Evidence: [dependency assessment](../plugins/relay/docs/plans/2026-09-12-relay-design-assessment.md).
 Small entrypoints alone do not prove a small or independent artifact.
 
 ### KI-09 — Ownership transfer and native binding need connected proof
@@ -346,7 +347,7 @@ behavior on the host. Idle or dead lock process does not establish writer quiesc
   probe limitation. Native creation still returned a ready rather than provisional
   ID; do not relabel source provisional fixtures as live host evidence.
 
-Evidence: [review synthesis](plans/2026-09-12-relay-design-review-synthesis.md).
+Evidence: [review synthesis](../plugins/relay/docs/plans/2026-09-12-relay-design-review-synthesis.md).
 Verify crash boundaries locally, then qualify actual native identity/report/archive
 behavior and separate-repository Flow coexistence before installation.
 
@@ -376,7 +377,7 @@ independent baseline while old work remains failed/cancelled and cannot satisfy
 accepted-result dependencies. Relay is not required to import v0.8 journals.
 
 Evidence: 2026-09-12 read-only inspection of Mafinance's frozen v0.8.3 source;
-current [refresh contract](../lib/compat/refresh.mjs) enforces exact replacement
+current [refresh contract](../plugins/flow/lib/compat/refresh.mjs) enforces exact replacement
 coverage and semantic equivalence. No journal edits, replacement tasks, product
 acceptance or destructive cleanup were performed for this diagnosis.
 
@@ -394,17 +395,17 @@ unchanged explicit receipt/acceptance, and safe task retirement after sender sto
 
 - [x] **Relay 0.2:** genuine idle wakeup → frozen report review → exact worker
   cleanup qualified; post-retirement successor preparation also passed. No daemon,
-  private IPC or hidden wait loop. [Boundaries and evidence](field-tests/2026-09-12-relay-0.2.0-native-wakeup.md).
+  private IPC or hidden wait loop. [Boundaries and evidence](../plugins/relay/docs/field-tests/2026-09-12-relay-0.2.0-native-wakeup.md).
 - [ ] **Follow-through:** observe the next useful product delivery under the new
   director experience; the RC1 live test was no-change, not a product implementation.
 - [x] **Relay 0.3 connected canary:** recovered coordinator/executor delivery,
   direct question/reply, hook-owned idle wakeup, child-first retirement and useful
   successor completed. One notification attempt per final; no worker reporting
   continuation. This is a tiny native canary, not broad product-pilot evidence.
-  [Interventions and evidence](field-tests/2026-09-12-relay-0.3.0-rc1-hook-candidate.md).
+  [Interventions and evidence](../plugins/relay/docs/field-tests/2026-09-12-relay-0.3.0-rc1-hook-candidate.md).
 - [ ] **Flow:** not reassessed; no legacy notification changes authorized.
 
-Implementation kickoff: [approved connected plan](plans/2026-09-12-relay-director-experience.md).
+Implementation kickoff: [approved connected plan](../plugins/relay/docs/plans/2026-09-12-relay-director-experience.md).
 
 ### KI-12 — Existing Flow projects lack a clear Relay adoption entrypoint
 
@@ -475,4 +476,4 @@ service is required. The precise reason for the host's missing message is unreso
 
 Evidence: Relay `lib/reports.mjs` capture/submit/receive contracts at `c08dec4`;
 the canary's preserved `director-empty-final-wait.json`; approved
-[receipt amendment](plans/2026-09-11-serial-first-delivery.md#3a-approved-amendment--shared-storage-receipt-2026-09-12).
+[receipt amendment](../plugins/flow/docs/plans/2026-09-11-serial-first-delivery.md#3a-approved-amendment--shared-storage-receipt-2026-09-12).

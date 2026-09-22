@@ -89,6 +89,6 @@ unpreserved product work, ambiguous destructive targets, or required restart.
 Otherwise continue within this slice without per-step confirmation. Version and
 release claims follow actual qualification, not the existence of a director skill.
 
-References: [personal adoption](../adr/0075-personal-flow-to-relay-adoption.md),
-[existing native contract](../../plugins/relay/docs/decisions/0002-native-adapter.md),
+References: [personal adoption](../../../../docs/adr/0075-personal-flow-to-relay-adoption.md),
+[existing native contract](../decisions/0002-native-adapter.md),
 [official hooks](https://learn.chatgpt.com/docs/hooks).

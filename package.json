@@ -1,51 +1,10 @@
 {
-  "name": "@wjmao/codex-flow",
-  "version": "0.9.13",
-  "description": "Dependency-free repository tooling for coordinated Codex task workflows.",
+  "name": "codex-orchestration-workspace",
   "private": true,
-  "homepage": "https://github.com/Wenjun-Mao/codex-orchestration#readme",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/Wenjun-Mao/codex-orchestration.git"
-  },
-  "bugs": {
-    "url": "https://github.com/Wenjun-Mao/codex-orchestration/issues"
-  },
-  "type": "module",
-  "bin": {
-    "codex-flow": "./bin/codex-flow.mjs",
-    "codex-flow-report-hook": "./bin/codex-flow-report-hook.mjs"
-  },
   "scripts": {
-    "test": "npm run test:v09",
-    "test:v09": "node --test --test-concurrency=1 test/*-v09.test.mjs test/*-v093.test.mjs test/*-v097.test.mjs test/recipient.test.mjs test/release-identity.test.mjs",
-    "validate": "node scripts/validate.mjs",
-    "prepack": "node scripts/release-identity.mjs",
-    "pack:check": "npm pack --dry-run"
-  },
-  "engines": {
-    "node": ">=20.11"
-  },
-  "files": [
-    ".codex-plugin/",
-    "bin/",
-    "hooks/",
-    "lib/",
-    "schemas/",
-    "examples/",
-    "skills/",
-    "templates/",
-    "docs/adr/",
-    "docs/coverage-v0.9.md",
-    "docs/architecture-v0.9.md",
-    "docs/compatibility-capsules-v0.9.md",
-    "docs/lessons-learned-v0.8.md",
-    "docs/mission.md",
-    "README.md",
-    "LICENSE",
-    "CONTRIBUTING.md",
-    "SECURITY.md",
-    "CHANGELOG.md"
-  ],
-  "license": "MIT"
+    "test": "npm --prefix plugins/relay test",
+    "validate": "npm --prefix plugins/relay run pack:check",
+    "test:flow": "npm --prefix plugins/flow test",
+    "validate:flow": "npm --prefix plugins/flow run validate"
+  }
 }

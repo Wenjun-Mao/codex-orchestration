@@ -17,7 +17,7 @@ records acceptance/rejection and completes child-first retirement.
 The hook is the primary automatic path, not a second sender trying to determine
 whether the worker forgot. Explicit human/agent discussion remains possible but
 does not substitute for receipt or trigger another automatic completion send.
-The accepted boundary is [ADR 0076](../adr/0076-relay-collaboration-and-completion.md):
+The accepted boundary is [ADR 0076](../../../../docs/adr/0076-relay-collaboration-and-completion.md):
 direct messages for collaboration; hook-owned reporting for completion.
 
 ## Diagnosis and scope
@@ -133,6 +133,6 @@ conflicting active runtime use, lost/unpreserved work, or a required App restart
 If feasibility fails, preserve the working 0.2.1 behavior and report the concrete
 tradeoff instead of implementing a differently named worker continuation.
 
-References: [current decision](../../plugins/relay/docs/decisions/0003-director-notification.md),
+References: [current decision](../decisions/0003-director-notification.md),
 [prior live qualification](../field-tests/2026-09-12-relay-0.2.0-native-wakeup.md),
 [director-experience plan](2026-09-12-relay-director-experience.md).

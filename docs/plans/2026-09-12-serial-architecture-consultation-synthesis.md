@@ -7,7 +7,7 @@ records interpretation separately; consultant recommendations are not test evide
 
 Subsequent user direction: prefer the serial-first successor, named **Relay**,
 without feature parity or two equally maintained products. Freeze legacy Flow
-for existing obligations. The revised [successor plan](2026-09-11-serial-first-delivery.md)
+for existing obligations. The revised [successor plan](../../plugins/flow/docs/plans/2026-09-11-serial-first-delivery.md)
 is the current planning authority; the working recommendation below records the
 earlier consultation synthesis, not a competing implementation plan.
 

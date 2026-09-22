@@ -2,7 +2,7 @@
 
 Status: amendments approved and incorporated; connected source implementation
 approved, delivery dispatch still pending. Supplements
-the [canonical plan](2026-09-11-serial-first-delivery.md) and
+the [canonical plan](../../../flow/docs/plans/2026-09-11-serial-first-delivery.md) and
 [assessment](2026-09-12-relay-design-assessment.md); not another execution plan.
 
 Both reviewers state they inspected `816c575072a97d0b8a8903a2fa22de14eb3c4e6b`.
@@ -37,7 +37,7 @@ broad architecture audit, legacy repair campaign or general framework is needed.
 ## Consequential source checks
 
 The director rechecked the new lock finding in
-[core.mjs](../../lib/core.mjs)::withProcessLock. It reads a dead owner's lock and
+[core.mjs](../../../flow/lib/core.mjs)::withProcessLock. It reads a dead owner's lock and
 later renames the current lock path without an atomic identity condition. Two
 callers can observe stale S; A replaces S and enters, then B renames A's new live
 lock using B's earlier observation and also enters. This confirms a static race
@@ -52,9 +52,9 @@ change installed Flow as part of this design review; any protective legacy fix
 requires a separately scoped decision and validation.
 
 The director also rechecked all-of-lib staging in
-[report-runtime.mjs](../../lib/adapters/codex-app/report-runtime.mjs), queue use in
-[codex-app-report-adapter.mjs](../../lib/codex-app-report-adapter.mjs), and the
-package-version state namespace in [git.mjs](../../lib/git.mjs). These support the
+[report-runtime.mjs](../../../flow/lib/adapters/codex-app/report-runtime.mjs), queue use in
+[codex-app-report-adapter.mjs](../../../flow/lib/codex-app-report-adapter.mjs), and the
+package-version state namespace in [git.mjs](../../../flow/lib/git.mjs). These support the
 assessment's extraction boundary. Staging all files does not mean executing them
 all; verification-module coupling does not mean every call invokes dispositions.
 

@@ -42,7 +42,7 @@ keeps intentional collaboration flexible and automatic completion deterministic.
 This supersedes decision 0003's worker-continuation choice for new assignments.
 Experimental queue transport was explicitly accepted and qualified; compatibility
 and connected native evidence are recorded under the
-[implementation plan](../plans/2026-09-12-relay-hook-owned-reporting.md).
+[implementation plan](../../plugins/relay/docs/plans/2026-09-12-relay-hook-owned-reporting.md).
 Do not modify the installed path before its replacement is verified.
 
 ## Deferred decision-record audit
