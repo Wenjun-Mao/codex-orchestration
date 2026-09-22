@@ -17,11 +17,14 @@ test work, certify completion, or archive tasks. Directors and coordinators foll
    worktree/branch only for a stated isolation need or an explicit user request.
    Never let manager and worker edit concurrently. Read-only native subagents must remain attended until
    their results are collected; Relay does not route subagent completions.
-3. Obtain the real native worker ID. If creation returns a provisional ID, resolve that
-   same task with native task tools; never create a duplicate. Use the manager's
-   host-provided `CODEX_THREAD_ID`, not an invented identity.
-4. Run `node <plugin-root>/bin/relay.mjs register --repo <repo> --worker <worker-id> --manager <manager-id>`.
-   Confirm success before becoming idle. If the worker already finished before registration,
+3. Include your host-provided `CODEX_THREAD_ID` as the manager ID in the launch brief,
+   and tell the worker to use Relay deliver and register itself before starting work.
+   This applies equally to director→coordinator and coordinator→executor delegation.
+4. When the real worker ID is available, you may also run
+   `node <plugin-root>/bin/relay.mjs register --repo <repo> --worker <worker-id> --manager <manager-id>`.
+   Identical registration preserves the route. A provisional creation ID is not a
+   worker ID; do not create a duplicate or keep polling solely to register it—the
+   worker registers with its own identity. If the worker already finished before registration,
    read its actual final with native tools; do not synthesize a Stop or replay it.
 5. Become available to the user. Workers use direct messages for mid-work questions;
    respond and resume the same task with native messaging when needed. Do not assume

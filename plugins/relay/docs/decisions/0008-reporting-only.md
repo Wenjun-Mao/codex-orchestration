@@ -34,6 +34,14 @@ final receipt and idle confirmation. A Codex Usage worker deleted its worktree
 before its final, preventing all Stop hooks from launching. This is a workflow
 ordering correction, not a new reporting gate.
 
+Workers register at startup using their native ID and the manager ID in the brief.
+Manager registration remains an idempotent fallback. In ADE, a worker ran to
+completion while the manager's task-list lookups did not expose it; no route was
+registered. Registration belongs on the side that already knows both IDs, not
+behind provisional-ID discovery. No discovery poller, handshake, or runtime change
+is needed. Missing/conflicting IDs are reported rather than guessed; already-ended
+unregistered finals are read natively, never replayed through a synthetic Stop.
+
 Test routing replay/conflicts, locks/atomicity, malformed and legacy state, shared
 worktrees, unchanged source, exact forwarding and native response validation.
 Package only routing dependencies. Keep historical decisions outside the runtime.

@@ -141,3 +141,23 @@ test('linked worktrees share one routing registry', t => {
   assert.equal(new Routes(linked).root, f.routes.root);
   assert.equal(captureStopEvent({ ...f.event, cwd: linked }).notification.recipient, f.manager);
 });
+
+test('worker startup registration delivers before manager discovery; fallback preserves route', async t => {
+  const f = fixture(t), linked = join(f.repo, 'worker');
+  f.git('worktree', 'add', '--detach', linked, 'HEAD');
+  const startup = spawnSync(process.execPath, [cli, 'register', '--repo', linked,
+    '--worker', f.worker, '--manager', f.manager], { encoding: 'utf8' });
+  assert.equal(startup.status, 0, startup.stderr);
+  const before = readFileSync(f.routes.file, 'utf8'), requests = [];
+  const result = await processStopEvent({ ...f.event, cwd: linked }, {
+    submit: async request => { requests.push(request); return { status: 'queued' }; },
+  });
+  assert.equal(result.status, 'queued');
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].recipient, f.manager);
+  assert.equal(requests[0].text, f.event.last_assistant_message);
+  assert.equal(f.command('register', '--worker', f.worker, '--manager', f.manager).status, 0);
+  assert.equal(readFileSync(f.routes.file, 'utf8'), before);
+  assert.notEqual(f.command('register', '--worker', f.worker, '--manager', randomUUID()).status, 0);
+  assert.equal(readFileSync(f.routes.file, 'utf8'), before);
+});

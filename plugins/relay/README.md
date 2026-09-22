@@ -19,7 +19,8 @@ node bin/relay.mjs unregister --repo /project --worker WORKER_UUID --manager MAN
 
 Same-host native Codex tasks in Git repositories only. Routing lives in the Git common
 directory at `relay/routes.json`; it contains only schema, worker IDs, manager IDs,
-and route UUIDs. Register real IDs before the manager becomes idle. A missed early
+and route UUIDs. Workers register at startup using their native ID and the manager
+ID in the brief; manager registration is an idempotent fallback. A missed early
 final can be read natively, not synthetically replayed.
 
 The hook reads without writing, looks up the current sender title, and submits one
