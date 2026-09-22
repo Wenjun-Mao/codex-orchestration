@@ -18,6 +18,8 @@ save a report file, or invoke the hook manually. A registered Stop hook forwards
 your actual final unchanged, preceded only by `From: <current task title>`.
 
 The manager reviews work and handles native archival and route removal. Do not
-self-archive or remove your route. Relay imposes no checks, Git baseline, contract,
+self-archive, remove your route, or delete your own task checkout/worktree or its branch.
+Leave them intact for final reporting; the manager cleans up after receiving the
+final and confirming you are idle. Relay imposes no checks, Git baseline, contract,
 or acceptance record. Use ignored project-local scratch only when actually needed.
 Native subagents are attended read-only support: collect their results before ending.

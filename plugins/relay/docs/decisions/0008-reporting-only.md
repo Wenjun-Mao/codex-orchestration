@@ -27,6 +27,13 @@ not retried. The native client ID provides stable deduplication identity, not a 
 local exactly-once protocol. In-flight sends may complete after route removal.
 
 ## Guardrails
+Serial dispatch explicitly selects the retained checkout where authorized, rather
+than inheriting a worktree default. Isolation needs a stated reason or user request.
+Workers never delete their own task directory or branch; managers clean up after
+final receipt and idle confirmation. A Codex Usage worker deleted its worktree
+before its final, preventing all Stop hooks from launching. This is a workflow
+ordering correction, not a new reporting gate.
+
 Test routing replay/conflicts, locks/atomicity, malformed and legacy state, shared
 worktrees, unchanged source, exact forwarding and native response validation.
 Package only routing dependencies. Keep historical decisions outside the runtime.
