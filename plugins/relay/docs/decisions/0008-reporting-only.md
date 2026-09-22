@@ -45,3 +45,11 @@ unregistered finals are read natively, never replayed through a synthetic Stop.
 Test routing replay/conflicts, locks/atomicity, malformed and legacy state, shared
 worktrees, unchanged source, exact forwarding and native response validation.
 Package only routing dependencies. Keep historical decisions outside the runtime.
+
+## Context-efficient review
+Briefs supply relevant entrypoints; workers prepare concise, review-ready finals
+with change/evidence pointers and verification limits. Managers use targeted reads
+and independent, risk-based review rather than reconstructing the whole work session.
+Routine completion uses Relay instead of polling. This addresses repeated discovery
+and oversized tool output, not review quality: no mandatory report schema, extra
+files, automated acceptance, or claimed token-saving percentage is introduced.

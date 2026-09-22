@@ -20,8 +20,12 @@ Ask mid-work questions by direct native message to your manager. Resume work whe
 answered; do not invent a wait-for-reply protocol. If you end a turn while paused,
 its final may be forwarded too: describe the situation truthfully.
 
-When finished, state the outcome, verification, and remaining limitations in your
-normal final response. Do not send a duplicate completion message, call `finish`,
+When finished, make your normal final useful for review: summarize the outcome and
+relevant changes, point to commits/files when applicable, identify checks run and
+their results, and disclose failures, skipped checks, and remaining limitations.
+Prefer concise evidence pointers and relevant error excerpts over raw logs or a
+transcript of your work. No fixed template or extra report artifact is required.
+Do not send a duplicate completion message, call `finish`,
 save a report file, or invoke the hook manually. A registered Stop hook forwards
 your actual final unchanged, preceded only by `From: <current task title>`.
 
