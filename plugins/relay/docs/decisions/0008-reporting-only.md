@@ -53,3 +53,35 @@ and independent, risk-based review rather than reconstructing the whole work ses
 Routine completion uses Relay instead of polling. This addresses repeated discovery
 and oversized tool output, not review quality: no mandatory report schema, extra
 files, automated acceptance, or claimed token-saving percentage is introduced.
+
+An active native Goal is the exception to ending the manager's turn for idle
+availability: continue useful independent work, or use bounded native task waiting
+when dependent on a worker. Serial-write restrictions and user communication remain.
+Ending a turn does not itself pause the Goal; native lifecycle and budget rules
+still govern. Relay forwarding is unchanged, with no Goal state in its registry.
+See [native Goal continuation](https://developers.openai.com/cookbook/examples/codex/using_goals_in_codex#how-goals-are-designed-in-codex).
+
+## Manager-side model guidance — 2026-09-22
+
+Use a small, difficulty-based preference in the direct skill, shared by directors
+and coordinators, applying equally to coordinator, executor and native subagent
+selection. Luna/High is the economical starting point for bounded work, with
+Xhigh/Max optional for deeper reasoning. Sol/Medium is the starting point for
+challenging work, with High/Xhigh optional for more demanding judgment. Choose
+directly, not through a mandatory escalation ladder; broader judgment can justify
+Sol rather than Luna/Max. Do not duplicate model
+choices in worker briefs, registry fields or runtime validation. User choices and
+native dispatch permissions still govern; no automatic fallback or escalation engine.
+Whichever role launches a native subagent announces its purpose, model and effort
+before spawning, matching the actual configuration and disclosing inherited or
+unverified settings. Both direct and deliver carry this visibility rule; it adds
+no registry fields, worker-brief requirements or runtime checks.
+
+The [current Codex model guide](https://developers.openai.com/codex/models)
+recommends starting at Luna/High and Sol/Medium. Standard short-context
+[API prices](https://developers.openai.com/api/docs/pricing), per million input/output
+tokens, are $0.10/$0.50 for GPT-6 Luna and $2/$10 for GPT-6 Sol, versus
+$0.20/$1.20 for GPT-5.6 Luna and $2/$12 for GPT-5.6 Terra. These are dated API
+rates, not Codex subscription usage estimates or proof of universal Luna/Terra
+capability parity. Review real task outcomes before broader capability claims;
+retired Flow guidance remains historical rather than becoming a second maintained policy.

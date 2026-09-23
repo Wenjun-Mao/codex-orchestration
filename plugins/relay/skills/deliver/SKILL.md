@@ -20,14 +20,11 @@ Ask mid-work questions by direct native message to your manager. Resume work whe
 answered; do not invent a wait-for-reply protocol. If you end a turn while paused,
 its final may be forwarded too: describe the situation truthfully.
 
-When finished, make your normal final useful for review: summarize the outcome and
-relevant changes, point to commits/files when applicable, identify checks run and
-their results, and disclose failures, skipped checks, and remaining limitations.
-Prefer concise evidence pointers and relevant error excerpts over raw logs or a
-transcript of your work. No fixed template or extra report artifact is required.
-Do not send a duplicate completion message, call `finish`,
-save a report file, or invoke the hook manually. A registered Stop hook forwards
-your actual final unchanged, preceded only by `From: <current task title>`.
+Finish with a concise outcome, change/evidence pointers, checks/results and any
+failures, skips or limitations—not full logs or a work transcript. The registered
+Stop hook forwards this final unchanged with `From: <current task title>`.
+No fixed template, duplicate completion message, `finish` command, report file
+or manual hook invocation.
 
 The manager reviews work and handles native archival and route removal. Do not
 self-archive, remove your route, or delete your own task checkout/worktree or its branch.
@@ -35,3 +32,5 @@ Leave them intact for final reporting; the manager cleans up after receiving the
 final and confirming you are idle. Relay imposes no checks, Git baseline, contract,
 or acceptance record. Use ignored project-local scratch only when actually needed.
 Native subagents are attended read-only support: collect their results before ending.
+Before spawning, announce the subagent's purpose and actual model/effort;
+label inherited or unverified settings honestly.
