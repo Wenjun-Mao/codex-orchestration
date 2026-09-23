@@ -61,9 +61,8 @@ subagents. Choose by task difficulty, not role. Explicit user choices take prece
 | Challenging coding, integration or coordination with meaningful ambiguity | GPT-6 Sol / Medium |
 | Difficult architecture, high-risk decisions or persistent reasoning failures | GPT-6 Sol / High |
 
-Default every GPT-6 Luna selection to Max unless the user overrides it. Sol also
-allows Xhigh. Choose directly, not through
-an escalation ladder; prefer Sol over Luna/Max when broader judgment is needed.
+Sol also allows Xhigh. Choose directly, not through an escalation ladder;
+prefer Sol over Luna/Max when broader judgment is needed.
 
 Set supported native model/effort fields explicitly; disclose unavailable choices.
 Reserve Astra for demonstrated need or user request. Escalate for inadequate reasoning,
