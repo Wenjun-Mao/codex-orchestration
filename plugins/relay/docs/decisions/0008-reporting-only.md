@@ -54,6 +54,12 @@ Routine completion uses Relay instead of polling. This addresses repeated discov
 and oversized tool output, not review quality: no mandatory report schema, extra
 files, automated acceptance, or claimed token-saving percentage is introduced.
 
+Directors and coordinators reuse workers for review fixes and follow-up work on
+the same assignment, archiving after review and completion. Separate assignments
+use new tasks where native creation is authorized. This preserves useful context
+without treating each final response as a reason to replace the worker; no runtime
+lifecycle tracking is added.
+
 An active native Goal is the exception to ending the manager's turn for idle
 availability: continue useful independent work, or use bounded native task waiting
 when dependent on a worker. Serial-write restrictions and user communication remain.
