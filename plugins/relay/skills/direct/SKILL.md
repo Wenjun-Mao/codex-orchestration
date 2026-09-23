@@ -57,11 +57,12 @@ subagents. Choose by task difficulty, not role. Explicit user choices take prece
 
 | Work | Model / reasoning |
 | --- | --- |
-| Clear, bounded implementation, routine coordination or focused verification | GPT-6 Luna / High |
+| Clear, bounded implementation, routine coordination or focused verification | GPT-6 Luna / Max |
 | Challenging coding, integration or coordination with meaningful ambiguity | GPT-6 Sol / Medium |
 | Difficult architecture, high-risk decisions or persistent reasoning failures | GPT-6 Sol / High |
 
-Optional deeper reasoning: Luna Xhigh/Max; Sol Xhigh. Choose directly, not through
+Default every GPT-6 Luna selection to Max unless the user overrides it. Sol also
+allows Xhigh. Choose directly, not through
 an escalation ladder; prefer Sol over Luna/Max when broader judgment is needed.
 
 Set supported native model/effort fields explicitly; disclose unavailable choices.

@@ -65,8 +65,8 @@ See [native Goal continuation](https://developers.openai.com/cookbook/examples/c
 
 Use a small, difficulty-based preference in the direct skill, shared by directors
 and coordinators, applying equally to coordinator, executor and native subagent
-selection. Luna/High is the economical starting point for bounded work, with
-Xhigh/Max optional for deeper reasoning. Sol/Medium is the starting point for
+selection. Luna/Max is the user-selected default for all Luna calls unless explicitly
+overridden. Sol/Medium is the starting point for
 challenging work, with High/Xhigh optional for more demanding judgment. Choose
 directly, not through a mandatory escalation ladder; broader judgment can justify
 Sol rather than Luna/Max. Do not duplicate model
@@ -77,8 +77,10 @@ before spawning, matching the actual configuration and disclosing inherited or
 unverified settings. Both direct and deliver carry this visibility rule; it adds
 no registry fields, worker-brief requirements or runtime checks.
 
-The [current Codex model guide](https://developers.openai.com/codex/models)
-recommends starting at Luna/High and Sol/Medium. Standard short-context
+The [Codex model guide](https://developers.openai.com/codex/models) recommends
+starting at Luna/High and Sol/Medium. Our Luna/Max preference instead follows the
+user's quality/cost tradeoff after reviewing the [launch evaluations](https://openai.com/index/introducing-gpt-6-sol-and-luna/);
+it is not a claim that Max is always faster or cheaper per task. Standard short-context
 [API prices](https://developers.openai.com/api/docs/pricing), per million input/output
 tokens, are $0.10/$0.50 for GPT-6 Luna and $2/$10 for GPT-6 Sol, versus
 $0.20/$1.20 for GPT-5.6 Luna and $2/$12 for GPT-5.6 Terra. These are dated API

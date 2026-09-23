@@ -32,5 +32,6 @@ Leave them intact for final reporting; the manager cleans up after receiving the
 final and confirming you are idle. Relay imposes no checks, Git baseline, contract,
 or acceptance record. Use ignored project-local scratch only when actually needed.
 Native subagents are attended read-only support: collect their results before ending.
+If selecting GPT-6 Luna, default to Max unless the user overrides it.
 Before spawning, announce the subagent's purpose and actual model/effort;
 label inherited or unverified settings honestly.
