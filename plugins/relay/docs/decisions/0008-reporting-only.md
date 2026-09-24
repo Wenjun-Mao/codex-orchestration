@@ -81,8 +81,14 @@ the implementation approval boundary and check plan coherence before handoff.
 Validation should distinguish instruction/package checks from observed UI behavior.
 
 The skill is named `brainstorm-and-plan` to expose both activities. Its six explicit
-stages lead with user intent and connect project inspection to the affected workflow,
-rather than opening with generic source-reading instructions. It replaces `plan`
+sections are reusable checks, not mandatory rounds: enter at the requested activity,
+reuse established context, and revisit only missing or changed information. Depth
+follows uncertainty and consequences, not code size. Handoff resolves user intent,
+scope, acceptance criteria, and dependencies while preserving engineering discretion;
+feasibility investigation precedes dependent implementation. Maintain one plan per
+scope and link required durable decisions rather than duplicating rationale. These
+refinements address source-review risks, not demonstrated live-conversation failures.
+It replaces `plan`
 without a duplicate alias; historical changelog entries retain their original names.
 
 ## Manager-side model guidance — 2026-09-22

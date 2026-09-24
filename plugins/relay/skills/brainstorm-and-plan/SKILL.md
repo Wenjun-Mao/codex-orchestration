@@ -5,22 +5,26 @@ description: Explore project ideas collaboratively and draft, revise, or save a 
 # Brainstorm and Plan
 
 Turn the user's idea into a shared understanding, a reviewed design, and an actionable
-plan. Start with what they want to achieve—not with a proposed solution or a file-reading ritual.
+plan. Start from the requested activity and existing agreement. These sections are
+checks, not mandatory conversational rounds: revisit only missing or changed information,
+and stop when the requested exploration, revision, or saved plan is complete.
 
 ## 1. Understand the goal
 
 - Identify the problem, who the change serves, constraints, and what success means.
 - If purpose is missing, ask about it before proposing features. If already supplied,
   reflect it briefly rather than asking again. Separate the user's intent from your assumptions.
-- Explain the appropriate depth: a feasibility question needs a bounded probe proposal;
-  a small change needs a short design and steps; architectural work needs explicit
-  boundaries, interfaces, and dependencies. Adjust depth as evidence changes.
+- Scale depth to uncertainty and consequences, not just code size: propose a bounded
+  probe for feasibility questions, brief steps for straightforward changes, and explicit
+  boundaries/interfaces for architectural work. For broad ideas, agree on the next useful
+  deliverable before detailed planning; keep the larger direction brief.
 
 ## 2. Ground the discussion in the project
 
 - Read applicable repository instructions before repository work.
-- Locate the workflow being changed: its entrypoints, implementation, tests, and relevant
-  plans or decisions. Establish how it works today, what can be reused, and what must change.
+- Reuse established project context; inspect only enough to verify assumptions relevant
+  to this decision. Locate affected entrypoints, implementation, tests, and plans/decisions
+  to establish current behavior, reusable parts, and necessary changes—not repeat broad discovery.
 - For a new project, establish the starting constraints instead of searching for nonexistent code.
   Do not ask the user factual questions that this inspection can answer.
 
@@ -50,16 +54,20 @@ the plan. Do not require separate approval for every section or reconfirm settle
 
 ## 6. Write and check the plan
 
-- Include outcome, scope, concrete steps and relevant files, dependencies, verification,
-  and important risks. Distinguish confirmed facts, assumptions, and open questions.
-- Check coverage of the agreed requirements, contradictions, missing dependencies, and
-  hidden decisions. Resolve material choices rather than burying them in implementation steps.
-- Save implementation plans in the existing plans directory (otherwise `docs/plans/`).
-  Brief exploration can stay in chat unless a saved artifact is requested. Record durable
-  architecture decisions in the repository's ADR format; avoid extra contracts or journals.
+- A handoff-ready plan makes outcome, scope/exclusions, observable acceptance criteria,
+  ordered deliverables, relevant files, dependencies, and material risks clear. Distinguish
+  facts from assumptions; check requirement coverage and contradictions.
+- Resolve choices that change agreed behavior or scope; identify technical decisions left
+  to the implementer. Put unresolved feasibility investigations before dependent implementation.
+  The implementer should not guess user intent, but should still exercise engineering judgment;
+  do not require prewritten implementation/test code for every step.
+- Maintain one plan for the same scope, updating it rather than creating overlapping versions.
+  Save it in the existing plans directory (otherwise `docs/plans/`); brief exploration can stay
+  in chat. Record durable decisions as repository conventions require, linking ADRs rather
+  than duplicating rationale. Do not add documents merely because another stage was reached.
 - Default to serial work on the retained checkout. Explain any useful bounded independent
   review; do not invent parallel writers. Model choice belongs at native dispatch, not in worker briefs.
 
-Present the plan for review; planning does not authorize implementation or task creation.
+Present the result for review; planning does not authorize implementation or task creation.
 After implementation approval, use `direct` when managing delegated work. This skill
 does not switch native Plan mode or override its restrictions; defer file writes when prohibited.
