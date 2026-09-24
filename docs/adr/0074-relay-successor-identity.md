@@ -13,7 +13,7 @@ Name the successor **Relay**. Use one consistent identity:
 
 - Product and App display name: `Relay`.
 - Plugin identifier and CLI command: `relay`.
-- Skill prefix: `relay:`, for example `relay:plan`.
+- Skill prefix: `relay:`, for example `relay:brainstorm-and-plan` (renamed from `relay:plan`).
 - Plugin directory/package basename: `relay`; a distribution scope may be added if needed.
 
 The name expresses handoffs between agents without implying concurrent writers

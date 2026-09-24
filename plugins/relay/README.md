@@ -38,6 +38,6 @@ Do not switch an active old assignment's runtime. At a quiet checkpoint, preserv
 wanted work, archive finished tasks, and explicitly retire old state before registration.
 Legacy `control.json` is rejected, never migrated or erased automatically.
 
-See the direct/deliver/plan skills and [decision](docs/decisions/0008-reporting-only.md).
+See the direct/deliver/brainstorm-and-plan skills and [decision](docs/decisions/0008-reporting-only.md).
 Older decisions and acceptance notes in the source tree are historical, superseded
 where they describe lifecycle enforcement; they are not shipped in the 0.4 runtime.

@@ -1,5 +1,7 @@
 # 0.4.0
 
+- Rename `relay:plan` to `relay:brainstorm-and-plan`, with explicit intent-to-plan stages
+  and native question UI preference; no duplicate legacy skill.
 - Replace lifecycle controller with register/unregister/status routing.
 - Preserve exact Stop forwarding, sender attribution and bounded native transport.
 - Remove source contracts, verification, acceptance, baseline and retirement commands.

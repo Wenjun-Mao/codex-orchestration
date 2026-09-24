@@ -80,6 +80,11 @@ mandatory per-stage approvals and automatic heavier-process escalation; preserve
 the implementation approval boundary and check plan coherence before handoff.
 Validation should distinguish instruction/package checks from observed UI behavior.
 
+The skill is named `brainstorm-and-plan` to expose both activities. Its six explicit
+stages lead with user intent and connect project inspection to the affected workflow,
+rather than opening with generic source-reading instructions. It replaces `plan`
+without a duplicate alias; historical changelog entries retain their original names.
+
 ## Manager-side model guidance — 2026-09-22
 
 Use a small, difficulty-based preference in the direct skill, shared by directors
