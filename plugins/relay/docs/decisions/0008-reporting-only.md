@@ -23,8 +23,8 @@ maintenance burden. Automatic legacy conversion could strand active old workers.
 Instead, reject old control state and transition explicitly at a quiet checkpoint.
 Reporting does not prevent concurrent edits or guarantee delivery after a transport
 error. Skills require serial coordination and truthful review; ambiguous sends are
-not retried. The native client ID provides stable deduplication identity, not a new
-local exactly-once protocol. In-flight sends may complete after route removal.
+not retried. The client ID provides stable replay identity, not a local exactly-once
+protocol or a guarantee of native deduplication. In-flight sends may complete after route removal.
 
 ## Guardrails
 Serial dispatch explicitly selects the retained checkout where authorized, rather
@@ -45,6 +45,23 @@ unregistered finals are read natively, never replayed through a synthetic Stop.
 Test routing replay/conflicts, locks/atomicity, malformed and legacy state, shared
 worktrees, unchanged source, exact forwarding and native response validation.
 Package only routing dependencies. Keep historical decisions outside the runtime.
+
+## Reporting edge cases — 0.4.1
+
+Fault-injection review confirmed that continued Stop events were dropped, failed
+lock initialization could strand mutations, optional title lookup could exhaust the
+send deadline, and cleanup uncertainty could overwrite an exact queue acknowledgement.
+Correct these within existing modules: include exact report text in deterministic
+message identity and accept continued finals; remove known-owned incomplete files on
+handled initialization errors; give metadata only a bounded fraction of send time;
+return cleanup uncertainty separately from send status. Replay identity stays stable
+without persisting bodies, and ambiguous sends are never retried. Crash-left malformed
+locks need quiescent, exact-file manual recovery, not automatic expiry or registry reset.
+Structured UI warnings remain deferred until native rendering is verified; retain
+nonblocking stderr diagnostics. No new lifecycle machinery or planning changes.
+The 0.4.1 native transport probe returned different queue IDs for two acknowledged
+submissions with the same client ID. Do not assume the host suppresses duplicates;
+no local deduplication store or automatic retry is introduced to compensate.
 
 ## Context-efficient review
 Briefs supply relevant entrypoints; workers prepare concise, review-ready finals

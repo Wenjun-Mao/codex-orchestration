@@ -12,6 +12,9 @@ try {
   if (captured.notificationOutcome?.status === 'ambiguous') {
     process.stderr.write(`Relay send unconfirmed: ${captured.notificationOutcome.reason}\n`);
   }
+  if (captured.notificationOutcome?.cleanupWarning) {
+    process.stderr.write(`Relay helper cleanup unconfirmed; send status: ${captured.notificationOutcome.status}\n`);
+  }
   process.stdout.write('{}\n');
 } catch (error) {
   process.stderr.write(`Relay final capture failed: ${error.message}\n`);

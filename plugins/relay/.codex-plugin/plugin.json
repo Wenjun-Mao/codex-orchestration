@@ -1,6 +1,6 @@
 {
   "name": "relay",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Same-host worker-to-manager report forwarding",
   "author": {
     "name": "Wenjun Mao"

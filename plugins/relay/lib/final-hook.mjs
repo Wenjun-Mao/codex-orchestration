@@ -4,7 +4,7 @@ import { submitQueueNotification } from './queue-notification.mjs';
 
 // Routing only: no result checks, message storage, or lifecycle writes.
 export function captureStopEvent(event) {
-  if (event?.hook_event_name !== 'Stop' || event.stop_hook_active === true
+  if (event?.hook_event_name !== 'Stop'
     || !['session_id', 'turn_id', 'cwd', 'last_assistant_message'].every(key =>
       typeof event[key] === 'string' && event[key].length > 0)) {
     return { status: 'ignored', reason: 'unsupported-stop-event' };
@@ -15,8 +15,11 @@ export function captureStopEvent(event) {
   const registry = routes.read();
   const route = Object.hasOwn(registry.routes, event.session_id) ? registry.routes[event.session_id] : undefined;
   if (!route) return { status: 'ignored', reason: 'relay-sender-unbound' };
-  // A stable native client-message ID needs no local delivery journal.
-  const hex = createHash('sha256').update(JSON.stringify([route.id, event.session_id, event.turn_id])).digest('hex');
+  // Another hook can continue a turn. Replay the same body with the same ID,
+  // but let a corrected final through even when the native turn ID is unchanged.
+  const hex = createHash('sha256').update(JSON.stringify([
+    route.id, event.session_id, event.turn_id, event.last_assistant_message,
+  ])).digest('hex');
   const id = `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-8${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
   return { status: 'ready', notification: {
     id, sender: event.session_id, recipient: route.manager, hostId: 'local',

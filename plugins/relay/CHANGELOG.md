@@ -1,3 +1,12 @@
+# 0.4.1
+
+- Forward continued Stop finals; exact-body replay keeps its native client ID while
+  corrections receive a distinct ID even within the same turn. No delivery journal.
+- Remove exclusively created incomplete files after handled initialization failures;
+  diagnose crash-left incomplete locks without automatic recovery or registry deletion.
+- Bound optional title lookup and fall back to the sender ID, preserving one queue attempt.
+- Preserve send acknowledgement separately from helper-cleanup uncertainty.
+
 # 0.4.0
 
 - Rename `relay:plan` to `relay:brainstorm-and-plan`, with explicit intent-to-plan stages

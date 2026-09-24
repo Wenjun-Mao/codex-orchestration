@@ -24,13 +24,33 @@ ID in the brief; manager registration is an idempotent fallback. A missed early
 final can be read natively, not synthetically replayed.
 
 The hook reads without writing, looks up the current sender title, and submits one
-native queue message with a stable client ID. It never retries an ambiguous send.
+native queue message. Title lookup gets at most 500 ms and a quarter of the remaining
+send deadline; if unavailable, attribution uses the sender UUID. Continued Stop finals
+are forwarded too. Client IDs are stable for the same route, task, turn, and exact
+report body; changed bodies get distinct IDs. Native duplicate suppression is not
+guaranteed. It never retries an ambiguous send.
 Delivery is not proof of work or acceptance. Missing routes are quiet; malformed
 state and transport failures are diagnostics.
 
 Registry mutations use atomic replacement and a short exclusive lock.
 Use `inspect-lock` and explicit `recover-lock --token EXACT --commands-stopped`
 only after all competing registry commands have stopped; locks never expire automatically.
+Handled initialization failures remove the exclusively created incomplete file.
+If a crash leaves an incomplete lock without a usable token, first stop all competing
+registry commands, resolve the project's actual Git common directory, and inspect
+its `relay/routes.lock`. Only after confirming that exact file is an incomplete regular
+file (not a symlink), manually remove that lock alone. Keep `routes.json` intact;
+do not infer safety from lock age or use project reset to recover a lock.
+
+## Supported installation
+
+The current transport targets local macOS Codex Desktop through
+`/Applications/ChatGPT.app/Contents/Resources/codex`, with the default `~/.codex` home.
+`node` (20.11+) must be available to the hook and `git` to registry discovery.
+The plugin's hooks must be enabled and trusted: visible skills or successful
+registration alone do not establish hook delivery. Other hosts/homes are not qualified.
+Queue acknowledgement is not recipient receipt; helper-cleanup warnings do not erase
+an exact queue acknowledgement. Unconfirmed sends remain nonblocking stderr diagnostics.
 
 ## Upgrade from 0.3
 This is a replacement, not a second mode. Old lifecycle commands are unsupported.

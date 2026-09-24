@@ -8,8 +8,14 @@ const object = value => value !== null && typeof value === 'object' && !Array.is
 const check = (condition, message) => { if (!condition) throw Error(message); };
 function writeNew(path, value) {
   const fd = openSync(path, 'wx', 0o600);
-  try { writeFileSync(fd, JSON.stringify(value, null, 2) + '\n'); fsyncSync(fd); }
-  finally { closeSync(fd); }
+  try {
+    try { writeFileSync(fd, JSON.stringify(value, null, 2) + '\n'); fsyncSync(fd); }
+    finally { closeSync(fd); }
+  } catch (error) {
+    // Exclusive creation succeeded: remove our incomplete file, never an existing lock.
+    unlinkSync(path);
+    throw error;
+  }
 }
 function syncDirectory(path) {
   const fd = openSync(path, 'r');
@@ -62,7 +68,14 @@ export class Routes {
       return { status: remove ? 'unregistered' : 'registered', worker, ...(remove ? {} : { route: registry.routes[worker] }) };
     } finally { unlinkSync(this.lock); }
   }
-  inspectLock() { return JSON.parse(readFileSync(this.lock, 'utf8')); }
+  inspectLock() {
+    const text = readFileSync(this.lock, 'utf8');
+    let lock;
+    try { lock = JSON.parse(text); } catch (error) { if (!(error instanceof SyntaxError)) throw error; }
+    check(object(lock) && uuid(lock.token),
+      `Incomplete Relay routing lock: ${this.lock}. Stop all registry commands before manually removing only this lock; preserve routes.json.`);
+    return lock;
+  }
   recoverLock(token, commandsStopped) {
     check(commandsStopped === true && uuid(token) && this.inspectLock().token === token, 'Stop registry commands and provide the exact inspected lock token');
     unlinkSync(this.lock);

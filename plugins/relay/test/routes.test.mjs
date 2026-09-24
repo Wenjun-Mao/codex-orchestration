@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
+import fs from 'node:fs';
+import { syncBuiltinESMExports } from 'node:module';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -102,6 +104,54 @@ test('failed atomic replacement preserves target and removes temporary file and 
   assert.deepEqual(readdirSync(f.routes.root), ['routes.json']);
 });
 
+test('failed lock initialization removes only its own lock and preserves registered routes', t => {
+  const f = fixture(t);
+  f.routes.update(f.worker, f.manager);
+  const before = readFileSync(f.routes.file, 'utf8');
+  for (const boundary of ['writeFileSync', 'fsyncSync']) {
+    const originalOpen = fs.openSync, originalOperation = fs[boundary];
+    let lockFd;
+    fs.openSync = (...args) => {
+      const fd = originalOpen(...args);
+      if (args[0] === f.routes.lock) lockFd = fd;
+      return fd;
+    };
+    fs[boundary] = (...args) => {
+      if (args[0] === lockFd) throw Object.assign(new Error('Injected lock initialization failure'), { code: 'ENOSPC' });
+      return originalOperation(...args);
+    };
+    syncBuiltinESMExports();
+    try { assert.throws(() => f.routes.update(randomUUID(), f.manager), { code: 'ENOSPC' }); }
+    finally { fs.openSync = originalOpen; fs[boundary] = originalOperation; syncBuiltinESMExports(); }
+    assert.equal(existsSync(f.routes.lock), false);
+    assert.equal(readFileSync(f.routes.file, 'utf8'), before);
+  }
+  f.routes.update(randomUUID(), f.manager);
+  assert.equal(Object.keys(f.routes.read().routes).length, 2);
+  writeFileSync(f.routes.lock, '');
+  assert.throws(() => f.routes.update(randomUUID(), f.manager), /lock exists/);
+  assert.throws(() => f.routes.inspectLock(), /Incomplete Relay routing lock/);
+  assert.throws(() => f.routes.recoverLock(randomUUID(), true), /Incomplete Relay routing lock/);
+  assert.equal(readFileSync(f.routes.lock, 'utf8'), '');
+});
+
+test('continued finals keep exact replay identity but distinguish corrections in the same turn', async t => {
+  const f = fixture(t), sent = [];
+  f.routes.update(f.worker, f.manager);
+  const submit = async request => { sent.push(request); return { status: 'queued' }; };
+  const corrected = { ...f.event, stop_hook_active: true, last_assistant_message: 'Corrected final 雪\n' };
+  for (const event of [f.event, { ...f.event, stop_hook_active: true }, corrected, corrected,
+    { ...corrected, turn_id: 'next-turn' }]) {
+    assert.equal((await processStopEvent(event, { submit })).status, 'queued');
+  }
+  assert.equal(sent[0].id, sent[1].id);
+  assert.notEqual(sent[0].id, sent[2].id);
+  assert.equal(sent[2].id, sent[3].id);
+  assert.notEqual(sent[3].id, sent[4].id);
+  assert.equal(sent[2].text, corrected.last_assistant_message);
+  assert.deepEqual(readdirSync(f.routes.root), ['routes.json']);
+});
+
 test('hierarchical routing forwards all finals without lifecycle or source checks/writes', async t => {
   const f = fixture(t), director = randomUUID();
   f.routes.update(f.worker, f.manager);
@@ -119,7 +169,7 @@ test('hierarchical routing forwards all finals without lifecycle or source check
   assert.equal(requests[2].recipient, director);
   assert.equal(requests[0].id, requests[1].id);
   assert.notEqual(requests[0].id, requests[2].id);
-  assert.equal(captureStopEvent({ ...f.event, stop_hook_active: true }).status, 'ignored');
+  assert.equal(captureStopEvent({ ...f.event, stop_hook_active: true }).status, 'ready');
   assert.equal(captureStopEvent({ ...f.event, session_id: 'toString' }).status, 'ignored');
   let calls = 0;
   const failure = await processStopEvent(f.event, { submit: async () => { calls++; throw Error('uncertain'); } });
