@@ -67,6 +67,19 @@ Ending a turn does not itself pause the Goal; native lifecycle and budget rules
 still govern. Relay forwarding is unchanged, with no Goal state in its registry.
 See [native Goal continuation](https://developers.openai.com/cookbook/examples/codex/using_goals_in_codex#how-goals-are-designed-in-codex).
 
+## Collaborative planning — 2026-09-23
+
+The plan skill previously requested clarification without describing an interactive
+design conversation or selecting native question tools. Adapt the core ideas of
+[Superpowers brainstorming](https://github.com/obra/superpowers/blob/main/skills/brainstorming/SKILL.md):
+establish shared intent, ask focused questions, compare real alternatives, review the
+design, and scale planning depth to the task. Prefer available native question UI
+within host restrictions, falling back to chat; a skill does not activate Plan mode.
+Keep this in one skill, not a new runtime or separate brainstorming workflow. Reject
+mandatory per-stage approvals and automatic heavier-process escalation; preserve
+the implementation approval boundary and check plan coherence before handoff.
+Validation should distinguish instruction/package checks from observed UI behavior.
+
 ## Manager-side model guidance — 2026-09-22
 
 Use a small, difficulty-based preference in the direct skill, shared by directors
