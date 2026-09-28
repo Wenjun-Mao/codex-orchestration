@@ -3,8 +3,9 @@ import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
-import { homedir } from 'node:os';
-import { submitQueueNotification } from '../lib/queue-notification.mjs';
+import { homedir, tmpdir } from 'node:os';
+import { mkdtempSync, mkdirSync, writeFileSync, chmodSync, rmSync } from 'node:fs';
+import { resolveCodexBinary, submitQueueNotification } from '../lib/queue-notification.mjs';
 const request = { id: '11111111-1111-4111-8111-111111111111', recipient: '22222222-2222-4222-8222-222222222222',
   sender: '33333333-3333-4333-8333-333333333333',
   hostId: 'local', senderHostId: 'local', text: 'Exact final 雪\n'.repeat(5000) };
@@ -27,8 +28,44 @@ function transport({ version = '0.154.0-alpha.6.2', queue = 'exact', silent = fa
         clientUserMessageId: queue === 'wrong' ? 'wrong' : request.id, input: queue === 'null' ? [null] : queue === 'changed-text' ? [{ type: 'text', text: 'altered' }] : value.params.input } } }) : null;
     if (reply) setImmediate(() => child.stdout.write(JSON.stringify(reply) + '\n'));
   });
-  return { sent, spawnProcess: () => child };
+  return { sent, resolveBinary: () => '/fixture/codex', spawnProcess: () => child };
 }
+test('bundle discovery supports old and new layouts, preferring the new executable', () => {
+  const root = mkdtempSync(join(tmpdir(), 'relay-bundle-'));
+  const old = join(root, 'codex'), nested = join(root, 'codex-cli/CodexCLI.app/Contents/MacOS');
+  const current = join(nested, 'codex');
+  try {
+    assert.throws(() => resolveCodexBinary(root), /executable unavailable/);
+    writeFileSync(old, '', { mode: 0o700 });
+    assert.equal(resolveCodexBinary(root), old);
+    mkdirSync(nested, { recursive: true });
+    writeFileSync(current, '', { mode: 0o600 });
+    assert.equal(resolveCodexBinary(root), old);
+    chmodSync(current, 0o700);
+    assert.equal(resolveCodexBinary(root), current);
+    rmSync(old);
+    assert.equal(resolveCodexBinary(root), current);
+    rmSync(current); mkdirSync(current);
+    assert.throws(() => resolveCodexBinary(root), /executable unavailable/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('discovery failure never spawns; selected executable failure never retries another path', async () => {
+  let spawns = 0, resolutions = 0;
+  const missing = await submitQueueNotification(request, {
+    resolveBinary: () => { throw Error('missing'); },
+    spawnProcess: () => { spawns++; throw Error('must not spawn'); },
+  });
+  assert.equal(missing.reason, 'transport-unavailable');
+  assert.equal(spawns, 0);
+  const failed = await submitQueueNotification(request, {
+    resolveBinary: () => { resolutions++; return '/fixture/codex'; },
+    spawnProcess: binary => { spawns++; assert.equal(binary, '/fixture/codex'); throw Error('spawn failed'); },
+  });
+  assert.equal(failed.reason, 'transport-unavailable');
+  assert.equal(spawns, 1);
+  assert.equal(resolutions, 1);
+});
 test('queue adapter accepts compatible updates and bounds exact response and host; never resumes tasks', async () => {
   for (const [options, status] of [[{}, 'queued'], [{ version: '0.155.0-alpha.9' }, 'queued'], [{ version: '99.0.0' }, 'queued'], [{ wrongHome: true }, 'ambiguous'], [{ queueError: true }, 'ambiguous'], [{ queue: 'changed-text' }, 'ambiguous'], [{ queue: 'wrong' }, 'ambiguous'], [{ silent: true }, 'ambiguous'], [{ noClose: true }, 'queued'], [{ badAgent: true }, 'ambiguous'], [{ queue: 'null' }, 'ambiguous']]) {
     const f = transport(options);
@@ -40,7 +77,7 @@ test('queue adapter accepts compatible updates and bounds exact response and hos
   }
   const wrongHost = await submitQueueNotification({ ...request, hostId: 'remote' }, { spawnProcess: () => { throw Error('must not spawn'); } });
   assert.equal(wrongHost.reason, 'unsupported-host');
-  assert.equal((await submitQueueNotification(request, { spawnProcess: () => { throw Error('missing'); } })).reason, 'transport-unavailable');
+  assert.equal((await submitQueueNotification(request, { resolveBinary: () => '/fixture/codex', spawnProcess: () => { throw Error('missing'); } })).reason, 'transport-unavailable');
 });
 
 test('optional title timeout falls back before queueing once and ignores late metadata', async () => {

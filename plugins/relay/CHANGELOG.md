@@ -1,3 +1,8 @@
+# 0.4.2
+
+- Discover the executable in the current or legacy macOS App bundle layout before
+  starting transport. Preserve one send attempt and existing host/response checks.
+
 # 0.4.1
 
 - Forward continued Stop finals; exact-body replay keeps its native client ID while

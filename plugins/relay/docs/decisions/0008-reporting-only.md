@@ -63,6 +63,16 @@ The 0.4.1 native transport probe returned different queue IDs for two acknowledg
 submissions with the same client ID. Do not assume the host suppresses duplicates;
 no local deduplication store or automatic retry is introduced to compensate.
 
+## App bundle discovery — 0.4.2
+
+App 26.924.22138 moved its CLI into `Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex`.
+The hardcoded legacy path failed before transport startup; a diagnostic using the
+new path reached the recipient. Select an executable regular file from these two
+known bundle layouts, current first, before spawning. Do not search arbitrary PATH
+binaries or retry after starting transport. Existing host/home and queue-response
+checks remain authoritative. Test both layouts, precedence, unusable/missing files,
+and no second spawn on failure; no registry or delivery storage changes.
+
 ## Context-efficient review
 Briefs supply relevant entrypoints; workers prepare concise, review-ready finals
 with change/evidence pointers and verification limits. Managers use targeted reads

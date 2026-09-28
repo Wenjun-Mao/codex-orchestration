@@ -45,7 +45,10 @@ do not infer safety from lock age or use project reset to recover a lock.
 ## Supported installation
 
 The current transport targets local macOS Codex Desktop through
-`/Applications/ChatGPT.app/Contents/Resources/codex`, with the default `~/.codex` home.
+the bundled executable under `/Applications/ChatGPT.app/Contents/Resources`, with
+the default `~/.codex` home. It selects executable `codex-cli/CodexCLI.app/Contents/MacOS/codex`
+first, then legacy `codex`, before starting a single transport process. No PATH search
+or retry with another executable after transport starts.
 `node` (20.11+) must be available to the hook and `git` to registry discovery.
 The plugin's hooks must be enabled and trusted: visible skills or successful
 registration alone do not establish hook delivery. Other hosts/homes are not qualified.

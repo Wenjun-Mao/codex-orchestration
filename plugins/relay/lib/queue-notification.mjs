@@ -2,13 +2,24 @@ import { spawn } from 'node:child_process';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { StringDecoder } from 'node:string_decoder';
+import { accessSync, constants, statSync } from 'node:fs';
 
 // Compatibility is determined by the protocol responses, not an App release pin.
-const binary = '/Applications/ChatGPT.app/Contents/Resources/codex';
+export function resolveCodexBinary(resources = '/Applications/ChatGPT.app/Contents/Resources') {
+  for (const relative of ['codex-cli/CodexCLI.app/Contents/MacOS/codex', 'codex']) {
+    const candidate = join(resources, relative);
+    try {
+      if (!statSync(candidate).isFile()) continue;
+      accessSync(candidate, constants.X_OK);
+      return candidate;
+    } catch { /* Try the other known bundle layout before any process is started. */ }
+  }
+  throw new Error('Codex bundled executable unavailable');
+}
 const uuid = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/;
 
 export async function submitQueueNotification(request, {
-  spawnProcess = spawn, deadlineMs = 6000, cleanupMs = 500, titleLookupMs = 500,
+  spawnProcess = spawn, resolveBinary = resolveCodexBinary, deadlineMs = 6000, cleanupMs = 500, titleLookupMs = 500,
   outputLimit = Math.max(65536, Buffer.byteLength(typeof request.text === 'string' ? request.text : '') * 6 + 65536),
 } = {}) {
   const uncertain = reason => ({ status: 'ambiguous', reason });
@@ -40,7 +51,7 @@ export async function submitQueueNotification(request, {
         }, cleanupMs);
       }, cleanupMs);
     };
-    try { child = spawnProcess(binary, ['app-server', '--listen', 'stdio://'], { stdio: ['pipe', 'pipe', 'pipe'] }); }
+    try { child = spawnProcess(resolveBinary(), ['app-server', '--listen', 'stdio://'], { stdio: ['pipe', 'pipe', 'pipe'] }); }
     catch { resolve(uncertain('transport-unavailable')); return; }
     const send = value => child.stdin.write(JSON.stringify(value) + '\n');
     const queue = (name = '') => {
