@@ -118,6 +118,18 @@ refinements address source-review risks, not demonstrated live-conversation fail
 It replaces `plan`
 without a duplicate alias; historical changelog entries retain their original names.
 
+## Model guidance update — 2026-09-29
+
+Replace GPT-6 Sol with GPT-6.1 Sol in the active manager guide, preserving Medium
+for challenging work, High for difficult work, optional Xhigh, and Luna/Max for
+bounded work. This applies to coordinators, executors and native subagents;
+existing tasks and global defaults stay unchanged. The local native catalog
+confirms these reasoning options. [Official model guidance](https://learn.chatgpt.com/docs/models#gpt-61-sol)
+describes availability; [Codex credit pricing](https://learn.chatgpt.com/docs/pricing#token-rates)
+keeps standard input/output rates at 50/250 credits per million tokens and halves
+cached input from 5 to 2.5 credits. Cost per task still depends on token use.
+The earlier comparison below is historical.
+
 ## Manager-side model guidance — 2026-09-22
 
 Use a small, difficulty-based preference in the direct skill, shared by directors
