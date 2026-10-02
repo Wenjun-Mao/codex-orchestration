@@ -1,15 +1,29 @@
 # Codex Orchestration
 
-One repository, independently packaged plugin products.
+One repository for independently maintained personal plugins and standalone skills.
 
 | Product | Status | Source |
 |---|---|---|
 | Relay | Active — worker-to-manager report forwarding | [plugins/relay](plugins/relay/README.md) |
 | Flow | Retired for now — preserved for reference | [plugins/flow](plugins/flow/README.md) |
 
-Each product owns its runtime, skills, tests, packaging and product documentation.
-Root `docs/` holds cross-product decisions, consultations and the
+Each plugin owns its runtime, skills, tests, packaging and product documentation.
+Standalone skills keep their instructions and supporting resources in `skills/<name>`.
+Root `docs/` holds repository-wide decisions, consultations and the
 [known-issues checklist](docs/known-issues.md). No shared runtime or build framework.
+
+## Standalone skills
+
+| Skill | Purpose | Source |
+|---|---|---|
+| External Consultation | Prepare, review and integrate outside consultation | [skills/external-consultation](skills/external-consultation/SKILL.md) |
+
+Repository `skills/` is the authoring source, not a Codex discovery or installation
+location. Deploy changes deliberately to the user's skill location; do not maintain
+installed copies as a second authoring source. This first import leaves the currently
+installed skill unchanged and adds no discovery links.
+
+See [standalone-skill layout decision](docs/adr/0078-standalone-personal-skills.md).
 
 ## Development
 
