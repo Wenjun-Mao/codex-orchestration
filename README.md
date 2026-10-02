@@ -24,3 +24,5 @@ relocated reference tree. Flow's legacy plugin identifier remains
 `codex-orchestration`; no compatibility rename or new Flow release is intended.
 
 See [repository layout decision](docs/adr/0077-multi-product-layout-and-flow-retirement.md).
+
+Reusable host finding: [native navigation can wake queued work in an unloaded chat](docs/field-tests/2026-10-02-native-navigation-wakeup.md).
