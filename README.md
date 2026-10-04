@@ -17,11 +17,14 @@ Root `docs/` holds repository-wide decisions, consultations and the
 | Skill | Purpose | Source |
 |---|---|---|
 | External Consultation | Prepare, review and integrate outside consultation | [skills/external-consultation](skills/external-consultation/SKILL.md) |
+| Codex Usage Retrospective | Explicitly invoked, read-only review of recent Codex work | [skills/codex-usage-retrospective](skills/codex-usage-retrospective/SKILL.md) |
 
 Repository `skills/` is the authoring source, not a Codex discovery or installation
 location. Deploy changes deliberately to the user's skill location; do not maintain
-installed copies as a second authoring source. This first import leaves the currently
-installed skill unchanged and adds no discovery links.
+installed copies as a second authoring source. The initial External Consultation
+import left its installation unchanged. Codex Usage Retrospective is deliberately
+installed from a pinned source revision; invoke it with `$codex-usage-retrospective`.
+No discovery links or automatic deployment are added.
 
 See [standalone-skill layout decision](docs/adr/0078-standalone-personal-skills.md).
 

@@ -1,0 +1,6 @@
+interface:
+  display_name: "Codex Usage Retrospective"
+  short_description: "Review recent Codex work without making changes"
+  default_prompt: "Use $codex-usage-retrospective to review my Codex work over the last seven days and return a read-only report."
+policy:
+  allow_implicit_invocation: false
