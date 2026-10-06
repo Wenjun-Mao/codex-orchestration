@@ -11,8 +11,13 @@ or support a decision. It does not need to manufacture a recommendation.
 
 ## Frame The Work
 
-- Name the primary purpose, intended use, and cost of being wrong before writing
-  the assignment.
+- Name the primary purpose and intended use before writing the assignment.
+  For decision support, identify the next decision and weigh potential benefit,
+  downside, and the costs of delay, retaining the current approach, or added
+  complexity.
+- Match the mandate to the purpose; do not default to adversarial risk
+  assessment. Distinguish binding constraints from assumptions and
+  implementation choices open to challenge.
 - Prefer a bounded local inspection, experiment, or source review when it can
   resolve the uncertainty directly.
 - Use one consultant by default. Use multiple consultants only for genuinely
@@ -32,7 +37,9 @@ or support a decision. It does not need to manufacture a recommendation.
 
 Make the complete self-contained packet the actual consultant prompt. A link,
 repository, or attachment may supplement the packet but must not replace its
-purpose, constraints, evidence boundary, or requested output.
+purpose, mandate, constraints, evidence boundary, or requested output. Carry the
+relevant decision scope and evidence expectations into the prompt; do not assume
+the consultant has read this skill.
 
 Before new consultant prompts, include a brief **Mode recommendation**:
 which mode(s), why they fit this task, and whether the other mode adds
@@ -64,10 +71,23 @@ prompt or specifying report expectations. When the consultant will inspect a
 repository, dataset, document set, or other versioned evidence, also read
 [repository-evidence.md](references/repository-evidence.md).
 
-Ask for support proportional to intended use and error cost. Clearly marked
-hypotheses are useful; unsupported certainty is not. Do not impose a universal
-word limit. Prefer an answer-first report that is concise where possible and
-detailed where the inquiry benefits.
+Ask for support proportional to intended use and error cost. For decision
+support, match the evidence burden to the consequences and reversibility of
+the next decision, not automatically to eventual adoption or broad success
+claims. Distinguish limits on what can be claimed from reasons to block action.
+Recommend proceeding when existing evidence is sufficient, or a bounded
+experiment when its expected learning or benefit justifies its cost and risk.
+An experiment's success does not automatically establish broader acceptance
+or release readiness.
+
+For any proposed additional gate, ask what concrete risk it addresses, what it
+costs, and whether a simpler alternative suffices. Do not manufacture bold
+proposals, objections, safeguards, experiments, or further review merely to
+fill the report.
+
+Clearly marked hypotheses are useful; unsupported certainty is not. Do not
+impose a universal word limit. Prefer an answer-first report that is concise
+where possible and detailed where the inquiry benefits.
 
 ## Review And Integrate
 

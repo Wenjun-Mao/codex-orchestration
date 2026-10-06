@@ -6,14 +6,18 @@ the assignment self-contained and omit sections that do not improve the work.
 ## Core Fields
 
 1. **Purpose and intended use:** Why the consultation exists and how its result
-   may affect understanding or action.
+   may affect understanding or action. State the intended mandate and, for
+   decision support, the next decision and its scope.
 2. **Central question:** The inquiry, uncertainty, or decision stated plainly.
 3. **Context:** Only the facts and history needed to reason well.
 4. **Evidence boundary:** What the consultant can inspect, what is unavailable,
    and which supplied facts are summaries rather than direct evidence.
 5. **Freedom to challenge:** Assumptions, framing, or candidate options the
    consultant may question.
-6. **Constraints and non-goals:** Attractive but irrelevant work to avoid.
+6. **Constraints and non-goals:** Binding boundaries, such as authorization,
+   privacy, and explicitly fixed product requirements; distinguish these from
+   working assumptions and implementation choices. Identify irrelevant work
+   to avoid.
 7. **Requested output:** The useful form, such as a source map, explanatory
    model, option map, critique, synthesis, or conditional recommendation.
 8. **Reliability expectation:** Citation, source, uncertainty, and hypothesis
@@ -23,7 +27,9 @@ the assignment self-contained and omit sections that do not improve the work.
    revision plus relevant file paths and symbols or passages for repository
    findings.
 9. **Practical value:** Ask for insights that improve understanding, simplify
-   the problem, reveal alternatives, or alter the intended decision.
+   the problem, reveal alternatives, or alter the intended decision. For
+   decision support, consider potential benefit and the costs of delay,
+   retaining the current approach, or adding complexity, not only downside.
 
 ## Multiple Consultants
 

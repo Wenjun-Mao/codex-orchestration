@@ -10,10 +10,11 @@ the internet is mentioned. These are working defaults, not exclusive
 capabilities or a ranking of intelligence.
 
 - Prefer **Pro** when the main value is deeper independent reasoning over
-  identifiable evidence: exact repository or artifact inspection, design
+  identifiable evidence: exact repository or artifact inspection, reframing,
+  option development and comparison, simplification, experiment design,
   correctness, causal or failure-path analysis, trade-offs, or critique of
-  the goal, diagnosis, and proposed solution. It need not be a code-only
-  assignment.
+  the goal, diagnosis, and proposed solution. It need not be a code-only or
+  adversarial assignment.
 - Prefer **Deep Research** when the main value requires substantial
   external discovery, comparison, and synthesis: primary research,
   approaches we may have missed, current capabilities, or evidence that
