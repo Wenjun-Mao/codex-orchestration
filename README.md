@@ -36,7 +36,7 @@ See [standalone-skill layout decision](docs/adr/0078-standalone-personal-skills.
 - Relay: `npm --prefix plugins/relay run release:check`; root `npm test` runs its tests only.
 - Flow reference validation: `npm --prefix plugins/flow run validate`.
 - Flow regression suite: `npm --prefix plugins/flow test`.
-- Relay App Check helper fixtures: `node --test skills/relay-app-check/scripts/self-check.test.mjs`.
+- Relay App Check helper fixtures: `node --test skills/relay-app-check/scripts/*.test.mjs`.
 
 Relay releases use `relay/vVERSION` tags. Historical `vVERSION` tags belong to Flow
 and retain the original root layout. Neither product is published to npm.

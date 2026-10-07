@@ -55,6 +55,16 @@ its acknowledgement/receipt cannot substitute for the genuine Stop canary. Do no
 retry an ambiguous send or change Relay to accommodate the diagnostic sandbox.
 No repairs, other-project work, monitoring or permanent check ledger are added.
 
+A subsequent canary attempt was rejected before creation: its request added a
+top-level `projectId`, and its manually copied manager ID differed from the host
+identity. Generate the complete native creation arguments and worker brief in a
+read-only helper, taking the manager solely from `CODEX_THREAD_ID`. Keep native
+launching and permission checks with the checker, not inside that helper. Limit
+the check to one created worker; a confirmed pre-creation validation rejection may
+be corrected with the same canary token/brief, while an uncertain outcome must not
+be retried. Test argument shape, identity consistency and preparation side effects.
+This corrects diagnostic preparation, not Relay's runtime or model selection.
+
 ## Alternatives and guardrails
 
 Keeping the user-local folder as the authoring source misses versioned review.

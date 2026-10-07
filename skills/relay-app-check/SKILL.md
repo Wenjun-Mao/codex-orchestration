@@ -56,36 +56,28 @@ publish, rerun the retired Flow suite, or add a new test framework for this chec
 ## 3. Dispatch one genuine hook canary, then return idle
 
 Read installed Relay `status --repo <repo>` and retain the relevant initial routes
-in this chat. Use host-provided `CODEX_THREAD_ID` as the checker/manager ID; never
-guess it. Generate one random UUID and the exact expected final body:
+in this chat. Locate this repository's **local** project with native `list_projects`.
+Read only the relevant native tool schemas, not a broad tool-catalog dump.
+Use [scripts/prepare-canary.mjs](scripts/prepare-canary.mjs) to generate the complete
+`create_thread` arguments from host-provided `CODEX_THREAD_ID`. Resolve `<skill-root>`
+to this skill's directory:
 
-```text
-Relay native Stop-hook check — <UUID>, exact text, 雪.
+```sh
+node <skill-root>/scripts/prepare-canary.mjs --repo <absolute-repo> --plugin-root <installed-relay-root> --project-id <native-project-id>
 ```
 
-Locate this repository with native `list_projects`, then use `create_thread` once,
-explicitly selecting its **local** checkout, not a worktree. Give the worker a unique
-title containing the UUID. Apply explicitly authorized model/effort choices at
-creation; otherwise respect native defaults and disclose them. Retain the creation
-result, title, expected body, repository and installed root in this chat.
+Quote paths as needed. Add `--model` and `--thinking` only for explicitly authorized
+choices; otherwise omit them and disclose native defaults. The helper only prints
+JSON: it does not launch, register or send. Its brief includes the exact manager
+identity, registration command and UUID/Unicode final body. Pass the resulting JSON
+unchanged to `create_thread`; do not retype IDs or add a top-level `projectId`.
+Retain the request, creation result and expected title/body in this chat, not a file.
 
-The complete worker brief must supply the absolute repository and installed Relay
-root, the real manager ID, and the exact expected body. Tell it to:
-
-1. Register only its own host-provided identity with installed Relay:
-   `node <installed-relay-root>/bin/relay.mjs register --repo <repo> --worker "$CODEX_THREAD_ID" --manager <manager-id>`.
-   Request scoped native execution approval if required for the protected Git
-   directory; do not change permission settings or invent an ID.
-2. Confirm registration succeeded, then end normally with **only** the supplied
-   expected body as its final response. On failure, give the actual error instead
-   of the success body. Make no source changes or extra checks.
-3. Never send a direct completion message, call the transport helper, invoke a
-   hook manually, fabricate a Stop event, unregister itself, or self-archive.
-   Leave its checkout available for the genuine installed Stop hook.
-
-A provisional creation ID is not the native worker ID. Let the worker register
-itself; do not poll for an ID or create a duplicate. A failed or uncertain creation
-is a blocker to inspect, not permission for another launch.
+The limit is **one created worker**, not one tool call. Correct a confirmed
+pre-creation argument-validation rejection using the current schema, retaining the
+same canary token and brief. Never retry an uncertain creation or create a replacement;
+inspect the outcome instead. A provisional creation ID is not the native worker ID.
+Let the worker self-register; do not poll solely for its ID or create a duplicate.
 
 **End the checker turn** with a brief pending result and the expected worker/body.
 The hook queues the report; this checker receives it once idle. Do not use
