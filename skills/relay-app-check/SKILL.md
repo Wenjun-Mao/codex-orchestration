@@ -1,6 +1,6 @@
 ---
 name: relay-app-check
-description: Check installed Relay compatibility after a Codex Desktop update, using existing tests and one current-chat transport probe. Diagnose and report without repairs, configuration changes, or other-project work.
+description: Check installed Relay runtime and transport compatibility after a Codex Desktop update, using existing tests and one current-chat probe. Diagnose and report without repairs, configuration changes, or other-project work.
 ---
 
 # Relay App Check
@@ -9,6 +9,7 @@ Run this explicitly requested maintenance check in a local Codex Desktop chat
 from this repository. Keep the healthy path short; investigate only failed or
 uncertain checks. An App version change alone is not an incompatibility and does
 not require a Relay release.
+This is a runtime/transport smoke check, not a live Stop-hook canary.
 
 ## Scope
 
@@ -63,6 +64,14 @@ queues one Unicode message using the installed `submitQueueNotification`. Both
 sender and recipient come from host-provided `CODEX_THREAD_ID`; do not replace a
 missing identity with a guessed UUID or another chat. Never submit a synthetic Stop.
 
+The dry-run can stay sandboxed. Before the live command, request narrowly scoped
+approved execution outside the shell sandbox (`exec_command` with
+`sandbox_permissions: "require_escalated"` where available and permitted).
+Desktop IPC startup can be denied inside `workspace-write`, closing the transport
+before initialization. Do not try a sandboxed live send first and then retry with
+escalation. If approval is unavailable or denied, report the live probe as
+permission-blocked without sending; do not change global permission settings.
+
 Preserve the returned request ID, body and outcome in the chat. Do not retry an
 ambiguous send, even with a new ID. An exact queue acknowledgement is not recipient
 receipt. A cleanup warning does not erase an exact acknowledgement. If the labelled
@@ -77,7 +86,9 @@ Lead with checks passed, issue found, or incomplete, scoped to the evidence:
   completed test result, transport outcome, and any missing coverage.
 - Always distinguish source tests, installed transport acknowledgement, observed
   recipient receipt, and genuine Stop-hook execution. This self-probe does not
-  exercise a genuine Stop; do not claim full end-to-end hook qualification.
+  exercise a genuine Stop; do not claim full end-to-end hook qualification. A real
+  hook test requires a registered worker to finish normally and its manager to
+  receive that final through the native Stop hook; this skill creates neither.
 - For an issue, give the exact failed step/error, evidence-backed diagnosis or
   named uncertainty, and the smallest next action. Separate source failures,
   disabled/untrusted hooks, permission blocks and installed transport failures.

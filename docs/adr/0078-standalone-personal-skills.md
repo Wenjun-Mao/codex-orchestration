@@ -40,6 +40,15 @@ receipt and genuine Stop execution remain separate evidence. Its helper reuses
 Relay rather than implementing another transport. No repairs, real registry
 changes, other-project work, monitoring or permanent check ledger are added.
 
+The first App Check run on 2026-10-07 exposed a diagnostic execution-boundary
+gap: sandboxed Desktop IPC startup closed without acknowledgement. An
+initialization-only comparison reproduced `Operation not permitted` inside the
+sandbox and succeeded with approved execution outside it. Request scoped native
+approval before the single live probe; if unavailable, report permission-blocked.
+Do not retry an ambiguous send or change Relay to accommodate the diagnostic
+sandbox. Keep the routine check distinct from a genuine registered-worker Stop
+canary, which it does not create or qualify.
+
 ## Alternatives and guardrails
 
 Keeping the user-local folder as the authoring source misses versioned review.
