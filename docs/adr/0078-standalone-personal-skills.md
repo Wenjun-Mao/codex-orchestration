@@ -34,20 +34,26 @@ deliberately install the two source files from a pinned, pushed revision.
 Expose Relay App Check locally through a checked-in relative symlink,
 `.agents/skills/relay-app-check` to `skills/relay-app-check`. Keep one authoring
 copy and explicit-only invocation; do not globally install it or package it in
-Relay. It inspects current installation/hook state, runs existing tests and
-uses the installed transport for one current-chat probe. Acknowledgement,
-receipt and genuine Stop execution remain separate evidence. Its helper reuses
-Relay rather than implementing another transport. No repairs, real registry
-changes, other-project work, monitoring or permanent check ledger are added.
+Relay. It inspects current installation/hook state and runs existing tests.
+The initial transport-only self-probe left native Stop invocation and worker
+routing untested. The routine check therefore now creates one disposable native
+worker in the retained local checkout, registers only its test route and requires
+its normal final to arrive through installed Relay. The checker returns idle
+after dispatch so queued delivery can resume it in a second turn; polling or a
+native wait result is not delivery evidence. Verify the exact body and genuine
+worker final before archiving the idle worker and removing only its route.
+Preserve unrelated routes/source, native permissions and explicit invocation.
 
 The first App Check run on 2026-10-07 exposed a diagnostic execution-boundary
 gap: sandboxed Desktop IPC startup closed without acknowledgement. An
 initialization-only comparison reproduced `Operation not permitted` inside the
 sandbox and succeeded with approved execution outside it. Request scoped native
-approval before the single live probe; if unavailable, report permission-blocked.
-Do not retry an ambiguous send or change Relay to accommodate the diagnostic
-sandbox. Keep the routine check distinct from a genuine registered-worker Stop
-canary, which it does not create or qualify.
+approval before a direct transport probe; if unavailable, report permission-blocked.
+Keep that helper only for missing-report diagnosis or an explicitly requested
+transport-only check. It reuses Relay rather than implementing another transport;
+its acknowledgement/receipt cannot substitute for the genuine Stop canary. Do not
+retry an ambiguous send or change Relay to accommodate the diagnostic sandbox.
+No repairs, other-project work, monitoring or permanent check ledger are added.
 
 ## Alternatives and guardrails
 

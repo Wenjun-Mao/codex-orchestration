@@ -1,6 +1,6 @@
 interface:
   display_name: "Relay App Check"
-  short_description: "Check Relay after a Codex Desktop update"
-  default_prompt: "Use $relay-app-check to check installed Relay compatibility after the Codex App update without making repairs."
+  short_description: "Test Relay's Stop hook after Codex updates"
+  default_prompt: "Use $relay-app-check to create one disposable GPT-6 Luna/Max worker chat, verify native Stop-hook delivery, then archive it and remove its test route without making repairs."
 policy:
   allow_implicit_invocation: false

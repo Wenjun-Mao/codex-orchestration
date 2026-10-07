@@ -18,7 +18,7 @@ Root `docs/` holds repository-wide decisions, consultations and the
 |---|---|---|
 | External Consultation | Prepare, review and integrate outside consultation | [skills/external-consultation](skills/external-consultation/SKILL.md) |
 | Codex Usage Retrospective | Explicitly invoked, read-only review of recent Codex work | [skills/codex-usage-retrospective](skills/codex-usage-retrospective/SKILL.md) |
-| Relay App Check | Explicitly invoked repo-local App compatibility diagnostic | [skills/relay-app-check](skills/relay-app-check/SKILL.md) |
+| Relay App Check | Repo-local native Stop-hook check with one disposable worker | [skills/relay-app-check](skills/relay-app-check/SKILL.md) |
 
 Repository `skills/` is the authoring source, not a Codex discovery or installation
 location. Deploy changes deliberately to the user's skill location; do not maintain
