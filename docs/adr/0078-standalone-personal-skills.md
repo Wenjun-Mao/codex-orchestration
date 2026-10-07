@@ -31,6 +31,15 @@ existing evidence, proposes changes and stops; it adds no scheduler, review
 ledger or automatic implementation. Retain the reviewed wording unchanged and
 deliberately install the two source files from a pinned, pushed revision.
 
+Expose Relay App Check locally through a checked-in relative symlink,
+`.agents/skills/relay-app-check` to `skills/relay-app-check`. Keep one authoring
+copy and explicit-only invocation; do not globally install it or package it in
+Relay. It inspects current installation/hook state, runs existing tests and
+uses the installed transport for one current-chat probe. Acknowledgement,
+receipt and genuine Stop execution remain separate evidence. Its helper reuses
+Relay rather than implementing another transport. No repairs, real registry
+changes, other-project work, monitoring or permanent check ledger are added.
+
 ## Alternatives and guardrails
 
 Keeping the user-local folder as the authoring source misses versioned review.

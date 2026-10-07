@@ -18,13 +18,16 @@ Root `docs/` holds repository-wide decisions, consultations and the
 |---|---|---|
 | External Consultation | Prepare, review and integrate outside consultation | [skills/external-consultation](skills/external-consultation/SKILL.md) |
 | Codex Usage Retrospective | Explicitly invoked, read-only review of recent Codex work | [skills/codex-usage-retrospective](skills/codex-usage-retrospective/SKILL.md) |
+| Relay App Check | Explicitly invoked repo-local App compatibility diagnostic | [skills/relay-app-check](skills/relay-app-check/SKILL.md) |
 
 Repository `skills/` is the authoring source, not a Codex discovery or installation
 location. Deploy changes deliberately to the user's skill location; do not maintain
 installed copies as a second authoring source. The initial External Consultation
 import left its installation unchanged. Codex Usage Retrospective is deliberately
 installed from a pinned source revision; invoke it with `$codex-usage-retrospective`.
-No discovery links or automatic deployment are added.
+Relay App Check is exposed only in this repository through
+`.agents/skills/relay-app-check`, a relative symlink to its source directory. It is
+not globally installed or shipped with Relay. No automatic deployment is added.
 
 See [standalone-skill layout decision](docs/adr/0078-standalone-personal-skills.md).
 
@@ -33,6 +36,7 @@ See [standalone-skill layout decision](docs/adr/0078-standalone-personal-skills.
 - Relay: `npm --prefix plugins/relay run release:check`; root `npm test` runs its tests only.
 - Flow reference validation: `npm --prefix plugins/flow run validate`.
 - Flow regression suite: `npm --prefix plugins/flow test`.
+- Relay App Check helper fixtures: `node --test skills/relay-app-check/scripts/self-check.test.mjs`.
 
 Relay releases use `relay/vVERSION` tags. Historical `vVERSION` tags belong to Flow
 and retain the original root layout. Neither product is published to npm.
