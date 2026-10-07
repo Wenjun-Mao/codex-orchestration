@@ -118,6 +118,18 @@ refinements address source-review risks, not demonstrated live-conversation fail
 It replaces `plan`
 without a duplicate alias; historical changelog entries retain their original names.
 
+## End-to-end authorization — 2026-10-07
+
+Avoiding repeated design approvals did not specify how operational authority reaches
+the implementer. Surface foreseeable operational actions and affected environments,
+including verification and rollback where relevant, before implementation approval.
+Distinguish granted permissions from missing ones and name unavoidable later gates.
+Carry actual approval into the handoff: milestones do not reset it, while uncovered
+actions, material scope/risk changes and native requirements still need authority.
+This is planning guidance, not blanket permission or runtime enforcement. The reported
+late activation question does not establish whether activation was already authorized;
+instruction validation is not proof that every director will follow the guidance.
+
 ## Model guidance update — 2026-09-29
 
 Replace GPT-6 Sol with GPT-6.1 Sol in the active manager guide, preserving Medium

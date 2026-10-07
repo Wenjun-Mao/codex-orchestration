@@ -61,6 +61,10 @@ the plan. Do not require separate approval for every section or reconfirm settle
   to the implementer. Put unresolved feasibility investigations before dependent implementation.
   The implementer should not guess user intent, but should still exercise engineering judgment;
   do not require prewritten implementation/test code for every step.
+- Surface foreseeable execution permissions before seeking approval: affected environments
+  and operational actions (such as activation or service restarts), plus verification and
+  rollback where relevant. Distinguish permissions already granted from those still needed;
+  resolve missing authorization up front where possible, and make unavoidable later gates explicit.
 - Maintain one plan for the same scope, updating it rather than creating overlapping versions.
   Save it in the existing plans directory (otherwise `docs/plans/`); brief exploration can stay
   in chat. Record durable decisions as repository conventions require, linking ADRs rather
@@ -68,6 +72,9 @@ the plan. Do not require separate approval for every section or reconfirm settle
 - Default to serial work on the retained checkout. Explain any useful bounded independent
   review; do not invent parallel writers. Model choice belongs at native dispatch, not in worker briefs.
 
-Present the result for review; planning does not authorize implementation or task creation.
-After implementation approval, use `direct` when managing delegated work. This skill
-does not switch native Plan mode or override its restrictions; defer file writes when prohibited.
+Present the result for review; planning alone does not authorize implementation or task creation.
+Carry the approved scope and granted permissions into the implementation handoff. Continue
+covered steps through verification and planned rollback without renewed milestone approvals;
+seek new authority only for uncovered actions, material scope/risk changes, or native requirements.
+After implementation approval, use `direct` when managing delegated work. This skill does not
+switch native Plan mode or override its restrictions; defer file writes when prohibited.
