@@ -33,5 +33,7 @@ final and confirming you are idle. Relay imposes no checks, Git baseline, contra
 or acceptance record. Use ignored project-local scratch only when actually needed.
 Native subagents are attended read-only support: collect their results before ending.
 If selecting GPT-6 Luna, default to Max unless the user overrides it.
-Before spawning, announce the subagent's purpose and actual model/effort;
-label inherited or unverified settings honestly.
+Before spawning, announce the subagent's purpose and requested model/effort.
+Distinguish selection unavailable (no selector) from not authorized (native restriction);
+set each supported, authorized field independently. Otherwise disclose known defaults/inheritance.
+Label effective settings unverified unless confirmed by the host.

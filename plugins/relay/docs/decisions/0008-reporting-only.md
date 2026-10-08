@@ -153,10 +153,17 @@ directly, not through a mandatory escalation ladder; broader judgment can justif
 Sol rather than Luna/Max. Do not duplicate model
 choices in worker briefs, registry fields or runtime validation. User choices and
 native dispatch permissions still govern; no automatic fallback or escalation engine.
-Whichever role launches a native subagent announces its purpose, model and effort
-before spawning, matching the actual configuration and disclosing inherited or
+Whichever role launches a native subagent announces its purpose and requested model/effort
+before spawning, matching the dispatch request and disclosing inherited or
 unverified settings. Both direct and deliver carry this visibility rule; it adds
 no registry fields, worker-brief requirements or runtime checks.
+
+Clarification (2026-10-08): an inspected ADE spawn interface exposed both selectors
+but restricted model overrides separately from reasoning effort; its return supplied
+IDs, not resolved settings. Distinguish missing selectors, unauthorized choices and
+unverified effective settings. Set each supported, authorized field independently;
+lack of returned configuration is not proof that selection was unavailable. This is
+a skill wording correction, not a native-permission override or enforcement layer.
 
 The [Codex model guide](https://developers.openai.com/codex/models) recommends
 starting at Luna/High and Sol/Medium. Our Luna/Max preference instead follows the

@@ -9,15 +9,17 @@ test work, certify completion, or archive tasks. Directors and coordinators foll
 
 1. Brief the outcome, checks, relevant plan and source entrypoints—not whole documents
    or limits on investigation. Follow native creation permissions. Apply authorized
-   model choices below at dispatch, not in the brief or registry; otherwise disclose host defaults.
+   model choices below at dispatch, not in the brief or registry; otherwise disclose known defaults/inheritance.
 2. For serial work, explicitly select the retained checkout (normally main) at dispatch
    when host rules and user authorization permit; do not silently accept a worktree
    default. If the host requires explicit user choice, obtain it. Use a separate
    worktree/branch only for a stated isolation need or an explicit user request.
    Never let manager and worker edit concurrently. Read-only native subagents must remain attended until
    their results are collected; Relay does not route subagent completions.
-   Before spawning, announce the subagent's purpose and actual model/effort;
-   label inherited or unverified settings honestly.
+   Before spawning, announce the subagent's purpose and requested model/effort.
+   Distinguish selection unavailable (no selector) from not authorized (native restriction);
+   set each supported, authorized field independently. Otherwise disclose known defaults/inheritance.
+   Label effective settings unverified unless confirmed by the host.
 3. Include your host-provided `CODEX_THREAD_ID` as the manager ID in the launch brief,
    and tell the worker to use Relay deliver and register itself before starting work.
    This applies equally to director→coordinator and coordinator→executor delegation.
@@ -68,7 +70,7 @@ subagents. Choose by task difficulty, not role. Explicit user choices take prece
 GPT-6.1 Sol also allows Xhigh. Choose directly, not through an escalation ladder;
 prefer Sol over Luna/Max when broader judgment is needed.
 
-Set supported native model/effort fields explicitly; disclose unavailable choices.
+Set each supported, authorized native model/effort field explicitly.
 Reserve Astra for demonstrated need or user request. Escalate for inadequate reasoning,
 not missing permissions/tools/inputs; avoid endless cheap retries. These are starting
 points, not guarantees; leave active tasks and global defaults unchanged.
