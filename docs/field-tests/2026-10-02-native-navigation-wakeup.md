@@ -3,6 +3,10 @@
 Status: verified in a disposable local desktop probe; reusable workaround, not
 a Relay feature or default workflow requirement.
 
+For the combined queue, navigation and CLI guide, see
+[Codex messaging, task wakeup, and CLI execution](../codex-messaging-and-task-wakeup.md).
+The evidence below remains the original bounded test, not a new qualification.
+
 ## Finding and use
 
 `thread/queue/add` can save a message without loading its destination chat.

@@ -46,4 +46,5 @@ relocated reference tree. Flow's legacy plugin identifier remains
 
 See [repository layout decision](docs/adr/0077-multi-product-layout-and-flow-retirement.md).
 
-Reusable host finding: [native navigation can wake queued work in an unloaded chat](docs/field-tests/2026-10-02-native-navigation-wakeup.md).
+Reusable host reference: [Codex messaging, task wakeup, and CLI execution](docs/codex-messaging-and-task-wakeup.md),
+including Relay's queue method and the [bounded native-navigation probe](docs/field-tests/2026-10-02-native-navigation-wakeup.md).
