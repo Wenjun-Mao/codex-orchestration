@@ -1,9 +1,10 @@
 # Planning, optional grilling, and strategic review
 
 Recorded: 2026-10-12.
-Status: agreed design direction with an unverified review-trigger mechanism.
-Current scope: capture decisions before any probes or implementation. This note
-does not install or rename skills, start a run, create an automation, or change Relay.
+Status: agreed design direction; bounded native timing probe narrows the proposed
+review-trigger mechanism. See the [field-test evidence](../field-tests/2026-10-12-strategic-review-heartbeat.md).
+This note records design and evidence, not installed behavior. It does not install
+or rename skills or change Relay.
 
 ## Purpose and boundaries
 
@@ -171,7 +172,7 @@ not a strategic review. Whole-effort coverage does not require replaying every
 transcript or rerunning every check. Review is not a routine human approval gate;
 seek new authority only where the next action actually needs it.
 
-## Review invocation proposal and unresolved behavior
+## Review invocation proposal and probe findings
 
 Instruction text such as "review periodically" is not a reliable clock. The agreed
 direction is two triggers feeding the same review procedure:
@@ -179,7 +180,7 @@ direction is two triggers feeding the same review procedure:
 | Trigger | Role |
 | --- | --- |
 | Work checkpoints | Check for review before another substantial work segment, after a meaningful milestone, repeated failure, or evidence that challenges the approach. |
-| Elapsed-time reminder | Supply an independent reminder during long stretches without a natural checkpoint, using a temporary native heartbeat rather than a Relay scheduler. |
+| Elapsed-time reminder | Use a temporary native heartbeat as an additional catch-up reminder, not a Relay scheduler. The probe below limits what it can do during uninterrupted work. |
 
 Direct would load and apply `strategic-review` when due, preserve the latest review
 checkpoint in existing notes, and avoid a duplicate timed review immediately after
@@ -187,22 +188,31 @@ a substantive milestone review. An overdue review should be handled at a safe
 boundary, not by interrupting an unsafe operation. The temporary reminder should
 be removed when the run ends and must not override a user pause.
 
-**Unverified:** the documented native same-chat scheduling capability does not
-establish how a heartbeat behaves during an already-running director turn. Do not
-claim reliable delivery, exact review timing, or non-interruption until the relevant
-behavior is observed. A trigger also cannot guarantee the quality of the review.
+**Observed in the October 12 bounded probe:** idle heartbeat delivery worked. During
+one roughly three-minute busy turn and one roughly three-minute native Goal spanning
+an automatic continuation, no heartbeat became visible until the work completed.
+The original turns were not interrupted. The native Goal stayed active across its
+first final response and was later explicitly completed. These observations do not
+distinguish internal queueing, skipping, or deferral, or guarantee future host behavior.
 
-The next bounded probe needs to distinguish:
+This limits the original independent-clock idea: a heartbeat cannot be relied on
+to prompt review during uninterrupted active work. The proposed wording should make
+elapsed-time checks at work boundaries and resumptions primary, and describe the
+heartbeat as an optional catch-up reminder. The desired cadence may be late until
+the next safe boundary; it is not a hard timer. No unsafe interruption or forced
+final response should be introduced merely to service the timer. On receipt,
+recheck current run status and user instructions as well as the latest review;
+ignore reminders made stale by completion or pause. Removing a schedule does not
+prove that an already-in-flight reminder was cancelled. This is an evidence-led
+refinement to review before implementing the skills, not a new runtime mechanism.
 
-- Idle director delivery from delivery while the director is already working.
-- Behavior with an active Goal, without confusing a turn ending with a Goal pause.
-- Whether reminders queue, defer, skip, or otherwise behave when the chat is busy,
-  and whether they can be handled without interrupting existing work.
-- Avoidance of duplicate review after a recent checkpoint and cessation after
-  completion; user pause must remain authoritative.
-
-The exact probe setup, reminder cadence, cleanup controls, and fallback if native
-behavior is unsuitable remain open. No probe or automation is created by this note.
+The linked field-test note records one successful recent-checkpoint skip, deletion
+of all four temporary reminders, completion of the diagnostic Goal, and archival
+of the disposable chat. The skip is instruction-level behavior, not deterministic
+enforcement or verification of the not-yet-written strategic-review skill.
+Human-paused Goals, restart/suspension, production-length runs, and review quality
+remain unqualified. A timer or timestamp cannot guarantee substantive review;
+user pause must remain authoritative.
 
 ## Superseded directions and next steps
 
@@ -215,9 +225,9 @@ Do not revive these earlier proposals as additional requirements:
 - Building a new hook, scheduler, registry, or mandatory reviewer hierarchy before
   testing the native reminder capability.
 
-Next work, in order: evaluate the bounded reminder behavior; resolve the remaining
-design questions; draft the skill wording for review; then implement and verify
-the agreed changes proportionally. Keep implementation, source publication, and
+Next work, in order: resolve the remaining design questions in light of the bounded
+probe; draft the skill wording for review; then implement and verify the agreed
+changes proportionally. Keep implementation, source publication, and
 installation distinct. Promote stable workflow decisions into the appropriate
 decision records without treating this exploratory note as proof of effectiveness.
 
