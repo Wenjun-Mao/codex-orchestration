@@ -31,6 +31,9 @@ not globally installed or shipped with Relay. No automatic deployment is added.
 
 See [standalone-skill layout decision](docs/adr/0078-standalone-personal-skills.md).
 
+See the [planning, optional grilling, and strategic review notes](docs/plans/2026-10-12-planning-grilling-and-strategic-review-notes.md)
+for the agreed direction and unverified long-run review trigger. These changes are not yet implemented.
+
 ## Development
 
 - Relay: `npm --prefix plugins/relay run release:check`; root `npm test` runs its tests only.
