@@ -9,16 +9,22 @@ test work, certify completion, or archive tasks. Directors and coordinators foll
 
 1. Brief the outcome, checks, relevant plan and source entrypoints—not whole documents
    or limits on investigation. Follow native creation permissions. Apply authorized
-   model choices below at dispatch, not in the brief or registry; otherwise disclose known defaults/inheritance.
+   model choices below at dispatch, not in the brief or registry. For worker task
+   creation, disclose known native defaults if overrides are unavailable or restricted.
 2. For serial work, explicitly select the retained checkout (normally main) at dispatch
    when host rules and user authorization permit; do not silently accept a worktree
    default. If the host requires explicit user choice, obtain it. Use a separate
    worktree/branch only for a stated isolation need or an explicit user request.
    Never let manager and worker edit concurrently. Read-only native subagents must remain attended until
    their results are collected; Relay does not route subagent completions.
-   Before spawning, announce the subagent's purpose and requested model/effort.
-   Distinguish selection unavailable (no selector) from not authorized (native restriction);
-   set each supported, authorized field independently. Otherwise disclose known defaults/inheritance.
+   Choose and set every subagent's model explicitly; never use default/inherited model
+   selection or a spawn mode that forces it. Set supported, authorized reasoning effort
+   explicitly, and announce the purpose and requested model/effort before spawning.
+   If explicit model selection is unavailable or restricted, ask the user for delegation
+   guidance using native question UI (`request_user_input_async`, or `request_user_input`
+   where permitted; chat if neither is available). Wait for the answer before starting
+   that work; do not silently fall back to an inherited subagent or doing it yourself.
+   Distinguish missing selectors from native restrictions; user guidance does not bypass them.
    Label effective settings unverified unless confirmed by the host.
 3. Include your host-provided `CODEX_THREAD_ID` as the manager ID in the launch brief,
    and tell the worker to use Relay deliver and register itself before starting work.

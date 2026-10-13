@@ -165,6 +165,16 @@ unverified effective settings. Set each supported, authorized field independentl
 lack of returned configuration is not proof that selection was unavailable. This is
 a skill wording correction, not a native-permission override or enforcement layer.
 
+Correction (2026-10-13): Direct requires explicit subagent model selection and a
+spawn mode that supports it. Disclosure of inheritance is no longer sufficient:
+an Astra director can otherwise duplicate its cost through routine subagents.
+If selection is unavailable or restricted, ask the user for delegation guidance
+through the available native question UI and wait before starting that work.
+Do not automatically substitute inherited subagents or work on the director;
+guidance does not bypass native restrictions. Reasoning effort remains explicit
+where supported and authorized; effective settings require host confirmation.
+This changes Direct's instructions only, without runtime enforcement.
+
 The [Codex model guide](https://developers.openai.com/codex/models) recommends
 starting at Luna/High and Sol/Medium. Our Luna/Max preference instead follows the
 user's quality/cost tradeoff after reviewing the [launch evaluations](https://openai.com/index/introducing-gpt-6-sol-and-luna/);
