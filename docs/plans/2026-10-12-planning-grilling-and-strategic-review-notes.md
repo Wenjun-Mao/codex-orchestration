@@ -6,6 +6,14 @@ review-trigger mechanism. See the [field-test evidence](../field-tests/2026-10-1
 This note records design and evidence, not installed behavior. It does not install
 or rename skills or change Relay.
 
+Update (2026-10-14): prioritize foreseeable permissions and decisions in planning,
+and their continued application in Direct, before the later skill additions.
+Default to an estimated completion duration with **no time limit**; add a deadline
+or cap only when the user supplies or explicitly agrees to one. The estimate is
+a forecast, not an execution budget. See the
+[focused change proposal](../../plugins/relay/docs/plans/2026-10-14-end-to-end-approval-proposal.md)
+for draft wording and the external-review mandate. It is not implemented.
+
 ## Purpose and boundaries
 
 Generalize the useful parts of UK Dev's plan/direct/review modernization workflow
@@ -112,10 +120,11 @@ when selected while keeping its use optional and its subject bounded.
 
 The original long-run requirements remain part of the design:
 
-- **Completion first.** Use observable acceptance criteria. Time limits are optional;
-  include them when supplied by the user or when they materially affect the work.
-  Do not require or invent a deadline for ordinary planning. Review cadence is not
-  a run deadline, and available time is not a quota to fill with activity.
+- **Completion first.** Use observable acceptance criteria. Default to an estimated
+  duration for the whole effort and no time limit. State meaningful uncertainty;
+  add a deadline or cap only when the user supplies or explicitly agrees to one.
+  An estimate is not a stopping rule or a quota to fill. Review cadence is not
+  a run deadline, and native controls remain separate.
 - **Prepare for autonomy.** Resolve foreseeable choices, dependencies, permissions,
   verification, activation, and recovery needs before launch. Cover ordinary
   diagnosis, repairs, retesting, and review within the authorized scope instead of
@@ -225,9 +234,11 @@ Do not revive these earlier proposals as additional requirements:
 - Building a new hook, scheduler, registry, or mandatory reviewer hierarchy before
   testing the native reminder capability.
 
-Next work, in order: resolve the remaining design questions in light of the bounded
-probe; draft the skill wording for review; then implement and verify the agreed
-changes proportionally. Keep implementation, source publication, and
+Next work, in order: review and implement the focused planning/Direct approval
+and estimate correction; then refine brainstorming and optional grilling; then
+establish strategic review and integrate mid-run invocation using the bounded
+probe findings. Review proposed wording before implementing each addition.
+Keep implementation, source publication, and
 installation distinct. Promote stable workflow decisions into the appropriate
 decision records without treating this exploratory note as proof of effectiveness.
 
