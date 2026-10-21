@@ -112,6 +112,12 @@ and [`codex exec` reference](https://learn.chatgpt.com/docs/developer-commands#c
 The examples' option placement was checked against the bundled CLI help; no live
 CLI generation or cross-runner wake test was performed for this document.
 
+An [October 21 app-server creation probe](../plugins/relay/docs/field-tests/2026-10-21-local-launch-compatibility.md)
+accepted configured Luna/Max and delivered a genuine Relay Stop report, but rejected
+the Desktop project ID and exposed conflicting live status between app-server and
+Desktop. It does not qualify a separate app-server as a Desktop worker launcher;
+see the [launch boundary decision](../plugins/relay/docs/decisions/0009-local-task-launch-boundary.md).
+
 ## Keep the boundaries lean
 
 Relay remains report forwarding only. Navigation is an optional native workaround;
