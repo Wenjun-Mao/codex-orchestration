@@ -72,6 +72,25 @@ the plan. Do not require separate approval for every section or reconfirm settle
 - Default to serial work on the retained checkout. Explain any useful bounded independent
   review; do not invent parallel writers. Model choice belongs at native dispatch, not in worker briefs.
 
+## 7. Independently review execution limits
+
+Before presenting an implementation plan as ready for approval or handoff, have one
+independent read-only subagent check for plan-created limits that could unnecessarily
+stall execution. Give it the goal, plan, relevant user instructions and granted authority,
+and actual project/platform constraints. Ask it to identify unnecessary approval gates,
+arbitrary budgets or attempt limits, overly broad serialization, and restrictions on
+delegated engineering judgment. Each finding should name the clause, explain the likely
+stall, and propose a justified correction while preserving real user limits, native
+requirements, and engineering safeguards. No findings is a valid result.
+
+Use **GPT-6.1 Sol / Medium** unless the user explicitly overrides it. Announce the purpose
+and requested settings, set both model and reasoning effort explicitly, and choose a
+fresh-context spawn mode that supports them; never use default/inherited settings.
+If selection is unavailable or restricted, ask the user for guidance before proceeding
+with the review rather than silently substituting another model or self-review.
+Keep the subagent attended, collect its findings, and assess and incorporate useful
+corrections before finalizing. This review adds no routine human approval checkpoint.
+
 Present the result for review; planning alone does not authorize implementation or task creation.
 Carry the approved scope and granted permissions into the implementation handoff. Continue
 covered steps through verification and planned rollback without renewed milestone approvals;

@@ -130,6 +130,23 @@ This is planning guidance, not blanket permission or runtime enforcement. The re
 late activation question does not establish whether activation was already authorized;
 instruction validation is not proof that every director will follow the guidance.
 
+## Independent plan-limit review — 2026-10-25
+
+Planner self-review can miss unnecessary constraints introduced by the plan itself.
+Before an implementation plan is ready for approval or handoff, Brainstorm and Plan
+now requires one attended read-only subagent to identify such limits, explain their
+effect, and suggest justified corrections using the goal, plan, actual authority,
+and project/platform constraints. Preserve real limits and safeguards; an empty
+finding set is valid. The planner assesses findings and integrates useful changes
+without adding a routine human sign-off or a new review framework.
+
+The user selected GPT-6.1 Sol / Medium explicitly for this role. Set both selectors
+in a fresh-context spawn mode, announce them, and never inherit the planner's
+settings. If selection is unavailable or restricted, seek user guidance rather
+than silently substituting. This changes the planning skill only; the separate
+approval-continuity proposal and later grilling/strategic-review design remain
+pending. Runtime forwarding and task lifecycle behavior are unaffected.
+
 ## Model guidance update — 2026-09-29
 
 Replace GPT-6 Sol with GPT-6.1 Sol in the active manager guide, preserving Medium
