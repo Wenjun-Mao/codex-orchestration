@@ -57,6 +57,9 @@ the plan. Do not require separate approval for every section or reconfirm settle
 - A handoff-ready plan makes outcome, scope/exclusions, observable acceptance criteria,
   ordered deliverables, relevant files, dependencies, and material risks clear. Distinguish
   facts from assumptions; check requirement coverage and contradictions.
+- Tie completion evidence to the user's intended result, not just finished deliverables.
+  State permitted assistance where it affects the claim; include actual use and
+  post-repair qualification when needed to demonstrate that result.
 - Resolve choices that change agreed behavior or scope; identify technical decisions left
   to the implementer. Put unresolved feasibility investigations before dependent implementation.
   The implementer should not guess user intent, but should still exercise engineering judgment;
@@ -72,27 +75,49 @@ the plan. Do not require separate approval for every section or reconfirm settle
 - Default to serial work on the retained checkout. Explain any useful bounded independent
   review; do not invent parallel writers. Model choice belongs at native dispatch, not in worker briefs.
 
-## 7. Independently review execution limits
+## 7. Independently review outcome sufficiency
 
-Before presenting an implementation plan as ready for approval or handoff, have one
-independent read-only subagent check for plan-created limits that could unnecessarily
-stall execution. Give it the goal, plan, relevant user instructions and granted authority,
-and actual project/platform constraints. Ask it to identify unnecessary approval gates,
+Before presenting an implementation plan as ready for approval or handoff, have an
+independent read-only subagent test whether its acceptance criteria are sufficient
+for the user's intended outcome. Give it the original goal and relevant user decisions,
+the plan, and actual constraints—not
+the planner's verdict. Ask for a realistic case where every deliverable and acceptance
+check passes but the promised outcome still fails, or an explanation of which planned
+evidence rules that out. Check for proxy measures replacing the real result, missing
+end-to-end use, and assistance or repairs that invalidate the claimed improvement.
+Fresh independent use is required only when the actual claim needs it.
+
+Each gap should cite the relevant provisions and propose the smallest correction.
+Incorporate justified corrections without silently weakening the intended outcome;
+resolve material scope choices with the user. Preserve legitimate bounded success:
+an agreed investigation may conclude negatively, and planned human/director judgment
+does not imply incompleteness. Do not add unrequested ambitions or require a new report.
+
+## 8. Independently review execution limits
+
+After incorporating the outcome review, have a separate independent read-only subagent
+check for plan-created limits that could unnecessarily stall execution. Give it the
+goal, revised plan, relevant user instructions and granted authority, and actual
+project/platform constraints. Ask it to identify unnecessary approval gates,
 arbitrary budgets or attempt limits, overly broad serialization, and restrictions on
 delegated engineering judgment. Each finding should name the clause, explain the likely
 stall, and propose a justified correction while preserving real user limits, native
 requirements, and engineering safeguards. No findings is a valid result.
 
-Use **GPT-6.1 Sol / Medium** unless the user explicitly overrides it. Announce the purpose
-and requested settings, set both model and reasoning effort explicitly, and choose a
-fresh-context spawn mode that supports them; never use default/inherited settings.
+For both reviews, use **GPT-6.1 Sol / Medium** unless the user explicitly overrides it.
+Announce the purpose and requested settings, set both model and reasoning effort
+explicitly, and choose a fresh-context spawn mode that supports them; never use
+default/inherited settings.
 If selection is unavailable or restricted, ask the user for guidance before proceeding
 with the review rather than silently substituting another model or self-review.
-Keep the subagent attended, collect its findings, and assess and incorporate useful
-corrections before finalizing. This review adds no routine human approval checkpoint.
+Keep each subagent attended, collect its findings, and assess and incorporate useful
+corrections before finalizing. If the limits review changes acceptance criteria, return
+those changes to the outcome reviewer for a focused recheck. Neither review adds a
+routine human approval checkpoint.
 
 Present the result for review; planning alone does not authorize implementation or task creation.
-Carry the approved scope and granted permissions into the implementation handoff. Continue
+Carry the approved outcome, acceptance criteria, scope and granted permissions into the
+implementation handoff. Continue
 covered steps through verification and planned rollback without renewed milestone approvals;
 seek new authority only for uncovered actions, material scope/risk changes, or native requirements.
 After implementation approval, use `direct` when managing delegated work. This skill does not

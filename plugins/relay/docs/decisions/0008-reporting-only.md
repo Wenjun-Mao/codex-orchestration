@@ -147,6 +147,29 @@ than silently substituting. This changes the planning skill only; the separate
 approval-continuity proposal and later grilling/strategic-review design remain
 pending. Runtime forwarding and task lifecycle behavior are unaffected.
 
+## Outcome sufficiency before execution limits — 2026-10-25
+
+UK Dev's learning-loop plan allowed an assisted application while promising less
+director reconstruction. Its deliverables could pass without demonstrating the
+intended improvement; later reviews also made genuine bounded successes sound
+incomplete by comparing them with unrequested ambitions. A generic goal/criteria
+agreement check had not caught either mismatch.
+
+Brainstorm and Plan now ties completion evidence and relevant assistance to the
+intended result. Before the limits review, a separate fresh read-only reviewer
+constructs a realistic case where all planned checks pass but the outcome fails,
+or explains which evidence excludes it. Correct justified gaps, including actual
+use or post-repair qualification only when the claim needs them, without silently
+lowering the outcome or enlarging agreed scope. Negative investigations and planned
+human judgment remain legitimate bounded outcomes.
+
+Both reviews use the existing explicit GPT-6.1 Sol / Medium dispatch rule and remain
+attended. The limits reviewer receives the corrected plan; changes affecting acceptance
+return to the outcome reviewer for a focused recheck. The approved outcome and criteria
+remain in the implementation handoff. No mandatory report, extra human sign-off,
+runtime enforcement or changes to Direct/Deliver are introduced. Scenario checks can
+test these judgments, but do not guarantee future instruction compliance.
+
 ## Model guidance update — 2026-09-29
 
 Replace GPT-6 Sol with GPT-6.1 Sol in the active manager guide, preserving Medium
