@@ -1,3 +1,8 @@
+# 0.5.2
+
+- Increase icon weight for small menus and use the same cyan in both composer
+  variants so dark surfaces remain readable when the default asset is selected.
+
 # 0.5.1
 
 - Add the two-node arrow icon, with a cyan listing logo and monochrome composer
