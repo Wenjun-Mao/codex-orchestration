@@ -1,3 +1,8 @@
+# 0.5.1
+
+- Add the two-node arrow icon, with a cyan listing logo and monochrome composer
+  variants for light and dark themes. Reporting runtime and skills are unchanged.
+
 # 0.5.0
 
 - Separate Brainstorm and Plan, retaining Brainstorm and Plan as a thin combined

@@ -1,6 +1,6 @@
 {
   "name": "relay",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "private": true,
   "description": "Same-host worker-to-manager report forwarding",
   "type": "module",
@@ -17,6 +17,7 @@
   },
   "files": [
     ".codex-plugin/plugin.json",
+    "assets/",
     "bin/relay.mjs",
     "bin/relay-final-hook.mjs",
     "hooks/",

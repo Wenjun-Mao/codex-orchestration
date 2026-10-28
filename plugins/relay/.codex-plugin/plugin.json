@@ -1,6 +1,6 @@
 {
   "name": "relay",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Same-host worker-to-manager report forwarding",
   "author": {
     "name": "Wenjun Mao"
@@ -8,6 +8,12 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "Relay",
+    "logo": "./assets/relay.svg",
+    "logoDark": "./assets/relay.svg",
+    "composerIcon": "./assets/relay-composer.svg",
+    "composerIconDark": "./assets/relay-composer-dark.svg",
+    "brandColor": "#22B8D8",
+    "brandColorDark": "#22B8D8",
     "shortDescription": "Forward task reports to managers.",
     "longDescription": "Same-host worker-to-manager report forwarding",
     "developerName": "Wenjun Mao",
