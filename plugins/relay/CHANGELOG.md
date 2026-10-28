@@ -1,3 +1,17 @@
+# 0.5.0
+
+- Separate Brainstorm and Plan, retaining Brainstorm and Plan as a thin combined
+  entrypoint. Exploration can end on its own; settled designs enter planning directly.
+- Add Review for strategic checkpoints and final outcome assessment. Direct uses
+  the project wrapper when present and carries existing authority through execution.
+- Preserve the agreed outcome, sufficient evidence and permitted assistance through
+  planning, repairs and closeout. Plan reviews outcome sufficiency before avoidable
+  restrictions, with explicit Sol/Xhigh and Sol/Medium settings respectively.
+- Rewrite Direct, Review and Deliver for readability; align Deliver's explicit
+  subagent selection and blocked-work reporting with the manager's requirements.
+- Keep estimates separate from real deadlines, and keep lifecycle reminders
+  project-owned. No reporting runtime, hook, registry or transport behavior changes.
+
 # 0.4.2
 
 - Discover the executable in the current or legacy macOS App bundle layout before

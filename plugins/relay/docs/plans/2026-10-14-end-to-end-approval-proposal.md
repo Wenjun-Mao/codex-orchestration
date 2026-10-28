@@ -1,5 +1,10 @@
 # Relay planning: approval completeness and estimated duration
 
+Update (2026-10-27): the approval-continuity and estimate behavior is adopted by
+[Relay 0.5.0](../decisions/0008-reporting-only.md#core-skills-and-project-wrappers--050-2026-10-27).
+The draft and old section references below are retained as historical rationale;
+installed discovery and trust are verified separately from this source decision.
+
 Created: 2026-10-14. Revised: 2026-10-15 (revision 2).
 Status: revised after two external reviews; awaiting user review, not implemented or installed.
 Source baseline: `db2975ff053d747def2c904e1ffa89fc31fd2076`.

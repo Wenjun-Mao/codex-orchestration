@@ -31,8 +31,11 @@ not globally installed or shipped with Relay. No automatic deployment is added.
 
 See [standalone-skill layout decision](docs/adr/0078-standalone-personal-skills.md).
 
-See the [planning, optional grilling, and strategic review notes](docs/plans/2026-10-12-planning-grilling-and-strategic-review-notes.md)
-for the agreed direction and unverified long-run review trigger. These changes are not yet implemented.
+Relay 0.5.0 adopts the separate Brainstorm, Plan and Review skills, with a thin
+combined planning entrypoint and project wrappers. See the
+[current decision](plugins/relay/docs/decisions/0008-reporting-only.md#core-skills-and-project-wrappers--050-2026-10-27).
+The earlier [planning and strategic-review notes](docs/plans/2026-10-12-planning-grilling-and-strategic-review-notes.md)
+remain historical; optional grilling and reminder-expiry changes are still deferred.
 
 ## Development
 

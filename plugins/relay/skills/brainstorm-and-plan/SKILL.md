@@ -1,124 +1,27 @@
 ---
 name: brainstorm-and-plan
-description: Explore project ideas collaboratively and draft, revise, or save a practical implementation plan without starting implementation.
+description: Take an idea through exploration into a reviewed implementation plan by applying relay:brainstorm and relay:plan. Use when the user wants both; skip exploration when the design is already settled.
 ---
 # Brainstorm and Plan
 
-Turn the user's idea into a shared understanding, a reviewed design, and an actionable
-plan. Start from the requested activity and existing agreement. These sections are
-checks, not mandatory conversational rounds: revisit only missing or changed information,
-and stop when the requested exploration, revision, or saved plan is complete.
+Help the user move from an idea to a reviewed plan. This is a convenient
+entrypoint to two skills, not a third planning method.
 
-## 1. Understand the goal
+1. If the purpose or approach is still unclear, read and apply
+   `relay:brainstorm` to resolve it. When the direction is settled,
+   continue into `relay:plan` without asking whether the user wants
+   the plan they already requested.
+2. If the user supplies a settled design, go directly to `relay:plan`.
+   Ask only about missing details that would change the plan.
+3. Read and apply `relay:plan` for the plan and its independent reviews.
+   If Brainstorm already handed off to Plan, continue that same pass;
+   do not run the planning workflow twice.
 
-- Identify the problem, who the change serves, constraints, and what success means.
-- If purpose is missing, ask about it before proposing features. If already supplied,
-  reflect it briefly rather than asking again. Separate the user's intent from your assumptions.
-- Scale depth to uncertainty and consequences, not just code size: propose a bounded
-  probe for feasibility questions, brief steps for straightforward changes, and explicit
-  boundaries/interfaces for architectural work. For broad ideas, agree on the next useful
-  deliverable before detailed planning; keep the larger direction brief.
+Carry forward decisions, existing documents and any project-specific
+instructions from the calling wrapper. Do not repeat discovery,
+duplicate documents or add another reviewer or approval stage.
 
-## 2. Ground the discussion in the project
-
-- Read applicable repository instructions before repository work.
-- Reuse established project context; inspect only enough to verify assumptions relevant
-  to this decision. Locate affected entrypoints, implementation, tests, and plans/decisions
-  to establish current behavior, reusable parts, and necessary changes—not repeat broad discovery.
-- For a new project, establish the starting constraints instead of searching for nonexistent code.
-  Do not ask the user factual questions that this inspection can answer.
-
-## 3. Clarify meaningful choices
-
-- Ask one focused question at a time, prioritizing unknowns that change scope or design.
-- Prefer native question UI (`request_user_input` or a supported equivalent) when permitted
-  by its mode and usage rules; otherwise ask in chat.
-- Offer meaningful choices with your recommendation and brief trade-offs, allowing a
-  free-text answer. Ask an open question when options would constrain discovery.
-- Incorporate answers before settling dependent decisions. Do not invent questions,
-  repeat settled choices, or treat an unanswered recommendation as the user's selection.
-
-## 4. Compare approaches
-
-For a genuine design choice, present two or three viable approaches, their trade-offs,
-and your recommendation. Explain why it fits the agreed goal and project constraints.
-If only one approach is sensible, explain it without manufacturing alternatives.
-Exclude speculative features and unrelated refactoring.
-
-## 5. Review the design
-
-Present the proposed behavior, affected components, important failure cases, and how
-success will be verified. Split complex designs into digestible sections; keep small
-changes brief. Invite correction and resolve material disagreement before finalizing
-the plan. Do not require separate approval for every section or reconfirm settled decisions.
-
-## 6. Write and check the plan
-
-- A handoff-ready plan makes outcome, scope/exclusions, observable acceptance criteria,
-  ordered deliverables, relevant files, dependencies, and material risks clear. Distinguish
-  facts from assumptions; check requirement coverage and contradictions.
-- Tie completion evidence to the user's intended result, not just finished deliverables.
-  State permitted assistance where it affects the claim; include actual use and
-  post-repair qualification when needed to demonstrate that result.
-- Resolve choices that change agreed behavior or scope; identify technical decisions left
-  to the implementer. Put unresolved feasibility investigations before dependent implementation.
-  The implementer should not guess user intent, but should still exercise engineering judgment;
-  do not require prewritten implementation/test code for every step.
-- Surface foreseeable execution permissions before seeking approval: affected environments
-  and operational actions (such as activation or service restarts), plus verification and
-  rollback where relevant. Distinguish permissions already granted from those still needed;
-  resolve missing authorization up front where possible, and make unavoidable later gates explicit.
-- Maintain one plan for the same scope, updating it rather than creating overlapping versions.
-  Save it in the existing plans directory (otherwise `docs/plans/`); brief exploration can stay
-  in chat. Record durable decisions as repository conventions require, linking ADRs rather
-  than duplicating rationale. Do not add documents merely because another stage was reached.
-- Default to serial work on the retained checkout. Explain any useful bounded independent
-  review; do not invent parallel writers. Model choice belongs at native dispatch, not in worker briefs.
-
-## 7. Independently review outcome sufficiency
-
-Before presenting an implementation plan as ready for approval or handoff, have an
-independent read-only subagent test whether its acceptance criteria are sufficient
-for the user's intended outcome. Give it the original goal and relevant user decisions,
-the plan, and actual constraints—not
-the planner's verdict. Ask for a realistic case where every deliverable and acceptance
-check passes but the promised outcome still fails, or an explanation of which planned
-evidence rules that out. Check for proxy measures replacing the real result, missing
-end-to-end use, and assistance or repairs that invalidate the claimed improvement.
-Fresh independent use is required only when the actual claim needs it.
-
-Each gap should cite the relevant provisions and propose the smallest correction.
-Incorporate justified corrections without silently weakening the intended outcome;
-resolve material scope choices with the user. Preserve legitimate bounded success:
-an agreed investigation may conclude negatively, and planned human/director judgment
-does not imply incompleteness. Do not add unrequested ambitions or require a new report.
-
-## 8. Independently review execution limits
-
-After incorporating the outcome review, have a separate independent read-only subagent
-check for plan-created limits that could unnecessarily stall execution. Give it the
-goal, revised plan, relevant user instructions and granted authority, and actual
-project/platform constraints. Ask it to identify unnecessary approval gates,
-arbitrary budgets or attempt limits, overly broad serialization, and restrictions on
-delegated engineering judgment. Each finding should name the clause, explain the likely
-stall, and propose a justified correction while preserving real user limits, native
-requirements, and engineering safeguards. No findings is a valid result.
-
-For both reviews, use **GPT-6.1 Sol / Medium** unless the user explicitly overrides it.
-Announce the purpose and requested settings, set both model and reasoning effort
-explicitly, and choose a fresh-context spawn mode that supports them; never use
-default/inherited settings.
-If selection is unavailable or restricted, ask the user for guidance before proceeding
-with the review rather than silently substituting another model or self-review.
-Keep each subagent attended, collect its findings, and assess and incorporate useful
-corrections before finalizing. If the limits review changes acceptance criteria, return
-those changes to the outcome reviewer for a focused recheck. Neither review adds a
-routine human approval checkpoint.
-
-Present the result for review; planning alone does not authorize implementation or task creation.
-Carry the approved outcome, acceptance criteria, scope and granted permissions into the
-implementation handoff. Continue
-covered steps through verification and planned rollback without renewed milestone approvals;
-seek new authority only for uncovered actions, material scope/risk changes, or native requirements.
-After implementation approval, use `direct` when managing delegated work. This skill does not
-switch native Plan mode or override its restrictions; defer file writes when prohibited.
+If the user changes the request to exploration only, finish through
+Brainstorm without producing a compulsory plan. For planning-only
+requests, use Plan directly. Follow Plan's handoff for any separately
+authorized execution; this wrapper grants no additional permission.

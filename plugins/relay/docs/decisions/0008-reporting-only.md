@@ -1,6 +1,8 @@
 # 0008 — Reporting-only Relay
 
 Status: accepted; supersedes lifecycle enforcement in decisions 0001–0007.
+The 0.5.0 amendment below owns the current skill layout, reviewer settings and
+shared model-selection guidance; earlier dated choices remain historical.
 
 ## Problem
 The worker-to-manager reporting relationship was embedded in a source lifecycle
@@ -225,3 +227,61 @@ $0.20/$1.20 for GPT-5.6 Luna and $2/$12 for GPT-5.6 Terra. These are dated API
 rates, not Codex subscription usage estimates or proof of universal Luna/Terra
 capability parity. Review real task outcomes before broader capability claims;
 retired Flow guidance remains historical rather than becoming a second maintained policy.
+
+
+## Core skills and project wrappers — 0.5.0, 2026-10-27
+
+Adopt separate Brainstorm and Plan skills, a thin Brainstorm and Plan entrypoint,
+and a core Review skill. Direct owns invoking the applicable project review wrapper,
+or core Review when no wrapper exists. Deliver keeps its worker reporting role.
+Project wrappers add domain evidence, constraints and commands without repeating
+core planning, delegation or review policy. A wrapper applying core is one pass.
+This supersedes the earlier single-skill planning choice and the separate proposed
+strategic-review skill name. Optional grilling remains deferred.
+
+Brainstorm supports exploration without a compulsory plan, and Plan accepts a
+settled design without repeating discovery. Plan carries sufficient outcome evidence,
+relevant assistance, foreseeable permissions, an estimate and any real user limit.
+Existing authorization continues through implementation, review fixes, verification,
+activation, recovery and cleanup; native requirements and explicit holds still apply.
+An estimate is a forecast, not a default deadline. Core skills create no scheduler,
+lifecycle reminder or Goal merely by being invoked.
+
+Keep the outcome-and-completion controls across the full workflow: define the actual
+result, independently challenge whether all checks could pass while it remains false,
+include the evidence required after repairs, preserve the original agreement plus
+explicit user amendments, and judge that agreement first. Useful partials, publication
+and cleanup cannot turn an unmet result into completion. Recognize legitimate bounded
+success, agreed investigations with negative findings and planned human involvement.
+Do not manufacture an autonomy requirement or silently downgrade a delivery promise.
+
+The two sequential Plan reviewers use fresh context and explicit settings: GPT-6.1
+Sol / Xhigh for outcome sufficiency and completeness, then GPT-6.1 Sol / Medium for
+avoidable restrictions. Changes to the outcome, evidence, assistance or assumptions
+used by the first review return to it for a focused recheck. Required proof is not
+an avoidable restriction merely because it takes work. Neither review adds a routine
+human approval stage. These settings supersede the earlier two-Medium proposal.
+
+Direct, Review and Deliver use plain language and separate the decisions an agent
+needs to make. Readability takes precedence over minimizing word count. Deliver now
+shares Direct's explicit subagent-selection rule; disclosing inherited defaults is
+not a fallback. If selection is unavailable or restricted, the worker asks the user
+for guidance, informs its manager which work waits, and continues independently
+useful assigned work where permitted. Waiting work stays unfinished, and other
+progress cannot substitute for evidence needed by the agreed result. Guidance does
+not bypass native restrictions.
+
+Brainstorm adapts [Superpowers brainstorming at commit 2ce8aa1](https://github.com/obra/superpowers/blob/2ce8aa15d05bd57213e6f746f953aafb7ded7a8b/skills/brainstorming/SKILL.md).
+Its MIT notice is packaged beside the skill in `skills/brainstorm/LICENSE`; attribution
+is outside the loaded skill instructions. Native question tools and available visual
+skills replace the upstream companion-server workflow. Plan is our own workflow.
+
+The package retains the reporting-only runtime: hooks, registry, transport, commands
+and archival ownership do not change. UK Dev wrapper adoption must reconcile existing
+callers and overlapping guidance, while preserving its outcome contract and domain
+requirements. Its optional-expiry reminder change remains separate work.
+
+Source/package checks and independent scenario reviews establish written consistency,
+not improved field results or automatic compliance. Installed discovery and hook trust
+must be verified separately from source adoption. Preserve the user's Git-ignored
+review drafts and pre-adoption snapshots after adoption; they are not packaged skills.

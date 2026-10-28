@@ -1,5 +1,12 @@
 # Planning, optional grilling, and strategic review
 
+Update (2026-10-27): the [Relay 0.5.0 decision](../../plugins/relay/docs/decisions/0008-reporting-only.md#core-skills-and-project-wrappers--050-2026-10-27)
+supersedes the proposed skill names and combined workflow below. Brainstorm and Plan
+are separate skills with a thin combined entrypoint; Review belongs to Relay and
+is invoked through project wrappers where available. Authorization continuity and
+estimates without default deadlines are adopted. Optional grilling and reminder
+expiry changes remain deferred. The original design discussion below is historical.
+
 Recorded: 2026-10-12.
 Status: agreed design direction; bounded native timing probe narrows the proposed
 review-trigger mechanism. See the [field-test evidence](../field-tests/2026-10-12-strategic-review-heartbeat.md).

@@ -11,8 +11,12 @@
   "lib/routes.mjs",
   "package.json",
   "runtime-files.json",
+  "skills/brainstorm-and-plan/SKILL.md",
+  "skills/brainstorm/LICENSE",
+  "skills/brainstorm/SKILL.md",
   "skills/deliver/SKILL.md",
   "skills/direct/SKILL.md",
   "skills/direct/references/cheap-unplug.md",
-  "skills/brainstorm-and-plan/SKILL.md"
+  "skills/plan/SKILL.md",
+  "skills/review/SKILL.md"
 ]

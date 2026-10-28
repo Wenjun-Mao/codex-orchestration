@@ -61,6 +61,22 @@ Do not switch an active old assignment's runtime. At a quiet checkpoint, preserv
 wanted work, archive finished tasks, and explicitly retire old state before registration.
 Legacy `control.json` is rejected, never migrated or erased automatically.
 
-See the direct/deliver/brainstorm-and-plan skills and [decision](docs/decisions/0008-reporting-only.md).
-Older decisions and acceptance notes in the source tree are historical, superseded
-where they describe lifecycle enforcement; they are not shipped in the 0.4 runtime.
+## Skills
+
+| Skill | Use |
+| --- | --- |
+| [Brainstorm](skills/brainstorm/SKILL.md) | Explore intent, alternatives and design with the user. |
+| [Plan](skills/plan/SKILL.md) | Turn a settled direction into executable work and review its outcome evidence and constraints. |
+| [Brainstorm and Plan](skills/brainstorm-and-plan/SKILL.md) | Apply the two stages as needed, without repeating either. |
+| [Direct](skills/direct/SKILL.md) | Manage authorized work, review evidence and direction, and close assignments. |
+| [Deliver](skills/deliver/SKILL.md) | Carry out a worker brief and report through Relay. |
+| [Review](skills/review/SKILL.md) | Judge the agreed outcome and recommend the next decision. |
+
+Project wrappers apply the core skills and add domain requirements. A wrapper
+applying Review is one review, not an additional pass. Completion depends on the
+agreed result and its evidence; finished activities or a forwarded final alone
+are insufficient. These are instructions for the agents, not new runtime gates.
+
+See the [current decision](docs/decisions/0008-reporting-only.md#core-skills-and-project-wrappers--050-2026-10-27).
+Earlier dated guidance and acceptance notes remain historical where superseded.
+The reporting-only runtime is unchanged in 0.5.0.
