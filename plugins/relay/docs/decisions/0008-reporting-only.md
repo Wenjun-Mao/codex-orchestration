@@ -1,8 +1,8 @@
 # 0008 — Reporting-only Relay
 
 Status: accepted; supersedes lifecycle enforcement in decisions 0001–0007.
-The 0.5.0 amendment below owns the current skill layout, reviewer settings and
-shared model-selection guidance; earlier dated choices remain historical.
+The 0.5.0 amendment defines the skill layout. The 0.5.3 amendment updates
+model selection for delegated work and plan reviews.
 
 ## Problem
 The worker-to-manager reporting relationship was embedded in a source lifecycle
@@ -285,3 +285,11 @@ Source/package checks and independent scenario reviews establish written consist
 not improved field results or automatic compliance. Installed discovery and hook trust
 must be verified separately from source adoption. Preserve the user's Git-ignored
 review drafts and pre-adoption snapshots after adoption; they are not packaged skills.
+
+## Model choices for delegated work and plan reviews — 0.5.3 (2026-11-17)
+
+[Direct](../../skills/direct/SKILL.md#choose-the-model-for-the-work) owns the
+shared model guide, including the visual and writing role for Terra and
+focused, repeatable assignments for Luna. Deliver follows it when the worker
+chooses a model. [Plan](../../skills/plan/SKILL.md#use-explicit-reviewer-settings)
+specifies GPT-6.2 Sol for its two independent reviewers.

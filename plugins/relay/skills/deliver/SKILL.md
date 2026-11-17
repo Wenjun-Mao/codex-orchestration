@@ -44,9 +44,11 @@ before ending your turn; Relay does not forward their completions.
 
 Choose every subagent's model explicitly. Never rely on a default,
 inherit the parent's model, or use a spawn mode that forces inheritance.
-Set supported, authorized reasoning effort explicitly as well. If you
-select GPT-6 Luna, use Max unless the user overrides it. Before spawning,
-announce the purpose and requested model and effort.
+Set supported, authorized reasoning effort explicitly as well. Follow the
+settings in the brief and use
+[Direct's model guide](../direct/SKILL.md#choose-the-model-for-the-work)
+for any model or effort left to your judgment.
+Before spawning, announce the purpose and requested model and effort.
 
 If explicit model selection is unavailable or restricted, ask the user
 directly for guidance on this settings decision. Use

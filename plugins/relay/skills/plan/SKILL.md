@@ -211,8 +211,8 @@ Unless the user overrides them, use:
 
 | Role | Model | Reasoning effort |
 | --- | --- | --- |
-| Outcome and plan completeness | GPT-6.1 Sol | Xhigh |
-| Avoidable execution restrictions | GPT-6.1 Sol | Medium |
+| Outcome and plan completeness | GPT-6.2 Sol | Xhigh |
+| Avoidable execution restrictions | GPT-6.2 Sol | Medium |
 
 Announce each reviewer's purpose, model and effort. Set both selectors
 explicitly and use fresh context; never inherit the parent settings.

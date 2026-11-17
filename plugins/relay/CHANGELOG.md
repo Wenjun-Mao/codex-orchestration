@@ -1,3 +1,8 @@
+# 0.5.3
+
+- Use GPT-6.2 Sol for coding and plan reviews, GPT-6.1 Terra for visual work
+  and prose, and GPT-6 Luna / Max for focused, repeatable assignments.
+
 # 0.5.2
 
 - Increase icon weight for small menus and use the same cyan in both composer

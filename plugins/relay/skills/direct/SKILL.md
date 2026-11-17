@@ -56,20 +56,22 @@ same time.
 ## Choose the Model for the Work
 
 When authorized to choose, use this guide for coordinators, executors
-and native subagents. Choose by difficulty. Explicit user choices and
-settings required by a named skill role take precedence.
+and native subagents. Choose by the work and the judgment it needs.
+Explicit user choices and settings required by a named skill role take
+precedence.
 
 | Work | Model / reasoning |
 | --- | --- |
-| Clear, bounded implementation, routine coordination or focused verification | GPT-6 Luna / Max |
-| Challenging coding, integration or coordination with meaningful ambiguity | GPT-6.1 Sol / Medium |
-| Difficult architecture, high-risk decisions or persistent reasoning failures | GPT-6.1 Sol / High |
+| Coding, integration, planning and general coordination (default) | GPT-6.2 Sol / Medium |
+| Difficult architecture, high-risk decisions or persistent reasoning failures | GPT-6.2 Sol / High |
+| Interpreting screenshots, checking a UI, or drafting prose | GPT-6.1 Terra / Medium |
+| Focused, repeatable work such as extracting known fields or running a well-defined check | GPT-6 Luna / Max |
 
-GPT-6.1 Sol also allows Xhigh. Choose the appropriate settings directly;
-there is no required escalation ladder. Reserve Astra for demonstrated
-need or a user request. Escalate when reasoning is inadequate, rather
-than to compensate for missing permissions, tools or inputs. Avoid
-repeated cheap attempts that make no progress.
+Choose the appropriate effort directly, including Xhigh for Sol when deeper
+reasoning is warranted. Resolve missing permissions, tools or inputs directly.
+If Luna unexpectedly disappears from the dispatch
+selector, recheck it. A Codex restart has restored it in prior sessions.
+If it is still missing, surface the issue before substituting a model.
 
 Apply the choice through the native dispatch fields, not merely in the
 brief or Relay registry. Set each supported, authorized selector
