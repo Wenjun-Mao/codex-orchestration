@@ -1,6 +1,6 @@
 {
   "name": "relay",
-  "version": "0.5.3",
+  "version": "0.5.4",
   "private": true,
   "description": "Same-host worker-to-manager report forwarding",
   "type": "module",

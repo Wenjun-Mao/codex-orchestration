@@ -67,7 +67,7 @@ precedence.
 | Interpreting screenshots, checking a UI, or drafting prose | GPT-6.1 Terra / Medium |
 | Focused, repeatable work such as extracting known fields or running a well-defined check | GPT-6 Luna / Max |
 
-Choose the appropriate effort directly, including Xhigh for Sol when deeper
+Choose the appropriate effort directly, including Xhigh or Max for Sol when deeper
 reasoning is warranted. Resolve missing permissions, tools or inputs directly.
 If Luna unexpectedly disappears from the dispatch
 selector, recheck it. A Codex restart has restored it in prior sessions.

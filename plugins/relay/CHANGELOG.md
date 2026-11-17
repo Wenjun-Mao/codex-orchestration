@@ -1,3 +1,7 @@
+# 0.5.4
+
+- Include Max alongside Xhigh in Direct's guidance for Sol.
+
 # 0.5.3
 
 - Use GPT-6.2 Sol for coding and plan reviews, GPT-6.1 Terra for visual work
